@@ -1,0 +1,126 @@
+{
+  "common": {
+    "or": "ou",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "back": "Retour",
+    "backToHome": "Retour à l'accueil",
+    "goHome": "Aller à l'accueil",
+    "signOut": "Se déconnecter"
+  },
+  "locale": {
+    "label": "Langue",
+    "fr": "Français",
+    "en": "English",
+    "nl": "Nederlands"
+  },
+  "auth": {
+    "login": {
+      "title": "Connexion",
+      "description": "Connectez-vous à votre caisse avec votre email et mot de passe.",
+      "email": "Email",
+      "password": "Mot de passe",
+      "submit": "Se connecter",
+      "submitting": "Connexion…",
+      "noAccount": "Première visite ?",
+      "createAccount": "Créer un compte",
+      "passkeyButton": "Se connecter avec une passkey",
+      "passkeyWaiting": "En attente de la passkey…",
+      "passkeyEmailRequired": "Saisissez votre email pour vous connecter avec une passkey."
+    },
+    "signup": {
+      "title": "Créer un compte",
+      "description": "Inscrivez-vous avec votre email pour commencer.",
+      "email": "Email",
+      "password": "Mot de passe",
+      "submit": "Créer le compte",
+      "submitting": "Création du compte…",
+      "haveAccount": "Vous avez déjà un compte ?",
+      "signIn": "Se connecter",
+      "verifyEmail": "Consultez votre email pour confirmer votre compte, puis revenez ici pour vous connecter."
+    },
+    "errors": {
+      "emailInvalid": "Saisissez une adresse email valide.",
+      "passwordRequired": "Le mot de passe est requis.",
+      "passwordMin": "Le mot de passe doit contenir au moins {min} caractères.",
+      "invalidCredentials": "Identifiants invalides.",
+      "invalidInput": "Saisie invalide.",
+      "passkeyStartFailed": "Impossible de démarrer la connexion par passkey.",
+      "passkeyVerifyFailed": "Impossible de vérifier la réponse de la passkey.",
+      "signInFailed": "Échec de la connexion.",
+      "sessionExpired": "Session expirée. Réessayez.",
+      "establishSessionFailed": "Impossible d'établir la session."
+    }
+  },
+  "funds": {
+    "yourFunds": {
+      "title": "Vos caisses",
+      "description": "Choisissez une caisse à utiliser, ou créez-en une nouvelle.",
+      "emptyTitle": "Aucune caisse pour le moment",
+      "emptyDescription": "Créez votre première caisse pour commencer.",
+      "create": "Créer une caisse",
+      "createAnother": "Créer une autre caisse"
+    },
+    "create": {
+      "title": "Créer une caisse",
+      "description": "Vous obtiendrez un sous-domaine gratuit en <code>.lacaisse.eu</code>. Les domaines personnalisés sont disponibles avec les forfaits payants.",
+      "name": "Nom",
+      "subdomain": "Sous-domaine",
+      "submit": "Créer la caisse",
+      "submitting": "Création…",
+      "errors": {
+        "nameMin": "Le nom doit contenir au moins {min} caractères.",
+        "subdomainMin": "Le sous-domaine doit contenir au moins {min} caractères.",
+        "subdomainMax": "Le sous-domaine doit contenir au plus {max} caractères.",
+        "subdomainFormat": "Le sous-domaine peut contenir uniquement des lettres minuscules, chiffres et tirets.",
+        "subdomainReserved": "Ce sous-domaine est réservé. Choisissez-en un autre.",
+        "subdomainTaken": "Ce sous-domaine est déjà utilisé."
+      }
+    },
+    "dashboard": {
+      "comingSoon": "Tableau de bord — bientôt disponible."
+    },
+    "notFound": {
+      "title": "La caisse que vous cherchez n'existe pas",
+      "description": "Aucune caisse n'est enregistrée à <code>{domain}</code>. Elle a peut-être été renommée, supprimée, ou le lien est incorrect."
+    }
+  },
+  "account": {
+    "passkeys": {
+      "title": "Passkeys",
+      "description": "Connectez-vous sans mot de passe avec une empreinte, un scan facial, ou une clé de sécurité. Les passkeys enregistrées ici fonctionnent sur toutes vos caisses.",
+      "empty": "Vous n'avez pas encore de passkey.",
+      "countOne": "{count} passkey enregistrée.",
+      "countOther": "{count} passkeys enregistrées.",
+      "addButton": "Ajouter une passkey",
+      "registerTitle": "Enregistrer une passkey",
+      "registerDescription": "Donnez un nom à cette passkey pour la reconnaître plus tard.",
+      "nickname": "Nom",
+      "nicknamePlaceholder": "ex: iPhone Touch ID",
+      "registerSubmit": "Continuer",
+      "registerWaiting": "En attente de l'authentificateur…",
+      "deleteTitle": "Supprimer cette passkey ?",
+      "deleteDescriptionNamed": "Vous ne pourrez plus vous connecter avec <strong>{name}</strong>. Cette action est irréversible.",
+      "deleteDescriptionUnnamed": "Vous ne pourrez plus vous connecter avec cette passkey. Cette action est irréversible.",
+      "deleteConfirm": "Supprimer la passkey",
+      "deleting": "Suppression…",
+      "rowUnnamed": "Passkey sans nom",
+      "rowSynced": "Synchronisée",
+      "rowDeviceBound": "Liée à l'appareil",
+      "rowAdded": "Ajoutée le {date}",
+      "rowLastUsed": "Dernière utilisation : {date}",
+      "deleteAriaLabel": "Supprimer la passkey",
+      "errors": {
+        "notFound": "Passkey introuvable.",
+        "notAllowed": "Action non autorisée.",
+        "generic": "Une erreur s'est produite."
+      }
+    }
+  },
+  "errors": {
+    "notFoundTitle": "Page introuvable",
+    "notFoundDescription": "La page que vous cherchez n'existe pas.",
+    "unauthorizedTitle": "Vous n'avez pas accès à cette page",
+    "unauthorizedDescription": "Vous êtes connecté mais votre compte n'a pas les permissions requises pour cette ressource. Si vous pensez qu'il s'agit d'une erreur, contactez le propriétaire de la caisse ou un administrateur."
+  }
+}

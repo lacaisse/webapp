@@ -4,12 +4,25 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* =============================================================================
+ * Design system tokens
+ *
+ * See docs/design-system.md for the full spec.
+ *
+ * Sections marked LOCKED are shared across all tenants. Sections marked
+ * TENANT-FLEXIBLE are overridden at runtime by services/tenant/theme.ts via
+ * an inline <style> block in the root layout.
+ * ============================================================================= */
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+
   --font-sans: var(--font-sans);
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-display: var(--font-display);
+  --font-heading: var(--font-display);
+
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -18,15 +31,26 @@
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
+
   --color-chart-5: var(--chart-5);
   --color-chart-4: var(--chart-4);
   --color-chart-3: var(--chart-3);
   --color-chart-2: var(--chart-2);
   --color-chart-1: var(--chart-1);
+
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
+
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -39,6 +63,7 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -46,75 +71,114 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 400ms;
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  /* --- LOCKED: warm neutral palette ----------------------------------------
+   * Hue ≈ 75°, very low chroma. Even "white" has a faint cream undertone. */
+  --background: oklch(0.99 0.005 75);
+  --foreground: oklch(0.18 0.012 75);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.18 0.012 75);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  --popover-foreground: oklch(0.18 0.012 75);
+  --secondary: oklch(0.96 0.008 75);
+  --secondary-foreground: oklch(0.18 0.012 75);
+  --muted: oklch(0.96 0.008 75);
+  --muted-foreground: oklch(0.50 0.018 75);
+  --accent: oklch(0.96 0.008 75);
+  --accent-foreground: oklch(0.18 0.012 75);
+  --border: oklch(0.91 0.012 75);
+  --input: oklch(0.91 0.012 75);
+
+  /* --- LOCKED: semantic colors -------------------------------------------- */
+  --destructive: oklch(0.55 0.20 27);
+  --destructive-foreground: oklch(0.99 0 0);
+  --success: oklch(0.55 0.13 145);
+  --success-foreground: oklch(0.99 0 0);
+  --warning: oklch(0.72 0.14 75);
+  --warning-foreground: oklch(0.18 0.012 75);
+  --info: oklch(0.58 0.12 235);
+  --info-foreground: oklch(0.99 0 0);
+
+  /* --- TENANT-FLEXIBLE: brand color --------------------------------------
+   * Defaults to a warm terracotta. Overridden per-tenant by
+   * renderTenantThemeStyle() in services/tenant/theme.ts. */
+  --primary: oklch(0.58 0.13 35);
+  --primary-foreground: oklch(0.99 0 0);
+  --ring: var(--primary);
+
+  /* --- LOCKED: charts (brand-led, with semantic accents) ------------------ */
+  --chart-1: var(--primary);
+  --chart-2: oklch(0.55 0.13 145);
+  --chart-3: oklch(0.72 0.14 75);
+  --chart-4: oklch(0.58 0.12 235);
+  --chart-5: oklch(0.50 0.018 75);
+
+  /* --- LOCKED: radii ----------------------------------------------------- */
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+
+  /* --- LOCKED: sidebar (inherits from neutrals + brand) ------------------ */
+  --sidebar: oklch(0.97 0.008 75);
+  --sidebar-foreground: oklch(0.18 0.012 75);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: oklch(0.93 0.012 75);
+  --sidebar-accent-foreground: oklch(0.18 0.012 75);
+  --sidebar-border: oklch(0.91 0.012 75);
+  --sidebar-ring: var(--primary);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
+  /* --- LOCKED: warm neutral palette, dark mode --------------------------- */
+  --background: oklch(0.16 0.008 75);
+  --foreground: oklch(0.96 0.005 75);
+  --card: oklch(0.20 0.010 75);
+  --card-foreground: oklch(0.96 0.005 75);
+  --popover: oklch(0.20 0.010 75);
+  --popover-foreground: oklch(0.96 0.005 75);
+  --secondary: oklch(0.26 0.012 75);
+  --secondary-foreground: oklch(0.96 0.005 75);
+  --muted: oklch(0.24 0.012 75);
+  --muted-foreground: oklch(0.68 0.015 75);
+  --accent: oklch(0.26 0.012 75);
+  --accent-foreground: oklch(0.96 0.005 75);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
+
+  /* --- LOCKED: semantic colors, dark mode -------------------------------- */
+  --destructive: oklch(0.65 0.20 27);
+  --destructive-foreground: oklch(0.99 0 0);
+  --success: oklch(0.65 0.13 145);
+  --success-foreground: oklch(0.99 0 0);
+  --warning: oklch(0.78 0.14 75);
+  --warning-foreground: oklch(0.18 0.012 75);
+  --info: oklch(0.68 0.12 235);
+  --info-foreground: oklch(0.99 0 0);
+
+  /* --primary / --primary-foreground inherit from :root unless the tenant
+     supplies a primaryDark / primaryForegroundDark override. */
+
+  --chart-1: var(--primary);
+  --chart-2: oklch(0.65 0.13 145);
+  --chart-3: oklch(0.78 0.14 75);
+  --chart-4: oklch(0.68 0.12 235);
+  --chart-5: oklch(0.68 0.015 75);
+
+  --sidebar: oklch(0.18 0.010 75);
+  --sidebar-foreground: oklch(0.96 0.005 75);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: oklch(0.24 0.012 75);
+  --sidebar-accent-foreground: oklch(0.96 0.005 75);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-ring: var(--primary);
 }
 
 @layer base {
@@ -126,5 +190,17 @@
   }
   html {
     @apply font-sans;
+  }
+  h1, h2, h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+  }
+  /* Display/balance numerals — use on big totals to get Fraunces' tabular
+     warmth. Opt-in via the .display-num class. */
+  .display-num {
+    font-family: var(--font-display);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "ss01";
+    letter-spacing: -0.02em;
   }
 }

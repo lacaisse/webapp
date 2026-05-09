@@ -4,12 +4,108 @@
 
 generator client {
   provider = "prisma-client"
-  // Prisma 7's `prisma-client` generator emits ESM TypeScript source. Output
-  // goes inside the project (not node_modules) so the import resolves and
-  // TypeScript can check it. Generated files are gitignored.
+  // Output inside the project (gitignored) — see AGENTS.md for the rationale.
   output   = "../services/db/generated"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+// =============================================================================
+// Roles
+// =============================================================================
+// GlobalRole = platform-level. Set via SQL or an admin tool.
+// FundRole   = per-fund. Lives on FundMember.
+//
+// Fund role hierarchy (high → low): OWNER > ADMIN > MEMBER > VIEWER.
+// Authorization comparisons live in services/auth/dal.ts.
+
+enum GlobalRole {
+  USER
+  ADMIN
+}
+
+enum FundRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+// =============================================================================
+// Core
+// =============================================================================
+//
+// "Fund" (en) / "caisse" (fr) is the tenant unit of La Caisse. Each fund has
+// exactly one canonical `domain` — for free funds it's a subdomain of the
+// platform apex (e.g. `acme.lacaisse.eu`); paid funds can replace it with
+// their own (e.g. `funds.acme.com`). There is no separate slug concept; the
+// host IS the identity.
+
+model User {
+  // Mirrors Supabase auth.users.id (uuid). No FK across schemas — kept in sync
+  // by the JIT upsert in services/auth/dal.ts#getCurrentUser.
+  id         String     @id @db.Uuid
+  email      String     @unique
+  name       String?
+  globalRole GlobalRole @default(USER)
+
+  memberships         FundMember[]
+  webauthnCredentials WebAuthnCredential[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Fund {
+  id     String @id @default(cuid())
+  domain String @unique // full hostname: "acme.lacaisse.eu" or "funds.acme.com"
+  name   String
+
+  members FundMember[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model FundMember {
+  id     String   @id @default(cuid())
+  userId String   @db.Uuid
+  fundId String
+  role   FundRole @default(MEMBER)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fund Fund @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, fundId])
+  @@index([fundId])
+}
+
+// =============================================================================
+// Passkeys (self-implemented since Supabase Auth has no native WebAuthn)
+// =============================================================================
+// Populated by /api/webauthn/register/verify; consulted by
+// /api/webauthn/authenticate/{options,verify}. See services/auth/webauthn.ts.
+
+model WebAuthnCredential {
+  id           String   @id @default(cuid())
+  userId       String   @db.Uuid
+  credentialId String   @unique // base64url-encoded credential ID returned by the authenticator
+  publicKey    Bytes
+  counter      BigInt   @default(0)
+  transports   String[] // 'usb' | 'nfc' | 'ble' | 'internal' | 'hybrid'
+  deviceType   String // 'singleDevice' | 'multiDevice'
+  backedUp     Boolean
+  nickname     String? // user-friendly label (e.g. "iPhone Touch ID")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+
+  @@index([userId])
 }

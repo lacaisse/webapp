@@ -47,6 +47,51 @@ These are non-obvious facts about the Next 16 / Prisma 7 stack that bit us durin
 - **Supavisor pooler compatibility**: `@prisma/adapter-pg` disables prepared statement caching by default, so `DATABASE_URL` can point at Supabase's transaction-mode pooler (port 6543) without extra config.
 
 ### Auth (Supabase + DAL)
-- The DAL (`services/auth/dal.ts`) wraps `getCurrentUser`, `requireUser`, `requireAdmin` in React's `cache()` so a single render pass only hits Supabase once.
-- **Roles live in `app_metadata.role`**, not `user_metadata`. `user_metadata` is user-writable and unsafe for authorization. Setting `app_metadata` requires the service role key.
+- The DAL (`services/auth/dal.ts`) wraps `getCurrentUser`, `requireUser`, `requireAdmin`, `requireFundRole` in React's `cache()` so a single render pass only hits Supabase/Prisma once.
 - `proxy.ts` calls `supabase.auth.getUser()` on every request — this is the only way to refresh tokens. Do not move code between `createServerClient` and `getUser()` in that file.
+- For elevated operations (passkey session bridge, setting `app_metadata`), use `services/auth/admin.ts` — it builds a client from `SUPABASE_SERVICE_ROLE_KEY`. Server-only.
+
+### Domain language: "fund" / "caisse"
+- The tenant unit is a **Fund** in code, **"caisse"** in French UI strings, **"fund"** in English UI strings. The Prisma model is `Fund`, the join model is `FundMember`, the per-fund role is `FundRole`. Service folder is `services/fund/`.
+- **There is no "slug" concept** — `Fund.domain` stores the full canonical hostname (e.g. `acme.lacaisse.eu` for free funds, `funds.acme.com` for paid custom domains). One field, one identity.
+- The create-fund form takes a "subdomain" input from the user (just the prefix, e.g. `acme`) and the server constructs `<subdomain>.<APP_DOMAIN>` before persisting. Custom-domain UX is TBD.
+
+### Roles & multi-tenancy
+- **`User.globalRole`** (`USER` | `ADMIN`) — platform-level. `requireAdmin()` reads this. Set via SQL or an admin tool. **Not** stored in Supabase metadata; lives in our Prisma User table.
+- **`FundMember.role`** (`OWNER` > `ADMIN` > `MEMBER` > `VIEWER`) — per-fund. Use `requireFundRole(minRole)` for any fund-scoped resource. Returns `{ user, fund, membership }`.
+- **JIT sync**: `getCurrentUser()` upserts the Supabase auth user into `User` on first read each render. There is no DB trigger or webhook — Supabase auth.users is canonical for identity, our Prisma User is canonical for app-level data (role, name, memberships).
+- The `User.id` is a uuid that **mirrors `auth.users.id`** — no FK across schemas.
+
+### Fund routing (host = identity)
+- Production: `<sub>.lacaisse.eu` (free) or any custom domain (paid). Dev: `<sub>.localhost:3000` (modern browsers resolve `*.localhost` to 127.0.0.1 — no `/etc/hosts` setup needed).
+- `proxy.ts` does ONE lookup: `Fund.findUnique({ where: { domain: host } })`. There's no subdomain extraction; the host IS the fund identity. Reserved infra subdomains (`www`, `api`, `admin`, `app`) short-circuit before the DB hit.
+- proxy.ts always **strips inbound** `x-fund-domain` / `x-fund-id` so a client can't spoof tenancy. Sets them on a successful lookup.
+- App code reads the fund via `services/fund/server.ts` (`getCurrentFund`, `getCurrentFundDomain`, `requireCurrentFund`, `getFundUrl`, `getApexUrl`). **Never re-parse the host.**
+- `APP_DOMAIN` env var configures the apex (`localhost` in dev, `lacaisse.eu` in prod). `NEXT_PUBLIC_APP_DOMAIN` is the client-visible mirror (the create-fund form uses it for the suffix display).
+- **Apex page logic**: `app/page.tsx` checks `getCurrentFundDomain()` first. If a domain header is set → require the fund (notFound on miss). If no domain → render the user's fund picker.
+- **Cross-host redirects**: `redirect("/some-path")` stays on the current host. Use `redirect(getApexUrl("/some-path"))` when redirecting from a fund subdomain back to apex (e.g. `/account/*` pages).
+
+### Forms (RHF + Zod + Server Actions)
+- Pattern: client component uses `useForm` + `zodResolver`, calls a server action from inside `handleSubmit` via `useTransition`. Server action re-validates with the same Zod schema (don't trust the client). See `app/(auth)/login/login-form.tsx`.
+- The server action returns `{ error: string } | { ok: true; ... }` on failure/info, or **doesn't return** (calls `redirect()`) on success.
+- Schemas live in a non-`"use server"` file so they can be imported by both client and server.
+- ⚠️ **`"use server"` files can only export async functions.** Exporting constants, types, schemas, or anything else gets silently transformed into a server-reference proxy. Build passes, runtime explodes the moment a client tries to use it (`X.map is not a function`, etc.). Co-locate non-action exports in a sibling `config.ts` / `schema.ts` and import from there.
+- **Schema error messages are i18n keys** (e.g. `"auth.errors.passwordMin"`), not human strings. Forms call `tRoot(message as never, { min: ... } as never)` to resolve them. Server actions translate via `getTranslations()` before returning.
+
+### Internationalization (next-intl)
+- Cookie-based locale (no URL prefix). Default locale: **`fr`**.
+- Messages live in `messages/fr.json` + `messages/en.json`. Add a new locale = add a JSON file + extend `SUPPORTED_LOCALES` in `services/i18n/locale.ts`.
+- Server: `await getTranslations("namespace")`. Client: `useTranslations("namespace")`. Never call hooks inside JSX — assign at the top of the component.
+- For dynamic key lookup (e.g. resolving a message that came from a Zod schema), get a "root" `t` via `useTranslations()` (no namespace) and pass `key as never` to bypass the strict key typing.
+- Locale switcher: `components/locale-switcher.tsx`, embedded in the auth layout footer.
+
+### Passkeys (WebAuthn)
+- **Supabase has no native WebAuthn** — we self-implement with `@simplewebauthn/{server,browser}`. Credentials live in `WebAuthnCredential` (Prisma).
+- **rpID** = `APP_DOMAIN` (the apex), so a passkey registered on `acme.lacaisse.eu` works on every fund subdomain. See `services/auth/webauthn.ts`.
+- **Session bridge**: after passkey verify, the route handler calls `auth.admin.generateLink({ type: 'magiclink', email })`, grabs `properties.email_otp`, and immediately calls `supabase.auth.verifyOtp({ ..., type: 'email' })` on the SSR client — which writes the Supabase session cookies. Requires `SUPABASE_SERVICE_ROLE_KEY`.
+- **Challenges** are stored in HttpOnly `wa_reg_challenge` / `wa_auth_challenge` cookies (5 min TTL, SameSite=Strict). Cleared after one use.
+- **Uint8Array typing trick**: simplewebauthn defines `Uint8Array_ = ReturnType<Uint8Array['slice']>` to dodge TS 5.7+ ArrayBuffer typing. Pass `bytes.slice()` rather than raw `bytes` when in doubt.
+
+### shadcn base-nova vs Radix shadcn
+- **No `asChild` prop on Button** (and other primitives). To style a `<Link>` like a button, use the exported `buttonVariants({ variant })` as a className. For dialog triggers and similar, Base UI primitives accept a **`render` prop** (e.g. `<DialogTrigger render={<Button>...</Button>} />`).
+- The `form` component (Form/FormField/FormItem/FormLabel/FormMessage) **does not exist** in base-nova. Compose RHF directly with `Input`/`Label`/`Alert` — see the auth forms for the canonical pattern.

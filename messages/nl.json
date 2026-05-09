@@ -1,0 +1,126 @@
+{
+  "common": {
+    "or": "of",
+    "cancel": "Annuleren",
+    "delete": "Verwijderen",
+    "back": "Terug",
+    "backToHome": "Terug naar home",
+    "goHome": "Naar home",
+    "signOut": "Uitloggen"
+  },
+  "locale": {
+    "label": "Taal",
+    "fr": "Français",
+    "en": "English",
+    "nl": "Nederlands"
+  },
+  "auth": {
+    "login": {
+      "title": "Inloggen",
+      "description": "Voer uw e-mail en wachtwoord in om toegang te krijgen tot uw fonds.",
+      "email": "E-mail",
+      "password": "Wachtwoord",
+      "submit": "Inloggen",
+      "submitting": "Inloggen…",
+      "noAccount": "Nieuw hier?",
+      "createAccount": "Account aanmaken",
+      "passkeyButton": "Inloggen met passkey",
+      "passkeyWaiting": "Wachten op passkey…",
+      "passkeyEmailRequired": "Voer uw e-mail in om met een passkey in te loggen."
+    },
+    "signup": {
+      "title": "Account aanmaken",
+      "description": "Registreer met uw e-mail om te beginnen.",
+      "email": "E-mail",
+      "password": "Wachtwoord",
+      "submit": "Account aanmaken",
+      "submitting": "Account aanmaken…",
+      "haveAccount": "Heeft u al een account?",
+      "signIn": "Inloggen",
+      "verifyEmail": "Controleer uw e-mail om uw account te bevestigen, en kom dan terug om in te loggen."
+    },
+    "errors": {
+      "emailInvalid": "Voer een geldig e-mailadres in.",
+      "passwordRequired": "Wachtwoord is verplicht.",
+      "passwordMin": "Het wachtwoord moet minstens {min} tekens lang zijn.",
+      "invalidCredentials": "Ongeldige inloggegevens.",
+      "invalidInput": "Ongeldige invoer.",
+      "passkeyStartFailed": "Kan passkey-inloggen niet starten.",
+      "passkeyVerifyFailed": "Kan de passkey-respons niet verifiëren.",
+      "signInFailed": "Inloggen mislukt.",
+      "sessionExpired": "Sessie verlopen. Probeer opnieuw.",
+      "establishSessionFailed": "Kan sessie niet tot stand brengen."
+    }
+  },
+  "funds": {
+    "yourFunds": {
+      "title": "Uw fondsen",
+      "description": "Kies een fonds om te gebruiken, of maak een nieuw aan.",
+      "emptyTitle": "Nog geen fondsen",
+      "emptyDescription": "Maak uw eerste fonds aan om te beginnen.",
+      "create": "Fonds aanmaken",
+      "createAnother": "Nog een fonds aanmaken"
+    },
+    "create": {
+      "title": "Fonds aanmaken",
+      "description": "U krijgt een gratis subdomein op <code>.lacaisse.eu</code>. Aangepaste domeinen zijn beschikbaar met betaalde abonnementen.",
+      "name": "Naam",
+      "subdomain": "Subdomein",
+      "submit": "Fonds aanmaken",
+      "submitting": "Aanmaken…",
+      "errors": {
+        "nameMin": "De naam moet minstens {min} tekens lang zijn.",
+        "subdomainMin": "Het subdomein moet minstens {min} tekens lang zijn.",
+        "subdomainMax": "Het subdomein mag maximaal {max} tekens lang zijn.",
+        "subdomainFormat": "Het subdomein mag alleen kleine letters, cijfers en streepjes bevatten.",
+        "subdomainReserved": "Dit subdomein is gereserveerd. Kies een ander.",
+        "subdomainTaken": "Dit subdomein is al in gebruik."
+      }
+    },
+    "dashboard": {
+      "comingSoon": "Fondsdashboard — binnenkort beschikbaar."
+    },
+    "notFound": {
+      "title": "Dit fonds bestaat niet",
+      "description": "Er is geen fonds geregistreerd op <code>{domain}</code>. Het is mogelijk hernoemd, verwijderd, of de link is onjuist."
+    }
+  },
+  "account": {
+    "passkeys": {
+      "title": "Passkeys",
+      "description": "Log in zonder wachtwoord met een vingerafdruk, gezichtsscan of beveiligingssleutel. Passkeys die u hier registreert werken op alle fondsen.",
+      "empty": "U heeft nog geen passkeys.",
+      "countOne": "{count} passkey geregistreerd.",
+      "countOther": "{count} passkeys geregistreerd.",
+      "addButton": "Passkey toevoegen",
+      "registerTitle": "Passkey registreren",
+      "registerDescription": "Geef deze passkey een naam zodat u hem later kunt herkennen.",
+      "nickname": "Naam",
+      "nicknamePlaceholder": "bv. iPhone Touch ID",
+      "registerSubmit": "Doorgaan",
+      "registerWaiting": "Wachten op authenticator…",
+      "deleteTitle": "Deze passkey verwijderen?",
+      "deleteDescriptionNamed": "U kunt niet meer inloggen met <strong>{name}</strong>. Deze actie is onomkeerbaar.",
+      "deleteDescriptionUnnamed": "U kunt niet meer inloggen met deze passkey. Deze actie is onomkeerbaar.",
+      "deleteConfirm": "Passkey verwijderen",
+      "deleting": "Verwijderen…",
+      "rowUnnamed": "Naamloze passkey",
+      "rowSynced": "Gesynchroniseerd",
+      "rowDeviceBound": "Aan apparaat gekoppeld",
+      "rowAdded": "Toegevoegd op {date}",
+      "rowLastUsed": "Laatst gebruikt: {date}",
+      "deleteAriaLabel": "Passkey verwijderen",
+      "errors": {
+        "notFound": "Passkey niet gevonden.",
+        "notAllowed": "Niet toegestaan.",
+        "generic": "Er is iets misgegaan."
+      }
+    }
+  },
+  "errors": {
+    "notFoundTitle": "Pagina niet gevonden",
+    "notFoundDescription": "De pagina die u zoekt bestaat niet.",
+    "unauthorizedTitle": "U heeft geen toegang tot deze pagina",
+    "unauthorizedDescription": "U bent ingelogd, maar uw account heeft niet de vereiste machtigingen voor deze bron. Als u denkt dat dit een vergissing is, neem contact op met de fondseigenaar of een platformbeheerder."
+  }
+}

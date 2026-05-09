@@ -1,0 +1,126 @@
+{
+  "common": {
+    "or": "or",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "back": "Back",
+    "backToHome": "Back to home",
+    "goHome": "Go home",
+    "signOut": "Sign out"
+  },
+  "locale": {
+    "label": "Language",
+    "fr": "Français",
+    "en": "English",
+    "nl": "Nederlands"
+  },
+  "auth": {
+    "login": {
+      "title": "Sign in",
+      "description": "Enter your email and password to access your fund.",
+      "email": "Email",
+      "password": "Password",
+      "submit": "Sign in",
+      "submitting": "Signing in…",
+      "noAccount": "New here?",
+      "createAccount": "Create an account",
+      "passkeyButton": "Sign in with a passkey",
+      "passkeyWaiting": "Waiting for passkey…",
+      "passkeyEmailRequired": "Enter your email to sign in with a passkey."
+    },
+    "signup": {
+      "title": "Create an account",
+      "description": "Sign up with your email to get started.",
+      "email": "Email",
+      "password": "Password",
+      "submit": "Create account",
+      "submitting": "Creating account…",
+      "haveAccount": "Already have an account?",
+      "signIn": "Sign in",
+      "verifyEmail": "Check your email to confirm your account, then return here to sign in."
+    },
+    "errors": {
+      "emailInvalid": "Enter a valid email address.",
+      "passwordRequired": "Password is required.",
+      "passwordMin": "Password must be at least {min} characters.",
+      "invalidCredentials": "Invalid credentials.",
+      "invalidInput": "Invalid input.",
+      "passkeyStartFailed": "Could not start passkey sign-in.",
+      "passkeyVerifyFailed": "Could not verify the passkey response.",
+      "signInFailed": "Sign-in failed.",
+      "sessionExpired": "Sign-in session expired. Try again.",
+      "establishSessionFailed": "Could not establish session."
+    }
+  },
+  "funds": {
+    "yourFunds": {
+      "title": "Your funds",
+      "description": "Choose a fund to access, or create a new one.",
+      "emptyTitle": "No funds yet",
+      "emptyDescription": "Create your first fund to get started.",
+      "create": "Create a fund",
+      "createAnother": "Create another fund"
+    },
+    "create": {
+      "title": "Create a fund",
+      "description": "You'll get a free <code>.lacaisse.eu</code> subdomain. Custom domains are available on paid plans.",
+      "name": "Name",
+      "subdomain": "Subdomain",
+      "submit": "Create fund",
+      "submitting": "Creating…",
+      "errors": {
+        "nameMin": "Name must be at least {min} characters.",
+        "subdomainMin": "Subdomain must be at least {min} characters.",
+        "subdomainMax": "Subdomain must be at most {max} characters.",
+        "subdomainFormat": "Subdomain may only contain lowercase letters, numbers, and hyphens.",
+        "subdomainReserved": "This subdomain is reserved. Please choose another.",
+        "subdomainTaken": "This subdomain is already taken."
+      }
+    },
+    "dashboard": {
+      "comingSoon": "Fund dashboard — coming soon."
+    },
+    "notFound": {
+      "title": "This fund doesn't exist",
+      "description": "No fund is registered at <code>{domain}</code>. It may have been renamed, deleted, or the link may be wrong."
+    }
+  },
+  "account": {
+    "passkeys": {
+      "title": "Passkeys",
+      "description": "Sign in without a password using a fingerprint, face scan, or security key. Passkeys you register here work on every fund subdomain.",
+      "empty": "You don't have any passkeys yet.",
+      "countOne": "{count} passkey registered.",
+      "countOther": "{count} passkeys registered.",
+      "addButton": "Add a passkey",
+      "registerTitle": "Register a passkey",
+      "registerDescription": "Give this passkey a name so you can recognize it later.",
+      "nickname": "Nickname",
+      "nicknamePlaceholder": "e.g. iPhone Touch ID",
+      "registerSubmit": "Continue",
+      "registerWaiting": "Waiting for authenticator…",
+      "deleteTitle": "Delete this passkey?",
+      "deleteDescriptionNamed": "You won't be able to sign in with <strong>{name}</strong> anymore. This can't be undone.",
+      "deleteDescriptionUnnamed": "You won't be able to sign in with this passkey anymore. This can't be undone.",
+      "deleteConfirm": "Delete passkey",
+      "deleting": "Deleting…",
+      "rowUnnamed": "Unnamed passkey",
+      "rowSynced": "Synced",
+      "rowDeviceBound": "Device-bound",
+      "rowAdded": "Added {date}",
+      "rowLastUsed": "Last used {date}",
+      "deleteAriaLabel": "Delete passkey",
+      "errors": {
+        "notFound": "Passkey not found.",
+        "notAllowed": "Not allowed.",
+        "generic": "Something went wrong."
+      }
+    }
+  },
+  "errors": {
+    "notFoundTitle": "Page not found",
+    "notFoundDescription": "The page you're looking for doesn't exist.",
+    "unauthorizedTitle": "You don't have access to this page",
+    "unauthorizedDescription": "Your account is signed in but lacks the permissions required for this resource. If you think this is a mistake, contact a fund owner or platform admin."
+  }
+}
