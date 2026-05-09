@@ -1,0 +1,15 @@
+// Prisma 7 — uses the new ESM `prisma-client` generator + a Driver Adapter
+// (PrismaClient is instantiated with `@prisma/adapter-pg`, see services/db/prisma.ts).
+// Datasource URL is read from prisma.config.ts (DIRECT_URL for CLI/migrations).
+
+generator client {
+  provider = "prisma-client"
+  // Prisma 7's `prisma-client` generator emits ESM TypeScript source. Output
+  // goes inside the project (not node_modules) so the import resolves and
+  // TypeScript can check it. Generated files are gitignored.
+  output   = "../services/db/generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
