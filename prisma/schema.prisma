@@ -37,7 +37,7 @@ enum FundRole {
 // Core
 // =============================================================================
 //
-// "Fund" (en) / "caisse" (fr) is the tenant unit of La Caisse. Each fund has
+// "Fund" (en) / "caisse" (fr) is the core unit of La Caisse. Each fund has
 // exactly one canonical `domain` — for free funds it's a subdomain of the
 // platform apex (e.g. `acme.lacaisse.eu`); paid funds can replace it with
 // their own (e.g. `funds.acme.com`). There is no separate slug concept; the
@@ -83,6 +83,27 @@ model FundMember {
 
   @@unique([userId, fundId])
   @@index([fundId])
+}
+
+// =============================================================================
+// Cross-host login exchange (Google-style auth handoff)
+// =============================================================================
+// Auth lives on `auth.lacaisse.eu`. After login, the auth host mints a single-
+// use code bound to a target host (a fund subdomain, custom domain, or apex)
+// and redirects the user to `<target>/auth/handoff?code=…`. The handoff route
+// consumes the code and writes Supabase session cookies for *that* host.
+// See services/auth/exchange.ts.
+
+model AuthExchange {
+  code       String    @id          // 32 bytes, base64url
+  userId     String    @db.Uuid
+  email      String                  // snapshot — avoids a User lookup on consume
+  targetHost String                  // exact hostname the code is valid for
+  createdAt  DateTime  @default(now())
+  expiresAt  DateTime                 // ~30s after createdAt
+  consumedAt DateTime?                // single-use; set atomically on consume
+
+  @@index([expiresAt])
 }
 
 // =============================================================================

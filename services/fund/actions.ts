@@ -3,6 +3,7 @@
 import { getTranslations } from "next-intl/server";
 import { requireUser } from "@/services/auth/dal";
 import { prisma } from "@/services/db/prisma";
+import { FUND_APEX } from "./host";
 import {
   CreateFundSchema,
   SUBDOMAIN_MAX_LENGTH,
@@ -32,8 +33,7 @@ export async function createFundAction(
   }
 
   const user = await requireUser();
-  const baseDomain = process.env.APP_DOMAIN ?? "localhost";
-  const domain = `${parsed.data.subdomain}.${baseDomain}`;
+  const domain = `${parsed.data.subdomain}.${FUND_APEX}`;
 
   try {
     const fund = await prisma.fund.create({

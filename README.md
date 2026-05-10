@@ -4,7 +4,7 @@ Open source platform for managing local solidarity food funds.
 
 ## About
 
-La Caisse is a multi-tenant web app that lets organizations — local solidarity food funds and similar initiatives — manage their members, cards, tokens, and partner merchants.
+La Caisse is a multi-fund web app that lets organizations — local solidarity food funds and similar initiatives — manage their members, cards, tokens, and partner merchants.
 
 The project originated as the platform built for [La CLASS](https://laclass.be) (Caisse locale de l'alimentation solidaire ASBL) by [Citizen Pay BV](https://citizenpay.be), and was open-sourced so that other funds can deploy, customize, and improve it.
 
@@ -17,7 +17,7 @@ The project originated as the platform built for [La CLASS](https://laclass.be) 
 - **Admin reporting** — balance per allocation tier, total fund balance, per-merchant payment breakdown
 - **Referrals** — invite codes, tokens granted to the referrer when the invitee activates
 - **Transactional emails** — pre-allocation reminders, confirmations, missed-payment notices, sent via Resend
-- **Multi-tenant** — every fund runs under its own brand on the official instance or a self-hosted one
+- **Multi-fund** — every fund runs under its own brand on the official instance or a self-hosted one
 
 ## Stack
 
@@ -88,9 +88,9 @@ DATABASE_URL=
 DIRECT_URL=
 ```
 
-## Multi-tenant architecture
+## Multi-fund architecture
 
-Each fund is an independent tenant, configurable on the following dimensions:
+Each fund runs independently and is configurable on the following dimensions:
 
 - Custom domain name
 - Logo and primary color

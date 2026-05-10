@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import { prisma } from "@/services/db/prisma";
+import { toRoutableFundHost } from "./host";
 
 // The current fund (caisse) is identified by the request host. proxy.ts
 // performs the lookup against `Fund.domain` and forwards `x-fund-domain` +
@@ -29,12 +30,14 @@ export const requireCurrentFund = cache(async () => {
 
 /**
  * Build the public URL for a fund on the current environment. `domain` is
- * the value stored on `Fund.domain` (the full hostname). Use this for
- * cross-host links — `<Link>` won't work because Next's client router can't
- * navigate to a different host.
+ * the value stored on `Fund.domain` (the canonical production hostname).
+ * In dev that gets translated back to the routable `<sub>.localhost` host.
+ * Use this for cross-host links — `<Link>` won't work because Next's client
+ * router can't navigate to a different host.
  */
 export function getFundUrl(domain: string): string {
-  return buildHostUrl(domain);
+  const apex = process.env.APP_DOMAIN ?? "localhost";
+  return buildHostUrl(toRoutableFundHost(domain, apex));
 }
 
 /** Build an apex URL — use for cross-host redirects from fund subdomains. */

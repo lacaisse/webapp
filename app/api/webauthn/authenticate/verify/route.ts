@@ -8,6 +8,7 @@ import { cookies, headers } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import { createSupabaseAdminClient } from "@/services/auth/admin";
 import { createSupabaseServerClient } from "@/services/auth/server";
+import { buildLoginRedirect } from "@/services/auth/post-login";
 import { getExpectedOrigin, getRpID } from "@/services/auth/webauthn";
 import { prisma } from "@/services/db/prisma";
 
@@ -15,6 +16,7 @@ const CHALLENGE_COOKIE = "wa_auth_challenge";
 
 type AuthVerifyBody = {
   response: AuthenticationResponseJSON;
+  returnTo?: string;
 };
 
 export async function POST(request: NextRequest) {
@@ -124,5 +126,14 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  return NextResponse.json({ ok: true });
+  // Auth-host session is now live. Mint a single-use exchange code targeted
+  // at the destination host (validated `returnTo` or the apex by default) so
+  // the client can hand off via /auth/handoff and obtain per-host cookies.
+  const { url: redirectTo } = await buildLoginRedirect({
+    userId: credential.user.id,
+    email: credential.user.email,
+    returnTo: body.returnTo,
+  });
+
+  return NextResponse.json({ ok: true, redirectTo });
 }

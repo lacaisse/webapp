@@ -20,6 +20,7 @@
       "description": "Connectez-vous à votre caisse avec votre email et mot de passe.",
       "email": "Email",
       "password": "Mot de passe",
+      "forgotLink": "Mot de passe oublié ?",
       "submit": "Se connecter",
       "submitting": "Connexion…",
       "noAccount": "Première visite ?",
@@ -27,6 +28,23 @@
       "passkeyButton": "Se connecter avec une passkey",
       "passkeyWaiting": "En attente de la passkey…",
       "passkeyEmailRequired": "Saisissez votre email pour vous connecter avec une passkey."
+    },
+    "forgotPassword": {
+      "title": "Réinitialiser votre mot de passe",
+      "description": "Nous vous enverrons un lien par email pour en définir un nouveau.",
+      "email": "Email",
+      "submit": "Envoyer le lien",
+      "submitting": "Envoi…",
+      "checkEmail": "Si un compte existe pour cet email, un lien de réinitialisation est en route. Consultez votre boîte de réception.",
+      "backToLogin": "Retour à la connexion"
+    },
+    "resetPassword": {
+      "title": "Définir un nouveau mot de passe",
+      "description": "Choisissez-en un dont vous vous souviendrez.",
+      "password": "Nouveau mot de passe",
+      "confirmPassword": "Confirmer le mot de passe",
+      "submit": "Mettre à jour",
+      "submitting": "Mise à jour…"
     },
     "signup": {
       "title": "Créer un compte",
@@ -43,6 +61,7 @@
       "emailInvalid": "Saisissez une adresse email valide.",
       "passwordRequired": "Le mot de passe est requis.",
       "passwordMin": "Le mot de passe doit contenir au moins {min} caractères.",
+      "passwordsDontMatch": "Les mots de passe ne correspondent pas.",
       "invalidCredentials": "Identifiants invalides.",
       "invalidInput": "Saisie invalide.",
       "passkeyStartFailed": "Impossible de démarrer la connexion par passkey.",
@@ -77,12 +96,295 @@
         "subdomainTaken": "Ce sous-domaine est déjà utilisé."
       }
     },
-    "dashboard": {
-      "comingSoon": "Tableau de bord — bientôt disponible."
-    },
     "notFound": {
       "title": "La caisse que vous cherchez n'existe pas",
       "description": "Aucune caisse n'est enregistrée à <code>{domain}</code>. Elle a peut-être été renommée, supprimée, ou le lien est incorrect."
+    }
+  },
+  "fund": {
+    "nav": {
+      "dashboard": "Tableau de bord",
+      "members": "Membres",
+      "cards": "Cartes",
+      "allocations": "Allocations",
+      "merchants": "Commerces",
+      "payments": "Paiements",
+      "referrals": "Parrainage",
+      "settings": "Paramètres",
+      "backToApex": "Retour à mes caisses"
+    },
+    "dashboard": {
+      "title": "Tableau de bord",
+      "description": "Vue d'ensemble de l'activité et des soldes de la caisse.",
+      "kpi": {
+        "totalBalance": "Solde total",
+        "totalBalanceHint": "Jetons en circulation sur toutes les cartes.",
+        "activeMembers": "Membres actifs",
+        "activeMembersHint": "Membres avec au moins une carte active.",
+        "allocatedThisMonth": "Alloué ce mois-ci",
+        "allocatedThisMonthHint": "Jetons distribués aux membres ce mois-ci.",
+        "spentThisMonth": "Dépensé ce mois-ci",
+        "spentThisMonthHint": "Jetons utilisés chez les commerces ce mois-ci."
+      },
+      "tiers": {
+        "title": "Paliers d'allocation",
+        "description": "Solde et portée de chaque palier configuré.",
+        "tierLabel": "Palier {n}",
+        "range": "Min {min} · Max {max}",
+        "members": "{n} membres"
+      },
+      "citizenpay": {
+        "title": "Connexion Citizen Pay",
+        "description": "État du lien avec votre compte Citizen Pay.",
+        "account": "Compte",
+        "terminal": "Terminal",
+        "lastSync": "Dernière synchronisation"
+      },
+      "recentActivity": {
+        "title": "Activité récente",
+        "date": "Date",
+        "event": "Événement",
+        "subject": "Concerné",
+        "amount": "Montant",
+        "empty": "Aucune activité pour le moment."
+      }
+    },
+    "members": {
+      "title": "Membres",
+      "description": "Gérez les comptes membres, l'onboarding et les paliers.",
+      "invite": "Inviter un membre",
+      "tabs": {
+        "all": "Tous",
+        "active": "Actifs",
+        "pending": "En attente",
+        "inactive": "Inactifs"
+      },
+      "columns": {
+        "name": "Nom",
+        "email": "Email",
+        "status": "Statut",
+        "cards": "Cartes",
+        "tier": "Palier",
+        "joined": "Inscrit le"
+      },
+      "empty": "Aucun membre à afficher."
+    },
+    "cards": {
+      "title": "Cartes",
+      "description": "Émettez, liez, bloquez et signalez les cartes perdues.",
+      "issue": "Émettre une carte",
+      "tabs": {
+        "active": "Actives",
+        "lost": "Perdues",
+        "blocked": "Bloquées"
+      },
+      "columns": {
+        "cardNumber": "Carte",
+        "holder": "Porteur",
+        "linkedTo": "Liée à",
+        "balance": "Solde",
+        "status": "Statut",
+        "issued": "Émise le"
+      },
+      "empty": "Aucune carte à afficher."
+    },
+    "allocations": {
+      "title": "Allocations",
+      "description": "Distribuez les jetons aux membres selon les paliers et la synchronisation bancaire.",
+      "tabs": {
+        "history": "Historique",
+        "tiers": "Paliers",
+        "schedule": "Planification"
+      },
+      "history": {
+        "date": "Date",
+        "member": "Membre",
+        "tier": "Palier",
+        "amount": "Montant",
+        "type": "Type",
+        "status": "Statut",
+        "empty": "Aucune allocation pour le moment."
+      },
+      "tiers": {
+        "addTier": "Ajouter un palier",
+        "name": "Nom",
+        "min": "Minimum",
+        "target": "Cible",
+        "max": "Maximum",
+        "members": "Membres",
+        "empty": "Aucun palier configuré. Ajoutez-en un pour commencer."
+      },
+      "schedule": {
+        "title": "Calendrier d'allocation",
+        "description": "Choisissez comment et quand les jetons sont alloués.",
+        "mode": "Mode",
+        "modeHint": "Période fixe ou pay-and-go.",
+        "period": "Période",
+        "periodHint": "Cadence pour le mode période fixe.",
+        "nextRun": "Prochaine exécution",
+        "nextRunHint": "Date de la prochaine allocation automatique."
+      }
+    },
+    "merchants": {
+      "title": "Commerces",
+      "description": "Onboardez les commerces et suivez leur connexion Citizen Pay.",
+      "invite": "Inviter un commerce",
+      "tabs": {
+        "active": "Actifs",
+        "pending": "En attente",
+        "disconnected": "Déconnectés"
+      },
+      "columns": {
+        "name": "Nom",
+        "contact": "Contact",
+        "citizenpay": "Citizen Pay",
+        "terminal": "Terminal",
+        "tokensReceived": "Jetons reçus",
+        "joined": "Inscrit le"
+      },
+      "empty": "Aucun commerce à afficher."
+    },
+    "payments": {
+      "title": "Paiements",
+      "description": "Transactions, virements aux commerces et frais de plateforme.",
+      "tabs": {
+        "transactions": "Transactions",
+        "payouts": "Virements",
+        "fees": "Frais",
+        "byMerchant": "Par commerce"
+      },
+      "transactions": {
+        "date": "Date",
+        "member": "Membre",
+        "merchant": "Commerce",
+        "amount": "Montant",
+        "tokens": "Jetons",
+        "status": "Statut",
+        "empty": "Aucune transaction pour le moment."
+      },
+      "payouts": {
+        "date": "Date",
+        "merchant": "Commerce",
+        "transactions": "Transactions",
+        "gross": "Brut",
+        "fees": "Frais",
+        "net": "Net",
+        "status": "Statut",
+        "empty": "Aucun virement pour le moment."
+      },
+      "fees": {
+        "date": "Date",
+        "merchant": "Commerce",
+        "transaction": "Transaction",
+        "rate": "Taux",
+        "amount": "Montant",
+        "empty": "Aucun frais enregistré."
+      },
+      "byMerchant": {
+        "merchant": "Commerce",
+        "transactions": "Transactions",
+        "totalGross": "Total brut",
+        "totalFees": "Total frais",
+        "totalPaidOut": "Total versé",
+        "balance": "Solde",
+        "empty": "Aucune activité commerce."
+      }
+    },
+    "referrals": {
+      "title": "Parrainage",
+      "description": "Récompensez les membres qui en amènent de nouveaux.",
+      "config": {
+        "title": "Paramètres du programme",
+        "description": "Les jetons ne sont attribués au parrain que lors de l'activation du filleul.",
+        "bonus": "Bonus parrain",
+        "bonusHint": "Jetons octroyés au parrain à l'activation du filleul.",
+        "codeFormat": "Format du code",
+        "codeFormatHint": "Modèle utilisé pour générer les codes de parrainage."
+      },
+      "history": {
+        "title": "Parrainages",
+        "sponsor": "Parrain",
+        "referee": "Filleul",
+        "code": "Code",
+        "status": "Statut",
+        "reward": "Récompense",
+        "date": "Date",
+        "empty": "Aucun parrainage pour le moment."
+      }
+    },
+    "settings": {
+      "title": "Paramètres",
+      "description": "Configurez l'identité, le jeton et les intégrations de la caisse.",
+      "tabs": {
+        "general": "Général",
+        "branding": "Identité visuelle",
+        "token": "Jeton",
+        "onboarding": "Onboarding",
+        "terms": "Conditions",
+        "citizenpay": "Citizen Pay"
+      },
+      "general": {
+        "title": "Général",
+        "description": "Informations de base sur la caisse.",
+        "name": "Nom",
+        "nameHint": "Nom public affiché aux membres et aux commerces.",
+        "domain": "Domaine",
+        "domainHint": "Nom d'hôte canonique de la caisse.",
+        "language": "Langue par défaut",
+        "languageHint": "Utilisée si le visiteur n'a pas de langue définie.",
+        "timezone": "Fuseau horaire",
+        "timezoneHint": "Affecte les allocations planifiées et les rapports."
+      },
+      "branding": {
+        "title": "Identité visuelle",
+        "description": "Logo et thème de couleurs de la caisse.",
+        "logo": "Logo",
+        "logoHint": "Affiché dans la barre latérale et les emails.",
+        "primaryColor": "Couleur primaire",
+        "primaryColorHint": "Utilisée pour les boutons et accents.",
+        "favicon": "Favicon",
+        "faviconHint": "Icône d'onglet du navigateur."
+      },
+      "token": {
+        "title": "Jeton",
+        "description": "Nommage et plafonds d'émission du jeton.",
+        "name": "Nom du jeton",
+        "nameHint": "Affiché dans l'UI lorsqu'on parle du jeton.",
+        "symbol": "Symbole",
+        "symbolHint": "Code court affiché à côté des montants.",
+        "cap": "Plafond d'émission",
+        "capHint": "Plafond du réseau limité PSD2 (1 M€)."
+      },
+      "onboarding": {
+        "title": "Onboarding",
+        "description": "Personnalisez l'inscription et le nombre de cartes par membre.",
+        "fields": "Champs d'inscription",
+        "fieldsHint": "Informations collectées à l'inscription.",
+        "cardOptions": "Options de cartes",
+        "cardOptionsHint": "Nombres de cartes prédéfinis (ex: 1, 2, 3, nous contacter).",
+        "welcomeMessage": "Message de bienvenue",
+        "welcomeMessageHint": "Affiché après l'onboarding."
+      },
+      "terms": {
+        "title": "Mentions légales",
+        "description": "Conditions générales et politique de confidentialité de la caisse.",
+        "tos": "Conditions générales",
+        "tosHint": "Requises à l'inscription.",
+        "privacy": "Politique de confidentialité",
+        "privacyHint": "Liée depuis les emails et l'onboarding."
+      },
+      "citizenpay": {
+        "title": "Citizen Pay",
+        "description": "État de la connexion au compte Citizen Pay et au terminal.",
+        "account": "Compte",
+        "accountHint": "Compte Citizen Pay lié à cette caisse.",
+        "terminal": "Terminal",
+        "terminalHint": "Terminal utilisé pour encaisser les jetons.",
+        "connection": "Connexion",
+        "connectionHint": "Dernier état connu de la connexion API.",
+        "lastSync": "Dernière synchronisation",
+        "lastSyncHint": "Date de la dernière synchronisation réussie."
+      }
     }
   },
   "account": {

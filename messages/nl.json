@@ -20,6 +20,7 @@
       "description": "Voer uw e-mail en wachtwoord in om toegang te krijgen tot uw fonds.",
       "email": "E-mail",
       "password": "Wachtwoord",
+      "forgotLink": "Wachtwoord vergeten?",
       "submit": "Inloggen",
       "submitting": "Inloggen…",
       "noAccount": "Nieuw hier?",
@@ -27,6 +28,23 @@
       "passkeyButton": "Inloggen met passkey",
       "passkeyWaiting": "Wachten op passkey…",
       "passkeyEmailRequired": "Voer uw e-mail in om met een passkey in te loggen."
+    },
+    "forgotPassword": {
+      "title": "Wachtwoord opnieuw instellen",
+      "description": "We sturen u een e-mail met een link om een nieuw wachtwoord in te stellen.",
+      "email": "E-mail",
+      "submit": "Reset-link versturen",
+      "submitting": "Versturen…",
+      "checkEmail": "Als er een account bestaat voor dit e-mailadres, is er een reset-link onderweg. Controleer uw inbox.",
+      "backToLogin": "Terug naar inloggen"
+    },
+    "resetPassword": {
+      "title": "Stel een nieuw wachtwoord in",
+      "description": "Kies iets dat u zult onthouden.",
+      "password": "Nieuw wachtwoord",
+      "confirmPassword": "Bevestig wachtwoord",
+      "submit": "Wachtwoord bijwerken",
+      "submitting": "Bijwerken…"
     },
     "signup": {
       "title": "Account aanmaken",
@@ -43,6 +61,7 @@
       "emailInvalid": "Voer een geldig e-mailadres in.",
       "passwordRequired": "Wachtwoord is verplicht.",
       "passwordMin": "Het wachtwoord moet minstens {min} tekens lang zijn.",
+      "passwordsDontMatch": "Wachtwoorden komen niet overeen.",
       "invalidCredentials": "Ongeldige inloggegevens.",
       "invalidInput": "Ongeldige invoer.",
       "passkeyStartFailed": "Kan passkey-inloggen niet starten.",
@@ -77,12 +96,295 @@
         "subdomainTaken": "Dit subdomein is al in gebruik."
       }
     },
-    "dashboard": {
-      "comingSoon": "Fondsdashboard — binnenkort beschikbaar."
-    },
     "notFound": {
       "title": "Dit fonds bestaat niet",
       "description": "Er is geen fonds geregistreerd op <code>{domain}</code>. Het is mogelijk hernoemd, verwijderd, of de link is onjuist."
+    }
+  },
+  "fund": {
+    "nav": {
+      "dashboard": "Dashboard",
+      "members": "Leden",
+      "cards": "Kaarten",
+      "allocations": "Allocaties",
+      "merchants": "Handelaars",
+      "payments": "Betalingen",
+      "referrals": "Doorverwijzingen",
+      "settings": "Instellingen",
+      "backToApex": "Terug naar mijn fondsen"
+    },
+    "dashboard": {
+      "title": "Dashboard",
+      "description": "Overzicht van de activiteit en saldi van uw fonds.",
+      "kpi": {
+        "totalBalance": "Totaal saldo",
+        "totalBalanceHint": "Tokens in omloop op alle kaarten.",
+        "activeMembers": "Actieve leden",
+        "activeMembersHint": "Leden met minstens één actieve kaart.",
+        "allocatedThisMonth": "Toegekend deze maand",
+        "allocatedThisMonthHint": "Tokens uitgegeven aan leden deze maand.",
+        "spentThisMonth": "Besteed deze maand",
+        "spentThisMonthHint": "Tokens ingewisseld bij handelaars deze maand."
+      },
+      "tiers": {
+        "title": "Allocatieniveaus",
+        "description": "Saldo en bereik van elk geconfigureerd niveau.",
+        "tierLabel": "Niveau {n}",
+        "range": "Min {min} · Max {max}",
+        "members": "{n} leden"
+      },
+      "citizenpay": {
+        "title": "Citizen Pay-verbinding",
+        "description": "Status van de koppeling met uw Citizen Pay-account.",
+        "account": "Account",
+        "terminal": "Terminal",
+        "lastSync": "Laatste synchronisatie"
+      },
+      "recentActivity": {
+        "title": "Recente activiteit",
+        "date": "Datum",
+        "event": "Gebeurtenis",
+        "subject": "Onderwerp",
+        "amount": "Bedrag",
+        "empty": "Nog geen activiteit."
+      }
+    },
+    "members": {
+      "title": "Leden",
+      "description": "Beheer ledenaccounts, onboarding en niveau-toewijzingen.",
+      "invite": "Lid uitnodigen",
+      "tabs": {
+        "all": "Alle",
+        "active": "Actief",
+        "pending": "In afwachting",
+        "inactive": "Inactief"
+      },
+      "columns": {
+        "name": "Naam",
+        "email": "E-mail",
+        "status": "Status",
+        "cards": "Kaarten",
+        "tier": "Niveau",
+        "joined": "Lid sinds"
+      },
+      "empty": "Geen leden om te tonen."
+    },
+    "cards": {
+      "title": "Kaarten",
+      "description": "Kaarten uitgeven, koppelen, blokkeren en verlies melden.",
+      "issue": "Kaart uitgeven",
+      "tabs": {
+        "active": "Actief",
+        "lost": "Verloren",
+        "blocked": "Geblokkeerd"
+      },
+      "columns": {
+        "cardNumber": "Kaart",
+        "holder": "Houder",
+        "linkedTo": "Gekoppeld aan",
+        "balance": "Saldo",
+        "status": "Status",
+        "issued": "Uitgegeven"
+      },
+      "empty": "Geen kaarten om te tonen."
+    },
+    "allocations": {
+      "title": "Allocaties",
+      "description": "Verdeel tokens onder leden op basis van niveaus en banksynchronisatie.",
+      "tabs": {
+        "history": "Geschiedenis",
+        "tiers": "Niveaus",
+        "schedule": "Planning"
+      },
+      "history": {
+        "date": "Datum",
+        "member": "Lid",
+        "tier": "Niveau",
+        "amount": "Bedrag",
+        "type": "Type",
+        "status": "Status",
+        "empty": "Nog geen allocaties."
+      },
+      "tiers": {
+        "addTier": "Niveau toevoegen",
+        "name": "Naam",
+        "min": "Minimum",
+        "target": "Doel",
+        "max": "Maximum",
+        "members": "Leden",
+        "empty": "Nog geen niveaus geconfigureerd. Voeg er een toe om te beginnen."
+      },
+      "schedule": {
+        "title": "Allocatieplanning",
+        "description": "Kies hoe en wanneer tokens worden toegewezen.",
+        "mode": "Modus",
+        "modeHint": "Vaste periode of pay-and-go.",
+        "period": "Periode",
+        "periodHint": "Frequentie bij vaste periode.",
+        "nextRun": "Volgende uitvoering",
+        "nextRunHint": "Datum van de volgende automatische allocatie."
+      }
+    },
+    "merchants": {
+      "title": "Handelaars",
+      "description": "Onboard handelaars en volg hun Citizen Pay-verbinding op.",
+      "invite": "Handelaar uitnodigen",
+      "tabs": {
+        "active": "Actief",
+        "pending": "In afwachting",
+        "disconnected": "Niet verbonden"
+      },
+      "columns": {
+        "name": "Naam",
+        "contact": "Contact",
+        "citizenpay": "Citizen Pay",
+        "terminal": "Terminal",
+        "tokensReceived": "Ontvangen tokens",
+        "joined": "Aangesloten op"
+      },
+      "empty": "Geen handelaars om te tonen."
+    },
+    "payments": {
+      "title": "Betalingen",
+      "description": "Transacties, uitbetalingen aan handelaars en kosten.",
+      "tabs": {
+        "transactions": "Transacties",
+        "payouts": "Uitbetalingen",
+        "fees": "Kosten",
+        "byMerchant": "Per handelaar"
+      },
+      "transactions": {
+        "date": "Datum",
+        "member": "Lid",
+        "merchant": "Handelaar",
+        "amount": "Bedrag",
+        "tokens": "Tokens",
+        "status": "Status",
+        "empty": "Nog geen transacties."
+      },
+      "payouts": {
+        "date": "Datum",
+        "merchant": "Handelaar",
+        "transactions": "Transacties",
+        "gross": "Bruto",
+        "fees": "Kosten",
+        "net": "Netto",
+        "status": "Status",
+        "empty": "Nog geen uitbetalingen."
+      },
+      "fees": {
+        "date": "Datum",
+        "merchant": "Handelaar",
+        "transaction": "Transactie",
+        "rate": "Tarief",
+        "amount": "Bedrag",
+        "empty": "Geen kosten geregistreerd."
+      },
+      "byMerchant": {
+        "merchant": "Handelaar",
+        "transactions": "Transacties",
+        "totalGross": "Totaal bruto",
+        "totalFees": "Totale kosten",
+        "totalPaidOut": "Totaal uitbetaald",
+        "balance": "Saldo",
+        "empty": "Nog geen handelaarsactiviteit."
+      }
+    },
+    "referrals": {
+      "title": "Doorverwijzingen",
+      "description": "Beloon leden die nieuwe leden aanbrengen.",
+      "config": {
+        "title": "Programma-instellingen",
+        "description": "Tokens worden pas toegekend aan de peter wanneer het petekind activeert.",
+        "bonus": "Peter-bonus",
+        "bonusHint": "Tokens die de peter krijgt bij activering van het petekind.",
+        "codeFormat": "Codeformaat",
+        "codeFormatHint": "Patroon voor doorverwijzingscodes."
+      },
+      "history": {
+        "title": "Doorverwijzingen",
+        "sponsor": "Peter",
+        "referee": "Petekind",
+        "code": "Code",
+        "status": "Status",
+        "reward": "Beloning",
+        "date": "Datum",
+        "empty": "Nog geen doorverwijzingen."
+      }
+    },
+    "settings": {
+      "title": "Instellingen",
+      "description": "Configureer identiteit, token en integraties van het fonds.",
+      "tabs": {
+        "general": "Algemeen",
+        "branding": "Huisstijl",
+        "token": "Token",
+        "onboarding": "Onboarding",
+        "terms": "Voorwaarden",
+        "citizenpay": "Citizen Pay"
+      },
+      "general": {
+        "title": "Algemeen",
+        "description": "Basisinformatie over het fonds.",
+        "name": "Naam",
+        "nameHint": "Publieke naam getoond aan leden en handelaars.",
+        "domain": "Domein",
+        "domainHint": "Canonieke hostnaam van het fonds.",
+        "language": "Standaardtaal",
+        "languageHint": "Gebruikt wanneer een bezoeker geen taal heeft ingesteld.",
+        "timezone": "Tijdzone",
+        "timezoneHint": "Beïnvloedt geplande allocaties en rapporten."
+      },
+      "branding": {
+        "title": "Huisstijl",
+        "description": "Logo en kleurthema van het fonds.",
+        "logo": "Logo",
+        "logoHint": "Getoond in de zijbalk en in e-mails.",
+        "primaryColor": "Primaire kleur",
+        "primaryColorHint": "Gebruikt voor knoppen en accenten.",
+        "favicon": "Favicon",
+        "faviconHint": "Pictogram in de browsertab."
+      },
+      "token": {
+        "title": "Token",
+        "description": "Naamgeving en uitgiftelimieten van de token.",
+        "name": "Tokennaam",
+        "nameHint": "Getoond in de UI.",
+        "symbol": "Symbool",
+        "symbolHint": "Korte code naast bedragen.",
+        "cap": "Uitgiftelimiet",
+        "capHint": "PSD2-plafond beperkt netwerk (€1 mln)."
+      },
+      "onboarding": {
+        "title": "Onboarding",
+        "description": "Pas inschrijving en aantal kaarten per lid aan.",
+        "fields": "Inschrijfvelden",
+        "fieldsHint": "Verzamelde info bij inschrijving.",
+        "cardOptions": "Kaartopties",
+        "cardOptionsHint": "Voorgedefinieerde aantallen kaarten (bv. 1, 2, 3, contacteer ons).",
+        "welcomeMessage": "Welkomstbericht",
+        "welcomeMessageHint": "Getoond na onboarding."
+      },
+      "terms": {
+        "title": "Juridisch",
+        "description": "Algemene voorwaarden en privacybeleid van het fonds.",
+        "tos": "Algemene voorwaarden",
+        "tosHint": "Vereist bij inschrijving.",
+        "privacy": "Privacybeleid",
+        "privacyHint": "Gelinkt vanuit e-mails en onboarding."
+      },
+      "citizenpay": {
+        "title": "Citizen Pay",
+        "description": "Status van de verbinding met uw Citizen Pay-account en terminal.",
+        "account": "Account",
+        "accountHint": "Citizen Pay-account gekoppeld aan dit fonds.",
+        "terminal": "Terminal",
+        "terminalHint": "Terminal voor het inwisselen van tokens.",
+        "connection": "Verbinding",
+        "connectionHint": "Laatste status van de API-verbinding.",
+        "lastSync": "Laatste synchronisatie",
+        "lastSyncHint": "Wanneer de laatste succesvolle synchronisatie liep."
+      }
     }
   },
   "account": {

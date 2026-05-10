@@ -1,6 +1,6 @@
 # Design system
 
-A multi-tenant design system: a fixed base (typography, neutrals, semantic colors, spacing, radii, motion) and a thin layer of tenant-flexible tokens (brand color, logo). Same skeleton, different skin.
+A multi-fund design system: a fixed base (typography, neutrals, semantic colors, spacing, radii, motion) and a thin layer of fund-flexible tokens (brand color, logo). Same skeleton, different skin.
 
 ## Philosophy
 
@@ -14,7 +14,7 @@ Built for non-profits, clubs, and solidarity funds. Three values guide every cho
 
 ## What's locked, what flexes
 
-| Layer                                                 | Locked | Per-tenant |
+| Layer                                                 | Locked | Per-fund |
 | ----------------------------------------------------- | ------ | ---------- |
 | Typography                                            | ✓      | —          |
 | Neutrals (background, surfaces, borders, text)        | ✓      | —          |
@@ -24,7 +24,7 @@ Built for non-profits, clubs, and solidarity funds. Three values guide every cho
 | Brand color (`--primary`)                             | —      | ✓          |
 | Logo                                                  | —      | ✓          |
 
-The brand color applies to buttons, links, focus rings, and the few accents that need a tenant signature. Everything else is shared so the platform feels like one product across tenants — rather than fifteen sites with different fonts and spacing.
+The brand color applies to buttons, links, focus rings, and the few accents that need a fund signature. Everything else is shared so the platform feels like one product across funds — rather than fifteen sites with different fonts and spacing.
 
 ## Tokens
 
@@ -54,9 +54,9 @@ Same in both modes (with `-foreground` companions). These are intentionally a ha
 | `--info`        | `oklch(0.58 0.12 235)` | Neutral notifications        |
 | `--destructive` | `oklch(0.55 0.20 27)`  | Errors, irreversible actions |
 
-### Color — per-tenant brand
+### Color — per-fund brand
 
-Each tenant supplies one or two values:
+Each fund supplies one or two values:
 
 | Token                  | Required | Notes                                                                                   |
 | ---------------------- | -------- | --------------------------------------------------------------------------------------- |
@@ -121,15 +121,15 @@ No drop-shadow soup.
 
 Respect `prefers-reduced-motion` everywhere.
 
-## Per-tenant injection
+## Per-fund injection
 
-Tenants are resolved server-side from the request hostname (or an `x-tenant-id` header in dev). The resolved `TenantBranding` object is injected once at the top of the document via an inline `<style>` block in `app/layout.tsx`.
+Funds are resolved server-side from the request hostname (proxy.ts forwards `x-fund-id` / `x-fund-domain`). The resolved `FundBranding` object is injected once at the top of the document via an inline `<style>` block in `app/layout.tsx`.
 
 ```tsx
 // app/layout.tsx
 import localFont from "next/font/local";
-import { renderTenantThemeStyle } from "@/services/tenant/theme";
-import { getCurrentTenant } from "@/services/tenant/dal";
+import { renderFundThemeStyle } from "@/services/fund/theme";
+import { getCurrentFund } from "@/services/fund/server";
 import "./globals.css";
 
 const geistSans = localFont({
@@ -150,16 +150,16 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const tenant = await getCurrentTenant();
+  const fund = await getCurrentFund();
   return (
     <html
-      lang={tenant.locale}
+      lang={fund.locale}
       className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full antialiased`}
     >
       <head>
         <style
           dangerouslySetInnerHTML={{
-            __html: renderTenantThemeStyle(tenant.theme),
+            __html: renderFundThemeStyle(fund.theme),
           }}
         />
       </head>
@@ -171,36 +171,36 @@ export default async function RootLayout({
 
 Why a `<style>` block and not inline `style={{}}` on `<html>`? We override both `:root` and `.dark` in one pass; inline style only sets one cascade level.
 
-The `dangerouslySetInnerHTML` is safe because `renderTenantThemeStyle` only emits CSS variables, and the values are validated as oklch strings on tenant config save (`isValidOklch`). User content never reaches the style tag.
+The `dangerouslySetInnerHTML` is safe because `renderFundThemeStyle` only emits CSS variables, and the values are validated as oklch strings on fund config save (`isValidOklch`). User content never reaches the style tag.
 
-Logos render through a `<TenantLogo />` component (TBD) that reads from the same tenant context and picks `logoLight` or `logoDark` based on the active mode.
+Logos render through a `<FundLogo />` component (TBD) that reads from the same fund context and picks `logoLight` or `logoDark` based on the active mode.
 
-## Example tenants
+## Example funds
 
 ```ts
 // La CLASS — the fund this was built for. Default warm terracotta.
 {
   name: "La CLASS",
   theme: { primary: "oklch(0.58 0.13 35)" },
-  logoLight: "/tenants/laclass/logo.svg",
-  logoDark:  "/tenants/laclass/logo-dark.svg",
+  logoLight: "/funds/laclass/logo.svg",
+  logoDark:  "/funds/laclass/logo-dark.svg",
 }
 
 // A sage-green fund focused on local farms.
 {
   name: "Marché Solidaire",
   theme: { primary: "oklch(0.50 0.10 150)" },
-  logoLight: "/tenants/marche/logo.svg",
+  logoLight: "/funds/marche/logo.svg",
 }
 
 // A burgundy/wine fund — civic, dignified.
 {
   name: "Caisse de Quartier",
   theme: { primary: "oklch(0.45 0.13 20)" },
-  logoLight: "/tenants/quartier/logo.svg",
+  logoLight: "/funds/quartier/logo.svg",
 }
 ```
 
 ## Adding a new component
 
-When you `npx shadcn add` a new component, it'll come with the base-nova styling and pull from these tokens automatically. The only thing to double-check: any color that should respond to tenant brand uses `bg-primary` / `text-primary` / `ring-primary`. Everything else stays on neutrals or semantics.
+When you `npx shadcn add` a new component, it'll come with the base-nova styling and pull from these tokens automatically. The only thing to double-check: any color that should respond to fund brand uses `bg-primary` / `text-primary` / `ring-primary`. Everything else stays on neutrals or semantics.

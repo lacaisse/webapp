@@ -2,7 +2,6 @@ import { getTranslations } from "next-intl/server";
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { Button } from "@/components/ui/button";
-import { logoutAction } from "../(auth)/actions";
 
 export default async function UnauthorizedPage() {
   const t = await getTranslations();
@@ -21,7 +20,11 @@ export default async function UnauthorizedPage() {
           <Link href="/" className={buttonVariants({ variant: "outline" })}>
             {t("common.goHome")}
           </Link>
-          <form action={logoutAction}>
+          {/* /auth/logout clears the local Supabase session and bounces
+              through auth.<APP_DOMAIN>/logout so the centralized session is
+              cleared too. POST so a navigation prefetch never accidentally
+              signs the user out. */}
+          <form action="/auth/logout" method="post">
             <Button type="submit" variant="ghost">
               {t("common.signOut")}
             </Button>

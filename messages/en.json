@@ -20,6 +20,7 @@
       "description": "Enter your email and password to access your fund.",
       "email": "Email",
       "password": "Password",
+      "forgotLink": "Forgot password?",
       "submit": "Sign in",
       "submitting": "Signing in…",
       "noAccount": "New here?",
@@ -27,6 +28,23 @@
       "passkeyButton": "Sign in with a passkey",
       "passkeyWaiting": "Waiting for passkey…",
       "passkeyEmailRequired": "Enter your email to sign in with a passkey."
+    },
+    "forgotPassword": {
+      "title": "Reset your password",
+      "description": "We'll email you a link to set a new one.",
+      "email": "Email",
+      "submit": "Send reset link",
+      "submitting": "Sending…",
+      "checkEmail": "If an account exists for that email, a reset link is on its way. Check your inbox.",
+      "backToLogin": "Back to sign in"
+    },
+    "resetPassword": {
+      "title": "Set a new password",
+      "description": "Pick something you'll remember.",
+      "password": "New password",
+      "confirmPassword": "Confirm password",
+      "submit": "Update password",
+      "submitting": "Updating…"
     },
     "signup": {
       "title": "Create an account",
@@ -43,6 +61,7 @@
       "emailInvalid": "Enter a valid email address.",
       "passwordRequired": "Password is required.",
       "passwordMin": "Password must be at least {min} characters.",
+      "passwordsDontMatch": "Passwords don't match.",
       "invalidCredentials": "Invalid credentials.",
       "invalidInput": "Invalid input.",
       "passkeyStartFailed": "Could not start passkey sign-in.",
@@ -77,12 +96,295 @@
         "subdomainTaken": "This subdomain is already taken."
       }
     },
-    "dashboard": {
-      "comingSoon": "Fund dashboard — coming soon."
-    },
     "notFound": {
       "title": "This fund doesn't exist",
       "description": "No fund is registered at <code>{domain}</code>. It may have been renamed, deleted, or the link may be wrong."
+    }
+  },
+  "fund": {
+    "nav": {
+      "dashboard": "Dashboard",
+      "members": "Members",
+      "cards": "Cards",
+      "allocations": "Allocations",
+      "merchants": "Merchants",
+      "payments": "Payments",
+      "referrals": "Referrals",
+      "settings": "Settings",
+      "backToApex": "Back to your funds"
+    },
+    "dashboard": {
+      "title": "Dashboard",
+      "description": "Overview of your fund's activity and balances.",
+      "kpi": {
+        "totalBalance": "Total balance",
+        "totalBalanceHint": "Tokens in circulation across all cards.",
+        "activeMembers": "Active members",
+        "activeMembersHint": "Members with at least one active card.",
+        "allocatedThisMonth": "Allocated this month",
+        "allocatedThisMonthHint": "Tokens issued to members this month.",
+        "spentThisMonth": "Spent this month",
+        "spentThisMonthHint": "Tokens redeemed at merchants this month."
+      },
+      "tiers": {
+        "title": "Allocation tiers",
+        "description": "Balance and reach for each configured tier.",
+        "tierLabel": "Tier {n}",
+        "range": "Min {min} · Max {max}",
+        "members": "{n} members"
+      },
+      "citizenpay": {
+        "title": "Citizen Pay connection",
+        "description": "Status of the link to your Citizen Pay account.",
+        "account": "Account",
+        "terminal": "Terminal",
+        "lastSync": "Last sync"
+      },
+      "recentActivity": {
+        "title": "Recent activity",
+        "date": "Date",
+        "event": "Event",
+        "subject": "Subject",
+        "amount": "Amount",
+        "empty": "No activity yet."
+      }
+    },
+    "members": {
+      "title": "Members",
+      "description": "Manage member accounts, onboarding, and tier assignments.",
+      "invite": "Invite member",
+      "tabs": {
+        "all": "All",
+        "active": "Active",
+        "pending": "Pending",
+        "inactive": "Inactive"
+      },
+      "columns": {
+        "name": "Name",
+        "email": "Email",
+        "status": "Status",
+        "cards": "Cards",
+        "tier": "Tier",
+        "joined": "Joined"
+      },
+      "empty": "No members to show."
+    },
+    "cards": {
+      "title": "Cards",
+      "description": "Issue, link, block, and report lost cards.",
+      "issue": "Issue card",
+      "tabs": {
+        "active": "Active",
+        "lost": "Lost",
+        "blocked": "Blocked"
+      },
+      "columns": {
+        "cardNumber": "Card",
+        "holder": "Holder",
+        "linkedTo": "Linked to",
+        "balance": "Balance",
+        "status": "Status",
+        "issued": "Issued"
+      },
+      "empty": "No cards to show."
+    },
+    "allocations": {
+      "title": "Allocations",
+      "description": "Distribute tokens to members based on tiers and bank synchronisation.",
+      "tabs": {
+        "history": "History",
+        "tiers": "Tiers",
+        "schedule": "Schedule"
+      },
+      "history": {
+        "date": "Date",
+        "member": "Member",
+        "tier": "Tier",
+        "amount": "Amount",
+        "type": "Type",
+        "status": "Status",
+        "empty": "No allocations yet."
+      },
+      "tiers": {
+        "addTier": "Add tier",
+        "name": "Name",
+        "min": "Minimum",
+        "target": "Target",
+        "max": "Maximum",
+        "members": "Members",
+        "empty": "No tiers configured. Add one to start allocating."
+      },
+      "schedule": {
+        "title": "Allocation schedule",
+        "description": "Choose how and when tokens are allocated to members.",
+        "mode": "Mode",
+        "modeHint": "Fixed period or pay-and-go.",
+        "period": "Period",
+        "periodHint": "Cadence used when running on a fixed period.",
+        "nextRun": "Next run",
+        "nextRunHint": "Date the next automatic allocation will fire."
+      }
+    },
+    "merchants": {
+      "title": "Merchants",
+      "description": "Onboard merchants and track their Citizen Pay connection.",
+      "invite": "Invite merchant",
+      "tabs": {
+        "active": "Active",
+        "pending": "Pending",
+        "disconnected": "Disconnected"
+      },
+      "columns": {
+        "name": "Name",
+        "contact": "Contact",
+        "citizenpay": "Citizen Pay",
+        "terminal": "Terminal",
+        "tokensReceived": "Tokens received",
+        "joined": "Joined"
+      },
+      "empty": "No merchants to show."
+    },
+    "payments": {
+      "title": "Payments",
+      "description": "Transactions, payouts to merchants, and platform fees.",
+      "tabs": {
+        "transactions": "Transactions",
+        "payouts": "Payouts",
+        "fees": "Fees",
+        "byMerchant": "By merchant"
+      },
+      "transactions": {
+        "date": "Date",
+        "member": "Member",
+        "merchant": "Merchant",
+        "amount": "Amount",
+        "tokens": "Tokens",
+        "status": "Status",
+        "empty": "No transactions yet."
+      },
+      "payouts": {
+        "date": "Date",
+        "merchant": "Merchant",
+        "transactions": "Transactions",
+        "gross": "Gross",
+        "fees": "Fees",
+        "net": "Net",
+        "status": "Status",
+        "empty": "No payouts yet."
+      },
+      "fees": {
+        "date": "Date",
+        "merchant": "Merchant",
+        "transaction": "Transaction",
+        "rate": "Rate",
+        "amount": "Amount",
+        "empty": "No fees recorded yet."
+      },
+      "byMerchant": {
+        "merchant": "Merchant",
+        "transactions": "Transactions",
+        "totalGross": "Total gross",
+        "totalFees": "Total fees",
+        "totalPaidOut": "Total paid out",
+        "balance": "Balance",
+        "empty": "No merchant activity yet."
+      }
+    },
+    "referrals": {
+      "title": "Referrals",
+      "description": "Reward members who bring new members to the fund.",
+      "config": {
+        "title": "Programme settings",
+        "description": "Tokens are awarded to the sponsor only when the referee activates their account.",
+        "bonus": "Sponsor bonus",
+        "bonusHint": "Token amount granted to the sponsor on referee activation.",
+        "codeFormat": "Code format",
+        "codeFormatHint": "Pattern used to generate referral codes."
+      },
+      "history": {
+        "title": "Referrals",
+        "sponsor": "Sponsor",
+        "referee": "Referee",
+        "code": "Code",
+        "status": "Status",
+        "reward": "Reward",
+        "date": "Date",
+        "empty": "No referrals yet."
+      }
+    },
+    "settings": {
+      "title": "Settings",
+      "description": "Configure your fund's identity, token, and integrations.",
+      "tabs": {
+        "general": "General",
+        "branding": "Branding",
+        "token": "Token",
+        "onboarding": "Onboarding",
+        "terms": "Terms",
+        "citizenpay": "Citizen Pay"
+      },
+      "general": {
+        "title": "General",
+        "description": "Basic information about your fund.",
+        "name": "Name",
+        "nameHint": "Public name displayed to members and merchants.",
+        "domain": "Domain",
+        "domainHint": "Canonical hostname for this fund.",
+        "language": "Default language",
+        "languageHint": "Used when a visitor has no locale set.",
+        "timezone": "Timezone",
+        "timezoneHint": "Affects scheduled allocations and reports."
+      },
+      "branding": {
+        "title": "Branding",
+        "description": "Logo and colour theme used across the fund's interface.",
+        "logo": "Logo",
+        "logoHint": "Shown in the sidebar and on emails.",
+        "primaryColor": "Primary colour",
+        "primaryColorHint": "Drives buttons and accents.",
+        "favicon": "Favicon",
+        "faviconHint": "Browser tab icon."
+      },
+      "token": {
+        "title": "Token",
+        "description": "Naming and issuance limits for your fund's token.",
+        "name": "Token name",
+        "nameHint": "Displayed in the UI when referring to the token.",
+        "symbol": "Symbol",
+        "symbolHint": "Short code displayed next to amounts.",
+        "cap": "Issuance cap",
+        "capHint": "PSD2 limited-network ceiling (€1M)."
+      },
+      "onboarding": {
+        "title": "Onboarding",
+        "description": "Customise how new members sign up and how many cards they can request.",
+        "fields": "Sign-up fields",
+        "fieldsHint": "Information collected during onboarding.",
+        "cardOptions": "Card options",
+        "cardOptionsHint": "Pre-defined card counts shown to members (e.g. 1, 2, 3, contact us).",
+        "welcomeMessage": "Welcome message",
+        "welcomeMessageHint": "Shown after a member completes onboarding."
+      },
+      "terms": {
+        "title": "Legal",
+        "description": "Terms of service and privacy policy specific to your fund.",
+        "tos": "Terms of service",
+        "tosHint": "Required at sign-up.",
+        "privacy": "Privacy policy",
+        "privacyHint": "Linked from emails and onboarding."
+      },
+      "citizenpay": {
+        "title": "Citizen Pay",
+        "description": "Status of the connection to your Citizen Pay account and terminal.",
+        "account": "Account",
+        "accountHint": "Citizen Pay account this fund is linked to.",
+        "terminal": "Terminal",
+        "terminalHint": "Terminal used to redeem tokens at merchants.",
+        "connection": "Connection",
+        "connectionHint": "Last known status of the API connection.",
+        "lastSync": "Last sync",
+        "lastSyncHint": "When the last successful sync ran."
+      }
     }
   },
   "account": {

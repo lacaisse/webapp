@@ -10,35 +10,38 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
-import { getCurrentUser } from "@/services/auth/dal";
+import { getCurrentUser, requireUser } from "@/services/auth/dal";
+import { buildLoginRedirect } from "@/services/auth/post-login";
 import { prisma } from "@/services/db/prisma";
-import {
-  getCurrentFundDomain,
-  getFundUrl,
-  requireCurrentFund,
-} from "@/services/fund/server";
+import { getApexUrl, getFundUrl } from "@/services/fund/server";
+import { getHostType } from "@/services/host/server";
 
 export default async function HomePage() {
-  // On a fund's domain (e.g. acme.lacaisse.eu) — render the fund's dashboard.
-  const domain = await getCurrentFundDomain();
-  if (domain) {
-    const fund = await requireCurrentFund();
-    const t = await getTranslations("funds.dashboard");
-    return (
-      <div className="flex flex-1 items-center justify-center px-4 py-12">
-        <div className="text-center space-y-2">
-          <h1 className="text-3xl font-semibold tracking-tight">
-            {fund.name}
-          </h1>
-          <p className="text-muted-foreground">{t("comingSoon")}</p>
-        </div>
-      </div>
-    );
+  const hostType = await getHostType();
+
+  // Auth host has no top-level page of its own — `/` exists only so post-
+  // login redirects to "/" don't 404 here. If the user is signed in, hand
+  // them off to the apex; otherwise send them to /login.
+  if (hostType === "auth") {
+    const user = await getCurrentUser();
+    if (!user?.email) redirect("/login");
+    const { url } = await buildLoginRedirect({
+      userId: user.id,
+      email: user.email,
+      returnTo: getApexUrl("/"),
+    });
+    redirect(url);
   }
 
-  // Apex (lacaisse.eu) — show the user's funds.
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  // On a fund's domain (e.g. acme.lacaisse.eu) — drop the user on the admin
+  // dashboard. The (fund) layout handles auth and the host check from there.
+  if (hostType === "fund") {
+    redirect("/dashboard");
+  }
+
+  // Apex (lacaisse.eu) — show the user's funds. `requireUser` handles the
+  // sign-in bounce to `auth.<APP_DOMAIN>/login?return_to=…`.
+  const user = await requireUser();
 
   const t = await getTranslations("funds.yourFunds");
   const memberships = await prisma.fundMember.findMany({
