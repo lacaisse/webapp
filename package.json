@@ -8,8 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "licenses:generate": "node scripts/generate-licenses.mjs",
-    "postinstall": "node scripts/generate-licenses.mjs",
-    "prebuild": "node scripts/generate-licenses.mjs"
+    "postinstall": "prisma generate && node scripts/generate-licenses.mjs",
+    "prebuild": "prisma generate && node scripts/generate-licenses.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
