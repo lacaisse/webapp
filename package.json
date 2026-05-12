@@ -6,17 +6,18 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "licenses:generate": "node scripts/generate-licenses.mjs",
+    "postinstall": "node scripts/generate-licenses.mjs",
+    "prebuild": "node scripts/generate-licenses.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
+    "@better-auth/passkey": "^1.6.10",
     "@hookform/resolvers": "^5.2.2",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
-    "@simplewebauthn/browser": "^13.3.0",
-    "@simplewebauthn/server": "^13.3.0",
-    "@supabase/ssr": "^0.10.3",
-    "@supabase/supabase-js": "^2.105.4",
+    "better-auth": "^1.6.10",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.14.0",
@@ -40,6 +41,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
+    "license-checker-rseidelsohn": "^4.4.2",
     "prisma": "^7.8.0",
     "tailwindcss": "^4",
     "typescript": "^5"

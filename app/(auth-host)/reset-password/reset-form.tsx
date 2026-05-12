@@ -15,7 +15,7 @@ import {
   type ResetPasswordInput,
 } from "../schemas";
 
-export function ResetPasswordForm() {
+export function ResetPasswordForm({ token }: { token: string }) {
   const t = useTranslations("auth.resetPassword");
   const tRoot = useTranslations();
 
@@ -27,7 +27,7 @@ export function ResetPasswordForm() {
 
   const onSubmit = (data: ResetPasswordInput) =>
     startTransition(async () => {
-      const result = await resetPasswordAction(data);
+      const result = await resetPasswordAction(data, token);
       if (result && "error" in result) {
         form.setError("root", { message: result.error });
       }

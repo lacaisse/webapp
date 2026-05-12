@@ -1,9 +1,11 @@
 "use server";
 
-import { getTranslations } from "next-intl/server";
+import { APIError } from "better-auth/api";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { createSupabaseServerClient } from "@/services/auth/server";
-import { buildLoginRedirect } from "@/services/auth/post-login";
+import { getTranslations } from "next-intl/server";
+import { auth } from "@/services/auth/better-auth";
+import { buildPostAuthRedirect } from "@/services/auth/redirects";
 import { getAuthUrl } from "@/services/host/server";
 import {
   ForgotPasswordSchema,
@@ -18,6 +20,16 @@ import {
 
 export type ActionResult = { error: string } | { ok: true; message?: string };
 
+// After auth on this host (`auth.<APP_DOMAIN>`), we DON'T redirect the browser
+// straight to the target. Instead `buildPostAuthRedirect` mints a single-use
+// `AuthExchange` code bound to (userId, targetHost) and returns a URL pointing
+// at `<target>/auth/exchange?code=…`. The target host's route handler consumes
+// the code and writes its own session cookie there.
+//
+// This is the Google-style handoff: each host owns its own cookie, no
+// crossSubDomainCookies required. Works identically for free fund subdomains,
+// paid custom domains, and users with 3rd-party cookies disabled.
+
 export async function loginAction(
   input: LoginInput,
   returnTo?: string,
@@ -28,22 +40,33 @@ export async function loginAction(
     return { error: t("invalidCredentials") };
   }
 
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.auth.signInWithPassword(parsed.data);
-  if (error) return { error: error.message };
-  if (!data.user?.email) return { error: t("signInFailed") };
+  let result: { user: { id: string; email: string } };
+  try {
+    result = await auth.api.signInEmail({
+      body: {
+        email: parsed.data.email,
+        password: parsed.data.password,
+      },
+      headers: await headers(),
+    });
+  } catch (e) {
+    // Better Auth surfaces auth failures as APIError. Treat them all as
+    // "invalid credentials" to avoid leaking which field was wrong.
+    if (e instanceof APIError) return { error: t("invalidCredentials") };
+    throw e;
+  }
 
-  const { url } = await buildLoginRedirect({
-    userId: data.user.id,
-    email: data.user.email,
-    returnTo,
-  });
-  redirect(url);
+  redirect(
+    await buildPostAuthRedirect({
+      userId: result.user.id,
+      email: result.user.email,
+      returnTo,
+    }),
+  );
 }
 
 export async function signupAction(
   input: SignupInput,
-  returnTo?: string,
 ): Promise<ActionResult> {
   const t = await getTranslations("auth");
   const parsed = SignupSchema.safeParse(input);
@@ -51,28 +74,39 @@ export async function signupAction(
     return { error: t("errors.invalidInput") };
   }
 
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.auth.signUp({
-    ...parsed.data,
-    options: {
-      // Email-verify links land on the auth host's PKCE callback. After
-      // exchange, the user is forwarded to /login which (if they're already
-      // signed in) bounces onward via the cross-host handoff.
-      emailRedirectTo: getAuthUrl("/auth/callback?next=/login"),
-    },
-  });
-  if (error) return { error: error.message };
-
-  if (!data.session || !data.user?.email) {
-    return { ok: true, message: t("signup.verifyEmail") };
+  let result: { user: { id: string; email: string } };
+  try {
+    // Better Auth's email sign-up auto-creates a session when
+    // requireEmailVerification is false. The `name` field is required by
+    // Better Auth's schema; we derive a stub from the email local-part and
+    // let the user edit it later in account settings.
+    result = await auth.api.signUpEmail({
+      body: {
+        email: parsed.data.email,
+        password: parsed.data.password,
+        name: parsed.data.email.split("@")[0] ?? "",
+      },
+      headers: await headers(),
+    });
+  } catch (e) {
+    if (e instanceof APIError) {
+      // Surface the localized message Better Auth returned (e.g. "user already
+      // exists"). Falls back to a generic "invalid input" if absent.
+      return { error: e.body?.message ?? t("errors.invalidInput") };
+    }
+    throw e;
   }
 
-  const { url } = await buildLoginRedirect({
-    userId: data.user.id,
-    email: data.user.email,
-    returnTo,
-  });
-  redirect(url);
+  // Fresh signups have no fund memberships, so we always send them to the
+  // apex picker (its empty state shows a "create your first fund" CTA). No
+  // return_to honoured — a fund subdomain would just bounce off
+  // requireFundRole on arrival.
+  redirect(
+    await buildPostAuthRedirect({
+      userId: result.user.id,
+      email: result.user.email,
+    }),
+  );
 }
 
 export async function forgotPasswordAction(
@@ -84,28 +118,31 @@ export async function forgotPasswordAction(
     return { error: t("errors.emailInvalid") };
   }
 
-  const supabase = await createSupabaseServerClient();
-  // Recovery flow lives on the auth host: Supabase emails a link with a PKCE
-  // code that lands on /auth/callback (auth host), which exchanges into a
-  // session, then forwards to /reset-password.
-  const redirectTo = getAuthUrl(
-    "/auth/callback?next=" + encodeURIComponent("/reset-password"),
-  );
-  const { error } = await supabase.auth.resetPasswordForEmail(
-    parsed.data.email,
-    { redirectTo },
-  );
-
-  // Whether or not the email matches a real account, return success — leaking
-  // "this email exists" is a known account-enumeration footgun.
-  if (error) {
-    console.error("resetPasswordForEmail error:", error.message);
+  try {
+    await auth.api.requestPasswordReset({
+      body: {
+        email: parsed.data.email,
+        // Better Auth appends `?token=...` to redirectTo and emails the
+        // result. The reset form on this host reads the token from URL.
+        redirectTo: getAuthUrl("/reset-password"),
+      },
+      headers: await headers(),
+    });
+  } catch (e) {
+    // Don't leak whether the email exists — return the same success message
+    // regardless. Log so we can spot SMTP/Resend breakage server-side.
+    if (e instanceof APIError) {
+      console.error("requestPasswordReset error:", e.body);
+    } else {
+      throw e;
+    }
   }
   return { ok: true, message: t("forgotPassword.checkEmail") };
 }
 
 export async function resetPasswordAction(
   input: ResetPasswordInput,
+  token: string,
 ): Promise<ActionResult> {
   const t = await getTranslations("auth");
   const parsed = ResetPasswordSchema.safeParse(input);
@@ -113,23 +150,24 @@ export async function resetPasswordAction(
     const issue = parsed.error.issues[0];
     return { error: t(issue.message as never, { min: 8 } as never) };
   }
-
-  const supabase = await createSupabaseServerClient();
-  // updateUser({ password }) requires an active session — which we have here
-  // because the PKCE callback exchanged the recovery code into a real session
-  // before redirecting the user to the reset form.
-  const { data, error } = await supabase.auth.updateUser({
-    password: parsed.data.password,
-  });
-  if (error) return { error: error.message };
-
-  // Hand the freshly-recovered user off to the apex.
-  if (data.user?.email) {
-    const { url } = await buildLoginRedirect({
-      userId: data.user.id,
-      email: data.user.email,
-    });
-    redirect(url);
+  if (!token) {
+    return { error: t("errors.sessionExpired") };
   }
-  redirect("/");
+
+  try {
+    await auth.api.resetPassword({
+      body: { newPassword: parsed.data.password, token },
+      headers: await headers(),
+    });
+  } catch (e) {
+    if (e instanceof APIError) {
+      return { error: e.body?.message ?? t("errors.sessionExpired") };
+    }
+    throw e;
+  }
+
+  // Better Auth's resetPassword consumes the token but does NOT auto-create
+  // a session. Send the user to /login on the auth host so they sign in with
+  // their new password.
+  redirect("/login");
 }

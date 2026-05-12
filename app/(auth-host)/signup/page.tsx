@@ -10,7 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getCurrentUser } from "@/services/auth/dal";
-import { buildLoginRedirect } from "@/services/auth/post-login";
+import { buildPostAuthRedirect } from "@/services/auth/redirects";
 import { SignupForm } from "./signup-form";
 
 export default async function SignupPage({
@@ -20,16 +20,17 @@ export default async function SignupPage({
 }) {
   const { return_to } = await searchParams;
 
-  // Already signed in (e.g. user clicked the email-verify link, or shared the
-  // signup URL between tabs) — hand off rather than re-prompting.
+  // Already signed in (e.g. shared the signup URL between tabs) — bounce
+  // through the exchange flow so the target host gets its own cookie.
   const user = await getCurrentUser();
-  if (user?.email) {
-    const { url } = await buildLoginRedirect({
-      userId: user.id,
-      email: user.email,
-      returnTo: return_to,
-    });
-    redirect(url);
+  if (user) {
+    redirect(
+      await buildPostAuthRedirect({
+        userId: user.id,
+        email: user.email,
+        returnTo: return_to,
+      }),
+    );
   }
 
   const t = await getTranslations("auth.signup");

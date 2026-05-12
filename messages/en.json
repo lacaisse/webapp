@@ -69,6 +69,12 @@
       "signInFailed": "Sign-in failed.",
       "sessionExpired": "Sign-in session expired. Try again.",
       "establishSessionFailed": "Could not establish session."
+    },
+    "emails": {
+      "resetPassword": {
+        "subject": "Reset your La Caisse password",
+        "text": "Hi,\n\nYou requested to reset your password. Click the link below to choose a new one:\n\n{url}\n\nIf you didn't request this, ignore this message — your password won't change.\n\nThe La Caisse team"
+      }
     }
   },
   "funds": {
@@ -110,6 +116,7 @@
       "merchants": "Merchants",
       "payments": "Payments",
       "referrals": "Referrals",
+      "emails": "Emails",
       "settings": "Settings",
       "backToApex": "Back to your funds"
     },
@@ -129,9 +136,9 @@
       "tiers": {
         "title": "Allocation tiers",
         "description": "Balance and reach for each configured tier.",
-        "tierLabel": "Tier {n}",
         "range": "Min {min} · Max {max}",
-        "members": "{n} members"
+        "members": "{n} members",
+        "empty": "No tiers configured."
       },
       "citizenpay": {
         "title": "Citizen Pay connection",
@@ -155,36 +162,40 @@
       "invite": "Invite member",
       "tabs": {
         "all": "All",
-        "active": "Active",
         "pending": "Pending",
+        "active": "Active",
         "inactive": "Inactive"
       },
       "columns": {
         "name": "Name",
         "email": "Email",
         "status": "Status",
-        "cards": "Cards",
         "tier": "Tier",
+        "cards": "Cards",
         "joined": "Joined"
       },
+      "unverified": "Email not verified",
       "empty": "No members to show."
     },
     "cards": {
       "title": "Cards",
       "description": "Issue, link, block, and report lost cards.",
-      "issue": "Issue card",
       "tabs": {
+        "all": "All",
         "active": "Active",
         "lost": "Lost",
         "blocked": "Blocked"
       },
       "columns": {
-        "cardNumber": "Card",
+        "serial": "Serial",
         "holder": "Holder",
-        "linkedTo": "Linked to",
-        "balance": "Balance",
+        "member": "Member",
         "status": "Status",
         "issued": "Issued"
+      },
+      "primary": "Primary card",
+      "badges": {
+        "lost": "Lost"
       },
       "empty": "No cards to show."
     },
@@ -200,29 +211,58 @@
         "date": "Date",
         "member": "Member",
         "tier": "Tier",
+        "source": "Source",
+        "period": "Period",
         "amount": "Amount",
-        "type": "Type",
         "status": "Status",
-        "empty": "No allocations yet."
+        "empty": "No allocations yet.",
+        "sources": {
+          "bankSync": "Bank deposit",
+          "referral": "Referral reward",
+          "manual": "Manual"
+        }
       },
       "tiers": {
         "addTier": "Add tier",
+        "edit": "Edit",
         "name": "Name",
         "min": "Minimum",
         "target": "Target",
         "max": "Maximum",
         "members": "Members",
-        "empty": "No tiers configured. Add one to start allocating."
+        "empty": "No tiers configured. Add one to start allocating.",
+        "dialog": {
+          "createTitle": "Add a tier",
+          "editTitle": "Edit tier",
+          "description": "Set the contribution range and the allocation amount. The allocation amount is what gets minted when a member's deposit falls within the range.",
+          "name": "Name",
+          "min": "Minimum contribution",
+          "allocation": "Allocation amount",
+          "max": "Maximum contribution",
+          "position": "Display position",
+          "save": "Save",
+          "saving": "Saving…",
+          "cancel": "Cancel"
+        },
+        "archive": {
+          "button": "Archive",
+          "title": "Archive this tier?",
+          "description": "Archived tiers stop accepting new member assignments. Existing assignments and historical mints are preserved.",
+          "cancel": "Cancel",
+          "confirm": "Archive",
+          "archiving": "Archiving…"
+        }
       },
       "schedule": {
         "title": "Allocation schedule",
-        "description": "Choose how and when tokens are allocated to members.",
-        "mode": "Mode",
-        "modeHint": "Fixed period or pay-and-go.",
-        "period": "Period",
-        "periodHint": "Cadence used when running on a fixed period.",
-        "nextRun": "Next run",
-        "nextRunHint": "Date the next automatic allocation will fire."
+        "description": "Fixed-period batches. Pay-and-go funds have no periods.",
+        "payAndGoDescription": "This fund runs in pay-and-go mode. Tokens are allocated immediately when a deposit is detected — there are no periods.",
+        "label": "Period",
+        "startsAt": "Starts at",
+        "cutoffDate": "Cutoff date",
+        "status": "Status",
+        "closedAt": "Closed at",
+        "empty": "No periods yet."
       }
     },
     "merchants": {
@@ -230,13 +270,21 @@
       "description": "Onboard merchants and track their Citizen Pay connection.",
       "invite": "Invite merchant",
       "tabs": {
-        "active": "Active",
         "pending": "Pending",
-        "disconnected": "Disconnected"
+        "active": "Active",
+        "rejected": "Rejected",
+        "inactive": "Inactive"
+      },
+      "badges": {
+        "verified": "Verified",
+        "unverified": "Unverified",
+        "connected": "Connected",
+        "notConnected": "Not connected"
       },
       "columns": {
         "name": "Name",
         "contact": "Contact",
+        "emailVerified": "Email",
         "citizenpay": "Citizen Pay",
         "terminal": "Terminal",
         "tokensReceived": "Tokens received",
@@ -246,48 +294,50 @@
     },
     "payments": {
       "title": "Payments",
-      "description": "Transactions, payouts to merchants, and platform fees.",
+      "description": "Bank deposits from members and payouts to merchants.",
       "tabs": {
         "transactions": "Transactions",
-        "payouts": "Payouts",
-        "fees": "Fees",
-        "byMerchant": "By merchant"
+        "unmatched": "Unmatched",
+        "payouts": "Payouts"
       },
       "transactions": {
         "date": "Date",
+        "counterpart": "Counterpart",
+        "reference": "Reference",
         "member": "Member",
-        "merchant": "Merchant",
+        "period": "Period",
         "amount": "Amount",
-        "tokens": "Tokens",
-        "status": "Status",
+        "unmatched": "Unmatched",
         "empty": "No transactions yet."
       },
       "payouts": {
         "date": "Date",
         "merchant": "Merchant",
-        "transactions": "Transactions",
-        "gross": "Gross",
-        "fees": "Fees",
-        "net": "Net",
-        "status": "Status",
+        "reference": "Reference",
+        "amount": "Amount",
         "empty": "No payouts yet."
       },
-      "fees": {
-        "date": "Date",
-        "merchant": "Merchant",
-        "transaction": "Transaction",
-        "rate": "Rate",
-        "amount": "Amount",
-        "empty": "No fees recorded yet."
-      },
-      "byMerchant": {
-        "merchant": "Merchant",
-        "transactions": "Transactions",
-        "totalGross": "Total gross",
-        "totalFees": "Total fees",
-        "totalPaidOut": "Total paid out",
-        "balance": "Balance",
-        "empty": "No merchant activity yet."
+      "admin": {
+        "link": {
+          "button": "Link to member",
+          "unlinkButton": "Unlink",
+          "title": "Link this deposit to a member",
+          "description": "Enter the member's payment reference or email. The deposit will count toward their allocation.",
+          "identifierLabel": "Payment reference or email",
+          "identifierPlaceholder": "ABCDEFGH or member@example.com",
+          "identifierHint": "Case-insensitive. Payment references are 8 characters from our generated alphabet.",
+          "identifierRequired": "Enter a reference or email.",
+          "cancel": "Cancel",
+          "confirm": "Link",
+          "linking": "Linking…",
+          "unlinking": "Unlinking…"
+        },
+        "errors": {
+          "notFound": "Bank transaction not found.",
+          "notIncoming": "Only incoming transactions can be linked to a member.",
+          "memberNotFound": "No member with that reference or email in this fund.",
+          "identifierRequired": "Enter a reference or email."
+        }
       }
     },
     "referrals": {
@@ -312,9 +362,41 @@
         "empty": "No referrals yet."
       }
     },
+    "emails": {
+      "title": "Emails",
+      "description": "Log of every transactional email this fund has queued or sent.",
+      "tabs": {
+        "all": "All",
+        "queued": "Queued",
+        "sent": "Sent",
+        "failed": "Failed"
+      },
+      "columns": {
+        "queued": "Queued",
+        "recipient": "Recipient",
+        "type": "Type",
+        "subject": "Subject",
+        "status": "Status"
+      },
+      "empty": "No emails recorded yet.",
+      "detail": {
+        "button": "View",
+        "status": "Status",
+        "queuedAt": "Queued",
+        "sentAt": "Sent",
+        "failedAt": "Failed",
+        "resendId": "Resend ID",
+        "viewText": "Text",
+        "viewHtml": "HTML",
+        "noBody": "Body was cleared or never populated."
+      }
+    },
     "settings": {
       "title": "Settings",
       "description": "Configure your fund's identity, token, and integrations.",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Saved.",
       "tabs": {
         "general": "General",
         "branding": "Branding",
@@ -328,42 +410,42 @@
         "description": "Basic information about your fund.",
         "name": "Name",
         "nameHint": "Public name displayed to members and merchants.",
-        "domain": "Domain",
-        "domainHint": "Canonical hostname for this fund.",
         "language": "Default language",
         "languageHint": "Used when a visitor has no locale set.",
         "timezone": "Timezone",
-        "timezoneHint": "Affects scheduled allocations and reports."
+        "timezoneHint": "Affects scheduled allocations and reports.",
+        "allocationMode": "Allocation mode",
+        "allocationModeHint": "Fixed period batches mints at each cutoff; pay-and-go mints immediately when a deposit is detected.",
+        "modeFixedPeriod": "Fixed period",
+        "modePayAndGo": "Pay-and-go"
       },
       "branding": {
         "title": "Branding",
         "description": "Logo and colour theme used across the fund's interface.",
-        "logo": "Logo",
-        "logoHint": "Shown in the sidebar and on emails.",
+        "logo": "Logo URL",
+        "logoHint": "Public URL of a hosted image — shown in the sidebar and on emails. Leave blank to use the platform default.",
         "primaryColor": "Primary colour",
-        "primaryColorHint": "Drives buttons and accents.",
-        "favicon": "Favicon",
-        "faviconHint": "Browser tab icon."
+        "primaryColorHint": "6-digit hex. Drives buttons and accents."
       },
       "token": {
         "title": "Token",
-        "description": "Naming and issuance limits for your fund's token.",
+        "description": "Naming for your fund's token.",
         "name": "Token name",
         "nameHint": "Displayed in the UI when referring to the token.",
         "symbol": "Symbol",
-        "symbolHint": "Short code displayed next to amounts.",
-        "cap": "Issuance cap",
-        "capHint": "PSD2 limited-network ceiling (€1M)."
+        "symbolHint": "Short code displayed next to amounts."
       },
       "onboarding": {
         "title": "Onboarding",
-        "description": "Customise how new members sign up and how many cards they can request.",
-        "fields": "Sign-up fields",
-        "fieldsHint": "Information collected during onboarding.",
-        "cardOptions": "Card options",
-        "cardOptionsHint": "Pre-defined card counts shown to members (e.g. 1, 2, 3, contact us).",
-        "welcomeMessage": "Welcome message",
-        "welcomeMessageHint": "Shown after a member completes onboarding."
+        "description": "Customise how new members and merchants apply.",
+        "verifyMember": {
+          "label": "Require email verification for members",
+          "description": "Members must click a link in a confirmation email before their application enters the admin review queue."
+        },
+        "verifyMerchant": {
+          "label": "Require email verification for merchants",
+          "description": "Merchants must click a link in a confirmation email before their application enters the admin review queue."
+        }
       },
       "terms": {
         "title": "Legal",
@@ -375,16 +457,275 @@
       },
       "citizenpay": {
         "title": "Citizen Pay",
-        "description": "Status of the connection to your Citizen Pay account and terminal.",
-        "account": "Account",
-        "accountHint": "Citizen Pay account this fund is linked to.",
-        "terminal": "Terminal",
-        "terminalHint": "Terminal used to redeem tokens at merchants.",
-        "connection": "Connection",
-        "connectionHint": "Last known status of the API connection.",
-        "lastSync": "Last sync",
-        "lastSyncHint": "When the last successful sync ran."
+        "description": "Connect this fund to its Citizen Pay account.",
+        "account": "Citizen Pay fund ID",
+        "accountHint": "Your fund's identifier on Citizen Pay. Leave blank to disconnect."
       }
+    }
+  },
+  "tiers": {
+    "errors": {
+      "nameRequired": "Tier name is required.",
+      "invalidAmount": "Amount must be a number with up to 2 decimal places.",
+      "orderingInvalid": "Minimum ≤ allocation ≤ maximum.",
+      "nameTaken": "Another tier already uses this name.",
+      "notFound": "Tier not found."
+    }
+  },
+  "settings": {
+    "errors": {
+      "nameMin": "Fund name must be at least 2 characters.",
+      "localeUnsupported": "Unsupported language.",
+      "timezoneRequired": "Timezone is required.",
+      "colorInvalid": "Use a 6-digit hex color (e.g. #1a73e8).",
+      "amountInvalid": "Amount must be a number with up to 2 decimal places."
+    }
+  },
+  "members": {
+    "email": {
+      "paymentConfirmation": {
+        "subject": "Payment received — {fundName}",
+        "textBody": "Hi {firstName},\n\nWe just received your payment of {amount} on {occurredAt} to {fundName}.\n\nIf your fund runs on pay-and-go, your card has already been topped up. Otherwise the credit will land at the next allocation period.\n\nThe {fundName} team"
+      },
+      "allocationConfirmation": {
+        "subject": "{amount} just landed on your card — {fundName}",
+        "textBody": "Hi {firstName},\n\nYour allocation of {amount} has just been credited to your {fundName} card. You can spend it at any partner merchant.\n\nThe {fundName} team"
+      }
+    },
+    "signup": {
+      "title": "Join {fundName}",
+      "description": "Fill in your details to apply for membership. An admin will review and get back to you.",
+      "firstName": "First name",
+      "lastName": "Last name",
+      "email": "Email",
+      "submit": "Apply",
+      "submitting": "Submitting…",
+      "errors": {
+        "firstNameRequired": "First name is required.",
+        "lastNameRequired": "Last name is required.",
+        "emailInvalid": "Enter a valid email address.",
+        "emailTaken": "An application with this email already exists for this fund.",
+        "fieldRequired": "{label} is required.",
+        "generic": "Something went wrong. Please try again."
+      },
+      "email": {
+        "verify": {
+          "subject": "Verify your email — {fundName}",
+          "textBody": "Hi {firstName},\n\nConfirm your email address to complete your application to join {fundName}. Click the link below — it's valid for 24 hours:\n\n  {verifyUrl}\n\nIf you didn't apply, you can ignore this email.\n\nThe {fundName} team"
+        },
+        "welcome": {
+          "subject": "Welcome to {fundName}",
+          "textBody": "Hi {firstName},\n\nWelcome to {fundName}. Your application is under review — an admin will reach out soon.\n\nWhen you're ready to contribute, include this reference on your bank transfer:\n  {paymentReference}\n\nThanks,\nThe {fundName} team"
+        }
+      },
+      "thanks": {
+        "checkEmail": {
+          "title": "Check your email",
+          "description": "We sent a verification link to your inbox.",
+          "nextSteps": "Click the link in the email to confirm your application to {fundName}. The link is valid for 24 hours. Once verified, an admin will review your application."
+        },
+        "applied": {
+          "title": "Application received",
+          "description": "Thanks for applying to {fundName}.",
+          "nextSteps": "An admin will review your application and reach out by email."
+        }
+      }
+    },
+    "admin": {
+      "activate": {
+        "button": "Activate",
+        "title": "Activate member",
+        "description": "Issue a card to {memberName}. Their account becomes active immediately.",
+        "unverifiedWarning": "This member hasn't verified their email yet. The activation email might bounce.",
+        "serialLabel": "Card serial number",
+        "serialPlaceholder": "e.g. 040039AA1D1291",
+        "serialHint": "Scan or type the NFC UUID printed on the physical card.",
+        "noteLabel": "Note (optional, internal)",
+        "notePlaceholder": "Anything to record about this activation.",
+        "cancel": "Cancel",
+        "confirm": "Activate and issue card",
+        "activating": "Activating…",
+        "serialRequired": "Card serial number is required."
+      },
+      "invite": {
+        "title": "Invite a member",
+        "description": "Create a member from a paper form or known applicant. They'll appear in the \"pending\" tab and be notified by email.",
+        "firstNameLabel": "First name",
+        "lastNameLabel": "Last name",
+        "emailLabel": "Email",
+        "cancel": "Cancel",
+        "confirm": "Invite member",
+        "inviting": "Sending invite…"
+      },
+      "addCard": {
+        "button": "Add card",
+        "title": "Add a card",
+        "description": "Link an additional card to {memberName} — typically for a dependant. The new card shares the primary's wallet.",
+        "serialLabel": "Card serial number",
+        "serialPlaceholder": "e.g. 040039AA1D1291",
+        "serialHint": "Scan or type the NFC UUID printed on the physical card.",
+        "holderLabel": "Holder name",
+        "holderHint": "Who carries this card — leave blank to use the member's name.",
+        "cancel": "Cancel",
+        "confirm": "Add card",
+        "adding": "Adding…",
+        "serialRequired": "Card serial number is required."
+      },
+      "email": {
+        "activated": {
+          "subject": "Your account is active — {fundName}",
+          "textBody": "Hi {firstName},\n\nWelcome to {fundName} — your account is now active.\n\nYour card (serial {cardSerial}) is yours to keep. When you're ready to contribute, include this reference on every bank transfer so we can credit your card automatically:\n\n  {paymentReference}\n\nUse your card at any partner merchant — they'll know how to redeem the tokens.\n\nThe {fundName} team"
+        },
+        "invited": {
+          "subject": "You've been invited to {fundName}",
+          "textBody": "Hi {firstName},\n\nAn admin at {fundName} has just added you as a member. You'll receive your card the next time you connect with the team.\n\nWhen you're ready to contribute, include this reference on your bank transfer so we can credit your card automatically:\n\n  {paymentReference}\n\nThe {fundName} team"
+        },
+        "referralBonusAwarded": {
+          "subject": "Your referral bonus has been added — {fundName}",
+          "textBody": "Hi {firstName},\n\nThanks for bringing a new member to {fundName}. Your referral has activated their account, and a bonus of {amount} has just been added to your card.\n\nThe {fundName} team"
+        }
+      },
+      "errors": {
+        "emailTaken": "A member with this email already exists for this fund.",
+        "generic": "Something went wrong. Please try again.",
+        "notFound": "Member not found.",
+        "alreadyActive": "This member is already active.",
+        "alreadyHasPrimaryCard": "This member already has a primary card.",
+        "notActiveForCard": "Only active members can be issued additional cards.",
+        "noPrimaryCard": "Activate the member first — they need a primary card before additional ones can be linked.",
+        "serialRequired": "Card serial number is required.",
+        "serialTaken": "This card is already registered to another member.",
+        "tierNotFound": "Tier not found or archived.",
+        "invalidStatusTransition": "That status change isn't allowed from the current state."
+      },
+      "status": {
+        "button": "Status",
+        "title": "Change member status",
+        "description": "{memberName} is currently {currentStatus}.",
+        "targetLabel": "New status",
+        "values": {
+          "ACTIVE": "Active",
+          "INACTIVE": "Inactive",
+          "LEFT": "Left"
+        },
+        "leftWarning": "Marking as Left stamps a departure date. Use Inactive for temporary pauses.",
+        "cancel": "Cancel",
+        "confirm": "Update",
+        "saving": "Saving…"
+      }
+    }
+  },
+  "merchants": {
+    "signup": {
+      "title": "Join {fundName} as a merchant",
+      "description": "Tell us about your business. An admin will review and reach out.",
+      "submit": "Apply",
+      "submitting": "Submitting…",
+      "fields": {
+        "name": "Business name",
+        "description": "Description",
+        "contactName": "Contact name",
+        "email": "Email",
+        "phone": "Phone",
+        "website": "Website",
+        "logoUrl": "Logo URL",
+        "address": "Address",
+        "postalCode": "Postal code",
+        "city": "City",
+        "country": "Country"
+      },
+      "errors": {
+        "nameRequired": "Business name is required.",
+        "contactNameRequired": "Contact name is required.",
+        "emailInvalid": "Enter a valid email address.",
+        "addressRequired": "Address is required.",
+        "postalCodeRequired": "Postal code is required.",
+        "cityRequired": "City is required.",
+        "countryRequired": "Country is required.",
+        "nameTaken": "A merchant with this business name already exists for this fund.",
+        "fieldRequired": "{label} is required.",
+        "generic": "Something went wrong. Please try again."
+      },
+      "email": {
+        "verify": {
+          "subject": "Verify your email — {fundName}",
+          "textBody": "Hello {merchantName},\n\nConfirm your email address to complete your application to join {fundName} as a merchant. Click the link below — it's valid for 24 hours:\n\n  {verifyUrl}\n\nIf you didn't apply, you can ignore this email.\n\nThe {fundName} team"
+        },
+        "welcome": {
+          "subject": "Application received — {fundName}",
+          "textBody": "Hello {merchantName},\n\nThanks for confirming your email. Your application to join {fundName} as a merchant is now with an admin for review. We'll be in touch.\n\nThe {fundName} team"
+        }
+      },
+      "thanks": {
+        "checkEmail": {
+          "title": "Check your email",
+          "description": "We sent a verification link to your inbox.",
+          "nextSteps": "Click the link in the email to confirm your application to {fundName}. The link is valid for 24 hours. Once verified, an admin will review your application."
+        },
+        "applied": {
+          "title": "Application received",
+          "description": "Thanks for applying to {fundName}.",
+          "nextSteps": "An admin will review your application and reach out by email. Once approved, you'll get connection details for Citizen Pay."
+        }
+      }
+    },
+    "admin": {
+      "review": {
+        "approve": "Approve",
+        "reject": "Reject",
+        "reconsider": "Reconsider",
+        "reconsidering": "Reconsidering…",
+        "cancel": "Cancel",
+        "approving": "Approving…",
+        "rejecting": "Rejecting…",
+        "approveConfirm": "Approve and send email",
+        "rejectConfirm": "Reject and send email",
+        "approveTitle": "Approve merchant?",
+        "approveDescription": "An approval email will be sent inviting {merchantName} to connect with Citizen Pay.",
+        "approveUnverifiedWarning": "This merchant hasn't verified their email yet. The approval email might bounce.",
+        "approveNoteLabel": "Note (optional, internal)",
+        "approveNotePlaceholder": "Anything to record about this approval — visible to other admins only.",
+        "rejectTitle": "Reject merchant?",
+        "rejectDescription": "{merchantName} will be notified with the reason below. They can re-apply later.",
+        "rejectReasonLabel": "Reason",
+        "rejectReasonPlaceholder": "Shared with the merchant in the rejection email.",
+        "reasonRequired": "A reason is required so the merchant understands the decision."
+      },
+      "email": {
+        "approved": {
+          "subject": "Application approved — {fundName}",
+          "textBodyWithLink": "Hello {merchantName},\n\nYour application to join {fundName} has been approved.\n\nNext step: connect your business with Citizen Pay so your terminal can accept tokens. Visit:\n\n  {citizenPayUrl}\n\nOnce you've completed Citizen Pay onboarding, you'll be live in the {fundName} network. If you have questions, contact the fund admin.\n\nThe {fundName} team",
+          "textBodyWithoutLink": "Hello {merchantName},\n\nYour application to join {fundName} has been approved.\n\nThe fund admin will be in touch with details for connecting to Citizen Pay so you can start accepting tokens.\n\nThe {fundName} team"
+        },
+        "rejected": {
+          "subject": "Application update — {fundName}",
+          "textBody": "Hello {merchantName},\n\nThank you for applying to {fundName}. Unfortunately we can't approve your application at this time.\n\nReason from the fund admin:\n\n  {reason}\n\nIf you'd like to discuss or re-apply later, please contact the fund admin.\n\nThe {fundName} team"
+        }
+      },
+      "errors": {
+        "notFound": "Merchant not found.",
+        "alreadyApproved": "This merchant is already approved.",
+        "alreadyRejected": "This merchant is already rejected.",
+        "notRejected": "Only rejected merchants can be reconsidered.",
+        "reasonRequired": "A reason is required."
+      }
+    }
+  },
+  "verifyEmail": {
+    "success": {
+      "title": "Email verified",
+      "description": "Thanks for confirming your email for {fundName}.",
+      "nextSteps": "An admin will be in touch by email."
+    },
+    "error": {
+      "title": "Verification failed",
+      "reasons": {
+        "missing": "No verification token was provided.",
+        "not_found": "This verification link isn't valid.",
+        "expired": "This verification link has expired.",
+        "email_mismatch": "The email address has changed since this link was issued."
+      },
+      "nextSteps": "Contact the fund admin or apply again to get a fresh verification email."
     }
   },
   "account": {
@@ -424,5 +765,372 @@
     "notFoundDescription": "The page you're looking for doesn't exist.",
     "unauthorizedTitle": "You don't have access to this page",
     "unauthorizedDescription": "Your account is signed in but lacks the permissions required for this resource. If you think this is a mistake, contact a fund owner or platform admin."
+  },
+  "landing": {
+    "nav": {
+      "howItWorks": "How it works",
+      "multiTenant": "Multi-tenant",
+      "features": "Features",
+      "getStarted": "Get started",
+      "docs": "Docs",
+      "signIn": "Sign in",
+      "startFund": "Start a fund"
+    },
+    "hero": {
+      "badge": "Open source · Multi-tenant · Hosted or self-hosted",
+      "headlineBefore": "Run a fund your",
+      "headlineItalic": "community",
+      "headlineAfter": "counts on.",
+      "descriptionLead": "La caisse",
+      "description": "gives solidarity funds, clubs, and community spaces everything they need to <em>manage members</em>, <em>track every contribution</em>, and <em>pay out without friction</em> — under your own brand, on your own terms.",
+      "alreadyMember": "Already a member? Find your fund",
+      "configurator": {
+        "eyebrow": "See it in your colors",
+        "reset": "Reset to defaults",
+        "fundName": "Fund name",
+        "fundNameHelper": "This is how members will see your fund.",
+        "fundType": "Type of fund",
+        "fundTypeHelper": "The demo adapts with sample data for your kind of fund.",
+        "fundTypeOptions": {
+          "solidarityFund": "Solidarity fund",
+          "club": "Club",
+          "communitySpace": "Community space",
+          "other": "Other"
+        },
+        "primaryColor": "Primary color",
+        "tokenName": "Token name",
+        "tokenNameHelper": "What your fund's currency is called. Singular form — we'll handle the plural.",
+        "tryWith": "Try it with this branding",
+        "skipDemo": "Skip the demo, start a fund",
+        "swatchHelperDefault": "the la caisse default.",
+        "swatchHelperOther": "used for buttons, highlights, and accents.",
+        "errors": {
+          "fundEmpty": "Give your fund a name to continue.",
+          "fundTooShort": "A bit longer, please — at least 3 characters.",
+          "fundTooLong": "Keep it under 60 characters — this is a display name, not a description.",
+          "tokenEmpty": "Give your token a name. \"Solidaire\", \"credit\", \"ticket\" — your call.",
+          "tokenTooLong": "Keep it short — this word appears in every balance and transaction.",
+          "tokenMultiWord": "Single words work best — \"solidaires\" reads better in a balance than \"food credits\"."
+        }
+      },
+      "swatches": {
+        "terracotta": "Terracotta",
+        "forest": "Forest",
+        "indigo": "Indigo",
+        "plum": "Plum",
+        "slate": "Slate",
+        "ochre": "Ochre"
+      },
+      "preview": {
+        "date": "October 2026",
+        "yourFund": "Your fund",
+        "allocateButton": "Allocate",
+        "nav": {
+          "overview": "Overview",
+          "members": "Members",
+          "allocations": "Allocations",
+          "merchants": "Merchants",
+          "transactions": "Transactions",
+          "settings": "Settings"
+        },
+        "kpi": {
+          "members": "Members",
+          "membersDelta": "+12 this month",
+          "tokensInCirculation": "{token} in circulation",
+          "tokensDelta": "83% used",
+          "merchants": "Partner merchants",
+          "merchantsDelta": "4 pending"
+        },
+        "chart": {
+          "title": "Allocations vs. redemptions",
+          "allocated": "allocated",
+          "redeemed": "redeemed"
+        },
+        "activity": {
+          "title": "Recent activity",
+          "received": "received {amount}",
+          "redeemed": "redeemed {amount} tokens",
+          "joined": "joined the fund"
+        }
+      }
+    },
+    "howItWorks": {
+      "title": "One fund, three sides.",
+      "intro": "A fund is a shared pot of money — built from member contributions, dues, donations, or grants — that pays out to the people and businesses keeping things running, whether that's local merchants, suppliers, your club's bar, or your space's event vendors. La caisse runs the whole loop, from members and contributors in to payouts out.",
+      "members": {
+        "role": "Members",
+        "title": "Members receive and spend.",
+        "body": "Members register through your fund's onboarding form and get a balance that's theirs to use — credited through allocations, dues, top-ups, or contributions, depending on how your fund works. They use a card to spend at participating merchants and suppliers. They can add cards for dependents, report a lost card, check their balance, and invite others with a referral code that rewards them when the new member activates.",
+        "list": [
+          "One account, multiple cards",
+          "Automatic top-ups, dues, or allocations",
+          "Referrals that grow the fund"
+        ]
+      },
+      "team": {
+        "role": "The fund team",
+        "title": "Your team runs the fund.",
+        "body": "You set the rules: how money flows in and out, on what cadence, and with what structure. Solidarity funds typically configure tiered allocations; clubs configure dues; community spaces configure memberships. La caisse handles the rest — onboarding new members, sending reminders, flagging missed payments or contributions, and giving you a live dashboard of balances, payouts, and per-supplier activity.",
+        "list": [
+          "Allocations, dues, or memberships",
+          "Member onboarding and account management",
+          "Reporting dashboard and transactional emails"
+        ]
+      },
+      "merchants": {
+        "role": "Merchants & suppliers",
+        "title": "Merchants and suppliers get paid.",
+        "body": "The people and businesses you pay — local merchants, suppliers, your club's bar, your space's event vendors — register with your fund and connect a Citizen Pay account. When money's owed to them, La caisse pays out on the cycle you set, minus any fee your fund configures. They see incoming payments, fees, and payout history from their own dashboard.",
+        "list": [
+          "One-time Citizen Pay onboarding",
+          "Configurable fund-side fees",
+          "Regular payouts, full transaction history"
+        ]
+      },
+      "loopEyebrow": "And the money goes around",
+      "loopCaption": "Contributions and dues fund the pot. Members use what they're owed. Suppliers and merchants get paid. Reports show every step.",
+      "loop": {
+        "contributions": "Contributions",
+        "fundBalance": "Fund balance",
+        "memberSpending": "Member spending",
+        "merchantPayouts": "Payouts"
+      }
+    },
+    "multiTenant": {
+      "title": "Your fund. Your brand. Your rules",
+      "titleQualifier": " — within sensible limits.",
+      "intro": "La caisse is built so every fund runs as its own product. Members never see a generic platform — they see your fund. Behind the scenes, the platform stays consistent so funds can share improvements, run on shared infrastructure, and avoid the maintenance burden of a true fork.",
+      "yours": {
+        "kicker": "YOURS TO CONFIGURE",
+        "heading": "Yours to configure.",
+        "description": "Everything members and merchants encounter as \"your fund.\"",
+        "items": {
+          "customDomain": {
+            "title": "Custom domain",
+            "body": "Run on votrecaisse.org or a subdomain of the official instance. SSL handled, no configuration required."
+          },
+          "logoAndColor": {
+            "title": "Logo and brand color",
+            "body": "Upload your logo, pick a primary color. Buttons, links, highlights, transactional emails — the interface picks up your color automatically."
+          },
+          "tokenName": {
+            "title": "Token name",
+            "body": "Call your fund's currency whatever fits — solidaire, panier, credit, ticket. It appears in every balance, transaction, and email."
+          },
+          "registrationForm": {
+            "title": "Registration form",
+            "body": "Build the onboarding form your fund needs. Household composition, income tier, neighborhood, GDPR consent — your fields, your validation, your order."
+          },
+          "terms": {
+            "title": "Terms and conditions",
+            "body": "Your terms, displayed during onboarding and accessible from every member account. Versioned, with re-acceptance prompts when you update them."
+          },
+          "allocationRules": {
+            "title": "Allocation rules",
+            "body": "Configure how money flows — allocation tiers for solidarity funds, dues for clubs, memberships for community spaces. Cadence, amounts, and tier assignment all stay under your control. Your policy, codified."
+          },
+          "language": {
+            "title": "Interface language",
+            "body": "EN, FR, or NL today. Members see your fund's language by default; bilingual funds can let members choose."
+          },
+          "merchantFees": {
+            "title": "Merchant fees",
+            "body": "Set the fee structure that works for your fund and your merchants — flat percentage, per-transaction, or hybrid."
+          }
+        }
+      },
+      "shared": {
+        "kicker": "SHARED ACROSS ALL FUNDS",
+        "heading": "Shared across all funds.",
+        "description": "The structural choices that let funds share improvements and stay reliable.",
+        "items": {
+          "coreMechanics": {
+            "title": "Core mechanics",
+            "body": "The way allocations, payouts, and member accounts work is the same everywhere. When one fund finds a better way, every fund gets it."
+          },
+          "pageStructure": {
+            "title": "Page structure and navigation",
+            "body": "Members and merchants who use one fund recognize another. Familiar layout, familiar flows."
+          },
+          "typography": {
+            "title": "Typography and spacing",
+            "body": "Typeface, type sizes, spacing scale, and component shapes are fixed. Tenants choose color and logo; the rest stays consistent."
+          },
+          "security": {
+            "title": "Security and infrastructure",
+            "body": "Authentication, session handling, audit logging, GDPR controls, encryption — not configurable per fund, because there's no good reason for them to vary."
+          },
+          "paymentIntegration": {
+            "title": "Payment integration",
+            "body": "Citizen Pay is the merchant payment rail. Alternative integrations may come, but each fund doesn't get to bring their own."
+          }
+        }
+      },
+      "hosting": {
+        "eyebrow": "Hosting",
+        "title": "Run by us, or run by you.",
+        "subtitle": "Two paths, same software.",
+        "path1": {
+          "step": "PATH 01",
+          "label": "OFFICIAL INSTANCE",
+          "title": "Hosted by Citizen Pay.",
+          "body": "We provision your fund, handle hosting and updates, and run the infrastructure. You focus on your members. €20/month flat — free for registered non-profits and schools."
+        },
+        "path2": {
+          "step": "PATH 02",
+          "label": "SELF-HOSTED",
+          "title": "Run it yourself.",
+          "body": "MIT-licensed, deploy on your own Vercel account or anywhere Next.js runs. You handle hosting and updates; you keep full control. Free."
+        },
+        "compareLink": "Compare in detail →"
+      }
+    },
+    "features": {
+      "titleTop": "Everything a fund needs.",
+      "titleBottom": "Nothing it doesn't.",
+      "intro": "Built from years of running real funds — starting with La CLASS — and shaped for the solidarity funds, clubs, and community spaces that come next. Grouped by who's using it.",
+      "groupLabel": "GROUP",
+      "groups": {
+        "members": {
+          "label": "For your members",
+          "intro": "A simple account, a card, and a balance that's clearly theirs.",
+          "items": {
+            "accountsCards": {
+              "kicker": "Accounts & cards",
+              "title": "One account, multiple cards.",
+              "body": "Members register once and can add cards for dependents — a partner, a child, anyone in the household covered by the fund. Lost or stolen cards can be blocked from the app in seconds."
+            },
+            "allocations": {
+              "kicker": "Balance updates",
+              "title": "Money moves on schedule.",
+              "body": "Members see their balance change on the cadence your fund sets — weekly, monthly, or otherwise. Reminders nudge them before each cycle so nothing's missed."
+            },
+            "balance": {
+              "kicker": "Balance & history",
+              "title": "Always know where things stand.",
+              "body": "Current balance, full history, recent spending at each merchant. Everything members need, nothing they don't."
+            },
+            "referrals": {
+              "kicker": "Referrals",
+              "title": "Members grow the fund.",
+              "body": "Every member gets an invite code. When someone joins and activates through their code, the referring member is rewarded — at an amount your fund configures."
+            }
+          }
+        },
+        "team": {
+          "label": "For your team",
+          "intro": "The controls to run the fund and the visibility to know it's working.",
+          "items": {
+            "tieredAllocations": {
+              "kicker": "Tiered allocations",
+              "title": "Allocate by situation, not by formula.",
+              "body": "Configure target, minimum, and maximum amounts that adapt to each member's situation — household size or income for solidarity funds, age or category for clubs, plan tier for community spaces. Members in different tiers contribute or receive differently, automatically."
+            },
+            "memberManagement": {
+              "kicker": "Member management",
+              "title": "Onboarding, activation, and the boring parts handled.",
+              "body": "Registration form (yours to design), account activation, address changes, card replacements — all in one place, all auditable."
+            },
+            "reporting": {
+              "kicker": "Reporting",
+              "title": "See the whole fund at a glance.",
+              "body": "Total balance, balance by tier, payouts per merchant or supplier, recent activity. Export what you need for your annual report or your funder."
+            },
+            "transactionalEmail": {
+              "kicker": "Transactional email",
+              "title": "The right message at the right moment.",
+              "body": "Confirmation when a member joins, reminders before cycles, alerts when something goes wrong. All sent automatically, all branded to your fund."
+            }
+          }
+        },
+        "merchants": {
+          "label": "For merchants and suppliers",
+          "intro": "A clean integration that doesn't ask the people you pay to learn a new tool.",
+          "items": {
+            "onboarding": {
+              "kicker": "Onboarding",
+              "title": "Sign up once, get paid forever.",
+              "body": "Merchants and suppliers connect a Citizen Pay account during onboarding. No card readers to install, no monthly logins required."
+            },
+            "fees": {
+              "kicker": "Configurable fees",
+              "title": "Your fund sets the rules.",
+              "body": "Define a fee — a flat percentage or a per-transaction amount — and it's deducted automatically at payout. Recipients see the breakdown on every transaction."
+            },
+            "payouts": {
+              "kicker": "Regular payouts",
+              "title": "Money lands when expected.",
+              "body": "Set a payout cycle that works for your suppliers and the fund's cash flow. Recipients get a clear view of incoming payments, fees, and what's owed."
+            }
+          }
+        }
+      },
+      "underTheHood": {
+        "kicker": "UNDER THE HOOD",
+        "title": "And the parts you don't see.",
+        "body": "Multi-tenant from the ground up, GDPR-conscious by design, open source under MIT. Every fund runs in isolation, with its own data, its own branding, and its own configuration — on shared infrastructure or your own.",
+        "chips": {
+          "multiTenant": "Multi-tenant",
+          "gdprConscious": "GDPR-conscious",
+          "mitLicense": "MIT license",
+          "publicOnGithub": "Public on GitHub",
+          "selfHostOrHosted": "Self-host or hosted",
+          "dataExport": "Data export, always"
+        }
+      }
+    },
+    "getStarted": {
+      "left": {
+        "eyebrow": "Ready when you are",
+        "title": "Start a fund in an afternoon.",
+        "body": "Set up your subdomain, invite your first members, onboard your first merchants and suppliers. Plain English, sensible defaults. €20/month — free for registered non-profits and schools.",
+        "ctaPrimary": "Start a fund",
+        "ctaSecondary": "Book a call"
+      },
+      "right": {
+        "eyebrow": "For developers",
+        "title": "Self-host on your own box.",
+        "body": "Pull the image, run the migration, point a domain. MIT-licensed on GitHub."
+      }
+    },
+    "footer": {
+      "description": "Open-source infrastructure for local solidarity funds, clubs, and community spaces. Hosted by us, or self-hosted on your own server.",
+      "product": {
+        "heading": "Product",
+        "howItWorks": "How it works",
+        "features": "Features",
+        "changelog": "Changelog"
+      },
+      "resources": {
+        "heading": "Resources",
+        "documentation": "Documentation",
+        "github": "GitHub",
+        "brand": "Brand",
+        "status": "Status"
+      },
+      "organization": {
+        "heading": "Organization",
+        "about": "About",
+        "contact": "Contact",
+        "privacy": "Privacy",
+        "terms": "Terms"
+      },
+      "copyright": "© 2026 La caisse · AGPL-3.0",
+      "licensesLink": "Licenses"
+    }
+  },
+  "licenses": {
+    "title": "Third-party licenses",
+    "intro": "La caisse is built on the open-source projects below. Thank you to their authors.",
+    "selfLicense": "La caisse itself is distributed under the <link>GNU Affero General Public License v3.0</link>.",
+    "count": "{count, plural, one {# package} other {# packages}}",
+    "table": {
+      "name": "Package",
+      "version": "Version",
+      "license": "License",
+      "source": "Source",
+      "viewSource": "View source"
+    },
+    "backHome": "Back to home"
   }
 }

@@ -6,37 +6,22 @@ import { prisma } from "@/services/db/prisma";
 import { FundRole } from "@/services/db/generated/enums";
 import { requireCurrentFund } from "@/services/fund/server";
 import { getAuthUrl, getHostType } from "@/services/host/server";
-import { createSupabaseServerClient } from "./server";
+import { auth } from "./better-auth";
 
 // =============================================================================
-// Current user (Supabase auth ↔ Prisma User)
+// Current user
 // =============================================================================
-// `getCurrentUser` is the single source of truth for "who is the request from".
-// It does just-in-time sync from Supabase auth.users into our Prisma User table
-// so the rest of the app can speak in terms of Prisma rows (with globalRole,
-// memberships, etc.) without caring about Supabase JWT internals.
+// Better Auth owns the User table directly — there's no JIT sync to do. The
+// session row points at our User row; we still fetch the full Prisma User
+// here because callers need globalRole + relations that Better Auth's
+// session.user shape doesn't include.
 
 export const getCurrentUser = cache(async () => {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user: authUser },
-  } = await supabase.auth.getUser();
-  if (!authUser?.email) return null;
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session?.user) return null;
 
-  // Upsert is idempotent and one round-trip; React.cache memoizes per render.
-  return prisma.user.upsert({
-    where: { id: authUser.id },
-    create: {
-      id: authUser.id,
-      email: authUser.email,
-      name:
-        (authUser.user_metadata?.full_name as string | undefined) ??
-        (authUser.user_metadata?.name as string | undefined) ??
-        null,
-    },
-    update: {
-      email: authUser.email,
-    },
+  return prisma.user.findUnique({
+    where: { id: session.user.id },
   });
 });
 
@@ -76,9 +61,8 @@ export const requireAdmin = cache(async () => {
 
 const FUND_ROLE_RANK: Record<FundRole, number> = {
   VIEWER: 0,
-  MEMBER: 1,
-  ADMIN: 2,
-  OWNER: 3,
+  ADMIN: 1,
+  OWNER: 2,
 };
 
 function hasMinFundRole(actual: FundRole, minimum: FundRole) {

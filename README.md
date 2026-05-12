@@ -6,7 +6,15 @@ Open source platform for managing local solidarity food funds.
 
 La Caisse is a multi-fund web app that lets organizations — local solidarity food funds and similar initiatives — manage their members, cards, tokens, and partner merchants.
 
-The project originated as the platform built for [La CLASS](https://laclass.be) (Caisse locale de l'alimentation solidaire ASBL) by [Citizen Pay BV](https://citizenpay.be), and was open-sourced so that other funds can deploy, customize, and improve it.
+The project originated as the platform built for [La CLASS](https://laclass.be) (Caisse locale de l'alimentation solidaire ASBL) by [Citizen Pay](https://citizenpay.eu), and was open-sourced so that other funds can deploy, customize, and improve it.
+
+## License
+
+La Caisse is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).
+See LICENSE for the full text.
+
+If the AGPL-3.0 does not suit your use case, commercial licenses are available.
+Contact [your email] to discuss.
 
 ## Features
 

@@ -14,16 +14,15 @@ export default async function PasskeysPage() {
   const user = await requireUser();
   const t = await getTranslations("account.passkeys");
 
-  const passkeys = await prisma.webAuthnCredential.findMany({
+  const passkeys = await prisma.passkey.findMany({
     where: { userId: user.id },
     orderBy: { createdAt: "desc" },
     select: {
       id: true,
-      nickname: true,
+      name: true,
       deviceType: true,
       backedUp: true,
       createdAt: true,
-      lastUsedAt: true,
     },
   });
 
@@ -40,7 +39,6 @@ export default async function PasskeysPage() {
               passkeys={passkeys.map((p) => ({
                 ...p,
                 createdAt: p.createdAt.toISOString(),
-                lastUsedAt: p.lastUsedAt?.toISOString() ?? null,
               }))}
             />
           </CardContent>

@@ -1,4 +1,3 @@
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { FundSidebar } from "@/components/fund-sidebar";
@@ -8,8 +7,9 @@ import { getHostType } from "@/services/host/server";
 
 // Fund admin shell: sidebar + main content. Pages in this group are scoped to
 // a fund and require ADMIN (per the scoping doc — reporting and management
-// are admin-only). If a request lands here on the wrong host, bounce to the
-// apex with the same path so deep links from a fund subdomain still resolve.
+// are admin-only). Off a fund host these routes don't exist — bounce to the
+// apex fund picker rather than preserving the path (which would just hit
+// this same layout again and loop).
 
 export default async function FundLayout({
   children,
@@ -17,10 +17,7 @@ export default async function FundLayout({
   children: React.ReactNode;
 }) {
   if ((await getHostType()) !== "fund") {
-    const h = await headers();
-    const path = h.get("x-pathname") ?? "/";
-    const search = h.get("x-search") ?? "";
-    redirect(getApexUrl(`${path}${search}`));
+    redirect(getApexUrl("/"));
   }
 
   const { fund } = await requireFundRole("ADMIN");

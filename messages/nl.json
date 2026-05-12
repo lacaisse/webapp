@@ -69,6 +69,12 @@
       "signInFailed": "Inloggen mislukt.",
       "sessionExpired": "Sessie verlopen. Probeer opnieuw.",
       "establishSessionFailed": "Kan sessie niet tot stand brengen."
+    },
+    "emails": {
+      "resetPassword": {
+        "subject": "Stel je La Caisse-wachtwoord opnieuw in",
+        "text": "Hallo,\n\nJe hebt gevraagd om je wachtwoord opnieuw in te stellen. Klik op de onderstaande link om een nieuw wachtwoord te kiezen:\n\n{url}\n\nAls je dit niet hebt aangevraagd, kun je deze e-mail negeren — je wachtwoord wordt niet gewijzigd.\n\nHet La Caisse-team"
+      }
     }
   },
   "funds": {
@@ -110,6 +116,7 @@
       "merchants": "Handelaars",
       "payments": "Betalingen",
       "referrals": "Doorverwijzingen",
+      "emails": "E-mails",
       "settings": "Instellingen",
       "backToApex": "Terug naar mijn fondsen"
     },
@@ -129,9 +136,9 @@
       "tiers": {
         "title": "Allocatieniveaus",
         "description": "Saldo en bereik van elk geconfigureerd niveau.",
-        "tierLabel": "Niveau {n}",
         "range": "Min {min} · Max {max}",
-        "members": "{n} leden"
+        "members": "{n} leden",
+        "empty": "Nog geen niveaus geconfigureerd."
       },
       "citizenpay": {
         "title": "Citizen Pay-verbinding",
@@ -155,36 +162,40 @@
       "invite": "Lid uitnodigen",
       "tabs": {
         "all": "Alle",
-        "active": "Actief",
         "pending": "In afwachting",
+        "active": "Actief",
         "inactive": "Inactief"
       },
       "columns": {
         "name": "Naam",
         "email": "E-mail",
         "status": "Status",
-        "cards": "Kaarten",
         "tier": "Niveau",
+        "cards": "Kaarten",
         "joined": "Lid sinds"
       },
+      "unverified": "E-mail niet geverifieerd",
       "empty": "Geen leden om te tonen."
     },
     "cards": {
       "title": "Kaarten",
       "description": "Kaarten uitgeven, koppelen, blokkeren en verlies melden.",
-      "issue": "Kaart uitgeven",
       "tabs": {
+        "all": "Alle",
         "active": "Actief",
         "lost": "Verloren",
         "blocked": "Geblokkeerd"
       },
       "columns": {
-        "cardNumber": "Kaart",
+        "serial": "Serie",
         "holder": "Houder",
-        "linkedTo": "Gekoppeld aan",
-        "balance": "Saldo",
+        "member": "Lid",
         "status": "Status",
         "issued": "Uitgegeven"
+      },
+      "primary": "Primaire kaart",
+      "badges": {
+        "lost": "Verloren"
       },
       "empty": "Geen kaarten om te tonen."
     },
@@ -200,29 +211,58 @@
         "date": "Datum",
         "member": "Lid",
         "tier": "Niveau",
+        "source": "Bron",
+        "period": "Periode",
         "amount": "Bedrag",
-        "type": "Type",
         "status": "Status",
-        "empty": "Nog geen allocaties."
+        "empty": "Nog geen allocaties.",
+        "sources": {
+          "bankSync": "Bankstorting",
+          "referral": "Doorverwijzingsbonus",
+          "manual": "Handmatig"
+        }
       },
       "tiers": {
         "addTier": "Niveau toevoegen",
+        "edit": "Bewerken",
         "name": "Naam",
         "min": "Minimum",
         "target": "Doel",
         "max": "Maximum",
         "members": "Leden",
-        "empty": "Nog geen niveaus geconfigureerd. Voeg er een toe om te beginnen."
+        "empty": "Nog geen niveaus geconfigureerd. Voeg er een toe om te beginnen.",
+        "dialog": {
+          "createTitle": "Niveau toevoegen",
+          "editTitle": "Niveau bewerken",
+          "description": "Stel het bijdragebereik en het allocatiebedrag in. Het allocatiebedrag is wat gemunt wordt wanneer een storting binnen het bereik valt.",
+          "name": "Naam",
+          "min": "Minimum bijdrage",
+          "allocation": "Allocatiebedrag",
+          "max": "Maximum bijdrage",
+          "position": "Volgorde",
+          "save": "Opslaan",
+          "saving": "Opslaan…",
+          "cancel": "Annuleren"
+        },
+        "archive": {
+          "button": "Archiveren",
+          "title": "Dit niveau archiveren?",
+          "description": "Gearchiveerde niveaus accepteren geen nieuwe toewijzingen meer. Bestaande toewijzingen en historische allocaties blijven behouden.",
+          "cancel": "Annuleren",
+          "confirm": "Archiveren",
+          "archiving": "Archiveren…"
+        }
       },
       "schedule": {
         "title": "Allocatieplanning",
-        "description": "Kies hoe en wanneer tokens worden toegewezen.",
-        "mode": "Modus",
-        "modeHint": "Vaste periode of pay-and-go.",
-        "period": "Periode",
-        "periodHint": "Frequentie bij vaste periode.",
-        "nextRun": "Volgende uitvoering",
-        "nextRunHint": "Datum van de volgende automatische allocatie."
+        "description": "Batches per vaste periode. Pay-and-go-fondsen hebben geen periodes.",
+        "payAndGoDescription": "Dit fonds werkt op pay-and-go. Tokens worden onmiddellijk toegewezen bij detectie van een storting — er zijn geen periodes.",
+        "label": "Periode",
+        "startsAt": "Start",
+        "cutoffDate": "Sluitingsdatum",
+        "status": "Status",
+        "closedAt": "Gesloten op",
+        "empty": "Nog geen periodes."
       }
     },
     "merchants": {
@@ -230,13 +270,21 @@
       "description": "Onboard handelaars en volg hun Citizen Pay-verbinding op.",
       "invite": "Handelaar uitnodigen",
       "tabs": {
-        "active": "Actief",
         "pending": "In afwachting",
-        "disconnected": "Niet verbonden"
+        "active": "Actief",
+        "rejected": "Afgewezen",
+        "inactive": "Inactief"
+      },
+      "badges": {
+        "verified": "Geverifieerd",
+        "unverified": "Niet geverifieerd",
+        "connected": "Verbonden",
+        "notConnected": "Niet verbonden"
       },
       "columns": {
         "name": "Naam",
         "contact": "Contact",
+        "emailVerified": "E-mail",
         "citizenpay": "Citizen Pay",
         "terminal": "Terminal",
         "tokensReceived": "Ontvangen tokens",
@@ -246,48 +294,50 @@
     },
     "payments": {
       "title": "Betalingen",
-      "description": "Transacties, uitbetalingen aan handelaars en kosten.",
+      "description": "Bankstortingen van leden en uitbetalingen aan handelaars.",
       "tabs": {
         "transactions": "Transacties",
-        "payouts": "Uitbetalingen",
-        "fees": "Kosten",
-        "byMerchant": "Per handelaar"
+        "unmatched": "Niet gekoppeld",
+        "payouts": "Uitbetalingen"
       },
       "transactions": {
         "date": "Datum",
+        "counterpart": "Tegenpartij",
+        "reference": "Referentie",
         "member": "Lid",
-        "merchant": "Handelaar",
+        "period": "Periode",
         "amount": "Bedrag",
-        "tokens": "Tokens",
-        "status": "Status",
+        "unmatched": "Niet gekoppeld",
         "empty": "Nog geen transacties."
       },
       "payouts": {
         "date": "Datum",
         "merchant": "Handelaar",
-        "transactions": "Transacties",
-        "gross": "Bruto",
-        "fees": "Kosten",
-        "net": "Netto",
-        "status": "Status",
+        "reference": "Referentie",
+        "amount": "Bedrag",
         "empty": "Nog geen uitbetalingen."
       },
-      "fees": {
-        "date": "Datum",
-        "merchant": "Handelaar",
-        "transaction": "Transactie",
-        "rate": "Tarief",
-        "amount": "Bedrag",
-        "empty": "Geen kosten geregistreerd."
-      },
-      "byMerchant": {
-        "merchant": "Handelaar",
-        "transactions": "Transacties",
-        "totalGross": "Totaal bruto",
-        "totalFees": "Totale kosten",
-        "totalPaidOut": "Totaal uitbetaald",
-        "balance": "Saldo",
-        "empty": "Nog geen handelaarsactiviteit."
+      "admin": {
+        "link": {
+          "button": "Koppelen aan lid",
+          "unlinkButton": "Ontkoppelen",
+          "title": "Deze storting aan een lid koppelen",
+          "description": "Voer de betalingsreferentie of het e-mailadres van het lid in. De storting telt mee voor hun allocatie.",
+          "identifierLabel": "Betalingsreferentie of e-mail",
+          "identifierPlaceholder": "ABCDEFGH of lid@voorbeeld.com",
+          "identifierHint": "Hoofdletterongevoelig. Betalingsreferenties zijn 8 tekens uit ons gegenereerde alfabet.",
+          "identifierRequired": "Voer een referentie of e-mail in.",
+          "cancel": "Annuleren",
+          "confirm": "Koppelen",
+          "linking": "Koppelen…",
+          "unlinking": "Ontkoppelen…"
+        },
+        "errors": {
+          "notFound": "Banktransactie niet gevonden.",
+          "notIncoming": "Alleen inkomende transacties kunnen aan een lid worden gekoppeld.",
+          "memberNotFound": "Geen lid gevonden met die referentie of dat e-mailadres in dit fonds.",
+          "identifierRequired": "Voer een referentie of e-mail in."
+        }
       }
     },
     "referrals": {
@@ -312,9 +362,41 @@
         "empty": "Nog geen doorverwijzingen."
       }
     },
+    "emails": {
+      "title": "E-mails",
+      "description": "Logboek van alle transactionele e-mails die dit fonds heeft ingepland of verzonden.",
+      "tabs": {
+        "all": "Alle",
+        "queued": "In wachtrij",
+        "sent": "Verzonden",
+        "failed": "Mislukt"
+      },
+      "columns": {
+        "queued": "In wachtrij",
+        "recipient": "Ontvanger",
+        "type": "Type",
+        "subject": "Onderwerp",
+        "status": "Status"
+      },
+      "empty": "Nog geen e-mails geregistreerd.",
+      "detail": {
+        "button": "Bekijken",
+        "status": "Status",
+        "queuedAt": "In wachtrij sinds",
+        "sentAt": "Verzonden",
+        "failedAt": "Mislukt",
+        "resendId": "Resend-ID",
+        "viewText": "Tekst",
+        "viewHtml": "HTML",
+        "noBody": "De inhoud is gewist of nooit opgeslagen."
+      }
+    },
     "settings": {
       "title": "Instellingen",
       "description": "Configureer identiteit, token en integraties van het fonds.",
+      "save": "Opslaan",
+      "saving": "Opslaan…",
+      "saved": "Opgeslagen.",
       "tabs": {
         "general": "Algemeen",
         "branding": "Huisstijl",
@@ -328,42 +410,42 @@
         "description": "Basisinformatie over het fonds.",
         "name": "Naam",
         "nameHint": "Publieke naam getoond aan leden en handelaars.",
-        "domain": "Domein",
-        "domainHint": "Canonieke hostnaam van het fonds.",
         "language": "Standaardtaal",
         "languageHint": "Gebruikt wanneer een bezoeker geen taal heeft ingesteld.",
         "timezone": "Tijdzone",
-        "timezoneHint": "Beïnvloedt geplande allocaties en rapporten."
+        "timezoneHint": "Beïnvloedt geplande allocaties en rapporten.",
+        "allocationMode": "Allocatiemodus",
+        "allocationModeHint": "Vaste periode: batch bij elke sluiting. Pay-and-go: onmiddellijk munten bij detectie van een storting.",
+        "modeFixedPeriod": "Vaste periode",
+        "modePayAndGo": "Pay-and-go"
       },
       "branding": {
         "title": "Huisstijl",
         "description": "Logo en kleurthema van het fonds.",
-        "logo": "Logo",
-        "logoHint": "Getoond in de zijbalk en in e-mails.",
+        "logo": "Logo-URL",
+        "logoHint": "Publieke URL van een gehoste afbeelding — getoond in de zijbalk en in e-mails. Leeg laten om de platformstandaard te gebruiken.",
         "primaryColor": "Primaire kleur",
-        "primaryColorHint": "Gebruikt voor knoppen en accenten.",
-        "favicon": "Favicon",
-        "faviconHint": "Pictogram in de browsertab."
+        "primaryColorHint": "Hex met 6 tekens. Gebruikt voor knoppen en accenten."
       },
       "token": {
         "title": "Token",
-        "description": "Naamgeving en uitgiftelimieten van de token.",
+        "description": "Naamgeving van de token van het fonds.",
         "name": "Tokennaam",
         "nameHint": "Getoond in de UI.",
         "symbol": "Symbool",
-        "symbolHint": "Korte code naast bedragen.",
-        "cap": "Uitgiftelimiet",
-        "capHint": "PSD2-plafond beperkt netwerk (€1 mln)."
+        "symbolHint": "Korte code naast bedragen."
       },
       "onboarding": {
         "title": "Onboarding",
-        "description": "Pas inschrijving en aantal kaarten per lid aan.",
-        "fields": "Inschrijfvelden",
-        "fieldsHint": "Verzamelde info bij inschrijving.",
-        "cardOptions": "Kaartopties",
-        "cardOptionsHint": "Voorgedefinieerde aantallen kaarten (bv. 1, 2, 3, contacteer ons).",
-        "welcomeMessage": "Welkomstbericht",
-        "welcomeMessageHint": "Getoond na onboarding."
+        "description": "Pas de aanvraag voor leden en handelaars aan.",
+        "verifyMember": {
+          "label": "E-mailverificatie verplichten voor leden",
+          "description": "Leden moeten op een bevestigingslink klikken voordat hun aanvraag in de beoordelingswachtrij belandt."
+        },
+        "verifyMerchant": {
+          "label": "E-mailverificatie verplichten voor handelaars",
+          "description": "Handelaars moeten op een bevestigingslink klikken voordat hun aanvraag in de beoordelingswachtrij belandt."
+        }
       },
       "terms": {
         "title": "Juridisch",
@@ -375,16 +457,304 @@
       },
       "citizenpay": {
         "title": "Citizen Pay",
-        "description": "Status van de verbinding met uw Citizen Pay-account en terminal.",
-        "account": "Account",
-        "accountHint": "Citizen Pay-account gekoppeld aan dit fonds.",
-        "terminal": "Terminal",
-        "terminalHint": "Terminal voor het inwisselen van tokens.",
-        "connection": "Verbinding",
-        "connectionHint": "Laatste status van de API-verbinding.",
-        "lastSync": "Laatste synchronisatie",
-        "lastSyncHint": "Wanneer de laatste succesvolle synchronisatie liep."
+        "description": "Koppel dit fonds aan zijn Citizen Pay-account.",
+        "account": "Citizen Pay fonds-ID",
+        "accountHint": "Identificatie van uw fonds bij Citizen Pay. Leeg laten om te ontkoppelen."
       }
+    }
+  },
+  "tiers": {
+    "errors": {
+      "nameRequired": "Naam van het niveau is verplicht.",
+      "invalidAmount": "Bedrag moet een getal zijn met maximaal 2 decimalen.",
+      "orderingInvalid": "Minimum ≤ allocatie ≤ maximum.",
+      "nameTaken": "Een ander niveau gebruikt deze naam al.",
+      "notFound": "Niveau niet gevonden."
+    }
+  },
+  "settings": {
+    "errors": {
+      "nameMin": "Fondsnaam moet minstens 2 tekens hebben.",
+      "localeUnsupported": "Niet-ondersteunde taal.",
+      "timezoneRequired": "Tijdzone is verplicht.",
+      "colorInvalid": "Gebruik een hexkleur met 6 tekens (bv. #1a73e8).",
+      "amountInvalid": "Bedrag moet een getal zijn met maximaal 2 decimalen."
+    }
+  },
+  "members": {
+    "email": {
+      "paymentConfirmation": {
+        "subject": "Betaling ontvangen — {fundName}",
+        "textBody": "Hallo {firstName},\n\nWe hebben zojuist uw betaling van {amount} op {occurredAt} aan {fundName} ontvangen.\n\nAls uw fonds op pay-and-go werkt, is uw kaart al opgewaardeerd. Anders wordt het tegoed verwerkt bij de volgende allocatieperiode.\n\nHet {fundName}-team"
+      },
+      "allocationConfirmation": {
+        "subject": "{amount} zijn zojuist op uw kaart gezet — {fundName}",
+        "textBody": "Hallo {firstName},\n\nUw allocatie van {amount} is zojuist op uw {fundName}-kaart bijgeschreven. U kunt ze gebruiken bij elke partnerhandelaar.\n\nHet {fundName}-team"
+      }
+    },
+    "signup": {
+      "title": "Lid worden van {fundName}",
+      "description": "Vul uw gegevens in om lid te worden. Een beheerder beoordeelt uw aanvraag en neemt contact op.",
+      "firstName": "Voornaam",
+      "lastName": "Achternaam",
+      "email": "E-mail",
+      "submit": "Aanvragen",
+      "submitting": "Verzenden…",
+      "errors": {
+        "firstNameRequired": "Voornaam is verplicht.",
+        "lastNameRequired": "Achternaam is verplicht.",
+        "emailInvalid": "Voer een geldig e-mailadres in.",
+        "emailTaken": "Er bestaat al een aanvraag met dit e-mailadres voor dit fonds.",
+        "fieldRequired": "{label} is verplicht.",
+        "generic": "Er is iets misgegaan. Probeer opnieuw."
+      },
+      "email": {
+        "verify": {
+          "subject": "Bevestig uw e-mail — {fundName}",
+          "textBody": "Hallo {firstName},\n\nBevestig uw e-mailadres om uw aanvraag bij {fundName} af te ronden. Klik op de onderstaande link — deze is 24 uur geldig:\n\n  {verifyUrl}\n\nAls u dit niet hebt aangevraagd, kunt u deze e-mail negeren.\n\nHet {fundName}-team"
+        },
+        "welcome": {
+          "subject": "Welkom bij {fundName}",
+          "textBody": "Hallo {firstName},\n\nWelkom bij {fundName}. Uw aanvraag wordt beoordeeld — een beheerder neemt binnenkort contact op.\n\nWanneer u klaar bent om bij te dragen, vermeld dan deze referentie op uw bankoverschrijving:\n  {paymentReference}\n\nBedankt,\nHet {fundName}-team"
+        }
+      },
+      "thanks": {
+        "checkEmail": {
+          "title": "Controleer uw inbox",
+          "description": "We hebben een verificatielink naar uw e-mailadres gestuurd.",
+          "nextSteps": "Klik op de link in de e-mail om uw aanvraag bij {fundName} te bevestigen. De link is 24 uur geldig. Zodra geverifieerd, beoordeelt een beheerder uw aanvraag."
+        },
+        "applied": {
+          "title": "Aanvraag ontvangen",
+          "description": "Bedankt voor uw aanvraag bij {fundName}.",
+          "nextSteps": "Een beheerder beoordeelt uw aanvraag en neemt contact op per e-mail."
+        }
+      }
+    },
+    "admin": {
+      "activate": {
+        "button": "Activeren",
+        "title": "Lid activeren",
+        "description": "Geef een kaart uit aan {memberName}. Hun account wordt onmiddellijk actief.",
+        "unverifiedWarning": "Dit lid heeft de e-mail nog niet geverifieerd. De activatiemail kan retour komen.",
+        "serialLabel": "Serienummer van de kaart",
+        "serialPlaceholder": "bv. 040039AA1D1291",
+        "serialHint": "Scan of typ de NFC-UUID die op de fysieke kaart staat.",
+        "noteLabel": "Notitie (optioneel, intern)",
+        "notePlaceholder": "Interne notitie over deze activering.",
+        "cancel": "Annuleren",
+        "confirm": "Activeren en kaart uitgeven",
+        "activating": "Activeren…",
+        "serialRequired": "Serienummer van de kaart is verplicht."
+      },
+      "invite": {
+        "title": "Lid uitnodigen",
+        "description": "Maak een lid aan op basis van een papieren formulier of een bekende aanvrager. Het lid verschijnt in het tabblad \"in afwachting\" en wordt per e-mail op de hoogte gebracht.",
+        "firstNameLabel": "Voornaam",
+        "lastNameLabel": "Achternaam",
+        "emailLabel": "E-mail",
+        "cancel": "Annuleren",
+        "confirm": "Lid uitnodigen",
+        "inviting": "Uitnodiging versturen…"
+      },
+      "addCard": {
+        "button": "Kaart toevoegen",
+        "title": "Kaart toevoegen",
+        "description": "Koppel een extra kaart aan {memberName} — meestal voor een gezinslid. De nieuwe kaart deelt de portemonnee van de hoofdkaart.",
+        "serialLabel": "Serienummer van de kaart",
+        "serialPlaceholder": "bv. 040039AA1D1291",
+        "serialHint": "Scan of typ de NFC-UUID die op de fysieke kaart staat.",
+        "holderLabel": "Naam houder",
+        "holderHint": "Wie deze kaart draagt — laat leeg om de naam van het lid te gebruiken.",
+        "cancel": "Annuleren",
+        "confirm": "Kaart toevoegen",
+        "adding": "Toevoegen…",
+        "serialRequired": "Serienummer van de kaart is verplicht."
+      },
+      "email": {
+        "activated": {
+          "subject": "Uw account is actief — {fundName}",
+          "textBody": "Hallo {firstName},\n\nWelkom bij {fundName} — uw account is nu actief.\n\nUw kaart (serie {cardSerial}) is van u. Wanneer u klaar bent om bij te dragen, vermeld dan deze referentie op elke overschrijving zodat we uw kaart automatisch kunnen crediteren:\n\n  {paymentReference}\n\nGebruik uw kaart bij elke partnerhandelaar — zij weten hoe ze de tokens kunnen inwisselen.\n\nHet {fundName}-team"
+        },
+        "invited": {
+          "subject": "U bent uitgenodigd bij {fundName}",
+          "textBody": "Hallo {firstName},\n\nEen beheerder van {fundName} heeft u zojuist als lid toegevoegd. U ontvangt uw kaart bij uw volgende contact met het team.\n\nWanneer u klaar bent om bij te dragen, vermeld dan deze referentie op uw bankoverschrijving zodat we uw kaart automatisch kunnen crediteren:\n\n  {paymentReference}\n\nHet {fundName}-team"
+        },
+        "referralBonusAwarded": {
+          "subject": "Uw doorverwijzingsbonus is toegevoegd — {fundName}",
+          "textBody": "Hallo {firstName},\n\nBedankt dat u een nieuw lid bij {fundName} heeft gebracht. Uw petekind heeft zijn account geactiveerd en een bonus van {amount} is zojuist aan uw kaart toegevoegd.\n\nHet {fundName}-team"
+        }
+      },
+      "errors": {
+        "emailTaken": "Er bestaat al een lid met dit e-mailadres voor dit fonds.",
+        "generic": "Er is iets misgegaan. Probeer opnieuw.",
+        "notFound": "Lid niet gevonden.",
+        "alreadyActive": "Dit lid is al actief.",
+        "alreadyHasPrimaryCard": "Dit lid heeft al een primaire kaart.",
+        "notActiveForCard": "Alleen actieve leden kunnen extra kaarten krijgen.",
+        "noPrimaryCard": "Activeer eerst het lid — het heeft een primaire kaart nodig voordat er extra kaarten kunnen worden gekoppeld.",
+        "serialRequired": "Serienummer van de kaart is verplicht.",
+        "serialTaken": "Deze kaart is al gekoppeld aan een ander lid.",
+        "tierNotFound": "Niveau niet gevonden of gearchiveerd.",
+        "invalidStatusTransition": "Deze statuswijziging is niet toegestaan vanuit de huidige status."
+      },
+      "status": {
+        "button": "Status",
+        "title": "Lidstatus wijzigen",
+        "description": "{memberName} is momenteel {currentStatus}.",
+        "targetLabel": "Nieuwe status",
+        "values": {
+          "ACTIVE": "Actief",
+          "INACTIVE": "Inactief",
+          "LEFT": "Vertrokken"
+        },
+        "leftWarning": "Markeren als Vertrokken legt een vertrekdatum vast. Gebruik Inactief voor tijdelijke pauzes.",
+        "cancel": "Annuleren",
+        "confirm": "Bijwerken",
+        "saving": "Opslaan…"
+      }
+    }
+  },
+  "cards": {
+    "admin": {
+      "block": {
+        "button": "Blokkeren",
+        "title": "Deze kaart blokkeren?",
+        "description": "{holderLabel} kan deze kaart niet meer gebruiken. U kunt hem later weer deblokkeren.",
+        "lostLabel": "Lid heeft de kaart als verloren gemeld",
+        "lostDescription": "Registreert een interne markering bovenop de blokkering. Handig om verloren kaarten op te volgen.",
+        "cancel": "Annuleren",
+        "confirm": "Kaart blokkeren",
+        "blocking": "Blokkeren…"
+      },
+      "unblock": {
+        "button": "Deblokkeren",
+        "title": "Deze kaart deblokkeren?",
+        "description": "{holderLabel} kan deze kaart weer gebruiken.",
+        "clearLostLabel": "Verloren-markering wissen",
+        "clearLostDescription": "Het lid heeft de kaart teruggevonden. Vink uit om de markering in de historie te bewaren.",
+        "cancel": "Annuleren",
+        "confirm": "Kaart deblokkeren",
+        "unblocking": "Deblokkeren…"
+      },
+      "errors": {
+        "notFound": "Kaart niet gevonden.",
+        "alreadyBlocked": "Deze kaart is al geblokkeerd.",
+        "alreadyActive": "Deze kaart is al actief."
+      }
+    }
+  },
+  "merchants": {
+    "signup": {
+      "title": "Word handelaar bij {fundName}",
+      "description": "Vertel ons over uw bedrijf. Een beheerder beoordeelt uw aanvraag en neemt contact op.",
+      "submit": "Aanvragen",
+      "submitting": "Verzenden…",
+      "fields": {
+        "name": "Bedrijfsnaam",
+        "description": "Omschrijving",
+        "contactName": "Contactpersoon",
+        "email": "E-mail",
+        "phone": "Telefoon",
+        "website": "Website",
+        "logoUrl": "Logo-URL",
+        "address": "Adres",
+        "postalCode": "Postcode",
+        "city": "Stad",
+        "country": "Land"
+      },
+      "errors": {
+        "nameRequired": "Bedrijfsnaam is verplicht.",
+        "contactNameRequired": "Contactpersoon is verplicht.",
+        "emailInvalid": "Voer een geldig e-mailadres in.",
+        "addressRequired": "Adres is verplicht.",
+        "postalCodeRequired": "Postcode is verplicht.",
+        "cityRequired": "Stad is verplicht.",
+        "countryRequired": "Land is verplicht.",
+        "nameTaken": "Een handelaar met deze bedrijfsnaam bestaat al voor dit fonds.",
+        "fieldRequired": "{label} is verplicht.",
+        "generic": "Er is iets misgegaan. Probeer opnieuw."
+      },
+      "email": {
+        "verify": {
+          "subject": "Bevestig uw e-mail — {fundName}",
+          "textBody": "Hallo {merchantName},\n\nBevestig uw e-mailadres om uw aanvraag om als handelaar bij {fundName} aan te sluiten af te ronden. Klik op de onderstaande link — deze is 24 uur geldig:\n\n  {verifyUrl}\n\nAls u dit niet hebt aangevraagd, kunt u deze e-mail negeren.\n\nHet {fundName}-team"
+        },
+        "welcome": {
+          "subject": "Aanvraag ontvangen — {fundName}",
+          "textBody": "Hallo {merchantName},\n\nBedankt voor het bevestigen van uw e-mail. Uw aanvraag om als handelaar bij {fundName} aan te sluiten ligt nu bij een beheerder ter beoordeling. We nemen contact op.\n\nHet {fundName}-team"
+        }
+      },
+      "thanks": {
+        "checkEmail": {
+          "title": "Controleer uw inbox",
+          "description": "We hebben een verificatielink naar uw e-mailadres gestuurd.",
+          "nextSteps": "Klik op de link in de e-mail om uw aanvraag bij {fundName} te bevestigen. De link is 24 uur geldig. Zodra geverifieerd, beoordeelt een beheerder uw aanvraag."
+        },
+        "applied": {
+          "title": "Aanvraag ontvangen",
+          "description": "Bedankt voor uw aanvraag bij {fundName}.",
+          "nextSteps": "Een beheerder beoordeelt uw aanvraag en neemt contact op per e-mail. Zodra goedgekeurd, ontvangt u verbindingsgegevens voor Citizen Pay."
+        }
+      }
+    },
+    "admin": {
+      "review": {
+        "approve": "Goedkeuren",
+        "reject": "Afwijzen",
+        "reconsider": "Heroverwegen",
+        "reconsidering": "Heroverwegen…",
+        "cancel": "Annuleren",
+        "approving": "Goedkeuren…",
+        "rejecting": "Afwijzen…",
+        "approveConfirm": "Goedkeuren en e-mail versturen",
+        "rejectConfirm": "Afwijzen en e-mail versturen",
+        "approveTitle": "Handelaar goedkeuren?",
+        "approveDescription": "Er wordt een goedkeuringsmail naar {merchantName} gestuurd met een uitnodiging om verbinding te maken met Citizen Pay.",
+        "approveUnverifiedWarning": "Deze handelaar heeft zijn e-mail nog niet geverifieerd. De goedkeuringsmail kan retour komen.",
+        "approveNoteLabel": "Notitie (optioneel, intern)",
+        "approveNotePlaceholder": "Interne notitie over deze goedkeuring — alleen zichtbaar voor beheerders.",
+        "rejectTitle": "Handelaar afwijzen?",
+        "rejectDescription": "{merchantName} wordt op de hoogte gebracht met onderstaande reden. Een nieuwe aanvraag is later mogelijk.",
+        "rejectReasonLabel": "Reden",
+        "rejectReasonPlaceholder": "Wordt gedeeld met de handelaar in de afwijzingsmail.",
+        "reasonRequired": "Een reden is verplicht zodat de handelaar de beslissing begrijpt."
+      },
+      "email": {
+        "approved": {
+          "subject": "Aanvraag goedgekeurd — {fundName}",
+          "textBodyWithLink": "Hallo {merchantName},\n\nUw aanvraag om bij {fundName} aan te sluiten is goedgekeurd.\n\nVolgende stap: verbind uw bedrijf met Citizen Pay zodat uw terminal tokens kan accepteren. Ga naar:\n\n  {citizenPayUrl}\n\nZodra u de Citizen Pay-onboarding hebt afgerond, bent u actief in het {fundName}-netwerk. Bij vragen kunt u contact opnemen met de beheerder.\n\nHet {fundName}-team",
+          "textBodyWithoutLink": "Hallo {merchantName},\n\nUw aanvraag om bij {fundName} aan te sluiten is goedgekeurd.\n\nDe beheerder neemt contact op met de details voor verbinding met Citizen Pay, zodat u tokens kunt gaan accepteren.\n\nHet {fundName}-team"
+        },
+        "rejected": {
+          "subject": "Update over uw aanvraag — {fundName}",
+          "textBody": "Hallo {merchantName},\n\nBedankt voor uw aanvraag bij {fundName}. Helaas kunnen we uw aanvraag op dit moment niet goedkeuren.\n\nReden van de beheerder:\n\n  {reason}\n\nNeem contact op met de beheerder als u dit wilt bespreken of later opnieuw wilt aanvragen.\n\nHet {fundName}-team"
+        }
+      },
+      "errors": {
+        "notFound": "Handelaar niet gevonden.",
+        "alreadyApproved": "Deze handelaar is al goedgekeurd.",
+        "alreadyRejected": "Deze handelaar is al afgewezen.",
+        "notRejected": "Alleen afgewezen handelaars kunnen heroverwogen worden.",
+        "reasonRequired": "Een reden is verplicht."
+      }
+    }
+  },
+  "verifyEmail": {
+    "success": {
+      "title": "E-mail geverifieerd",
+      "description": "Bedankt voor het bevestigen van uw e-mail voor {fundName}.",
+      "nextSteps": "Een beheerder neemt contact op per e-mail."
+    },
+    "error": {
+      "title": "Verificatie mislukt",
+      "reasons": {
+        "missing": "Er is geen verificatietoken meegegeven.",
+        "not_found": "Deze verificatielink is niet geldig.",
+        "expired": "Deze verificatielink is verlopen.",
+        "email_mismatch": "Het e-mailadres is gewijzigd sinds deze link werd verstuurd."
+      },
+      "nextSteps": "Neem contact op met de beheerder van het fonds of dien een nieuwe aanvraag in om een nieuwe verificatie-e-mail te ontvangen."
     }
   },
   "account": {
@@ -424,5 +794,372 @@
     "notFoundDescription": "De pagina die u zoekt bestaat niet.",
     "unauthorizedTitle": "U heeft geen toegang tot deze pagina",
     "unauthorizedDescription": "U bent ingelogd, maar uw account heeft niet de vereiste machtigingen voor deze bron. Als u denkt dat dit een vergissing is, neem contact op met de fondseigenaar of een platformbeheerder."
+  },
+  "landing": {
+    "nav": {
+      "howItWorks": "Hoe het werkt",
+      "multiTenant": "Multi-fonds",
+      "features": "Functies",
+      "getStarted": "Aan de slag",
+      "docs": "Docs",
+      "signIn": "Inloggen",
+      "startFund": "Fonds starten"
+    },
+    "hero": {
+      "badge": "Open source · Multi-fonds · Gehost of zelf-gehost",
+      "headlineBefore": "Beheer het fonds waarop uw",
+      "headlineItalic": "gemeenschap",
+      "headlineAfter": "rekent.",
+      "descriptionLead": "La caisse",
+      "description": "geeft solidaire fondsen, clubs en gemeenschapsruimtes alles wat ze nodig hebben om <em>leden te beheren</em>, <em>elke bijdrage op te volgen</em> en <em>soepel uit te betalen</em> — onder uw eigen merk, op uw eigen voorwaarden.",
+      "alreadyMember": "Al lid? Vind uw fonds",
+      "configurator": {
+        "eyebrow": "Zie het in uw kleuren",
+        "reset": "Standaard herstellen",
+        "fundName": "Naam van het fonds",
+        "fundNameHelper": "Zo zien leden uw fonds.",
+        "fundType": "Soort fonds",
+        "fundTypeHelper": "De demo past zich aan met voorbeeldgegevens voor uw soort.",
+        "fundTypeOptions": {
+          "solidarityFund": "Solidair fonds",
+          "club": "Club",
+          "communitySpace": "Gemeenschapsruimte",
+          "other": "Andere"
+        },
+        "primaryColor": "Hoofdkleur",
+        "tokenName": "Naam van het tegoed",
+        "tokenNameHelper": "Hoe de munteenheid van uw fonds heet. Enkelvoud — wij regelen het meervoud.",
+        "tryWith": "Probeer met deze huisstijl",
+        "skipDemo": "Sla de demo over, start een fonds",
+        "swatchHelperDefault": "de standaardkleur van la caisse.",
+        "swatchHelperOther": "gebruikt voor knoppen, accenten en uitlichtingen.",
+        "errors": {
+          "fundEmpty": "Geef uw fonds een naam om door te gaan.",
+          "fundTooShort": "Iets langer graag — minstens 3 tekens.",
+          "fundTooLong": "Onder de 60 tekens — dit is een weergavenaam, geen beschrijving.",
+          "tokenEmpty": "Geef uw tegoed een naam. \"Solidair\", \"credit\", \"ticket\" — aan u.",
+          "tokenTooLong": "Houd het kort — dit woord verschijnt in elk saldo en elke transactie.",
+          "tokenMultiWord": "Eén woord werkt het beste — \"solidaires\" leest beter in een saldo dan \"voedselcredits\"."
+        }
+      },
+      "swatches": {
+        "terracotta": "Terracotta",
+        "forest": "Bos",
+        "indigo": "Indigo",
+        "plum": "Pruim",
+        "slate": "Leisteen",
+        "ochre": "Oker"
+      },
+      "preview": {
+        "date": "Oktober 2026",
+        "yourFund": "Uw fonds",
+        "allocateButton": "Toekennen",
+        "nav": {
+          "overview": "Overzicht",
+          "members": "Leden",
+          "allocations": "Toekenningen",
+          "merchants": "Handelaars",
+          "transactions": "Transacties",
+          "settings": "Instellingen"
+        },
+        "kpi": {
+          "members": "Leden",
+          "membersDelta": "+12 deze maand",
+          "tokensInCirculation": "{token} in omloop",
+          "tokensDelta": "83% gebruikt",
+          "merchants": "Partnerhandelaars",
+          "merchantsDelta": "4 in afwachting"
+        },
+        "chart": {
+          "title": "Toekenningen vs. inwisselingen",
+          "allocated": "toegekend",
+          "redeemed": "ingewisseld"
+        },
+        "activity": {
+          "title": "Recente activiteit",
+          "received": "ontving {amount}",
+          "redeemed": "wisselde {amount} tegoeden in",
+          "joined": "is lid geworden"
+        }
+      }
+    },
+    "howItWorks": {
+      "title": "Eén fonds, drie kanten.",
+      "intro": "Een fonds is een gedeelde pot — gevoed door bijdragen van leden, contributies, donaties of subsidies — die uitbetaalt aan de mensen en bedrijven die het draaiende houden, of dat nu lokale handelaars zijn, leveranciers, de bar van uw club of de evenementleveranciers van uw ruimte. La caisse runt de hele lus, van leden en bijdragers in tot uitbetalingen uit.",
+      "members": {
+        "role": "Leden",
+        "title": "Leden ontvangen en besteden.",
+        "body": "Leden registreren zich via het onboardingformulier van uw fonds en krijgen een saldo om te gebruiken — gecrediteerd via toekenningen, contributies, opladingen of bijdragen, afhankelijk van hoe uw fonds werkt. Ze gebruiken een kaart om bij deelnemende handelaars en leveranciers uit te geven. Ze kunnen kaarten toevoegen voor gezinsleden, een verloren kaart melden, hun saldo controleren en anderen uitnodigen met een referralcode die hen beloont wanneer het nieuwe lid wordt geactiveerd.",
+        "list": [
+          "Eén account, meerdere kaarten",
+          "Automatische opladingen, contributies of toekenningen",
+          "Referrals die het fonds laten groeien"
+        ]
+      },
+      "team": {
+        "role": "Het fondsteam",
+        "title": "Uw team runt het fonds.",
+        "body": "U bepaalt de regels: hoe geld in- en uitstroomt, in welk ritme, met welke structuur. Solidaire fondsen werken doorgaans met toekenningen per trap; clubs met contributies; gemeenschapsruimtes met lidmaatschappen. La caisse doet de rest — onboarding van nieuwe leden, herinneringen, signaleren van gemiste betalingen of bijdragen, en een live dashboard van saldi, uitbetalingen en activiteit per partij.",
+        "list": [
+          "Toekenningen, contributies of lidmaatschappen",
+          "Onboarding van leden en accountbeheer",
+          "Rapportagedashboard en transactionele e-mails"
+        ]
+      },
+      "merchants": {
+        "role": "Handelaars & leveranciers",
+        "title": "Handelaars en leveranciers worden betaald.",
+        "body": "De mensen en bedrijven die u betaalt — lokale handelaars, leveranciers, de bar van uw club, evenementleveranciers voor uw ruimte — registreren zich bij uw fonds en koppelen een Citizen Pay-account. Wanneer u hen geld verschuldigd bent, betaalt La caisse uit volgens het ritme dat u instelt, min eventuele bijdragen die uw fonds configureert. Ze zien hun inkomende betalingen, bijdragen en uitbetalingsgeschiedenis vanuit hun eigen dashboard.",
+        "list": [
+          "Eenmalige Citizen Pay-onboarding",
+          "Instelbare bijdragen vanuit het fonds",
+          "Regelmatige uitbetalingen, volledige geschiedenis"
+        ]
+      },
+      "loopEyebrow": "En het geld blijft rondgaan",
+      "loopCaption": "Bijdragen en contributies vullen de pot. Leden gebruiken wat hen toekomt. Leveranciers en handelaars worden betaald. Rapportages tonen elke stap.",
+      "loop": {
+        "contributions": "Bijdragen",
+        "fundBalance": "Fondssaldo",
+        "memberSpending": "Bestedingen van leden",
+        "merchantPayouts": "Uitbetalingen"
+      }
+    },
+    "multiTenant": {
+      "title": "Uw fonds. Uw merk. Uw regels",
+      "titleQualifier": " — binnen redelijke grenzen.",
+      "intro": "La caisse is zo gebouwd dat elk fonds als zijn eigen product draait. Leden zien nooit een generiek platform — ze zien uw fonds. Achter de schermen blijft het platform consistent, zodat fondsen verbeteringen kunnen delen, op gedeelde infrastructuur kunnen draaien en de onderhoudskost van een echte fork vermijden.",
+      "yours": {
+        "kicker": "UW INSTELLINGEN",
+        "heading": "Door u in te stellen.",
+        "description": "Alles wat leden en handelaars als \"uw fonds\" ervaren.",
+        "items": {
+          "customDomain": {
+            "title": "Eigen domein",
+            "body": "Draai op uwfonds.org of een subdomein van de officiële instantie. SSL geregeld, geen configuratie nodig."
+          },
+          "logoAndColor": {
+            "title": "Logo en merkkleur",
+            "body": "Upload uw logo, kies een hoofdkleur. Knoppen, links, accenten, transactionele e-mails — de interface neemt uw kleur automatisch over."
+          },
+          "tokenName": {
+            "title": "Naam van het tegoed",
+            "body": "Noem de munteenheid van uw fonds wat past — solidair, mand, credit, ticket. Ze verschijnt in elk saldo, elke transactie en elke e-mail."
+          },
+          "registrationForm": {
+            "title": "Inschrijvingsformulier",
+            "body": "Bouw het onboardingformulier dat uw fonds nodig heeft. Gezinssamenstelling, inkomenstrap, buurt, AVG-toestemming — uw velden, uw validatie, uw volgorde."
+          },
+          "terms": {
+            "title": "Voorwaarden",
+            "body": "Uw voorwaarden, getoond tijdens onboarding en bereikbaar vanuit elk lidaccount. Geversioneerd, met opnieuw-akkoord-vragen bij updates."
+          },
+          "allocationRules": {
+            "title": "Toekenningsregels",
+            "body": "Configureer hoe geld stroomt — toekenningstrappen voor solidaire fondsen, contributies voor clubs, lidmaatschappen voor gemeenschapsruimtes. Ritme, bedragen en toewijzing blijven onder uw controle. Uw beleid, vastgelegd."
+          },
+          "language": {
+            "title": "Interfacetaal",
+            "body": "Vandaag NL, FR of EN. Leden zien standaard de taal van uw fonds; tweetalige fondsen kunnen de keuze aan leden laten."
+          },
+          "merchantFees": {
+            "title": "Bijdragen handelaars",
+            "body": "Bepaal de structuur die past bij uw fonds en uw handelaars — vast percentage, per transactie, of een combinatie."
+          }
+        }
+      },
+      "shared": {
+        "kicker": "GEDEELD DOOR ALLE FONDSEN",
+        "heading": "Gedeeld door alle fondsen.",
+        "description": "De structurele keuzes waardoor fondsen verbeteringen kunnen delen en betrouwbaar blijven.",
+        "items": {
+          "coreMechanics": {
+            "title": "Kernmechaniek",
+            "body": "Hoe toekenningen, uitbetalingen en lidaccounts werken is overal hetzelfde. Wanneer één fonds iets beters vindt, krijgt elk fonds het."
+          },
+          "pageStructure": {
+            "title": "Paginastructuur en navigatie",
+            "body": "Leden en handelaars die één fonds kennen, vinden hun weg in een ander. Vertrouwde indeling, vertrouwde flows."
+          },
+          "typography": {
+            "title": "Typografie en witruimte",
+            "body": "Lettertype, lettergroottes, witruimteschaal en componentvormen liggen vast. Fondsen kiezen kleur en logo; de rest blijft consistent."
+          },
+          "security": {
+            "title": "Beveiliging en infrastructuur",
+            "body": "Authenticatie, sessiebeheer, audit-logging, AVG-controles, versleuteling — niet per fonds configureerbaar, want er is geen goede reden waarom ze zouden variëren."
+          },
+          "paymentIntegration": {
+            "title": "Betaalintegratie",
+            "body": "Citizen Pay is het betaalrails voor handelaars. Andere integraties kunnen komen, maar elk fonds brengt niet z'n eigen."
+          }
+        }
+      },
+      "hosting": {
+        "eyebrow": "Hosting",
+        "title": "Gerund door ons, of door u.",
+        "subtitle": "Twee paden, dezelfde software.",
+        "path1": {
+          "step": "PAD 01",
+          "label": "OFFICIËLE INSTANTIE",
+          "title": "Gehost door Citizen Pay.",
+          "body": "Wij voorzien uw fonds, regelen hosting en updates, en runnen de infrastructuur. U focust op uw leden. €20/maand vast — gratis voor geregistreerde non-profits en scholen."
+        },
+        "path2": {
+          "step": "PAD 02",
+          "label": "ZELF-GEHOST",
+          "title": "Run het zelf.",
+          "body": "MIT-gelicentieerd, deploy op uw eigen Vercel-account of overal waar Next.js draait. U regelt hosting en updates; u behoudt volledige controle. Gratis."
+        },
+        "compareLink": "Vergelijken in detail →"
+      }
+    },
+    "features": {
+      "titleTop": "Alles wat een fonds nodig heeft.",
+      "titleBottom": "Niets meer.",
+      "intro": "Gebouwd op jaren ervaring met echte fondsen — te beginnen met La CLASS — en gevormd voor de solidaire fondsen, clubs en gemeenschapsruimtes die volgen. Gegroepeerd per gebruiker.",
+      "groupLabel": "GROEP",
+      "groups": {
+        "members": {
+          "label": "Voor uw leden",
+          "intro": "Een eenvoudig account, een kaart en een saldo dat duidelijk van hen is.",
+          "items": {
+            "accountsCards": {
+              "kicker": "Accounts & kaarten",
+              "title": "Eén account, meerdere kaarten.",
+              "body": "Leden registreren zich één keer en kunnen kaarten toevoegen voor gezinsleden — een partner, een kind, iedereen in het gezin dat door het fonds wordt gedekt. Verloren of gestolen kaarten zijn binnen seconden te blokkeren vanuit de app."
+            },
+            "allocations": {
+              "kicker": "Saldomutaties",
+              "title": "Geld beweegt op tijd.",
+              "body": "Leden zien hun saldo veranderen volgens het ritme van uw fonds — wekelijks, maandelijks of anders. Herinneringen vóór elke cyclus zorgen dat niets gemist wordt."
+            },
+            "balance": {
+              "kicker": "Saldo & geschiedenis",
+              "title": "Altijd weten hoe het ervoor staat.",
+              "body": "Huidig saldo, volledige geschiedenis, recente uitgaven per handelaar. Alles wat leden nodig hebben, niets meer."
+            },
+            "referrals": {
+              "kicker": "Referrals",
+              "title": "Leden laten het fonds groeien.",
+              "body": "Elk lid krijgt een uitnodigingscode. Wanneer iemand zich aansluit en zijn account activeert via die code, wordt het verwijzende lid beloond — met een bedrag dat uw fonds instelt."
+            }
+          }
+        },
+        "team": {
+          "label": "Voor uw team",
+          "intro": "De knoppen om het fonds te runnen en het zicht om te weten dat het werkt.",
+          "items": {
+            "tieredAllocations": {
+              "kicker": "Toekenningen per trap",
+              "title": "Toekennen op situatie, niet op formule.",
+              "body": "Configureer streef-, minimum- en maximumbedragen die zich aanpassen aan de situatie van elk lid — gezinsgrootte of inkomen voor solidaire fondsen, leeftijd of categorie voor clubs, lidmaatschapsniveau voor gemeenschapsruimtes. Leden in verschillende trappen dragen bij of ontvangen verschillend, automatisch."
+            },
+            "memberManagement": {
+              "kicker": "Ledenbeheer",
+              "title": "Onboarding, activatie en de saaie taken geregeld.",
+              "body": "Inschrijvingsformulier (door u te ontwerpen), accountactivatie, adreswijzigingen, kaartvervangingen — alles op één plek, alles controleerbaar."
+            },
+            "reporting": {
+              "kicker": "Rapportage",
+              "title": "Het hele fonds in één oogopslag.",
+              "body": "Totaal saldo, saldo per trap, uitbetalingen per handelaar of leverancier, recente activiteit. Exporteer wat u nodig heeft voor uw jaarrapport of uw financier."
+            },
+            "transactionalEmail": {
+              "kicker": "Transactionele e-mails",
+              "title": "Het juiste bericht op het juiste moment.",
+              "body": "Bevestiging bij aansluiting van een lid, herinneringen vóór cycli, signalen wanneer iets misgaat. Allemaal automatisch verzonden, in de huisstijl van uw fonds."
+            }
+          }
+        },
+        "merchants": {
+          "label": "Voor handelaars en leveranciers",
+          "intro": "Een nette integratie die de mensen die u betaalt niet vraagt een nieuwe tool te leren.",
+          "items": {
+            "onboarding": {
+              "kicker": "Onboarding",
+              "title": "Eenmaal inschrijven, altijd uitbetaald.",
+              "body": "Handelaars en leveranciers koppelen tijdens onboarding een Citizen Pay-account. Geen kaartlezers te installeren, geen maandelijkse logins nodig."
+            },
+            "fees": {
+              "kicker": "Instelbare bijdragen",
+              "title": "Uw fonds bepaalt de regels.",
+              "body": "Stel een bijdrage in — vast percentage of bedrag per transactie — die automatisch bij de uitbetaling wordt afgetrokken. Ontvangers zien de uitsplitsing op elke transactie."
+            },
+            "payouts": {
+              "kicker": "Regelmatige uitbetalingen",
+              "title": "Geld arriveert wanneer verwacht.",
+              "body": "Stel een uitbetalingscyclus in die werkt voor uw leveranciers en de cashflow van het fonds. Ontvangers hebben helder zicht op inkomende betalingen, bijdragen en wat er nog komt."
+            }
+          }
+        }
+      },
+      "underTheHood": {
+        "kicker": "ONDER DE MOTORKAP",
+        "title": "En de delen die u niet ziet.",
+        "body": "Vanaf de grond multi-fonds, AVG-bewust ontworpen, open source onder MIT. Elk fonds draait in isolatie, met eigen data, eigen huisstijl en eigen configuratie — op gedeelde infrastructuur of de uwe.",
+        "chips": {
+          "multiTenant": "Multi-fonds",
+          "gdprConscious": "AVG-bewust",
+          "mitLicense": "MIT-licentie",
+          "publicOnGithub": "Publiek op GitHub",
+          "selfHostOrHosted": "Zelf- of gehost",
+          "dataExport": "Data-export, altijd"
+        }
+      }
+    },
+    "getStarted": {
+      "left": {
+        "eyebrow": "Klaar wanneer u dat bent",
+        "title": "Start een fonds in één namiddag.",
+        "body": "Zet uw subdomein op, nodig uw eerste leden uit, onboard uw eerste handelaars en leveranciers. Helder Nederlands, zinvolle standaardwaarden. €20/maand — gratis voor geregistreerde non-profits en scholen.",
+        "ctaPrimary": "Start een fonds",
+        "ctaSecondary": "Plan een gesprek"
+      },
+      "right": {
+        "eyebrow": "Voor ontwikkelaars",
+        "title": "Zelf-host op uw eigen server.",
+        "body": "Pull de image, draai de migratie, wijs een domein toe. MIT-gelicentieerd op GitHub."
+      }
+    },
+    "footer": {
+      "description": "Open-source infrastructuur voor lokale solidaire fondsen, clubs en gemeenschapsruimtes. Gehost door ons, of zelf-gehost op uw eigen server.",
+      "product": {
+        "heading": "Product",
+        "howItWorks": "Hoe het werkt",
+        "features": "Functies",
+        "changelog": "Wijzigingen"
+      },
+      "resources": {
+        "heading": "Bronnen",
+        "documentation": "Documentatie",
+        "github": "GitHub",
+        "brand": "Merk",
+        "status": "Status"
+      },
+      "organization": {
+        "heading": "Organisatie",
+        "about": "Over",
+        "contact": "Contact",
+        "privacy": "Privacy",
+        "terms": "Voorwaarden"
+      },
+      "copyright": "© 2026 La caisse · AGPL-3.0",
+      "licensesLink": "Licenties"
+    }
+  },
+  "licenses": {
+    "title": "Licenties van derden",
+    "intro": "La caisse is gebouwd op de open-sourceprojecten hieronder. Met dank aan hun auteurs.",
+    "selfLicense": "La caisse zelf valt onder de <link>GNU Affero General Public License v3.0</link>.",
+    "count": "{count, plural, one {# pakket} other {# pakketten}}",
+    "table": {
+      "name": "Pakket",
+      "version": "Versie",
+      "license": "Licentie",
+      "source": "Bron",
+      "viewSource": "Bekijk bron"
+    },
+    "backHome": "Terug naar home"
   }
 }

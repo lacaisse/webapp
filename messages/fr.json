@@ -69,6 +69,12 @@
       "signInFailed": "Échec de la connexion.",
       "sessionExpired": "Session expirée. Réessayez.",
       "establishSessionFailed": "Impossible d'établir la session."
+    },
+    "emails": {
+      "resetPassword": {
+        "subject": "Réinitialisez votre mot de passe La Caisse",
+        "text": "Bonjour,\n\nVous avez demandé à réinitialiser votre mot de passe. Cliquez sur le lien ci-dessous pour en définir un nouveau :\n\n{url}\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez ce message — votre mot de passe ne sera pas modifié.\n\nL'équipe La Caisse"
+      }
     }
   },
   "funds": {
@@ -110,6 +116,7 @@
       "merchants": "Commerces",
       "payments": "Paiements",
       "referrals": "Parrainage",
+      "emails": "Emails",
       "settings": "Paramètres",
       "backToApex": "Retour à mes caisses"
     },
@@ -129,9 +136,9 @@
       "tiers": {
         "title": "Paliers d'allocation",
         "description": "Solde et portée de chaque palier configuré.",
-        "tierLabel": "Palier {n}",
         "range": "Min {min} · Max {max}",
-        "members": "{n} membres"
+        "members": "{n} membres",
+        "empty": "Aucun palier configuré."
       },
       "citizenpay": {
         "title": "Connexion Citizen Pay",
@@ -155,36 +162,40 @@
       "invite": "Inviter un membre",
       "tabs": {
         "all": "Tous",
-        "active": "Actifs",
         "pending": "En attente",
+        "active": "Actifs",
         "inactive": "Inactifs"
       },
       "columns": {
         "name": "Nom",
         "email": "Email",
         "status": "Statut",
-        "cards": "Cartes",
         "tier": "Palier",
+        "cards": "Cartes",
         "joined": "Inscrit le"
       },
+      "unverified": "Email non vérifié",
       "empty": "Aucun membre à afficher."
     },
     "cards": {
       "title": "Cartes",
       "description": "Émettez, liez, bloquez et signalez les cartes perdues.",
-      "issue": "Émettre une carte",
       "tabs": {
+        "all": "Toutes",
         "active": "Actives",
         "lost": "Perdues",
         "blocked": "Bloquées"
       },
       "columns": {
-        "cardNumber": "Carte",
+        "serial": "Série",
         "holder": "Porteur",
-        "linkedTo": "Liée à",
-        "balance": "Solde",
+        "member": "Membre",
         "status": "Statut",
         "issued": "Émise le"
+      },
+      "primary": "Carte principale",
+      "badges": {
+        "lost": "Perdue"
       },
       "empty": "Aucune carte à afficher."
     },
@@ -200,29 +211,58 @@
         "date": "Date",
         "member": "Membre",
         "tier": "Palier",
+        "source": "Source",
+        "period": "Période",
         "amount": "Montant",
-        "type": "Type",
         "status": "Statut",
-        "empty": "Aucune allocation pour le moment."
+        "empty": "Aucune allocation pour le moment.",
+        "sources": {
+          "bankSync": "Dépôt bancaire",
+          "referral": "Récompense parrainage",
+          "manual": "Manuel"
+        }
       },
       "tiers": {
         "addTier": "Ajouter un palier",
+        "edit": "Modifier",
         "name": "Nom",
         "min": "Minimum",
         "target": "Cible",
         "max": "Maximum",
         "members": "Membres",
-        "empty": "Aucun palier configuré. Ajoutez-en un pour commencer."
+        "empty": "Aucun palier configuré. Ajoutez-en un pour commencer.",
+        "dialog": {
+          "createTitle": "Ajouter un palier",
+          "editTitle": "Modifier le palier",
+          "description": "Définissez la plage de contribution et le montant d'allocation. Le montant d'allocation est ce qui est minté lorsqu'un dépôt tombe dans la plage.",
+          "name": "Nom",
+          "min": "Contribution minimum",
+          "allocation": "Montant d'allocation",
+          "max": "Contribution maximum",
+          "position": "Ordre d'affichage",
+          "save": "Enregistrer",
+          "saving": "Enregistrement…",
+          "cancel": "Annuler"
+        },
+        "archive": {
+          "button": "Archiver",
+          "title": "Archiver ce palier ?",
+          "description": "Les paliers archivés n'acceptent plus de nouvelles assignations. Les assignations existantes et les allocations historiques sont conservées.",
+          "cancel": "Annuler",
+          "confirm": "Archiver",
+          "archiving": "Archivage…"
+        }
       },
       "schedule": {
         "title": "Calendrier d'allocation",
-        "description": "Choisissez comment et quand les jetons sont alloués.",
-        "mode": "Mode",
-        "modeHint": "Période fixe ou pay-and-go.",
-        "period": "Période",
-        "periodHint": "Cadence pour le mode période fixe.",
-        "nextRun": "Prochaine exécution",
-        "nextRunHint": "Date de la prochaine allocation automatique."
+        "description": "Batchs en période fixe. Les caisses pay-and-go n'ont pas de périodes.",
+        "payAndGoDescription": "Cette caisse fonctionne en pay-and-go. Les jetons sont attribués immédiatement à la détection d'un dépôt — il n'y a pas de périodes.",
+        "label": "Période",
+        "startsAt": "Début",
+        "cutoffDate": "Date de clôture",
+        "status": "Statut",
+        "closedAt": "Clôturée le",
+        "empty": "Aucune période pour le moment."
       }
     },
     "merchants": {
@@ -230,13 +270,21 @@
       "description": "Onboardez les commerces et suivez leur connexion Citizen Pay.",
       "invite": "Inviter un commerce",
       "tabs": {
-        "active": "Actifs",
         "pending": "En attente",
-        "disconnected": "Déconnectés"
+        "active": "Actifs",
+        "rejected": "Refusés",
+        "inactive": "Inactifs"
+      },
+      "badges": {
+        "verified": "Vérifié",
+        "unverified": "Non vérifié",
+        "connected": "Connecté",
+        "notConnected": "Non connecté"
       },
       "columns": {
         "name": "Nom",
         "contact": "Contact",
+        "emailVerified": "Email",
         "citizenpay": "Citizen Pay",
         "terminal": "Terminal",
         "tokensReceived": "Jetons reçus",
@@ -246,48 +294,50 @@
     },
     "payments": {
       "title": "Paiements",
-      "description": "Transactions, virements aux commerces et frais de plateforme.",
+      "description": "Dépôts bancaires des membres et virements aux commerces.",
       "tabs": {
         "transactions": "Transactions",
-        "payouts": "Virements",
-        "fees": "Frais",
-        "byMerchant": "Par commerce"
+        "unmatched": "Non attribuées",
+        "payouts": "Virements"
       },
       "transactions": {
         "date": "Date",
+        "counterpart": "Contrepartie",
+        "reference": "Référence",
         "member": "Membre",
-        "merchant": "Commerce",
+        "period": "Période",
         "amount": "Montant",
-        "tokens": "Jetons",
-        "status": "Statut",
+        "unmatched": "Non attribuée",
         "empty": "Aucune transaction pour le moment."
       },
       "payouts": {
         "date": "Date",
         "merchant": "Commerce",
-        "transactions": "Transactions",
-        "gross": "Brut",
-        "fees": "Frais",
-        "net": "Net",
-        "status": "Statut",
+        "reference": "Référence",
+        "amount": "Montant",
         "empty": "Aucun virement pour le moment."
       },
-      "fees": {
-        "date": "Date",
-        "merchant": "Commerce",
-        "transaction": "Transaction",
-        "rate": "Taux",
-        "amount": "Montant",
-        "empty": "Aucun frais enregistré."
-      },
-      "byMerchant": {
-        "merchant": "Commerce",
-        "transactions": "Transactions",
-        "totalGross": "Total brut",
-        "totalFees": "Total frais",
-        "totalPaidOut": "Total versé",
-        "balance": "Solde",
-        "empty": "Aucune activité commerce."
+      "admin": {
+        "link": {
+          "button": "Lier à un membre",
+          "unlinkButton": "Délier",
+          "title": "Lier ce dépôt à un membre",
+          "description": "Saisissez la référence de paiement ou l'email du membre. Le dépôt comptera dans son allocation.",
+          "identifierLabel": "Référence de paiement ou email",
+          "identifierPlaceholder": "ABCDEFGH ou membre@exemple.com",
+          "identifierHint": "Insensible à la casse. Les références de paiement font 8 caractères depuis notre alphabet généré.",
+          "identifierRequired": "Saisissez une référence ou un email.",
+          "cancel": "Annuler",
+          "confirm": "Lier",
+          "linking": "Liaison…",
+          "unlinking": "Détachement…"
+        },
+        "errors": {
+          "notFound": "Transaction bancaire introuvable.",
+          "notIncoming": "Seules les transactions entrantes peuvent être liées à un membre.",
+          "memberNotFound": "Aucun membre trouvé avec cette référence ou cet email dans cette caisse.",
+          "identifierRequired": "Saisissez une référence ou un email."
+        }
       }
     },
     "referrals": {
@@ -312,9 +362,41 @@
         "empty": "Aucun parrainage pour le moment."
       }
     },
+    "emails": {
+      "title": "Emails",
+      "description": "Journal de tous les emails transactionnels mis en file ou envoyés par cette caisse.",
+      "tabs": {
+        "all": "Tous",
+        "queued": "En file",
+        "sent": "Envoyés",
+        "failed": "Échoués"
+      },
+      "columns": {
+        "queued": "Mis en file",
+        "recipient": "Destinataire",
+        "type": "Type",
+        "subject": "Sujet",
+        "status": "Statut"
+      },
+      "empty": "Aucun email enregistré.",
+      "detail": {
+        "button": "Voir",
+        "status": "Statut",
+        "queuedAt": "Mis en file",
+        "sentAt": "Envoyé",
+        "failedAt": "Échec",
+        "resendId": "ID Resend",
+        "viewText": "Texte",
+        "viewHtml": "HTML",
+        "noBody": "Le corps a été effacé ou n'a jamais été enregistré."
+      }
+    },
     "settings": {
       "title": "Paramètres",
       "description": "Configurez l'identité, le jeton et les intégrations de la caisse.",
+      "save": "Enregistrer",
+      "saving": "Enregistrement…",
+      "saved": "Enregistré.",
       "tabs": {
         "general": "Général",
         "branding": "Identité visuelle",
@@ -328,42 +410,42 @@
         "description": "Informations de base sur la caisse.",
         "name": "Nom",
         "nameHint": "Nom public affiché aux membres et aux commerces.",
-        "domain": "Domaine",
-        "domainHint": "Nom d'hôte canonique de la caisse.",
         "language": "Langue par défaut",
         "languageHint": "Utilisée si le visiteur n'a pas de langue définie.",
         "timezone": "Fuseau horaire",
-        "timezoneHint": "Affecte les allocations planifiées et les rapports."
+        "timezoneHint": "Affecte les allocations planifiées et les rapports.",
+        "allocationMode": "Mode d'allocation",
+        "allocationModeHint": "Période fixe : batch à chaque clôture. Pay-and-go : mint immédiat à la détection d'un dépôt.",
+        "modeFixedPeriod": "Période fixe",
+        "modePayAndGo": "Pay-and-go"
       },
       "branding": {
         "title": "Identité visuelle",
         "description": "Logo et thème de couleurs de la caisse.",
-        "logo": "Logo",
-        "logoHint": "Affiché dans la barre latérale et les emails.",
+        "logo": "URL du logo",
+        "logoHint": "URL publique d'une image hébergée — affichée dans la barre latérale et les emails. Laissez vide pour utiliser le défaut de la plateforme.",
         "primaryColor": "Couleur primaire",
-        "primaryColorHint": "Utilisée pour les boutons et accents.",
-        "favicon": "Favicon",
-        "faviconHint": "Icône d'onglet du navigateur."
+        "primaryColorHint": "Hex à 6 chiffres. Utilisée pour les boutons et accents."
       },
       "token": {
         "title": "Jeton",
-        "description": "Nommage et plafonds d'émission du jeton.",
+        "description": "Nommage du jeton de la caisse.",
         "name": "Nom du jeton",
         "nameHint": "Affiché dans l'UI lorsqu'on parle du jeton.",
         "symbol": "Symbole",
-        "symbolHint": "Code court affiché à côté des montants.",
-        "cap": "Plafond d'émission",
-        "capHint": "Plafond du réseau limité PSD2 (1 M€)."
+        "symbolHint": "Code court affiché à côté des montants."
       },
       "onboarding": {
         "title": "Onboarding",
-        "description": "Personnalisez l'inscription et le nombre de cartes par membre.",
-        "fields": "Champs d'inscription",
-        "fieldsHint": "Informations collectées à l'inscription.",
-        "cardOptions": "Options de cartes",
-        "cardOptionsHint": "Nombres de cartes prédéfinis (ex: 1, 2, 3, nous contacter).",
-        "welcomeMessage": "Message de bienvenue",
-        "welcomeMessageHint": "Affiché après l'onboarding."
+        "description": "Personnalisez les inscriptions membres et commerces.",
+        "verifyMember": {
+          "label": "Exiger la vérification email pour les membres",
+          "description": "Les membres doivent cliquer sur un lien de confirmation avant que leur demande n'entre dans la file de validation."
+        },
+        "verifyMerchant": {
+          "label": "Exiger la vérification email pour les commerces",
+          "description": "Les commerces doivent cliquer sur un lien de confirmation avant que leur demande n'entre dans la file de validation."
+        }
       },
       "terms": {
         "title": "Mentions légales",
@@ -375,16 +457,304 @@
       },
       "citizenpay": {
         "title": "Citizen Pay",
-        "description": "État de la connexion au compte Citizen Pay et au terminal.",
-        "account": "Compte",
-        "accountHint": "Compte Citizen Pay lié à cette caisse.",
-        "terminal": "Terminal",
-        "terminalHint": "Terminal utilisé pour encaisser les jetons.",
-        "connection": "Connexion",
-        "connectionHint": "Dernier état connu de la connexion API.",
-        "lastSync": "Dernière synchronisation",
-        "lastSyncHint": "Date de la dernière synchronisation réussie."
+        "description": "Connectez cette caisse à son compte Citizen Pay.",
+        "account": "Identifiant Citizen Pay",
+        "accountHint": "Identifiant de votre caisse sur Citizen Pay. Laissez vide pour déconnecter."
       }
+    }
+  },
+  "tiers": {
+    "errors": {
+      "nameRequired": "Le nom du palier est requis.",
+      "invalidAmount": "Le montant doit être un nombre avec jusqu'à 2 décimales.",
+      "orderingInvalid": "Minimum ≤ allocation ≤ maximum.",
+      "nameTaken": "Un autre palier utilise déjà ce nom.",
+      "notFound": "Palier introuvable."
+    }
+  },
+  "settings": {
+    "errors": {
+      "nameMin": "Le nom de la caisse doit contenir au moins 2 caractères.",
+      "localeUnsupported": "Langue non prise en charge.",
+      "timezoneRequired": "Le fuseau horaire est requis.",
+      "colorInvalid": "Utilisez une couleur hex à 6 chiffres (ex. #1a73e8).",
+      "amountInvalid": "Le montant doit être un nombre avec jusqu'à 2 décimales."
+    }
+  },
+  "members": {
+    "email": {
+      "paymentConfirmation": {
+        "subject": "Paiement reçu — {fundName}",
+        "textBody": "Bonjour {firstName},\n\nNous venons de recevoir votre paiement de {amount} le {occurredAt} à {fundName}.\n\nSi votre caisse fonctionne en pay-and-go, votre carte a déjà été créditée. Sinon, le crédit sera attribué lors de la prochaine période d'allocation.\n\nL'équipe {fundName}"
+      },
+      "allocationConfirmation": {
+        "subject": "{amount} viennent d'arriver sur votre carte — {fundName}",
+        "textBody": "Bonjour {firstName},\n\nVotre allocation de {amount} vient d'être créditée sur votre carte {fundName}. Vous pouvez l'utiliser chez tout commerce partenaire.\n\nL'équipe {fundName}"
+      }
+    },
+    "signup": {
+      "title": "Rejoindre {fundName}",
+      "description": "Remplissez vos coordonnées pour demander à devenir membre. Un administrateur vous recontactera.",
+      "firstName": "Prénom",
+      "lastName": "Nom",
+      "email": "Email",
+      "submit": "Envoyer",
+      "submitting": "Envoi…",
+      "errors": {
+        "firstNameRequired": "Le prénom est requis.",
+        "lastNameRequired": "Le nom est requis.",
+        "emailInvalid": "Saisissez une adresse email valide.",
+        "emailTaken": "Une demande avec cet email existe déjà pour cette caisse.",
+        "fieldRequired": "{label} est requis.",
+        "generic": "Une erreur s'est produite. Réessayez."
+      },
+      "email": {
+        "verify": {
+          "subject": "Vérifiez votre email — {fundName}",
+          "textBody": "Bonjour {firstName},\n\nConfirmez votre adresse email pour finaliser votre demande de rejoindre {fundName}. Cliquez sur le lien ci-dessous — il est valable 24 heures :\n\n  {verifyUrl}\n\nSi vous n'avez pas fait cette demande, ignorez cet email.\n\nL'équipe {fundName}"
+        },
+        "welcome": {
+          "subject": "Bienvenue chez {fundName}",
+          "textBody": "Bonjour {firstName},\n\nBienvenue chez {fundName}. Votre demande est en cours d'examen — un administrateur vous contactera bientôt.\n\nLorsque vous serez prêt à contribuer, indiquez cette référence sur votre virement bancaire :\n  {paymentReference}\n\nMerci,\nL'équipe {fundName}"
+        }
+      },
+      "thanks": {
+        "checkEmail": {
+          "title": "Vérifiez votre boîte mail",
+          "description": "Nous avons envoyé un lien de vérification à votre adresse email.",
+          "nextSteps": "Cliquez sur le lien dans l'email pour confirmer votre demande auprès de {fundName}. Le lien est valable 24 heures. Une fois vérifié, un administrateur examinera votre demande."
+        },
+        "applied": {
+          "title": "Demande envoyée",
+          "description": "Merci pour votre demande auprès de {fundName}.",
+          "nextSteps": "Un administrateur examinera votre demande et vous contactera par email."
+        }
+      }
+    },
+    "admin": {
+      "activate": {
+        "button": "Activer",
+        "title": "Activer le membre",
+        "description": "Attribuez une carte à {memberName}. Son compte devient actif immédiatement.",
+        "unverifiedWarning": "Ce membre n'a pas encore vérifié son email. L'email d'activation pourrait revenir.",
+        "serialLabel": "Numéro de série de la carte",
+        "serialPlaceholder": "ex. 040039AA1D1291",
+        "serialHint": "Scannez ou saisissez le UUID NFC inscrit sur la carte physique.",
+        "noteLabel": "Note (optionnel, interne)",
+        "notePlaceholder": "Notes internes sur cette activation.",
+        "cancel": "Annuler",
+        "confirm": "Activer et attribuer la carte",
+        "activating": "Activation…",
+        "serialRequired": "Le numéro de série de la carte est requis."
+      },
+      "invite": {
+        "title": "Inviter un membre",
+        "description": "Créez un membre depuis un formulaire papier ou une demande connue. Il apparaîtra dans l'onglet « En attente » et sera averti par email.",
+        "firstNameLabel": "Prénom",
+        "lastNameLabel": "Nom",
+        "emailLabel": "Email",
+        "cancel": "Annuler",
+        "confirm": "Inviter le membre",
+        "inviting": "Envoi de l'invitation…"
+      },
+      "addCard": {
+        "button": "Ajouter une carte",
+        "title": "Ajouter une carte",
+        "description": "Liez une carte supplémentaire à {memberName} — typiquement pour un dépendant. La nouvelle carte partage le portefeuille de la carte principale.",
+        "serialLabel": "Numéro de série de la carte",
+        "serialPlaceholder": "ex. 040039AA1D1291",
+        "serialHint": "Scannez ou saisissez le UUID NFC inscrit sur la carte physique.",
+        "holderLabel": "Nom du porteur",
+        "holderHint": "La personne qui porte cette carte — laissez vide pour utiliser le nom du membre.",
+        "cancel": "Annuler",
+        "confirm": "Ajouter la carte",
+        "adding": "Ajout…",
+        "serialRequired": "Le numéro de série de la carte est requis."
+      },
+      "email": {
+        "activated": {
+          "subject": "Votre compte est actif — {fundName}",
+          "textBody": "Bonjour {firstName},\n\nBienvenue chez {fundName} — votre compte est maintenant actif.\n\nVotre carte (série {cardSerial}) est à vous. Lorsque vous êtes prêt à contribuer, indiquez cette référence sur chaque virement pour que nous puissions créditer votre carte automatiquement :\n\n  {paymentReference}\n\nUtilisez votre carte chez tout commerce partenaire — ils sauront encaisser les jetons.\n\nL'équipe {fundName}"
+        },
+        "invited": {
+          "subject": "Vous êtes invité chez {fundName}",
+          "textBody": "Bonjour {firstName},\n\nUn administrateur de {fundName} vient de vous ajouter comme membre. Vous recevrez votre carte lors de votre prochain contact avec l'équipe.\n\nLorsque vous serez prêt à contribuer, indiquez cette référence sur votre virement bancaire pour que nous puissions créditer votre carte automatiquement :\n\n  {paymentReference}\n\nL'équipe {fundName}"
+        },
+        "referralBonusAwarded": {
+          "subject": "Votre bonus de parrainage a été ajouté — {fundName}",
+          "textBody": "Bonjour {firstName},\n\nMerci d'avoir amené un nouveau membre à {fundName}. Votre filleul a activé son compte, et un bonus de {amount} vient d'être ajouté à votre carte.\n\nL'équipe {fundName}"
+        }
+      },
+      "errors": {
+        "emailTaken": "Un membre avec cet email existe déjà pour cette caisse.",
+        "generic": "Une erreur s'est produite. Réessayez.",
+        "notFound": "Membre introuvable.",
+        "alreadyActive": "Ce membre est déjà actif.",
+        "alreadyHasPrimaryCard": "Ce membre a déjà une carte principale.",
+        "notActiveForCard": "Seuls les membres actifs peuvent recevoir des cartes supplémentaires.",
+        "noPrimaryCard": "Activez d'abord le membre — il a besoin d'une carte principale avant de pouvoir en lier d'autres.",
+        "serialRequired": "Le numéro de série de la carte est requis.",
+        "serialTaken": "Cette carte est déjà attribuée à un autre membre.",
+        "tierNotFound": "Palier introuvable ou archivé.",
+        "invalidStatusTransition": "Ce changement de statut n'est pas autorisé depuis l'état actuel."
+      },
+      "status": {
+        "button": "Statut",
+        "title": "Changer le statut du membre",
+        "description": "{memberName} est actuellement {currentStatus}.",
+        "targetLabel": "Nouveau statut",
+        "values": {
+          "ACTIVE": "Actif",
+          "INACTIVE": "Inactif",
+          "LEFT": "Parti"
+        },
+        "leftWarning": "Marquer comme Parti enregistre une date de départ. Utilisez Inactif pour une pause temporaire.",
+        "cancel": "Annuler",
+        "confirm": "Mettre à jour",
+        "saving": "Enregistrement…"
+      }
+    }
+  },
+  "cards": {
+    "admin": {
+      "block": {
+        "button": "Bloquer",
+        "title": "Bloquer cette carte ?",
+        "description": "{holderLabel} ne pourra plus utiliser cette carte. Vous pourrez la débloquer plus tard.",
+        "lostLabel": "Le membre a signalé la carte comme perdue",
+        "lostDescription": "Enregistre un indicateur interne en plus du blocage. Pratique pour suivre les cartes perdues.",
+        "cancel": "Annuler",
+        "confirm": "Bloquer la carte",
+        "blocking": "Blocage…"
+      },
+      "unblock": {
+        "button": "Débloquer",
+        "title": "Débloquer cette carte ?",
+        "description": "{holderLabel} pourra à nouveau utiliser cette carte.",
+        "clearLostLabel": "Effacer l'indicateur de perte",
+        "clearLostDescription": "Le membre a retrouvé sa carte. Décochez pour conserver l'indicateur de perte dans l'historique.",
+        "cancel": "Annuler",
+        "confirm": "Débloquer la carte",
+        "unblocking": "Déblocage…"
+      },
+      "errors": {
+        "notFound": "Carte introuvable.",
+        "alreadyBlocked": "Cette carte est déjà bloquée.",
+        "alreadyActive": "Cette carte est déjà active."
+      }
+    }
+  },
+  "merchants": {
+    "signup": {
+      "title": "Devenir commerce partenaire de {fundName}",
+      "description": "Parlez-nous de votre commerce. Un administrateur examinera votre demande et vous contactera.",
+      "submit": "Envoyer",
+      "submitting": "Envoi…",
+      "fields": {
+        "name": "Nom du commerce",
+        "description": "Description",
+        "contactName": "Personne de contact",
+        "email": "Email",
+        "phone": "Téléphone",
+        "website": "Site web",
+        "logoUrl": "URL du logo",
+        "address": "Adresse",
+        "postalCode": "Code postal",
+        "city": "Ville",
+        "country": "Pays"
+      },
+      "errors": {
+        "nameRequired": "Le nom du commerce est requis.",
+        "contactNameRequired": "Le nom de la personne de contact est requis.",
+        "emailInvalid": "Saisissez une adresse email valide.",
+        "addressRequired": "L'adresse est requise.",
+        "postalCodeRequired": "Le code postal est requis.",
+        "cityRequired": "La ville est requise.",
+        "countryRequired": "Le pays est requis.",
+        "nameTaken": "Un commerce avec ce nom existe déjà pour cette caisse.",
+        "fieldRequired": "{label} est requis.",
+        "generic": "Une erreur s'est produite. Réessayez."
+      },
+      "email": {
+        "verify": {
+          "subject": "Vérifiez votre email — {fundName}",
+          "textBody": "Bonjour {merchantName},\n\nConfirmez votre adresse email pour finaliser votre demande de rejoindre {fundName} en tant que commerce. Cliquez sur le lien ci-dessous — il est valable 24 heures :\n\n  {verifyUrl}\n\nSi vous n'avez pas fait cette demande, ignorez cet email.\n\nL'équipe {fundName}"
+        },
+        "welcome": {
+          "subject": "Demande reçue — {fundName}",
+          "textBody": "Bonjour {merchantName},\n\nMerci d'avoir confirmé votre email. Votre demande pour rejoindre {fundName} en tant que commerce est maintenant en cours d'examen par un administrateur. Nous reviendrons vers vous.\n\nL'équipe {fundName}"
+        }
+      },
+      "thanks": {
+        "checkEmail": {
+          "title": "Vérifiez votre boîte mail",
+          "description": "Nous avons envoyé un lien de vérification à votre adresse email.",
+          "nextSteps": "Cliquez sur le lien dans l'email pour confirmer votre demande auprès de {fundName}. Le lien est valable 24 heures. Une fois vérifié, un administrateur examinera votre demande."
+        },
+        "applied": {
+          "title": "Demande envoyée",
+          "description": "Merci pour votre demande auprès de {fundName}.",
+          "nextSteps": "Un administrateur examinera votre demande et vous contactera par email. Une fois approuvé, vous recevrez les informations pour vous connecter à Citizen Pay."
+        }
+      }
+    },
+    "admin": {
+      "review": {
+        "approve": "Approuver",
+        "reject": "Refuser",
+        "reconsider": "Réexaminer",
+        "reconsidering": "Réexamen…",
+        "cancel": "Annuler",
+        "approving": "Approbation…",
+        "rejecting": "Refus…",
+        "approveConfirm": "Approuver et envoyer l'email",
+        "rejectConfirm": "Refuser et envoyer l'email",
+        "approveTitle": "Approuver ce commerce ?",
+        "approveDescription": "Un email sera envoyé à {merchantName} pour l'inviter à se connecter à Citizen Pay.",
+        "approveUnverifiedWarning": "Ce commerce n'a pas encore vérifié son email. L'email d'approbation pourrait revenir.",
+        "approveNoteLabel": "Note (optionnel, interne)",
+        "approveNotePlaceholder": "Notes internes sur cette approbation — visibles uniquement par les administrateurs.",
+        "rejectTitle": "Refuser ce commerce ?",
+        "rejectDescription": "{merchantName} sera notifié avec le motif ci-dessous. Il pourra refaire une demande plus tard.",
+        "rejectReasonLabel": "Motif",
+        "rejectReasonPlaceholder": "Partagé avec le commerce dans l'email de refus.",
+        "reasonRequired": "Un motif est requis pour que le commerce comprenne la décision."
+      },
+      "email": {
+        "approved": {
+          "subject": "Demande approuvée — {fundName}",
+          "textBodyWithLink": "Bonjour {merchantName},\n\nVotre demande pour rejoindre {fundName} a été approuvée.\n\nProchaine étape : connectez votre commerce à Citizen Pay pour que votre terminal puisse accepter les jetons. Rendez-vous sur :\n\n  {citizenPayUrl}\n\nUne fois l'onboarding Citizen Pay terminé, vous serez actif dans le réseau {fundName}. Pour toute question, contactez l'administrateur de la caisse.\n\nL'équipe {fundName}",
+          "textBodyWithoutLink": "Bonjour {merchantName},\n\nVotre demande pour rejoindre {fundName} a été approuvée.\n\nL'administrateur de la caisse vous contactera avec les informations pour vous connecter à Citizen Pay et commencer à accepter les jetons.\n\nL'équipe {fundName}"
+        },
+        "rejected": {
+          "subject": "Mise à jour de votre demande — {fundName}",
+          "textBody": "Bonjour {merchantName},\n\nMerci pour votre demande auprès de {fundName}. Malheureusement, nous ne pouvons pas approuver votre demande pour le moment.\n\nMotif de l'administrateur :\n\n  {reason}\n\nPour en discuter ou refaire une demande plus tard, contactez l'administrateur de la caisse.\n\nL'équipe {fundName}"
+        }
+      },
+      "errors": {
+        "notFound": "Commerce introuvable.",
+        "alreadyApproved": "Ce commerce est déjà approuvé.",
+        "alreadyRejected": "Ce commerce est déjà refusé.",
+        "notRejected": "Seuls les commerces refusés peuvent être réexaminés.",
+        "reasonRequired": "Un motif est requis."
+      }
+    }
+  },
+  "verifyEmail": {
+    "success": {
+      "title": "Email vérifié",
+      "description": "Merci d'avoir confirmé votre email pour {fundName}.",
+      "nextSteps": "Un administrateur vous contactera par email."
+    },
+    "error": {
+      "title": "Échec de la vérification",
+      "reasons": {
+        "missing": "Aucun jeton de vérification n'a été fourni.",
+        "not_found": "Ce lien de vérification n'est pas valide.",
+        "expired": "Ce lien de vérification a expiré.",
+        "email_mismatch": "L'adresse email a changé depuis l'envoi de ce lien."
+      },
+      "nextSteps": "Contactez l'administrateur de la caisse ou refaites une demande pour recevoir un nouveau lien de vérification."
     }
   },
   "account": {
@@ -424,5 +794,372 @@
     "notFoundDescription": "La page que vous cherchez n'existe pas.",
     "unauthorizedTitle": "Vous n'avez pas accès à cette page",
     "unauthorizedDescription": "Vous êtes connecté mais votre compte n'a pas les permissions requises pour cette ressource. Si vous pensez qu'il s'agit d'une erreur, contactez le propriétaire de la caisse ou un administrateur."
+  },
+  "landing": {
+    "nav": {
+      "howItWorks": "Comment ça marche",
+      "multiTenant": "Multi-caisses",
+      "features": "Fonctionnalités",
+      "getStarted": "Commencer",
+      "docs": "Docs",
+      "signIn": "Se connecter",
+      "startFund": "Créer une caisse"
+    },
+    "hero": {
+      "badge": "Open source · Multi-caisses · Hébergé ou auto-hébergé",
+      "headlineBefore": "Animez la caisse sur laquelle votre",
+      "headlineItalic": "communauté",
+      "headlineAfter": "compte.",
+      "descriptionLead": "La caisse",
+      "description": "donne aux caisses solidaires, clubs et espaces communautaires tout ce qu'il faut pour <em>gérer les membres</em>, <em>suivre chaque contribution</em> et <em>verser sans friction</em> — sous votre marque, à vos conditions.",
+      "alreadyMember": "Déjà membre ? Trouvez votre caisse",
+      "configurator": {
+        "eyebrow": "Voyez-le à vos couleurs",
+        "reset": "Réinitialiser",
+        "fundName": "Nom de la caisse",
+        "fundNameHelper": "C'est ainsi que vos membres verront votre caisse.",
+        "fundType": "Type de caisse",
+        "fundTypeHelper": "La démo s'adapte avec des données d'exemple selon votre type.",
+        "fundTypeOptions": {
+          "solidarityFund": "Caisse solidaire",
+          "club": "Club",
+          "communitySpace": "Espace communautaire",
+          "other": "Autre"
+        },
+        "primaryColor": "Couleur principale",
+        "tokenName": "Nom du jeton",
+        "tokenNameHelper": "Comment s'appelle la monnaie de votre caisse. Au singulier — on gère le pluriel.",
+        "tryWith": "Essayer avec cette identité",
+        "skipDemo": "Passer la démo, créer une caisse",
+        "swatchHelperDefault": "la couleur par défaut de la caisse.",
+        "swatchHelperOther": "utilisée pour les boutons, accents et mises en avant.",
+        "errors": {
+          "fundEmpty": "Donnez un nom à votre caisse pour continuer.",
+          "fundTooShort": "Un peu plus long, s'il vous plaît — au moins 3 caractères.",
+          "fundTooLong": "Sous 60 caractères — c'est un nom d'affichage, pas une description.",
+          "tokenEmpty": "Donnez un nom à votre jeton. « solidaire », « crédit », « ticket » — à vous de voir.",
+          "tokenTooLong": "Restez court — ce mot apparaît dans chaque solde et transaction.",
+          "tokenMultiWord": "Un seul mot fonctionne mieux — « solidaires » sonne mieux dans un solde que « crédits alimentaires »."
+        }
+      },
+      "swatches": {
+        "terracotta": "Terracotta",
+        "forest": "Forêt",
+        "indigo": "Indigo",
+        "plum": "Prune",
+        "slate": "Ardoise",
+        "ochre": "Ocre"
+      },
+      "preview": {
+        "date": "Octobre 2026",
+        "yourFund": "Votre caisse",
+        "allocateButton": "Allouer",
+        "nav": {
+          "overview": "Aperçu",
+          "members": "Membres",
+          "allocations": "Allocations",
+          "merchants": "Commerçants",
+          "transactions": "Transactions",
+          "settings": "Paramètres"
+        },
+        "kpi": {
+          "members": "Membres",
+          "membersDelta": "+12 ce mois-ci",
+          "tokensInCirculation": "{token} en circulation",
+          "tokensDelta": "83 % utilisés",
+          "merchants": "Commerçants partenaires",
+          "merchantsDelta": "4 en attente"
+        },
+        "chart": {
+          "title": "Allocations vs. dépenses",
+          "allocated": "allouées",
+          "redeemed": "dépensées"
+        },
+        "activity": {
+          "title": "Activité récente",
+          "received": "a reçu {amount}",
+          "redeemed": "a encaissé {amount} jetons",
+          "joined": "a rejoint la caisse"
+        }
+      }
+    },
+    "howItWorks": {
+      "title": "Une caisse, trois côtés.",
+      "intro": "Une caisse est un pot commun — alimenté par les contributions des membres, les cotisations, les dons ou les subventions — qui paye les personnes et entreprises qui font tourner les choses, qu'il s'agisse de commerçants locaux, de fournisseurs, du bar de votre club ou des prestataires de votre espace. La caisse anime toute la boucle, des membres et contributeurs à l'entrée jusqu'aux versements à la sortie.",
+      "members": {
+        "role": "Membres",
+        "title": "Les membres reçoivent et dépensent.",
+        "body": "Les membres s'inscrivent via le formulaire d'onboarding de votre caisse et obtiennent un solde à utiliser — crédité par allocations, cotisations, recharges ou contributions, selon le fonctionnement de votre caisse. Ils utilisent une carte pour dépenser chez les commerçants et fournisseurs partenaires. Ils peuvent ajouter des cartes pour leurs proches, signaler une carte perdue, consulter leur solde et inviter d'autres personnes avec un code de parrainage qui les récompense à l'activation du nouveau membre.",
+        "list": [
+          "Un compte, plusieurs cartes",
+          "Recharges, cotisations ou allocations automatiques",
+          "Parrainages qui font grandir la caisse"
+        ]
+      },
+      "team": {
+        "role": "L'équipe de la caisse",
+        "title": "Votre équipe pilote la caisse.",
+        "body": "Vous fixez les règles : comment l'argent entre et sort, à quelle cadence, et selon quelle structure. Les caisses solidaires configurent typiquement des allocations par paliers ; les clubs configurent des cotisations ; les espaces communautaires configurent des abonnements. La caisse s'occupe du reste — onboarding des nouveaux membres, rappels, signalement des paiements ou contributions manqués, et tableau de bord en direct des soldes, paiements et activité par fournisseur.",
+        "list": [
+          "Allocations, cotisations ou abonnements",
+          "Onboarding des membres et gestion des comptes",
+          "Tableau de bord et emails transactionnels"
+        ]
+      },
+      "merchants": {
+        "role": "Commerçants & fournisseurs",
+        "title": "Commerçants et fournisseurs sont payés.",
+        "body": "Les personnes et entreprises que vous payez — commerçants locaux, fournisseurs, bar de votre club, prestataires d'événements pour votre espace — s'inscrivent auprès de votre caisse et connectent un compte Citizen Pay. Quand vous leur devez de l'argent, La caisse verse selon le cycle que vous définissez, moins les frais que votre caisse configure. Ils voient leurs paiements entrants, frais et historique des versements depuis leur propre tableau de bord.",
+        "list": [
+          "Onboarding Citizen Pay en une fois",
+          "Frais côté caisse configurables",
+          "Versements réguliers, historique complet"
+        ]
+      },
+      "loopEyebrow": "Et l'argent circule",
+      "loopCaption": "Contributions et cotisations alimentent le pot. Les membres utilisent ce qui leur revient. Fournisseurs et commerçants sont payés. Les rapports tracent chaque étape.",
+      "loop": {
+        "contributions": "Contributions",
+        "fundBalance": "Solde de la caisse",
+        "memberSpending": "Dépenses des membres",
+        "merchantPayouts": "Versements"
+      }
+    },
+    "multiTenant": {
+      "title": "Votre caisse. Votre marque. Vos règles",
+      "titleQualifier": " — dans des limites raisonnables.",
+      "intro": "La caisse est conçue pour que chaque caisse tourne comme son propre produit. Les membres ne voient jamais une plateforme générique — ils voient votre caisse. En coulisses, la plateforme reste cohérente afin que les caisses puissent partager les améliorations, mutualiser l'infrastructure et éviter le coût d'entretien d'un véritable fork.",
+      "yours": {
+        "kicker": "À VOUS DE CONFIGURER",
+        "heading": "À vous de configurer.",
+        "description": "Tout ce que les membres et commerçants perçoivent comme « votre caisse ».",
+        "items": {
+          "customDomain": {
+            "title": "Domaine personnalisé",
+            "body": "Tournez sur votrecaisse.org ou un sous-domaine de l'instance officielle. SSL géré, aucune configuration requise."
+          },
+          "logoAndColor": {
+            "title": "Logo et couleur de marque",
+            "body": "Téléversez votre logo, choisissez une couleur principale. Boutons, liens, accents, emails transactionnels — l'interface reprend votre couleur automatiquement."
+          },
+          "tokenName": {
+            "title": "Nom du jeton",
+            "body": "Appelez la monnaie de votre caisse comme cela vous convient — solidaire, panier, crédit, ticket. Elle apparaît dans chaque solde, transaction et email."
+          },
+          "registrationForm": {
+            "title": "Formulaire d'inscription",
+            "body": "Construisez le formulaire d'onboarding dont votre caisse a besoin. Composition du foyer, palier de revenus, quartier, consentement RGPD — vos champs, votre validation, votre ordre."
+          },
+          "terms": {
+            "title": "Conditions générales",
+            "body": "Vos conditions, affichées pendant l'onboarding et accessibles depuis chaque compte membre. Versionnées, avec demande de ré-acceptation en cas de mise à jour."
+          },
+          "allocationRules": {
+            "title": "Règles d'allocation",
+            "body": "Configurez comment l'argent circule — paliers d'allocations pour les caisses solidaires, cotisations pour les clubs, abonnements pour les espaces communautaires. Cadence, montants et affectations restent sous votre contrôle. Votre politique, codifiée."
+          },
+          "language": {
+            "title": "Langue de l'interface",
+            "body": "FR, EN ou NL aujourd'hui. Les membres voient par défaut la langue de votre caisse ; les caisses bilingues peuvent laisser le choix."
+          },
+          "merchantFees": {
+            "title": "Frais commerçants",
+            "body": "Définissez la structure de frais qui convient à votre caisse et à vos commerçants — pourcentage fixe, frais par transaction, ou hybride."
+          }
+        }
+      },
+      "shared": {
+        "kicker": "PARTAGÉ ENTRE TOUTES LES CAISSES",
+        "heading": "Partagé entre toutes les caisses.",
+        "description": "Les choix structurels qui permettent aux caisses de partager des améliorations et de rester fiables.",
+        "items": {
+          "coreMechanics": {
+            "title": "Mécanismes de base",
+            "body": "Le fonctionnement des allocations, paiements et comptes membres est le même partout. Quand une caisse trouve mieux, toutes en profitent."
+          },
+          "pageStructure": {
+            "title": "Structure et navigation",
+            "body": "Les membres et commerçants qui connaissent une caisse retrouvent leurs repères dans une autre. Même mise en page, mêmes parcours."
+          },
+          "typography": {
+            "title": "Typographie et espacement",
+            "body": "Caractères, tailles, échelle d'espacement et formes des composants sont fixés. Les caisses choisissent leur couleur et leur logo ; le reste reste cohérent."
+          },
+          "security": {
+            "title": "Sécurité et infrastructure",
+            "body": "Authentification, gestion des sessions, audit logs, RGPD, chiffrement — non configurables par caisse, parce qu'il n'y a pas de bonne raison qu'ils varient."
+          },
+          "paymentIntegration": {
+            "title": "Intégration de paiement",
+            "body": "Citizen Pay est le rail de paiement commerçant. D'autres intégrations viendront, mais chaque caisse n'amène pas la sienne."
+          }
+        }
+      },
+      "hosting": {
+        "eyebrow": "Hébergement",
+        "title": "Géré par nous, ou par vous.",
+        "subtitle": "Deux chemins, le même logiciel.",
+        "path1": {
+          "step": "PARCOURS 01",
+          "label": "INSTANCE OFFICIELLE",
+          "title": "Hébergée par Citizen Pay.",
+          "body": "Nous provisionnons votre caisse, gérons l'hébergement et les mises à jour, et exploitons l'infrastructure. Vous vous concentrez sur vos membres. 20 €/mois forfait — gratuit pour les associations enregistrées et les écoles."
+        },
+        "path2": {
+          "step": "PARCOURS 02",
+          "label": "AUTO-HÉBERGÉ",
+          "title": "Faites-le tourner vous-même.",
+          "body": "Sous licence MIT, déployez sur votre propre compte Vercel ou partout où Next.js tourne. Vous gérez l'hébergement et les mises à jour ; vous gardez le contrôle total. Gratuit."
+        },
+        "compareLink": "Comparer en détail →"
+      }
+    },
+    "features": {
+      "titleTop": "Tout ce qu'une caisse a besoin.",
+      "titleBottom": "Rien de plus.",
+      "intro": "Construit après des années d'expérience à animer de vraies caisses — à commencer par La CLASS — et façonné pour les caisses solidaires, clubs et espaces communautaires qui suivent. Groupé par utilisateur.",
+      "groupLabel": "GROUPE",
+      "groups": {
+        "members": {
+          "label": "Pour vos membres",
+          "intro": "Un compte simple, une carte, et un solde clairement à eux.",
+          "items": {
+            "accountsCards": {
+              "kicker": "Comptes & cartes",
+              "title": "Un compte, plusieurs cartes.",
+              "body": "Les membres s'inscrivent une fois et peuvent ajouter des cartes pour des proches — conjoint, enfant, toute personne du foyer couverte par la caisse. Les cartes perdues ou volées se bloquent depuis l'application en quelques secondes."
+            },
+            "allocations": {
+              "kicker": "Mises à jour du solde",
+              "title": "L'argent bouge à l'heure.",
+              "body": "Les membres voient leur solde évoluer selon la cadence fixée par votre caisse — hebdomadaire, mensuelle ou autre. Des rappels avant chaque cycle évitent les oublis."
+            },
+            "balance": {
+              "kicker": "Solde & historique",
+              "title": "Toujours savoir où ça en est.",
+              "body": "Solde courant, historique complet, dépenses récentes chez chaque commerçant. Tout ce qu'il faut aux membres, rien de plus."
+            },
+            "referrals": {
+              "kicker": "Parrainages",
+              "title": "Les membres font grandir la caisse.",
+              "body": "Chaque membre dispose d'un code d'invitation. Quand quelqu'un s'inscrit et active son compte via ce code, le parrain est récompensé — d'un montant que votre caisse configure."
+            }
+          }
+        },
+        "team": {
+          "label": "Pour votre équipe",
+          "intro": "Les leviers pour piloter la caisse et la visibilité pour s'assurer qu'elle tourne.",
+          "items": {
+            "tieredAllocations": {
+              "kicker": "Allocations par paliers",
+              "title": "Allouer selon la situation, pas selon une formule.",
+              "body": "Configurez les montants cible, minimum et maximum qui s'adaptent à la situation de chaque membre — taille du foyer ou revenus pour les caisses solidaires, âge ou catégorie pour les clubs, type d'abonnement pour les espaces communautaires. Les membres de paliers différents contribuent ou reçoivent différemment, automatiquement."
+            },
+            "memberManagement": {
+              "kicker": "Gestion des membres",
+              "title": "Onboarding, activation et tâches ingrates gérés.",
+              "body": "Formulaire d'inscription (à votre main), activation des comptes, changements d'adresse, remplacements de cartes — tout au même endroit, tout auditable."
+            },
+            "reporting": {
+              "kicker": "Rapports",
+              "title": "Voir toute la caisse d'un coup d'œil.",
+              "body": "Solde total, solde par palier, paiements par commerçant ou fournisseur, activité récente. Exportez ce qu'il vous faut pour votre rapport annuel ou votre financeur."
+            },
+            "transactionalEmail": {
+              "kicker": "Emails transactionnels",
+              "title": "Le bon message au bon moment.",
+              "body": "Confirmation à l'arrivée d'un membre, rappels avant chaque cycle, alertes en cas de souci. Envoyés automatiquement, à la marque de votre caisse."
+            }
+          }
+        },
+        "merchants": {
+          "label": "Pour les commerçants et fournisseurs",
+          "intro": "Une intégration nette qui ne demande pas aux personnes que vous payez d'apprendre un nouvel outil.",
+          "items": {
+            "onboarding": {
+              "kicker": "Onboarding",
+              "title": "S'inscrire une fois, être payé à jamais.",
+              "body": "Commerçants et fournisseurs connectent un compte Citizen Pay lors de l'onboarding. Pas de lecteur de carte à installer, pas de connexion mensuelle requise."
+            },
+            "fees": {
+              "kicker": "Frais configurables",
+              "title": "Votre caisse fixe les règles.",
+              "body": "Définissez des frais — pourcentage fixe ou montant par transaction — automatiquement déduits au versement. Les bénéficiaires voient le détail sur chaque transaction."
+            },
+            "payouts": {
+              "kicker": "Versements réguliers",
+              "title": "L'argent arrive quand prévu.",
+              "body": "Définissez un cycle de versement adapté à vos fournisseurs et à la trésorerie de la caisse. Les bénéficiaires ont une vue claire des paiements entrants, des frais et de ce qui est dû."
+            }
+          }
+        }
+      },
+      "underTheHood": {
+        "kicker": "SOUS LE CAPOT",
+        "title": "Et les parties que vous ne voyez pas.",
+        "body": "Multi-caisses dès le départ, soucieuse du RGPD par conception, open source sous MIT. Chaque caisse tourne en isolation, avec ses propres données, sa propre marque et sa propre configuration — sur une infrastructure mutualisée ou la vôtre.",
+        "chips": {
+          "multiTenant": "Multi-caisses",
+          "gdprConscious": "Soucieuse du RGPD",
+          "mitLicense": "Licence MIT",
+          "publicOnGithub": "Public sur GitHub",
+          "selfHostOrHosted": "Auto-hébergée ou hébergée",
+          "dataExport": "Export des données, toujours"
+        }
+      }
+    },
+    "getStarted": {
+      "left": {
+        "eyebrow": "Quand vous êtes prêt",
+        "title": "Lancez une caisse en une après-midi.",
+        "body": "Configurez votre sous-domaine, invitez vos premiers membres, intégrez vos premiers commerçants et fournisseurs. En français clair, avec des valeurs par défaut sensées. 20 €/mois — gratuit pour les associations enregistrées et les écoles.",
+        "ctaPrimary": "Créer une caisse",
+        "ctaSecondary": "Prendre rendez-vous"
+      },
+      "right": {
+        "eyebrow": "Pour les développeurs",
+        "title": "Auto-hébergez sur votre serveur.",
+        "body": "Tirez l'image, lancez la migration, pointez un domaine. Sous licence MIT sur GitHub."
+      }
+    },
+    "footer": {
+      "description": "Infrastructure open source pour les caisses solidaires, clubs et espaces communautaires locaux. Hébergée par nous, ou auto-hébergée sur votre serveur.",
+      "product": {
+        "heading": "Produit",
+        "howItWorks": "Comment ça marche",
+        "features": "Fonctionnalités",
+        "changelog": "Journal des évolutions"
+      },
+      "resources": {
+        "heading": "Ressources",
+        "documentation": "Documentation",
+        "github": "GitHub",
+        "brand": "Marque",
+        "status": "État du service"
+      },
+      "organization": {
+        "heading": "Organisation",
+        "about": "À propos",
+        "contact": "Contact",
+        "privacy": "Confidentialité",
+        "terms": "Conditions"
+      },
+      "copyright": "© 2026 La caisse · AGPL-3.0",
+      "licensesLink": "Licences"
+    }
+  },
+  "licenses": {
+    "title": "Licences tierces",
+    "intro": "La caisse repose sur les projets open-source ci-dessous. Merci à leurs auteurs.",
+    "selfLicense": "La caisse elle-même est distribuée sous <link>licence publique générale GNU Affero v3.0</link>.",
+    "count": "{count, plural, one {# paquet} other {# paquets}}",
+    "table": {
+      "name": "Paquet",
+      "version": "Version",
+      "license": "Licence",
+      "source": "Source",
+      "viewSource": "Voir la source"
+    },
+    "backHome": "Retour à l’accueil"
   }
 }

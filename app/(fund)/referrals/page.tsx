@@ -1,5 +1,6 @@
-import { getTranslations } from "next-intl/server";
+import { getFormatter, getTranslations } from "next-intl/server";
 
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -10,14 +11,31 @@ import {
 import {
   Table,
   TableBody,
+  TableCell,
   TableEmpty,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { prisma } from "@/services/db/prisma";
+import { requireCurrentFund } from "@/services/fund/server";
+import { ReferralForm } from "@/app/(fund)/settings/settings-forms";
 
 export default async function ReferralsPage() {
   const t = await getTranslations("fund.referrals");
+  const format = await getFormatter();
+  const fund = await requireCurrentFund();
+
+  const referrals = await prisma.referral.findMany({
+    where: { fundId: fund.id },
+    orderBy: { createdAt: "desc" },
+    take: 200,
+    include: {
+      sponsor: { select: { firstName: true, lastName: true } },
+      referee: { select: { firstName: true, lastName: true } },
+      rewardOperation: { select: { status: true } },
+    },
+  });
 
   return (
     <>
@@ -31,14 +49,31 @@ export default async function ReferralsPage() {
           <CardTitle>{t("config.title")}</CardTitle>
           <CardDescription>{t("config.description")}</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 pb-4 sm:grid-cols-2">
-          <Field label={t("config.bonus")} value="—" hint={t("config.bonusHint")} />
-          <Field label={t("config.codeFormat")} value="—" hint={t("config.codeFormatHint")} />
+        <CardContent className="pb-4">
+          <ReferralForm
+            fund={{
+              name: fund.name,
+              defaultLocale: fund.defaultLocale,
+              timezone: fund.timezone,
+              allocationMode: fund.allocationMode,
+              logoUrl: fund.logoUrl,
+              primaryColor: fund.primaryColor,
+              tokenName: fund.tokenName,
+              tokenSymbol: fund.tokenSymbol,
+              termsUrl: fund.termsUrl,
+              privacyUrl: fund.privacyUrl,
+              citizenPayFundId: fund.citizenPayFundId,
+              referralBonusAmount:
+                fund.referralBonusAmount?.toString() ?? null,
+            }}
+          />
         </CardContent>
       </Card>
 
       <section className="space-y-3">
-        <h2 className="font-heading text-lg font-medium">{t("history.title")}</h2>
+        <h2 className="font-heading text-lg font-medium">
+          {t("history.title")}
+        </h2>
         <Table>
           <TableHeader>
             <TableRow>
@@ -51,7 +86,35 @@ export default async function ReferralsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            <TableEmpty colSpan={6}>{t("history.empty")}</TableEmpty>
+            {referrals.length === 0 ? (
+              <TableEmpty colSpan={6}>{t("history.empty")}</TableEmpty>
+            ) : (
+              referrals.map((r) => (
+                <TableRow key={r.id}>
+                  <TableCell>
+                    {`${r.sponsor.firstName} ${r.sponsor.lastName}`.trim()}
+                  </TableCell>
+                  <TableCell>
+                    {`${r.referee.firstName} ${r.referee.lastName}`.trim()}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs">
+                    {r.codeUsed}
+                  </TableCell>
+                  <TableCell>
+                    <ReferralStatusBadge
+                      status={r.status}
+                      mintStatus={r.rewardOperation?.status}
+                    />
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {fund.referralBonusAmount?.toString() ?? "—"}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {format.dateTime(r.createdAt, { dateStyle: "medium" })}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </section>
@@ -59,22 +122,17 @@ export default async function ReferralsPage() {
   );
 }
 
-function Field({
-  label,
-  value,
-  hint,
+function ReferralStatusBadge({
+  status,
+  mintStatus,
 }: {
-  label: string;
-  value: string;
-  hint: string;
+  status: "PENDING" | "ACTIVATED";
+  mintStatus?: "PENDING" | "CONFIRMED" | "FAILED";
 }) {
-  return (
-    <div>
-      <div className="text-xs tracking-wide text-muted-foreground uppercase">
-        {label}
-      </div>
-      <div className="mt-1 text-base font-medium">{value}</div>
-      <div className="mt-0.5 text-xs text-muted-foreground">{hint}</div>
-    </div>
-  );
+  if (status === "PENDING") return <Badge variant="warning">{status}</Badge>;
+  if (mintStatus === "CONFIRMED") return <Badge variant="success">PAID</Badge>;
+  if (mintStatus === "FAILED")
+    return <Badge variant="destructive">REWARD FAILED</Badge>;
+  return <Badge>REWARD PENDING</Badge>;
 }
+

@@ -3,9 +3,14 @@ import { randomBytes } from "node:crypto";
 import { prisma } from "@/services/db/prisma";
 
 // Single-use, short-lived code used to hand a verified identity from the
-// centralized auth host (`auth.<APP_DOMAIN>`) to a target host (any fund or
-// the apex). Bound to (userId, targetHost). 30s TTL. Single-use is enforced
-// by an atomic updateMany on consume — see consumeExchangeCode.
+// centralized auth host (`auth.<APP_DOMAIN>`) to a target host. Bound to
+// (userId, targetHost). 30s TTL. Single-use enforced by an atomic updateMany.
+//
+// This is the core of the Google-style cross-host handoff: each host owns
+// its own Better Auth session cookie, and `/auth/exchange` on the target
+// consumes a code to mint a fresh session there. Avoids any reliance on
+// cross-subdomain cookies (which fail when third-party cookies are blocked
+// and don't span paid custom domains anyway).
 
 const TTL_MS = 30_000;
 const CODE_BYTES = 32;

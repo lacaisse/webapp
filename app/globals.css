@@ -64,6 +64,10 @@
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
 
+  --color-hairline: var(--hairline);
+  --color-primary-tint: var(--primary-tint);
+  --color-primary-soft: var(--primary-soft);
+
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -112,6 +116,9 @@
    * renderFundThemeStyle() in services/fund/theme.ts. */
   --primary: oklch(0.58 0.13 35);
   --primary-foreground: oklch(0.99 0 0);
+  --primary-tint: oklch(0.58 0.13 35 / 0.10);
+  --primary-soft: oklch(0.58 0.13 35 / 0.18);
+  --hairline: oklch(0.18 0.012 75 / 0.10);
   --ring: var(--primary);
 
   /* --- LOCKED: charts (brand-led, with semantic accents) ------------------ */
@@ -164,6 +171,9 @@
 
   /* --primary / --primary-foreground inherit from :root unless the fund
      supplies a primaryDark / primaryForegroundDark override. */
+  --primary-tint: oklch(0.58 0.13 35 / 0.15);
+  --primary-soft: oklch(0.58 0.13 35 / 0.25);
+  --hairline: oklch(1 0 0 / 0.10);
 
   --chart-1: var(--primary);
   --chart-2: oklch(0.65 0.13 145);
@@ -202,5 +212,53 @@
     font-variant-numeric: tabular-nums;
     font-feature-settings: "ss01";
     letter-spacing: -0.02em;
+  }
+}
+
+/* Landing-page utilities: terracotta-dot pulse + entrance fade. */
+@layer utilities {
+  .lp-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--primary);
+    flex-shrink: 0;
+  }
+  .lp-dot-pulse { position: relative; }
+  .lp-dot-pulse::after {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 0 var(--primary);
+    animation: lp-dot-pulse 2.6s var(--ease-out) infinite;
+  }
+  @keyframes lp-dot-pulse {
+    0%   { box-shadow: 0 0 0 0 oklch(0.58 0.13 35 / 0.45); }
+    70%  { box-shadow: 0 0 0 14px oklch(0.58 0.13 35 / 0); }
+    100% { box-shadow: 0 0 0 0 oklch(0.58 0.13 35 / 0); }
+  }
+  .lp-fade-in { animation: lp-fade-in 700ms var(--ease-out) both; }
+  .lp-fade-in-1 { animation-delay: 80ms; }
+  .lp-fade-in-2 { animation-delay: 160ms; }
+  .lp-fade-in-3 { animation-delay: 240ms; }
+  .lp-fade-in-4 { animation-delay: 320ms; }
+  @keyframes lp-fade-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .lp-eyebrow {
+    font-family: var(--font-sans);
+    font-size: 12px;
+    line-height: 16px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+    font-weight: 500;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .lp-fade-in { animation: none; opacity: 1; transform: none; }
+    .lp-dot-pulse::after { animation: none; }
   }
 }

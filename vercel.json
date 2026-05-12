@@ -4,6 +4,22 @@
     {
       "path": "/api/cron/auth-exchange-cleanup",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/citizenpay-operation-status",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/citizenpay-bank-sync",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/citizenpay-period-close",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/citizenpay-mint-retry",
+      "schedule": "*/10 * * * *"
     }
   ]
 }

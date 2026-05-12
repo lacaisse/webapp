@@ -10,7 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getCurrentUser } from "@/services/auth/dal";
-import { buildLoginRedirect } from "@/services/auth/post-login";
+import { buildPostAuthRedirect } from "@/services/auth/redirects";
 import { LoginForm } from "./login-form";
 
 export default async function LoginPage({
@@ -20,16 +20,17 @@ export default async function LoginPage({
 }) {
   const { return_to } = await searchParams;
 
-  // Already signed in on the auth host — skip the form and walk the same
-  // post-login path the form would, handing off to `return_to` (or apex).
+  // Already signed in on the auth host — skip the form and bounce the user
+  // through the exchange flow so the target host gets its own session cookie.
   const user = await getCurrentUser();
-  if (user?.email) {
-    const { url } = await buildLoginRedirect({
-      userId: user.id,
-      email: user.email,
-      returnTo: return_to,
-    });
-    redirect(url);
+  if (user) {
+    redirect(
+      await buildPostAuthRedirect({
+        userId: user.id,
+        email: user.email,
+        returnTo: return_to,
+      }),
+    );
   }
 
   const t = await getTranslations("auth.login");

@@ -7,19 +7,18 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { createSupabaseServerClient } from "@/services/auth/server";
 import { ResetPasswordForm } from "./reset-form";
 
-export default async function ResetPasswordPage() {
-  // The PKCE callback exchanges the recovery code into a real session before
-  // forwarding here. If the user lands here without a session (typed the URL
-  // directly, or the link expired and was never exchanged), there's nothing
-  // for `updateUser({ password })` to act on — bounce them to /forgot-password.
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/forgot-password?error=link_invalid");
+// Better Auth's reset email links to `/reset-password?token=…`. The token is
+// the only credential the form needs — no session is established until the
+// user enters a new password and submits.
+export default async function ResetPasswordPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ token?: string }>;
+}) {
+  const { token } = await searchParams;
+  if (!token) redirect("/forgot-password?error=link_invalid");
 
   const t = await getTranslations("auth.resetPassword");
 
@@ -30,7 +29,7 @@ export default async function ResetPasswordPage() {
         <CardDescription>{t("description")}</CardDescription>
       </CardHeader>
       <CardContent>
-        <ResetPasswordForm />
+        <ResetPasswordForm token={token} />
       </CardContent>
     </Card>
   );

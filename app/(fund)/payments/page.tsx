@@ -1,20 +1,24 @@
-import { getTranslations } from "next-intl/server";
+import { getFormatter, getTranslations } from "next-intl/server";
 
+import { Badge } from "@/components/ui/badge";
 import { Tabs, resolveActiveTab } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
+  TableCell,
   TableEmpty,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { prisma } from "@/services/db/prisma";
+import { requireCurrentFund } from "@/services/fund/server";
+import { BankTransactionRowActions } from "./bank-transaction-actions";
 
 const TABS = [
   { value: "transactions" },
+  { value: "unmatched" },
   { value: "payouts" },
-  { value: "fees" },
-  { value: "byMerchant" },
 ] as const;
 
 export default async function PaymentsPage({
@@ -23,6 +27,7 @@ export default async function PaymentsPage({
   searchParams: Promise<{ tab?: string }>;
 }) {
   const t = await getTranslations("fund.payments");
+  const fund = await requireCurrentFund();
   const sp = await searchParams;
   const active = resolveActiveTab(sp.tab, TABS);
 
@@ -41,93 +46,146 @@ export default async function PaymentsPage({
         }))}
       />
 
-      {active === "transactions" && <TransactionsTab />}
-      {active === "payouts" && <PayoutsTab />}
-      {active === "fees" && <FeesTab />}
-      {active === "byMerchant" && <ByMerchantTab />}
+      {active === "transactions" && (
+        <IncomingTable fundId={fund.id} onlyUnmatched={false} />
+      )}
+      {active === "unmatched" && (
+        <IncomingTable fundId={fund.id} onlyUnmatched={true} />
+      )}
+      {active === "payouts" && <PayoutsTable fundId={fund.id} />}
     </>
   );
 }
 
-async function TransactionsTab() {
+async function IncomingTable({
+  fundId,
+  onlyUnmatched,
+}: {
+  fundId: string;
+  onlyUnmatched: boolean;
+}) {
   const t = await getTranslations("fund.payments.transactions");
+  const format = await getFormatter();
+
+  const transactions = await prisma.bankTransaction.findMany({
+    where: {
+      fundId,
+      direction: "INCOMING",
+      ...(onlyUnmatched ? { memberId: null } : {}),
+    },
+    orderBy: { occurredAt: "desc" },
+    take: 100,
+    include: {
+      member: { select: { firstName: true, lastName: true } },
+      allocationPeriod: { select: { label: true } },
+    },
+  });
+
   return (
     <Table>
       <TableHeader>
         <TableRow>
           <TableHead>{t("date")}</TableHead>
+          <TableHead>{t("counterpart")}</TableHead>
+          <TableHead>{t("reference")}</TableHead>
           <TableHead>{t("member")}</TableHead>
-          <TableHead>{t("merchant")}</TableHead>
-          <TableHead>{t("amount")}</TableHead>
-          <TableHead>{t("tokens")}</TableHead>
-          <TableHead>{t("status")}</TableHead>
+          <TableHead>{t("period")}</TableHead>
+          <TableHead className="text-right">{t("amount")}</TableHead>
+          <TableHead />
         </TableRow>
       </TableHeader>
       <TableBody>
-        <TableEmpty colSpan={6}>{t("empty")}</TableEmpty>
+        {transactions.length === 0 ? (
+          <TableEmpty colSpan={7}>{t("empty")}</TableEmpty>
+        ) : (
+          transactions.map((b) => {
+            const memberName = b.member
+              ? `${b.member.firstName} ${b.member.lastName}`.trim()
+              : null;
+            return (
+              <TableRow key={b.id}>
+                <TableCell className="text-sm text-muted-foreground">
+                  {format.dateTime(b.occurredAt, { dateStyle: "medium" })}
+                </TableCell>
+                <TableCell>
+                  <div className="text-sm">{b.counterpartName ?? "—"}</div>
+                  <div className="font-mono text-xs text-muted-foreground">
+                    {b.counterpartIban ?? ""}
+                  </div>
+                </TableCell>
+                <TableCell className="font-mono text-xs">
+                  {b.counterpartReference ?? b.remittanceInfo ?? "—"}
+                </TableCell>
+                <TableCell>
+                  {memberName ? (
+                    <span className="text-sm">{memberName}</span>
+                  ) : (
+                    <Badge variant="warning">{t("unmatched")}</Badge>
+                  )}
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {b.allocationPeriod?.label ?? "—"}
+                </TableCell>
+                <TableCell className="text-right font-medium">
+                  {b.amount.toString()} {b.currency}
+                </TableCell>
+                <TableCell className="text-right">
+                  <BankTransactionRowActions
+                    bankTransactionId={b.id}
+                    isMatched={b.memberId !== null}
+                  />
+                </TableCell>
+              </TableRow>
+            );
+          })
+        )}
       </TableBody>
     </Table>
   );
 }
 
-async function PayoutsTab() {
+async function PayoutsTable({ fundId }: { fundId: string }) {
   const t = await getTranslations("fund.payments.payouts");
+  const format = await getFormatter();
+
+  const transactions = await prisma.bankTransaction.findMany({
+    where: { fundId, direction: "OUTGOING" },
+    orderBy: { occurredAt: "desc" },
+    take: 100,
+    include: { merchant: { select: { name: true } } },
+  });
+
   return (
     <Table>
       <TableHeader>
         <TableRow>
           <TableHead>{t("date")}</TableHead>
           <TableHead>{t("merchant")}</TableHead>
-          <TableHead>{t("transactions")}</TableHead>
-          <TableHead>{t("gross")}</TableHead>
-          <TableHead>{t("fees")}</TableHead>
-          <TableHead>{t("net")}</TableHead>
-          <TableHead>{t("status")}</TableHead>
+          <TableHead>{t("reference")}</TableHead>
+          <TableHead className="text-right">{t("amount")}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        <TableEmpty colSpan={7}>{t("empty")}</TableEmpty>
-      </TableBody>
-    </Table>
-  );
-}
-
-async function FeesTab() {
-  const t = await getTranslations("fund.payments.fees");
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>{t("date")}</TableHead>
-          <TableHead>{t("merchant")}</TableHead>
-          <TableHead>{t("transaction")}</TableHead>
-          <TableHead>{t("rate")}</TableHead>
-          <TableHead>{t("amount")}</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        <TableEmpty colSpan={5}>{t("empty")}</TableEmpty>
-      </TableBody>
-    </Table>
-  );
-}
-
-async function ByMerchantTab() {
-  const t = await getTranslations("fund.payments.byMerchant");
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>{t("merchant")}</TableHead>
-          <TableHead>{t("transactions")}</TableHead>
-          <TableHead>{t("totalGross")}</TableHead>
-          <TableHead>{t("totalFees")}</TableHead>
-          <TableHead>{t("totalPaidOut")}</TableHead>
-          <TableHead>{t("balance")}</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        <TableEmpty colSpan={6}>{t("empty")}</TableEmpty>
+        {transactions.length === 0 ? (
+          <TableEmpty colSpan={4}>{t("empty")}</TableEmpty>
+        ) : (
+          transactions.map((b) => (
+            <TableRow key={b.id}>
+              <TableCell className="text-sm text-muted-foreground">
+                {format.dateTime(b.occurredAt, { dateStyle: "medium" })}
+              </TableCell>
+              <TableCell>
+                {b.merchant?.name ?? b.counterpartName ?? "—"}
+              </TableCell>
+              <TableCell className="font-mono text-xs">
+                {b.counterpartReference ?? b.remittanceInfo ?? "—"}
+              </TableCell>
+              <TableCell className="text-right font-medium">
+                {b.amount.toString()} {b.currency}
+              </TableCell>
+            </TableRow>
+          ))
+        )}
       </TableBody>
     </Table>
   );

@@ -1,22 +1,37 @@
 import { Plus } from "lucide-react";
-import { getTranslations } from "next-intl/server";
+import { getFormatter, getTranslations } from "next-intl/server";
 
+import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Tabs, resolveActiveTab } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
+  TableCell,
   TableEmpty,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { prisma } from "@/services/db/prisma";
+import { requireCurrentFund } from "@/services/fund/server";
+import { MerchantRowActions } from "./merchant-row-actions";
 
 const TABS = [
-  { value: "active" },
   { value: "pending" },
-  { value: "disconnected" },
+  { value: "active" },
+  { value: "rejected" },
+  { value: "inactive" },
 ] as const;
+
+// Tab → status filter. Server-side: the merchants admin list per the
+// scoping doc plus the review queue (PENDING is the entry point).
+const STATUS_BY_TAB = {
+  pending: "PENDING",
+  active: "ACTIVE",
+  rejected: "REJECTED",
+  inactive: "INACTIVE",
+} as const;
 
 export default async function MerchantsPage({
   searchParams,
@@ -24,8 +39,27 @@ export default async function MerchantsPage({
   searchParams: Promise<{ tab?: string }>;
 }) {
   const t = await getTranslations("fund.merchants");
+  const format = await getFormatter();
+  const fund = await requireCurrentFund();
   const sp = await searchParams;
   const active = resolveActiveTab(sp.tab, TABS);
+
+  const merchants = await prisma.merchant.findMany({
+    where: { fundId: fund.id, status: STATUS_BY_TAB[active] },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      contactName: true,
+      status: true,
+      emailVerifiedAt: true,
+      citizenPayActivatedAt: true,
+      reviewedAt: true,
+      reviewNote: true,
+      joinedAt: true,
+    },
+  });
 
   return (
     <>
@@ -53,15 +87,59 @@ export default async function MerchantsPage({
           <TableRow>
             <TableHead>{t("columns.name")}</TableHead>
             <TableHead>{t("columns.contact")}</TableHead>
+            <TableHead>{t("columns.emailVerified")}</TableHead>
             <TableHead>{t("columns.citizenpay")}</TableHead>
-            <TableHead>{t("columns.terminal")}</TableHead>
-            <TableHead>{t("columns.tokensReceived")}</TableHead>
             <TableHead>{t("columns.joined")}</TableHead>
             <TableHead />
           </TableRow>
         </TableHeader>
         <TableBody>
-          <TableEmpty colSpan={7}>{t("empty")}</TableEmpty>
+          {merchants.length === 0 ? (
+            <TableEmpty colSpan={6}>{t("empty")}</TableEmpty>
+          ) : (
+            merchants.map((m) => (
+              <TableRow key={m.id}>
+                <TableCell className="font-medium">{m.name}</TableCell>
+                <TableCell>
+                  <div className="text-sm">{m.contactName ?? "—"}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {m.email ?? "—"}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  {m.emailVerifiedAt ? (
+                    <Badge variant="success">
+                      {t("badges.verified")}
+                    </Badge>
+                  ) : (
+                    <Badge variant="warning">
+                      {t("badges.unverified")}
+                    </Badge>
+                  )}
+                </TableCell>
+                <TableCell>
+                  {m.citizenPayActivatedAt ? (
+                    <Badge variant="success">
+                      {t("badges.connected")}
+                    </Badge>
+                  ) : (
+                    <Badge>{t("badges.notConnected")}</Badge>
+                  )}
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {format.dateTime(m.joinedAt, { dateStyle: "medium" })}
+                </TableCell>
+                <TableCell className="text-right">
+                  <MerchantRowActions
+                    merchantId={m.id}
+                    merchantName={m.name}
+                    emailVerified={m.emailVerifiedAt !== null}
+                    status={m.status}
+                  />
+                </TableCell>
+              </TableRow>
+            ))
+          )}
         </TableBody>
       </Table>
     </>

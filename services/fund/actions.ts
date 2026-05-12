@@ -1,8 +1,9 @@
 "use server";
 
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { requireUser } from "@/services/auth/dal";
 import { prisma } from "@/services/db/prisma";
+import { isSupportedLocale } from "@/services/i18n/config";
 import { FUND_APEX } from "./host";
 import {
   CreateFundSchema,
@@ -35,12 +36,32 @@ export async function createFundAction(
   const user = await requireUser();
   const domain = `${parsed.data.subdomain}.${FUND_APEX}`;
 
+  // Inherit the creator's session locale as the fund's default. Most cases
+  // the creator's locale matches the audience's; admin can change it later.
+  const creatorLocale = await getLocale();
+  const defaultLocale = isSupportedLocale(creatorLocale)
+    ? creatorLocale
+    : undefined; // schema default ("fr") if not supported
+
   try {
+    // One nested create. Default tier values come from the scoping doc's
+    // example (5.3.1): min €100 / target €150 / max €225 — admin can edit
+    // amounts and add more tiers from the settings UI.
     const fund = await prisma.fund.create({
       data: {
         name: parsed.data.name,
         domain,
-        members: { create: { userId: user.id, role: "OWNER" } },
+        ...(defaultLocale ? { defaultLocale } : {}),
+        staff: { create: { userId: user.id, role: "OWNER" } },
+        tiers: {
+          create: {
+            name: "Standard",
+            minContribution: "100.00",
+            maxContribution: "225.00",
+            allocationAmount: "150.00",
+            position: 0,
+          },
+        },
       },
     });
     return { ok: true, redirectTo: getFundUrl(fund.domain) };

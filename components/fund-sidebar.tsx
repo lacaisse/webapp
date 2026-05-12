@@ -8,6 +8,7 @@ import {
   CreditCard,
   Gift,
   LayoutDashboard,
+  Mail,
   Receipt,
   Settings,
   Store,
@@ -43,6 +44,7 @@ export function FundSidebar({
     { href: "/merchants", label: t("merchants"), icon: Store },
     { href: "/payments", label: t("payments"), icon: Receipt },
     { href: "/referrals", label: t("referrals"), icon: Gift },
+    { href: "/emails", label: t("emails"), icon: Mail },
     { href: "/settings", label: t("settings"), icon: Settings },
   ];
 

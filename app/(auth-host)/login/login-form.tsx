@@ -1,6 +1,5 @@
 "use client";
 
-import { startAuthentication } from "@simplewebauthn/browser";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Fingerprint } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -12,6 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { signIn } from "@/services/auth/client";
 import { loginAction } from "../actions";
 import { LoginSchema, type LoginInput } from "../schemas";
 
@@ -22,10 +22,9 @@ export function LoginForm() {
   // can resolve any key, then format the result.
   const tRoot = useTranslations();
 
-  // Where to send the user after a successful login. The auth host issues a
-  // single-use exchange code bound to this target and redirects there;
-  // /auth/handoff on the target writes its own Supabase cookies. If absent,
-  // the post-login helper defaults to the apex.
+  // Where to send the user after a successful login. Better Auth's session
+  // cookie is apex-scoped, so a `window.location.href = returnTo` carries it
+  // along — no handoff needed.
   const searchParams = useSearchParams();
   const returnTo = searchParams.get("return_to") ?? undefined;
 
@@ -48,52 +47,18 @@ export function LoginForm() {
 
   const onPasskeySignIn = () => {
     setPkError(null);
-    const email = form.getValues("email");
-    if (!email) {
-      form.setError("email", { message: "auth.login.passkeyEmailRequired" });
-      return;
-    }
-
     startPkTransition(async () => {
-      try {
-        const optionsRes = await fetch(
-          "/api/webauthn/authenticate/options",
-          {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ email }),
-          },
-        );
-        if (!optionsRes.ok) {
-          throw new Error(tRoot("auth.errors.passkeyStartFailed"));
-        }
-        const options = await optionsRes.json();
-
-        const assertion = await startAuthentication({ optionsJSON: options });
-
-        const verifyRes = await fetch(
-          "/api/webauthn/authenticate/verify",
-          {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ response: assertion, returnTo }),
-          },
-        );
-        const verifyJson = await verifyRes.json();
-        if (!verifyRes.ok) {
-          throw new Error(verifyJson.error ?? tRoot("auth.errors.signInFailed"));
-        }
-
-        // Server wrote the auth-host Supabase session AND minted a single-use
-        // exchange code targeted at the destination host. Hard-nav to the
-        // returned URL — `/auth/handoff` consumes the code and writes the
-        // target host's session cookies.
-        window.location.href = verifyJson.redirectTo ?? "/";
-      } catch (e) {
-        setPkError(
-          e instanceof Error ? e.message : tRoot("auth.errors.signInFailed"),
-        );
+      // Better Auth's passkey plugin discovers credentials by RP context (no
+      // email needed) when the authenticator opts in. The browser shows the
+      // platform passkey picker; on success the session cookie is written
+      // by /api/auth/passkey/verify-authentication.
+      const result = await signIn.passkey();
+      if (result?.error) {
+        setPkError(result.error.message ?? tRoot("auth.errors.signInFailed"));
+        return;
       }
+      // Hard-nav so the destination host loads with the freshly-set cookie.
+      window.location.href = returnTo ?? "/";
     });
   };
 

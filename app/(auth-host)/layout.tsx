@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { getHostType } from "@/services/host/server";
@@ -16,6 +17,14 @@ export default async function AuthLayout({
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center bg-muted/40 px-4 py-12">
+      <Image
+        src="/logo.png"
+        alt="La caisse"
+        width={80}
+        height={62}
+        priority
+        className="mb-6 h-auto w-16"
+      />
       <div className="w-full max-w-sm">{children}</div>
       <div className="mt-6">
         <LocaleSwitcher />

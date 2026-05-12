@@ -1,0 +1,382 @@
+"use server";
+
+import { getTranslations } from "next-intl/server";
+import { revalidatePath } from "next/cache";
+
+import { requireFundRole } from "@/services/auth/dal";
+import { getCitizenPayClient } from "@/services/citizenpay/client";
+import { prisma } from "@/services/db/prisma";
+import {
+  sendMemberActivated,
+  sendMemberInvited,
+} from "@/services/email/transactional";
+import { BuiltinSignupSchema } from "./schema";
+import { generatePaymentReference } from "./payment-reference";
+
+const MAX_REFERENCE_RETRIES = 5;
+
+export type ActivateMemberResult = { ok: true } | { error: string };
+
+// Activation: admin scans a physical card, enters the NFC serial, the row
+// is created locally with `account = null` (CitizenPay will populate that
+// when we wire the registration call). Card.status stays INACTIVE until
+// CP confirms the terminal can charge; the member's status flips to ACTIVE
+// since they're a fully-onboarded recipient regardless of terminal state.
+
+export async function activateMemberAction(input: {
+  memberId: string;
+  cardSerial: string;
+  note?: string;
+}): Promise<ActivateMemberResult> {
+  const t = await getTranslations();
+  const { fund } = await requireFundRole("ADMIN");
+
+  const cardSerial = input.cardSerial.trim();
+  if (!cardSerial) {
+    return { error: t("members.admin.errors.serialRequired" as never) };
+  }
+
+  const member = await prisma.member.findFirst({
+    where: { id: input.memberId, fundId: fund.id },
+    select: {
+      id: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      status: true,
+      paymentReference: true,
+      primaryCardId: true,
+    },
+  });
+  if (!member) return { error: t("members.admin.errors.notFound" as never) };
+  if (member.status === "ACTIVE") {
+    return { error: t("members.admin.errors.alreadyActive" as never) };
+  }
+  if (member.primaryCardId) {
+    return { error: t("members.admin.errors.alreadyHasPrimaryCard" as never) };
+  }
+
+  // Check serial isn't already used (globally — NFC UUIDs are universally
+  // unique, our constraint is too).
+  const existing = await prisma.card.findUnique({
+    where: { serialNumber: cardSerial },
+    select: { id: true },
+  });
+  if (existing) {
+    return { error: t("members.admin.errors.serialTaken" as never) };
+  }
+
+  // Look up an existing PENDING referral where this member is the referee.
+  // If we find one (and the sponsor still has a primary card), we'll trigger
+  // the bonus mint in the same transaction.
+  const referral = await prisma.referral.findUnique({
+    where: { refereeId: member.id },
+    include: {
+      sponsor: {
+        select: {
+          id: true,
+          primaryCard: { select: { id: true, account: true } },
+        },
+      },
+    },
+  });
+  const canFireReferral =
+    referral?.status === "PENDING" &&
+    referral.sponsor.primaryCard?.account &&
+    fund.referralBonusAmount &&
+    fund.referralBonusAmount.toNumber() > 0;
+
+  const welcomeSubject = t(
+    "members.admin.email.activated.subject" as never,
+    { fundName: fund.name } as never,
+  );
+
+  // Pre-register the card with CitizenPay so we can store the on-chain
+  // account on the new row. If CP is unreachable / the call fails, we still
+  // create the local row with account=null — a future sync job retries.
+  const cp = getCitizenPayClient();
+  let cpAccount: string | null = null;
+  try {
+    const registered = await cp.registerCard({
+      serialNumber: cardSerial,
+      fundId: fund.id,
+      fundCitizenPayId: fund.citizenPayFundId,
+      holderName: `${member.firstName} ${member.lastName}`.trim(),
+    });
+    cpAccount = registered.account;
+  } catch (e) {
+    console.error("[citizenpay] registerCard failed during activation", e);
+  }
+
+  const tx = await prisma.$transaction(async (tx) => {
+    // 1. Create the card.
+    const card = await tx.card.create({
+      data: {
+        memberId: member.id,
+        serialNumber: cardSerial,
+        account: cpAccount,
+        holderName: `${member.firstName} ${member.lastName}`.trim(),
+        status: "INACTIVE", // CP confirms terminal-active separately
+        issuedAt: new Date(),
+      },
+    });
+
+    // 2. Link as primary + flip member to ACTIVE.
+    await tx.member.update({
+      where: { id: member.id },
+      data: {
+        primaryCardId: card.id,
+        status: "ACTIVE",
+        notes: input.note?.trim() || undefined,
+      },
+    });
+
+    // 3. Queue + return the welcome (activation) email.
+    const emailRow = await tx.email.create({
+      data: {
+        fundId: fund.id,
+        type: "MEMBER_ACTIVATED",
+        toEmail: member.email,
+        memberId: member.id,
+        idempotencyKey: `MEMBER_ACTIVATED:member:${member.id}`,
+        subject: welcomeSubject,
+      },
+    });
+
+    // 4. Referral reward (if applicable). Create a PENDING TokenOperation
+    // and flip the referral to ACTIVATED. Submission to CP happens after
+    // the transaction so HTTP latency doesn't hold DB locks.
+    let referralOpId: string | null = null;
+    if (canFireReferral && referral) {
+      const op = await tx.tokenOperation.create({
+        data: {
+          fundId: fund.id,
+          type: "MINT",
+          memberId: referral.sponsor.id,
+          account: referral.sponsor.primaryCard!.account!,
+          amount: fund.referralBonusAmount!,
+          status: "PENDING",
+        },
+      });
+      await tx.referral.update({
+        where: { id: referral.id },
+        data: {
+          status: "ACTIVATED",
+          activatedAt: new Date(),
+          rewardOperationId: op.id,
+        },
+      });
+      referralOpId = op.id;
+    }
+
+    return { emailId: emailRow.id, cardSerial, referralOpId };
+  });
+
+  // Submit the referral mint to CitizenPay outside the transaction. On
+  // success we stamp the tx hash; on failure the op stays PENDING and the
+  // polling job retries.
+  if (tx.referralOpId && referral?.sponsor.primaryCard?.account) {
+    try {
+      const submitted = await cp.submitMint({
+        fundCitizenPayId: fund.citizenPayFundId,
+        toAccount: referral.sponsor.primaryCard.account,
+        amount: fund.referralBonusAmount!.toString(),
+        reference: tx.referralOpId,
+      });
+      await prisma.tokenOperation.update({
+        where: { id: tx.referralOpId },
+        data: { txHash: submitted.txHash },
+      });
+    } catch (e) {
+      console.error("[citizenpay] submitMint failed for referral reward", e);
+    }
+  }
+
+  // Outside the transaction: dispatch the Resend send. Failure is swallowed
+  // by the sender so activation never fails because of an email problem.
+  await sendMemberActivated({
+    emailId: tx.emailId,
+    toEmail: member.email,
+    fundName: fund.name,
+    firstName: member.firstName,
+    cardSerial: tx.cardSerial,
+    paymentReference: member.paymentReference ?? "",
+  });
+
+  revalidatePath("/members");
+  return { ok: true };
+}
+
+export type AddCardResult = { ok: true } | { error: string };
+
+// Issue an additional card to an already-ACTIVE member (5.3.2). Used for
+// dependants — spouse, children. The new card binds to the same member;
+// at CitizenPay it'll be wired to share the primary's wallet so the
+// spending limit lives on the primary card, not the new one.
+export async function addCardAction(input: {
+  memberId: string;
+  cardSerial: string;
+  holderName?: string;
+}): Promise<AddCardResult> {
+  const t = await getTranslations();
+  const { fund } = await requireFundRole("ADMIN");
+
+  const cardSerial = input.cardSerial.trim();
+  if (!cardSerial) {
+    return { error: t("members.admin.errors.serialRequired" as never) };
+  }
+
+  const member = await prisma.member.findFirst({
+    where: { id: input.memberId, fundId: fund.id },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      status: true,
+      primaryCardId: true,
+    },
+  });
+  if (!member) return { error: t("members.admin.errors.notFound" as never) };
+  if (member.status !== "ACTIVE") {
+    return { error: t("members.admin.errors.notActiveForCard" as never) };
+  }
+  if (!member.primaryCardId) {
+    return { error: t("members.admin.errors.noPrimaryCard" as never) };
+  }
+
+  const existing = await prisma.card.findUnique({
+    where: { serialNumber: cardSerial },
+    select: { id: true },
+  });
+  if (existing) {
+    return { error: t("members.admin.errors.serialTaken" as never) };
+  }
+
+  const holderName =
+    input.holderName?.trim() ||
+    `${member.firstName} ${member.lastName}`.trim();
+
+  // Register with CitizenPay first to claim the wallet address. Same
+  // fail-soft behaviour as activation — local row is still created if CP
+  // is unreachable.
+  const cp = getCitizenPayClient();
+  let cpAccount: string | null = null;
+  try {
+    const registered = await cp.registerCard({
+      serialNumber: cardSerial,
+      fundId: fund.id,
+      fundCitizenPayId: fund.citizenPayFundId,
+      holderName,
+    });
+    cpAccount = registered.account;
+  } catch (e) {
+    console.error("[citizenpay] registerCard failed during addCard", e);
+  }
+
+  await prisma.card.create({
+    data: {
+      memberId: member.id,
+      serialNumber: cardSerial,
+      account: cpAccount,
+      holderName,
+      status: "INACTIVE", // CP confirms terminal-active separately
+      issuedAt: new Date(),
+    },
+  });
+
+  revalidatePath("/members");
+  return { ok: true };
+}
+
+export type InviteMemberResult =
+  | { ok: true }
+  | { error: string; field?: "firstName" | "lastName" | "email" };
+
+// Admin-initiated invite: creates an INVITED member from a paper-form or
+// admin-known recipient, emails them a heads-up, and shows up in the
+// "pending" tab so the admin can activate them when a card is in hand.
+export async function inviteMemberAction(input: {
+  firstName: string;
+  lastName: string;
+  email: string;
+}): Promise<InviteMemberResult> {
+  const t = await getTranslations();
+  const { fund } = await requireFundRole("ADMIN");
+
+  const parsed = BuiltinSignupSchema.safeParse(input);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return {
+      error: t(issue.message as never),
+      field: issue.path[0] as "firstName" | "lastName" | "email" | undefined,
+    };
+  }
+
+  const inviteSubject = t("members.admin.email.invited.subject" as never, {
+    fundName: fund.name,
+  } as never);
+
+  for (let attempt = 0; attempt < MAX_REFERENCE_RETRIES; attempt++) {
+    const paymentReference = generatePaymentReference();
+
+    let result: { memberId: string; emailId: string } | null = null;
+    try {
+      result = await prisma.$transaction(async (tx) => {
+        const m = await tx.member.create({
+          data: {
+            fundId: fund.id,
+            email: parsed.data.email,
+            firstName: parsed.data.firstName,
+            lastName: parsed.data.lastName,
+            status: "INVITED",
+            paymentReference,
+            // Admin vouches for identity — no verification round-trip.
+            emailVerifiedAt: new Date(),
+          },
+        });
+        const email = await tx.email.create({
+          data: {
+            fundId: fund.id,
+            type: "MEMBER_INVITED",
+            toEmail: m.email,
+            memberId: m.id,
+            idempotencyKey: `MEMBER_INVITED:member:${m.id}`,
+            subject: inviteSubject,
+          },
+        });
+        return { memberId: m.id, emailId: email.id };
+      });
+    } catch (e) {
+      if (isP2002For(e, "paymentReference")) continue;
+      if (isP2002For(e, "email")) {
+        return {
+          error: t("members.admin.errors.emailTaken" as never),
+          field: "email",
+        };
+      }
+      throw e;
+    }
+
+    await sendMemberInvited({
+      emailId: result.emailId,
+      toEmail: parsed.data.email,
+      fundName: fund.name,
+      firstName: parsed.data.firstName,
+      paymentReference,
+    });
+
+    revalidatePath("/members");
+    return { ok: true };
+  }
+
+  return { error: t("members.admin.errors.generic" as never) };
+}
+
+function isP2002For(e: unknown, field: string): boolean {
+  if (!(e instanceof Error) || !("code" in e)) return false;
+  if ((e as { code?: string }).code !== "P2002") return false;
+  const meta = (e as { meta?: { target?: unknown } }).meta;
+  if (!meta?.target) return false;
+  const target = Array.isArray(meta.target) ? meta.target : [meta.target];
+  return target.some((t) => typeof t === "string" && t.includes(field));
+}

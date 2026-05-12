@@ -1,18 +1,19 @@
-import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/services/db/prisma";
 import { toCanonicalFundDomain } from "@/services/fund/host";
 
 // Next 16 renamed `middleware.ts` to `proxy.ts` (function `proxy`).
-// Three responsibilities:
+// Two responsibilities:
 //   1. Classify the request host into one of: `auth` (centralized login on
 //      `auth.<APP_DOMAIN>`), `apex` (the apex itself or reserved infra
 //      subdomains), or `fund` (a Fund.domain match — subdomain or custom
 //      domain). Forwarded as `x-host-type`.
 //   2. For `fund` hosts, forward `x-fund-id` / `x-fund-domain` so app code
 //      doesn't re-parse Host. Read via services/fund/server.ts.
-//   3. Refresh the Supabase session cookies so server components see fresh
-//      tokens.
+//
+// Session refresh is NOT done here — Better Auth uses DB-backed sessions
+// looked up on-demand by services/auth/dal.ts#getCurrentUser; the
+// nextCookies() plugin handles cookie writes on Server Action responses.
 //
 // There is no "slug" concept — the host IS the fund identity. Free funds
 // happen to live on `<sub>.lacaisse.eu`, paid funds on their own domain.
@@ -77,35 +78,7 @@ export async function proxy(request: NextRequest) {
     request.headers.set("x-host-type", hostType);
   }
 
-  let response = NextResponse.next({ request });
-
-  // Supabase session refresh
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          for (const { name, value } of cookiesToSet) {
-            request.cookies.set(name, value);
-          }
-          response = NextResponse.next({ request });
-          for (const { name, value, options } of cookiesToSet) {
-            response.cookies.set(name, value, options);
-          }
-        },
-      },
-    },
-  );
-
-  // IMPORTANT: getUser() is the only call that triggers a token refresh.
-  // Do not add code between createServerClient and this call.
-  await supabase.auth.getUser();
-
-  return response;
+  return NextResponse.next({ request });
 }
 
 export const config = {

@@ -1,6 +1,5 @@
 "use client";
 
-import { startRegistration } from "@simplewebauthn/browser";
 import { Fingerprint, Trash2 } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
@@ -18,15 +17,14 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { deletePasskeyAction } from "@/services/auth/passkey-actions";
+import { passkey } from "@/services/auth/client";
 
 export type PasskeyRow = {
   id: string;
-  nickname: string | null;
+  name: string | null;
   deviceType: string;
   backedUp: boolean;
   createdAt: string;
-  lastUsedAt: string | null;
 };
 
 export function PasskeysManager({ passkeys }: { passkeys: PasskeyRow[] }) {
@@ -60,40 +58,25 @@ function RegisterPasskeyDialog() {
 
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [nickname, setNickname] = useState("");
+  const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const onRegister = () => {
     setError(null);
     startTransition(async () => {
-      try {
-        const optionsRes = await fetch("/api/webauthn/register/options", {
-          method: "POST",
-        });
-        if (!optionsRes.ok) throw new Error(tErrCommon("passkeyStartFailed"));
-        const options = await optionsRes.json();
-
-        const attResp = await startRegistration({ optionsJSON: options });
-
-        const verifyRes = await fetch("/api/webauthn/register/verify", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ response: attResp, nickname }),
-        });
-        const verifyJson = await verifyRes.json();
-        if (!verifyRes.ok) {
-          throw new Error(verifyJson.error ?? tErrCommon("passkeyVerifyFailed"));
-        }
-
-        setOpen(false);
-        setNickname("");
-        router.refresh();
-      } catch (e) {
-        setError(
-          e instanceof Error ? e.message : t("errors.generic"),
-        );
+      // addPasskey runs the WebAuthn registration ceremony against
+      // /api/auth/passkey/{generate-register-options,verify-registration}
+      // and creates the Passkey row on success.
+      const result = await passkey.addPasskey({ name: name || undefined });
+      if (result?.error) {
+        setError(result.error.message ?? tErrCommon("passkeyVerifyFailed"));
+        return;
       }
+
+      setOpen(false);
+      setName("");
+      router.refresh();
     });
   };
 
@@ -114,12 +97,12 @@ function RegisterPasskeyDialog() {
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label htmlFor="nickname">{t("nickname")}</Label>
+            <Label htmlFor="passkey-name">{t("nickname")}</Label>
             <Input
-              id="nickname"
+              id="passkey-name"
               placeholder={t("nicknamePlaceholder")}
-              value={nickname}
-              onChange={(e) => setNickname(e.target.value)}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
               autoFocus
             />
           </div>
@@ -146,7 +129,7 @@ function RegisterPasskeyDialog() {
   );
 }
 
-function PasskeyRow({ passkey }: { passkey: PasskeyRow }) {
+function PasskeyRow({ passkey: pk }: { passkey: PasskeyRow }) {
   const t = useTranslations("account.passkeys");
   const tCommon = useTranslations("common");
   const format = useFormatter();
@@ -157,8 +140,8 @@ function PasskeyRow({ passkey }: { passkey: PasskeyRow }) {
 
   const onDelete = () =>
     startTransition(async () => {
-      const result = await deletePasskeyAction(passkey.id);
-      if ("error" in result) return;
+      const result = await passkey.deletePasskey({ id: pk.id });
+      if (result?.error) return;
       setConfirmOpen(false);
       router.refresh();
     });
@@ -169,21 +152,13 @@ function PasskeyRow({ passkey }: { passkey: PasskeyRow }) {
   return (
     <div className="flex items-center justify-between rounded-lg border bg-card p-3">
       <div className="space-y-0.5">
-        <div className="font-medium">
-          {passkey.nickname ?? t("rowUnnamed")}
-        </div>
+        <div className="font-medium">{pk.name ?? t("rowUnnamed")}</div>
         <div className="text-xs text-muted-foreground">
-          {passkey.deviceType === "multiDevice"
+          {pk.deviceType === "multiDevice"
             ? t("rowSynced")
             : t("rowDeviceBound")}
           {" · "}
-          {t("rowAdded", { date: dateFmt(passkey.createdAt) })}
-          {passkey.lastUsedAt && (
-            <>
-              {" · "}
-              {t("rowLastUsed", { date: dateFmt(passkey.lastUsedAt) })}
-            </>
-          )}
+          {t("rowAdded", { date: dateFmt(pk.createdAt) })}
         </div>
       </div>
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
@@ -202,9 +177,9 @@ function PasskeyRow({ passkey }: { passkey: PasskeyRow }) {
           <DialogHeader>
             <DialogTitle>{t("deleteTitle")}</DialogTitle>
             <DialogDescription>
-              {passkey.nickname
+              {pk.name
                 ? t.rich("deleteDescriptionNamed", {
-                    name: passkey.nickname,
+                    name: pk.name,
                     strong: (chunks) => <strong>{chunks}</strong>,
                   })
                 : t("deleteDescriptionUnnamed")}
