@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { getAuthUrl } from "@/services/host/server";
 import { LandingLogo } from "./landing-logo";
@@ -12,7 +13,6 @@ export async function LandingNav() {
     { label: t("multiTenant"), href: "#multi-tenant" },
     { label: t("features"), href: "#features" },
     { label: t("getStarted"), href: "#get-started" },
-    { label: t("docs"), href: "#" },
   ];
 
   return (
@@ -26,8 +26,8 @@ export async function LandingNav() {
       }}
     >
       <div className="mx-auto flex h-16 w-full max-w-[1240px] items-center justify-between px-8 max-[760px]:px-5">
-        <a
-          href="#"
+        <Link
+          href="/"
           className="flex items-center gap-2.5 text-foreground no-underline"
         >
           <LandingLogo size={26} animated />
@@ -37,7 +37,7 @@ export async function LandingNav() {
           >
             la caisse
           </span>
-        </a>
+        </Link>
         <div className="flex items-center gap-1 max-[860px]:hidden">
           {items.map(({ label, href }) => (
             <a

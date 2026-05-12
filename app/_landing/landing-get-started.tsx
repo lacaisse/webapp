@@ -48,13 +48,6 @@ export async function LandingGetStarted() {
               >
                 {t("left.ctaPrimary")} →
               </a>
-              <a
-                href="#"
-                className="inline-flex h-11 items-center gap-2 rounded-lg border px-[18px] text-[15px] font-medium text-foreground no-underline transition-colors hover:bg-muted"
-                style={{ borderColor: "var(--border)" }}
-              >
-                {t("left.ctaSecondary")}
-              </a>
             </div>
           </div>
 

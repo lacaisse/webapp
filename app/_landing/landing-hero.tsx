@@ -22,7 +22,7 @@ const SWATCHES: Swatch[] = [
 const DEFAULT_FUND = "Caisse de Saint-Gilles";
 const DEFAULT_TOKEN = "solidaire";
 
-export function LandingHero() {
+export function LandingHero({ loginUrl }: { loginUrl: string }) {
   const t = useTranslations("landing.hero");
   const [fundName, setFundName] = useState(DEFAULT_FUND);
   const [tokenName, setTokenName] = useState(DEFAULT_TOKEN);
@@ -110,7 +110,7 @@ export function LandingHero() {
               style={{ color: "var(--muted-foreground)" }}
             >
               <a
-                href="#"
+                href={loginUrl}
                 className="border-b text-foreground no-underline"
                 style={{
                   borderColor: "var(--border)",

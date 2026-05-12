@@ -801,7 +801,6 @@
       "multiTenant": "Multi-caisses",
       "features": "Fonctionnalités",
       "getStarted": "Commencer",
-      "docs": "Docs",
       "signIn": "Se connecter",
       "startFund": "Créer une caisse"
     },
@@ -1009,9 +1008,8 @@
           "step": "PARCOURS 02",
           "label": "AUTO-HÉBERGÉ",
           "title": "Faites-le tourner vous-même.",
-          "body": "Sous licence MIT, déployez sur votre propre compte Vercel ou partout où Next.js tourne. Vous gérez l'hébergement et les mises à jour ; vous gardez le contrôle total. Gratuit."
-        },
-        "compareLink": "Comparer en détail →"
+          "body": "Sous licence AGPL-3.0, déployez sur votre propre compte Vercel ou partout où Next.js tourne. Vous gérez l'hébergement et les mises à jour ; vous gardez le contrôle total. Gratuit."
+        }
       }
     },
     "features": {
@@ -1097,11 +1095,11 @@
       "underTheHood": {
         "kicker": "SOUS LE CAPOT",
         "title": "Et les parties que vous ne voyez pas.",
-        "body": "Multi-caisses dès le départ, soucieuse du RGPD par conception, open source sous MIT. Chaque caisse tourne en isolation, avec ses propres données, sa propre marque et sa propre configuration — sur une infrastructure mutualisée ou la vôtre.",
+        "body": "Multi-caisses dès le départ, soucieuse du RGPD par conception, open source sous AGPL-3.0. Chaque caisse tourne en isolation, avec ses propres données, sa propre marque et sa propre configuration — sur une infrastructure mutualisée ou la vôtre.",
         "chips": {
           "multiTenant": "Multi-caisses",
           "gdprConscious": "Soucieuse du RGPD",
-          "mitLicense": "Licence MIT",
+          "agplLicense": "Licence AGPL-3.0",
           "publicOnGithub": "Public sur GitHub",
           "selfHostOrHosted": "Auto-hébergée ou hébergée",
           "dataExport": "Export des données, toujours"
@@ -1113,39 +1111,28 @@
         "eyebrow": "Quand vous êtes prêt",
         "title": "Lancez une caisse en une après-midi.",
         "body": "Configurez votre sous-domaine, invitez vos premiers membres, intégrez vos premiers commerçants et fournisseurs. En français clair, avec des valeurs par défaut sensées. 20 €/mois — gratuit pour les associations enregistrées et les écoles.",
-        "ctaPrimary": "Créer une caisse",
-        "ctaSecondary": "Prendre rendez-vous"
+        "ctaPrimary": "Créer une caisse"
       },
       "right": {
         "eyebrow": "Pour les développeurs",
         "title": "Auto-hébergez sur votre serveur.",
-        "body": "Tirez l'image, lancez la migration, pointez un domaine. Sous licence MIT sur GitHub."
+        "body": "Tirez l'image, lancez la migration, pointez un domaine. Sous AGPL-3.0 sur GitHub."
       }
     },
     "footer": {
       "description": "Infrastructure open source pour les caisses solidaires, clubs et espaces communautaires locaux. Hébergée par nous, ou auto-hébergée sur votre serveur.",
-      "product": {
-        "heading": "Produit",
+      "explore": {
+        "heading": "Explorer",
         "howItWorks": "Comment ça marche",
+        "multiTenant": "Multi-caisses",
         "features": "Fonctionnalités",
-        "changelog": "Journal des évolutions"
+        "getStarted": "Commencer"
       },
-      "resources": {
-        "heading": "Ressources",
-        "documentation": "Documentation",
-        "github": "GitHub",
-        "brand": "Marque",
-        "status": "État du service"
-      },
-      "organization": {
-        "heading": "Organisation",
-        "about": "À propos",
-        "contact": "Contact",
-        "privacy": "Confidentialité",
-        "terms": "Conditions"
-      },
+      "githubLink": "GitHub",
       "copyright": "© 2026 La caisse · AGPL-3.0",
-      "licensesLink": "Licences"
+      "licensesLink": "Licences",
+      "privacyLink": "Confidentialité",
+      "termsLink": "Conditions"
     }
   },
   "licenses": {
@@ -1161,5 +1148,163 @@
       "viewSource": "Voir la source"
     },
     "backHome": "Retour à l’accueil"
+  },
+  "privacy": {
+    "title": "Politique de confidentialité",
+    "lastUpdated": "Dernière mise à jour : 12 mai 2026",
+    "intro": "Cette politique explique quelles données personnelles La caisse collecte, pourquoi nous les traitons et quels choix vous avez. Elle s’applique aux personnes qui visitent lacaisse.eu, détiennent un compte, opèrent une caisse hébergée par nous, ou participent en tant que membre, commerçant ou invité d’une caisse que nous hébergeons.",
+    "controller": {
+      "heading": "Qui sommes-nous",
+      "body": "La caisse est exploitée par Citizen Pay BV, société belge dont le siège social est situé Cantersteen 47, 1000 Bruxelles, numéro d’entreprise 1029.985.788, TVA BE 1029.985.788. Citizen Pay BV est le responsable du traitement des données décrites dans cette politique. Vous pouvez nous joindre à privacy@lacaisse.eu."
+    },
+    "scope": {
+      "heading": "Quand cette politique s’applique",
+      "intro": "Nous traitons des données personnelles lorsque vous :",
+      "items": [
+        "visitez lacaisse.eu ou un sous-domaine de caisse que nous opérons ;",
+        "créez ou détenez un compte La caisse ;",
+        "opérez une caisse sur notre infrastructure hébergée ; ou",
+        "participez en tant que membre, commerçant ou invité d’une caisse que nous hébergeons."
+      ],
+      "note": "Si vous participez à une caisse opérée par un tiers qui auto-héberge La caisse, c’est cet opérateur qui est responsable du traitement de vos données — pas nous."
+    },
+    "data": {
+      "heading": "Quelles données nous collectons et pourquoi",
+      "intro": "Nous traitons les catégories suivantes de données personnelles :",
+      "items": [
+        "Données de compte — nom, e-mail, empreinte du mot de passe, identifiants passkey. Pour fournir et sécuriser votre compte (RGPD art. 6.1.b — contrat).",
+        "Données opérationnelles de caisse — nom de la caisse, identité visuelle, membres, règles d’allocation, transactions. Pour faire fonctionner la caisse en votre nom (contrat ; sous-traitant pour le compte de l’opérateur de caisse).",
+        "Données de facturation — jetons de paiement, factures, numéros de TVA. Pour traiter les paiements d’abonnement et respecter les obligations comptables.",
+        "Journaux d’utilisation — IP, navigateur, activité de session. Pour la sécurité, la prévention des abus et le débogage (intérêt légitime, art. 6.1.f).",
+        "Correspondance d’assistance — e-mails et messages que vous nous envoyez. Pour répondre à vos demandes (intérêt légitime).",
+        "E-mails marketing — uniquement si vous y consentez, retirable à tout moment (consentement, art. 6.1.a)."
+      ],
+      "note": "Pour les données de membres traitées au nom d’un opérateur de caisse, nous agissons en tant que sous-traitant. L’opérateur de caisse est le responsable du traitement et décide de la conservation, de l’accès et de la divulgation de ces données."
+    },
+    "subprocessors": {
+      "heading": "Sous-traitants",
+      "intro": "Nous nous appuyons sur les sous-traitants suivants pour exploiter le service :",
+      "items": [
+        "Vercel Inc. — hébergement applicatif (UE ; transferts vers les États-Unis sous Clauses Contractuelles Types).",
+        "Supabase Inc. — base de données, authentification, stockage (région UE).",
+        "Resend Inc. — e-mails transactionnels et de notification (UE ; transferts vers les États-Unis sous CCT).",
+        "Citizenpay — open banking et règlement de jetons (UE)."
+      ],
+      "note": "Les transferts vers les États-Unis reposent sur les Clauses Contractuelles Types et le cadre EU-U.S. Data Privacy Framework lorsque applicable. Une liste à jour des sous-traitants est disponible sur demande."
+    },
+    "retention": {
+      "heading": "Durée de conservation",
+      "items": [
+        "Données de compte : pendant que votre compte est actif, plus 30 jours après sa clôture.",
+        "Données opérationnelles de caisse : pendant que la caisse est active. Après clôture, exportables pendant 30 jours, puis supprimées sous 90 jours.",
+        "Registres de facturation : 7 ans (droit comptable belge).",
+        "Journaux : 30 à 90 jours selon la catégorie."
+      ]
+    },
+    "rights": {
+      "heading": "Vos droits",
+      "intro": "En vertu du RGPD, vous avez le droit de :",
+      "items": [
+        "accéder aux données personnelles que nous détenons à votre sujet ;",
+        "faire corriger des données inexactes ;",
+        "faire effacer des données, sous réserve des obligations de conservation ;",
+        "restreindre ou vous opposer au traitement ;",
+        "recevoir vos données dans un format portable ;",
+        "retirer tout consentement que vous avez donné ;",
+        "introduire une plainte auprès de l’Autorité belge de protection des données via www.autoriteprotectiondonnees.be."
+      ],
+      "contact": "Pour exercer ces droits, écrivez à privacy@lacaisse.eu. Nous répondons sous 30 jours."
+    },
+    "cookies": {
+      "heading": "Cookies",
+      "body": "Nous n’utilisons que des cookies strictement nécessaires au fonctionnement du service : session, locale et sécurité. Nous n’utilisons pas de cookies analytiques, publicitaires ou de pistage, et nous n’affichons pas de bannière de consentement."
+    },
+    "security": {
+      "heading": "Sécurité",
+      "body": "Nous utilisons TLS en transit, le chiffrement au repos, le support des passkeys pour une authentification résistante au hameçonnage, et des périmètres de données isolés par caisse. Les incidents affectant des données personnelles sont signalés à l’Autorité de protection des données dans les 72 heures lorsque requis."
+    },
+    "changes": {
+      "heading": "Modifications de cette politique",
+      "body": "Nous pouvons mettre à jour cette politique. Les changements substantiels sont annoncés par e-mail aux titulaires de compte. La date de « dernière mise à jour » ci-dessus reflète toujours la modification la plus récente."
+    },
+    "contactSection": {
+      "heading": "Contact",
+      "body": "Citizen Pay BV — Cantersteen 47, 1000 Bruxelles — privacy@lacaisse.eu."
+    }
+  },
+  "terms": {
+    "title": "Conditions d’utilisation",
+    "lastUpdated": "Dernière mise à jour : 12 mai 2026",
+    "intro": "Ces conditions régissent votre utilisation de La caisse, la plateforme exploitée par Citizen Pay BV. En créant un compte ou en utilisant le service, vous les acceptez.",
+    "about": {
+      "heading": "1. À propos de ces conditions",
+      "body": "La caisse est exploitée par Citizen Pay BV, société belge dont le siège social est situé Cantersteen 47, 1000 Bruxelles, numéro d’entreprise 1029.985.788. Ces conditions forment un accord contraignant entre vous et Citizen Pay BV (« nous »)."
+    },
+    "eligibility": {
+      "heading": "2. Qui peut utiliser La caisse",
+      "body": "Vous devez être âgé(e) d’au moins 18 ans, ou de l’âge légal de la majorité dans votre juridiction, et autorisé(e) à engager toute organisation au nom de laquelle vous agissez."
+    },
+    "account": {
+      "heading": "3. Votre compte",
+      "body": "Vous êtes responsable de la sécurité de vos identifiants et de l’activité sous votre compte. Avertissez-nous rapidement en cas de soupçon d’accès non autorisé (security@lacaisse.eu)."
+    },
+    "acceptableUse": {
+      "heading": "4. Utilisation acceptable",
+      "intro": "Vous acceptez de ne pas :",
+      "items": [
+        "utiliser La caisse à des fins illégales ou en violation de sanctions applicables ;",
+        "contourner les limites techniques, abuser de l’API ou tenter un accès non autorisé ;",
+        "téléverser des logiciels malveillants ou du contenu illégal, contrefaisant ou nuisible ;",
+        "vous faire passer pour autrui ou présenter de manière trompeuse la finalité de votre caisse."
+      ]
+    },
+    "billing": {
+      "heading": "5. Abonnement et facturation",
+      "items": [
+        "Plan hébergé : 20 €/mois par caisse, facturé mensuellement. TVA appliquée le cas échéant.",
+        "Gratuit pour les associations et écoles : les associations enregistrées, ASBL et établissements scolaires utilisent La caisse gratuitement. Fournissez un justificatif à l’inscription ou dans les paramètres de votre compte.",
+        "Auto-hébergement : La caisse est sous licence AGPL-3.0 — l’auto-hébergement est gratuit, et ces conditions ne couvrent que le service hébergé proposé par Citizen Pay BV.",
+        "Remboursements : les frais mensuels ne sont pas remboursables, mais vous pouvez résilier à tout moment ; la résiliation prend effet à la fin de la période de facturation en cours."
+      ]
+    },
+    "openSource": {
+      "heading": "6. Open source",
+      "body": "La caisse est open source sous la licence publique générale GNU Affero v3.0. Vous pouvez inspecter, copier, exécuter et modifier le code conformément à l’AGPL-3.0. Les composants tiers sont listés sur la page Licences."
+    },
+    "yourData": {
+      "heading": "7. Vos données",
+      "body": "Votre utilisation de La caisse est également soumise à notre politique de confidentialité. Vous conservez la propriété des données que vous téléversez et pouvez exporter les données d’une caisse à tout moment depuis ses paramètres."
+    },
+    "availability": {
+      "heading": "8. Disponibilité du service",
+      "body": "Nous faisons des efforts raisonnables pour maintenir La caisse disponible mais n’offrons aucune garantie de disponibilité pour les plans gratuit ou standard. Nous pouvons effectuer des opérations de maintenance, avec préavis lorsque possible."
+    },
+    "disclaimers": {
+      "heading": "9. Exclusions de garantie",
+      "body": "La caisse est fournie « en l’état ». Dans toute la mesure permise par la loi, nous excluons toute garantie — expresse ou implicite — y compris d’adéquation à un usage particulier, de qualité marchande et d’absence de contrefaçon. La caisse est un outil que vous opérez ; vous restez responsable de l’exploitation légale de votre caisse et des décisions financières que vous prenez avec elle."
+    },
+    "liability": {
+      "heading": "10. Limitation de responsabilité",
+      "body": "Dans toute la mesure permise par la loi, notre responsabilité agrégée pour toute réclamation découlant de ces conditions ou liée à elles est limitée au plus élevé entre (a) les montants que vous nous avez payés au cours des 12 mois précédant la réclamation et (b) 100 €. Nous ne sommes pas responsables des dommages indirects, accessoires, consécutifs, spéciaux ou punitifs."
+    },
+    "termination": {
+      "heading": "11. Résiliation",
+      "items": [
+        "Par vous : résiliez à tout moment depuis les paramètres du compte. Vos données sont exportables pendant 30 jours après la clôture, puis supprimées.",
+        "Par nous : nous pouvons suspendre ou résilier votre compte en cas de violation de ces conditions ou d’usage illégal de La caisse. Lorsque possible, nous donnerons un préavis et une occasion de régulariser."
+      ]
+    },
+    "changes": {
+      "heading": "12. Modifications",
+      "body": "Nous pouvons mettre à jour ces conditions. Les changements substantiels sont annoncés par e-mail au moins 30 jours avant leur prise d’effet. L’utilisation continue après cette date constitue une acceptation."
+    },
+    "law": {
+      "heading": "13. Droit applicable et juridiction",
+      "body": "Ces conditions sont régies par le droit belge. Tout litige découlant de ces conditions ou lié à elles sera soumis aux tribunaux de Bruxelles, Belgique, sans préjudice des protections impératives des consommateurs dans votre pays de résidence."
+    },
+    "contactSection": {
+      "heading": "14. Contact",
+      "body": "Citizen Pay BV — Cantersteen 47, 1000 Bruxelles — legal@lacaisse.eu."
+    }
   }
 }

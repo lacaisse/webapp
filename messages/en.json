@@ -772,7 +772,6 @@
       "multiTenant": "Multi-tenant",
       "features": "Features",
       "getStarted": "Get started",
-      "docs": "Docs",
       "signIn": "Sign in",
       "startFund": "Start a fund"
     },
@@ -980,9 +979,8 @@
           "step": "PATH 02",
           "label": "SELF-HOSTED",
           "title": "Run it yourself.",
-          "body": "MIT-licensed, deploy on your own Vercel account or anywhere Next.js runs. You handle hosting and updates; you keep full control. Free."
-        },
-        "compareLink": "Compare in detail →"
+          "body": "AGPL-3.0 licensed, deploy on your own Vercel account or anywhere Next.js runs. You handle hosting and updates; you keep full control. Free."
+        }
       }
     },
     "features": {
@@ -1068,11 +1066,11 @@
       "underTheHood": {
         "kicker": "UNDER THE HOOD",
         "title": "And the parts you don't see.",
-        "body": "Multi-tenant from the ground up, GDPR-conscious by design, open source under MIT. Every fund runs in isolation, with its own data, its own branding, and its own configuration — on shared infrastructure or your own.",
+        "body": "Multi-tenant from the ground up, GDPR-conscious by design, open source under AGPL-3.0. Every fund runs in isolation, with its own data, its own branding, and its own configuration — on shared infrastructure or your own.",
         "chips": {
           "multiTenant": "Multi-tenant",
           "gdprConscious": "GDPR-conscious",
-          "mitLicense": "MIT license",
+          "agplLicense": "AGPL-3.0 license",
           "publicOnGithub": "Public on GitHub",
           "selfHostOrHosted": "Self-host or hosted",
           "dataExport": "Data export, always"
@@ -1084,39 +1082,28 @@
         "eyebrow": "Ready when you are",
         "title": "Start a fund in an afternoon.",
         "body": "Set up your subdomain, invite your first members, onboard your first merchants and suppliers. Plain English, sensible defaults. €20/month — free for registered non-profits and schools.",
-        "ctaPrimary": "Start a fund",
-        "ctaSecondary": "Book a call"
+        "ctaPrimary": "Start a fund"
       },
       "right": {
         "eyebrow": "For developers",
         "title": "Self-host on your own box.",
-        "body": "Pull the image, run the migration, point a domain. MIT-licensed on GitHub."
+        "body": "Pull the image, run the migration, point a domain. AGPL-3.0 on GitHub."
       }
     },
     "footer": {
       "description": "Open-source infrastructure for local solidarity funds, clubs, and community spaces. Hosted by us, or self-hosted on your own server.",
-      "product": {
-        "heading": "Product",
+      "explore": {
+        "heading": "Explore",
         "howItWorks": "How it works",
+        "multiTenant": "Multi-tenant",
         "features": "Features",
-        "changelog": "Changelog"
+        "getStarted": "Get started"
       },
-      "resources": {
-        "heading": "Resources",
-        "documentation": "Documentation",
-        "github": "GitHub",
-        "brand": "Brand",
-        "status": "Status"
-      },
-      "organization": {
-        "heading": "Organization",
-        "about": "About",
-        "contact": "Contact",
-        "privacy": "Privacy",
-        "terms": "Terms"
-      },
+      "githubLink": "GitHub",
       "copyright": "© 2026 La caisse · AGPL-3.0",
-      "licensesLink": "Licenses"
+      "licensesLink": "Licenses",
+      "privacyLink": "Privacy",
+      "termsLink": "Terms"
     }
   },
   "licenses": {
@@ -1132,5 +1119,163 @@
       "viewSource": "View source"
     },
     "backHome": "Back to home"
+  },
+  "privacy": {
+    "title": "Privacy notice",
+    "lastUpdated": "Last updated: 12 May 2026",
+    "intro": "This notice explains what personal data La caisse collects, why we process it, and what choices you have. It applies to people who visit lacaisse.eu, hold an account, operate a fund hosted by us, or participate as a member, merchant, or guest of a fund we host.",
+    "controller": {
+      "heading": "Who we are",
+      "body": "La caisse is operated by Citizen Pay BV, a Belgian company with registered office at Cantersteen 47, 1000 Brussels, company number 1029.985.788, VAT BE 1029.985.788. Citizen Pay BV is the data controller for the personal data described in this notice. You can reach us at privacy@lacaisse.eu."
+    },
+    "scope": {
+      "heading": "When this notice applies",
+      "intro": "We process personal data when you:",
+      "items": [
+        "visit lacaisse.eu or a fund subdomain we operate;",
+        "create or hold a La caisse account;",
+        "operate a fund on our hosted infrastructure; or",
+        "participate as a member, merchant, or guest of a fund we host."
+      ],
+      "note": "If you participate in a fund operated by a third party who self-hosts La caisse, that operator is the controller for your data — not us."
+    },
+    "data": {
+      "heading": "What we collect and why",
+      "intro": "We process the following categories of personal data:",
+      "items": [
+        "Account data — name, email, password hash, passkey credentials. To provide and secure your account (GDPR art. 6.1.b — contract).",
+        "Fund operational data — fund name, branding, members, allocation rules, transactions. To run the fund on your behalf (contract; processor on behalf of the fund operator).",
+        "Billing data — payment tokens, invoices, VAT numbers. To process subscription payments and meet accounting obligations.",
+        "Usage logs — IP, browser, session activity. For security, abuse prevention, and debugging (legitimate interest, art. 6.1.f).",
+        "Support correspondence — emails and messages you send us. To respond to your queries (legitimate interest).",
+        "Marketing emails — only if you opt in, withdrawable at any time (consent, art. 6.1.a)."
+      ],
+      "note": "For member data processed on behalf of a fund operator, we act as a processor. The fund operator is the controller and decides retention, access, and disclosure for that data."
+    },
+    "subprocessors": {
+      "heading": "Sub-processors",
+      "intro": "We rely on the sub-processors below to operate the service:",
+      "items": [
+        "Vercel Inc. — application hosting (EU; US transfers under Standard Contractual Clauses).",
+        "Supabase Inc. — database, authentication, storage (EU region).",
+        "Resend Inc. — transactional and notification email (EU; US transfers under SCCs).",
+        "Citizenpay — open banking and token settlement (EU)."
+      ],
+      "note": "Transfers to the United States rely on Standard Contractual Clauses and the EU-U.S. Data Privacy Framework where applicable. An up-to-date sub-processor list is available on request."
+    },
+    "retention": {
+      "heading": "How long we keep your data",
+      "items": [
+        "Account data: while your account is active, plus 30 days after closure.",
+        "Fund operational data: while the fund is active. After closure, exportable for 30 days, then deleted within 90 days.",
+        "Billing records: 7 years (Belgian accounting law).",
+        "Logs: 30 to 90 days depending on category."
+      ]
+    },
+    "rights": {
+      "heading": "Your rights",
+      "intro": "Under the GDPR you have the right to:",
+      "items": [
+        "access the personal data we hold about you;",
+        "have inaccurate data corrected;",
+        "have data erased, subject to retention obligations;",
+        "restrict or object to processing;",
+        "receive your data in a portable format;",
+        "withdraw any consent you have given;",
+        "lodge a complaint with the Belgian Data Protection Authority at www.dataprotectionauthority.be."
+      ],
+      "contact": "To exercise these rights, email privacy@lacaisse.eu. We respond within 30 days."
+    },
+    "cookies": {
+      "heading": "Cookies",
+      "body": "We only use cookies strictly necessary to operate the service: session, locale, and security. We do not use analytics, advertising, or tracking cookies, and we do not show a consent banner."
+    },
+    "security": {
+      "heading": "Security",
+      "body": "We use TLS in transit, encryption at rest, passkey support for phishing-resistant authentication, and isolated per-fund data scopes. Incidents affecting personal data are reported to the Data Protection Authority within 72 hours where required."
+    },
+    "changes": {
+      "heading": "Changes to this notice",
+      "body": "We may update this notice. Material changes are announced by email to account holders. The \"last updated\" date above always reflects the most recent change."
+    },
+    "contactSection": {
+      "heading": "Contact",
+      "body": "Citizen Pay BV — Cantersteen 47, 1000 Brussels — privacy@lacaisse.eu."
+    }
+  },
+  "terms": {
+    "title": "Terms of service",
+    "lastUpdated": "Last updated: 12 May 2026",
+    "intro": "These terms govern your use of La caisse, the platform operated by Citizen Pay BV. By creating an account or using the service, you agree to them.",
+    "about": {
+      "heading": "1. About these terms",
+      "body": "La caisse is operated by Citizen Pay BV, a Belgian company with registered office at Cantersteen 47, 1000 Brussels, company number 1029.985.788. These terms form a binding agreement between you and Citizen Pay BV (\"we\", \"us\")."
+    },
+    "eligibility": {
+      "heading": "2. Who can use La caisse",
+      "body": "You must be at least 18, or the legal age of majority where you live, and authorised to bind any organisation on whose behalf you act."
+    },
+    "account": {
+      "heading": "3. Your account",
+      "body": "You are responsible for keeping your credentials secure and for activity under your account. Tell us promptly if you suspect unauthorised access (security@lacaisse.eu)."
+    },
+    "acceptableUse": {
+      "heading": "4. Acceptable use",
+      "intro": "You agree not to:",
+      "items": [
+        "use La caisse for unlawful purposes or in violation of any applicable sanctions;",
+        "circumvent technical limits, abuse the API, or attempt unauthorised access;",
+        "upload malware or content that is illegal, infringing, or harmful;",
+        "impersonate others or misrepresent your fund's purpose."
+      ]
+    },
+    "billing": {
+      "heading": "5. Subscription and billing",
+      "items": [
+        "Hosted plan: €20/month per fund, billed monthly. VAT applied where required.",
+        "Free for non-profits and schools: registered non-profits, charities, and educational institutions use La caisse free of charge. Provide registration evidence on signup or in account settings.",
+        "Self-hosted: La caisse is licensed under AGPL-3.0 — self-hosting is free, and these terms cover only the hosted service offered by Citizen Pay BV.",
+        "Refunds: monthly fees are non-refundable, but you may cancel at any time; cancellation takes effect at the end of the current billing period."
+      ]
+    },
+    "openSource": {
+      "heading": "6. Open source",
+      "body": "La caisse is open source under the GNU Affero General Public License v3.0. You may inspect, fork, run, and modify the code in accordance with the AGPL-3.0. Third-party components are listed on the licenses page."
+    },
+    "yourData": {
+      "heading": "7. Your data",
+      "body": "Your use of La caisse is also subject to our privacy notice. You retain ownership of data you upload and can export fund data at any time from the fund settings page."
+    },
+    "availability": {
+      "heading": "8. Service availability",
+      "body": "We make reasonable efforts to keep La caisse available but offer no uptime guarantee for the free or standard plans. We may perform maintenance, with notice where feasible."
+    },
+    "disclaimers": {
+      "heading": "9. Disclaimers",
+      "body": "La caisse is provided \"as is\". To the maximum extent permitted by law, we disclaim all warranties — express or implied — including fitness for a particular purpose, merchantability, and non-infringement. La caisse is a tool you operate; you remain responsible for your fund's lawful operation and the financial decisions you make with it."
+    },
+    "liability": {
+      "heading": "10. Limitation of liability",
+      "body": "To the maximum extent permitted by law, our aggregate liability for any claim arising out of or related to these terms is limited to the greater of (a) the amounts you paid us in the 12 months preceding the claim and (b) €100. We are not liable for indirect, incidental, consequential, special, or punitive damages."
+    },
+    "termination": {
+      "heading": "11. Termination",
+      "items": [
+        "By you: cancel at any time from account settings. Your data is exportable for 30 days after closure, then deleted.",
+        "By us: we may suspend or terminate your account if you breach these terms or use La caisse unlawfully. Where feasible we will give notice and an opportunity to cure."
+      ]
+    },
+    "changes": {
+      "heading": "12. Changes",
+      "body": "We may update these terms. Material changes are announced by email at least 30 days before they take effect. Continued use after that date constitutes acceptance."
+    },
+    "law": {
+      "heading": "13. Governing law and jurisdiction",
+      "body": "These terms are governed by Belgian law. Any dispute arising out of or related to these terms shall be submitted to the courts of Brussels, Belgium, without prejudice to mandatory consumer protections in your country of residence."
+    },
+    "contactSection": {
+      "heading": "14. Contact",
+      "body": "Citizen Pay BV — Cantersteen 47, 1000 Brussels — legal@lacaisse.eu."
+    }
   }
 }

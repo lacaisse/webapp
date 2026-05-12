@@ -26,7 +26,7 @@ const GROUPS = [
 const CHIPS = [
   "multiTenant",
   "gdprConscious",
-  "mitLicense",
+  "agplLicense",
   "publicOnGithub",
   "selfHostOrHosted",
   "dataExport",

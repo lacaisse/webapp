@@ -801,7 +801,6 @@
       "multiTenant": "Multi-fonds",
       "features": "Functies",
       "getStarted": "Aan de slag",
-      "docs": "Docs",
       "signIn": "Inloggen",
       "startFund": "Fonds starten"
     },
@@ -1009,9 +1008,8 @@
           "step": "PAD 02",
           "label": "ZELF-GEHOST",
           "title": "Run het zelf.",
-          "body": "MIT-gelicentieerd, deploy op uw eigen Vercel-account of overal waar Next.js draait. U regelt hosting en updates; u behoudt volledige controle. Gratis."
-        },
-        "compareLink": "Vergelijken in detail →"
+          "body": "AGPL-3.0-gelicentieerd, deploy op uw eigen Vercel-account of overal waar Next.js draait. U regelt hosting en updates; u behoudt volledige controle. Gratis."
+        }
       }
     },
     "features": {
@@ -1097,11 +1095,11 @@
       "underTheHood": {
         "kicker": "ONDER DE MOTORKAP",
         "title": "En de delen die u niet ziet.",
-        "body": "Vanaf de grond multi-fonds, AVG-bewust ontworpen, open source onder MIT. Elk fonds draait in isolatie, met eigen data, eigen huisstijl en eigen configuratie — op gedeelde infrastructuur of de uwe.",
+        "body": "Vanaf de grond multi-fonds, AVG-bewust ontworpen, open source onder AGPL-3.0. Elk fonds draait in isolatie, met eigen data, eigen huisstijl en eigen configuratie — op gedeelde infrastructuur of de uwe.",
         "chips": {
           "multiTenant": "Multi-fonds",
           "gdprConscious": "AVG-bewust",
-          "mitLicense": "MIT-licentie",
+          "agplLicense": "AGPL-3.0-licentie",
           "publicOnGithub": "Publiek op GitHub",
           "selfHostOrHosted": "Zelf- of gehost",
           "dataExport": "Data-export, altijd"
@@ -1113,39 +1111,28 @@
         "eyebrow": "Klaar wanneer u dat bent",
         "title": "Start een fonds in één namiddag.",
         "body": "Zet uw subdomein op, nodig uw eerste leden uit, onboard uw eerste handelaars en leveranciers. Helder Nederlands, zinvolle standaardwaarden. €20/maand — gratis voor geregistreerde non-profits en scholen.",
-        "ctaPrimary": "Start een fonds",
-        "ctaSecondary": "Plan een gesprek"
+        "ctaPrimary": "Start een fonds"
       },
       "right": {
         "eyebrow": "Voor ontwikkelaars",
         "title": "Zelf-host op uw eigen server.",
-        "body": "Pull de image, draai de migratie, wijs een domein toe. MIT-gelicentieerd op GitHub."
+        "body": "Pull de image, draai de migratie, wijs een domein toe. AGPL-3.0 op GitHub."
       }
     },
     "footer": {
       "description": "Open-source infrastructuur voor lokale solidaire fondsen, clubs en gemeenschapsruimtes. Gehost door ons, of zelf-gehost op uw eigen server.",
-      "product": {
-        "heading": "Product",
+      "explore": {
+        "heading": "Verkennen",
         "howItWorks": "Hoe het werkt",
+        "multiTenant": "Multi-fonds",
         "features": "Functies",
-        "changelog": "Wijzigingen"
+        "getStarted": "Aan de slag"
       },
-      "resources": {
-        "heading": "Bronnen",
-        "documentation": "Documentatie",
-        "github": "GitHub",
-        "brand": "Merk",
-        "status": "Status"
-      },
-      "organization": {
-        "heading": "Organisatie",
-        "about": "Over",
-        "contact": "Contact",
-        "privacy": "Privacy",
-        "terms": "Voorwaarden"
-      },
+      "githubLink": "GitHub",
       "copyright": "© 2026 La caisse · AGPL-3.0",
-      "licensesLink": "Licenties"
+      "licensesLink": "Licenties",
+      "privacyLink": "Privacy",
+      "termsLink": "Voorwaarden"
     }
   },
   "licenses": {
@@ -1161,5 +1148,163 @@
       "viewSource": "Bekijk bron"
     },
     "backHome": "Terug naar home"
+  },
+  "privacy": {
+    "title": "Privacyverklaring",
+    "lastUpdated": "Laatst bijgewerkt: 12 mei 2026",
+    "intro": "Deze verklaring legt uit welke persoonsgegevens La caisse verzamelt, waarom we ze verwerken en welke keuzes u hebt. Ze geldt voor wie lacaisse.eu bezoekt, een account heeft, een fonds beheert dat door ons wordt gehost, of deelneemt als lid, handelaar of gast van een fonds dat wij hosten.",
+    "controller": {
+      "heading": "Wie wij zijn",
+      "body": "La caisse wordt geëxploiteerd door Citizen Pay BV, een Belgische vennootschap met maatschappelijke zetel te Cantersteen 47, 1000 Brussel, ondernemingsnummer 1029.985.788, btw BE 1029.985.788. Citizen Pay BV is de verwerkingsverantwoordelijke voor de in deze verklaring beschreven persoonsgegevens. U kunt ons bereiken via privacy@lacaisse.eu."
+    },
+    "scope": {
+      "heading": "Wanneer deze verklaring geldt",
+      "intro": "We verwerken persoonsgegevens wanneer u:",
+      "items": [
+        "lacaisse.eu of een door ons beheerd fondssubdomein bezoekt;",
+        "een La caisse-account aanmaakt of aanhoudt;",
+        "een fonds beheert op onze gehoste infrastructuur; of",
+        "deelneemt als lid, handelaar of gast van een fonds dat wij hosten."
+      ],
+      "note": "Als u deelneemt aan een fonds dat door een derde wordt beheerd die La caisse zelf host, is die beheerder de verwerkingsverantwoordelijke voor uw gegevens — niet wij."
+    },
+    "data": {
+      "heading": "Wat we verzamelen en waarom",
+      "intro": "We verwerken de volgende categorieën persoonsgegevens:",
+      "items": [
+        "Accountgegevens — naam, e-mail, wachtwoord-hash, passkey-credentials. Om uw account te leveren en te beveiligen (AVG art. 6.1.b — overeenkomst).",
+        "Operationele fondsgegevens — fondsnaam, huisstijl, leden, allocatieregels, transacties. Om het fonds namens u te draaien (overeenkomst; verwerker namens de fondsbeheerder).",
+        "Facturatiegegevens — betalingstokens, facturen, btw-nummers. Om abonnementsbetalingen te verwerken en aan boekhoudkundige verplichtingen te voldoen.",
+        "Gebruikslogs — IP, browser, sessieactiviteit. Voor beveiliging, misbruikpreventie en debugging (gerechtvaardigd belang, art. 6.1.f).",
+        "Ondersteuningscorrespondentie — e-mails en berichten die u ons stuurt. Om op uw vragen te antwoorden (gerechtvaardigd belang).",
+        "Marketing-e-mails — uitsluitend bij opt-in, op elk moment intrekbaar (toestemming, art. 6.1.a)."
+      ],
+      "note": "Voor lidgegevens die we namens een fondsbeheerder verwerken, treden wij op als verwerker. De fondsbeheerder is de verwerkingsverantwoordelijke en beslist over bewaring, toegang en bekendmaking van die gegevens."
+    },
+    "subprocessors": {
+      "heading": "Sub-verwerkers",
+      "intro": "We maken gebruik van de volgende sub-verwerkers om de dienst te exploiteren:",
+      "items": [
+        "Vercel Inc. — applicatiehosting (EU; doorgifte naar de VS via Standaardcontractbepalingen).",
+        "Supabase Inc. — database, authenticatie, opslag (EU-regio).",
+        "Resend Inc. — transactionele en notificatie-e-mail (EU; doorgifte naar de VS via SCC's).",
+        "Citizenpay — open banking en token-afwikkeling (EU)."
+      ],
+      "note": "Doorgiften naar de Verenigde Staten gebeuren op basis van Standaardcontractbepalingen en het EU-U.S. Data Privacy Framework waar van toepassing. Een actuele lijst van sub-verwerkers is op verzoek beschikbaar."
+    },
+    "retention": {
+      "heading": "Hoe lang we uw gegevens bewaren",
+      "items": [
+        "Accountgegevens: zolang uw account actief is, plus 30 dagen na sluiting.",
+        "Operationele fondsgegevens: zolang het fonds actief is. Na sluiting 30 dagen exporteerbaar, daarna binnen 90 dagen verwijderd.",
+        "Facturatiedossiers: 7 jaar (Belgisch boekhoudrecht).",
+        "Logs: 30 tot 90 dagen, afhankelijk van de categorie."
+      ]
+    },
+    "rights": {
+      "heading": "Uw rechten",
+      "intro": "Onder de AVG hebt u het recht om:",
+      "items": [
+        "toegang te krijgen tot de persoonsgegevens die we over u bewaren;",
+        "onjuiste gegevens te laten corrigeren;",
+        "gegevens te laten wissen, onder voorbehoud van bewaarplichten;",
+        "de verwerking te beperken of bezwaar te maken;",
+        "uw gegevens in een overdraagbaar formaat te ontvangen;",
+        "elke gegeven toestemming in te trekken;",
+        "een klacht in te dienen bij de Belgische Gegevensbeschermingsautoriteit via www.gegevensbeschermingsautoriteit.be."
+      ],
+      "contact": "Stuur een e-mail naar privacy@lacaisse.eu om deze rechten uit te oefenen. We antwoorden binnen 30 dagen."
+    },
+    "cookies": {
+      "heading": "Cookies",
+      "body": "We gebruiken uitsluitend strikt noodzakelijke cookies voor de werking van de dienst: sessie, taal en beveiliging. We gebruiken geen analytische, advertentie- of trackingcookies en tonen geen toestemmingsbanner."
+    },
+    "security": {
+      "heading": "Beveiliging",
+      "body": "We gebruiken TLS in transit, encryptie at rest, passkey-ondersteuning voor phishingbestendige authenticatie en geïsoleerde gegevensbereiken per fonds. Incidenten die persoonsgegevens raken worden waar vereist binnen 72 uur gemeld aan de Gegevensbeschermingsautoriteit."
+    },
+    "changes": {
+      "heading": "Wijzigingen aan deze verklaring",
+      "body": "We kunnen deze verklaring bijwerken. Belangrijke wijzigingen worden per e-mail aan accounthouders aangekondigd. De datum « laatst bijgewerkt » hierboven weerspiegelt steeds de meest recente wijziging."
+    },
+    "contactSection": {
+      "heading": "Contact",
+      "body": "Citizen Pay BV — Cantersteen 47, 1000 Brussel — privacy@lacaisse.eu."
+    }
+  },
+  "terms": {
+    "title": "Algemene voorwaarden",
+    "lastUpdated": "Laatst bijgewerkt: 12 mei 2026",
+    "intro": "Deze voorwaarden regelen uw gebruik van La caisse, het platform dat wordt geëxploiteerd door Citizen Pay BV. Door een account aan te maken of de dienst te gebruiken, gaat u akkoord met deze voorwaarden.",
+    "about": {
+      "heading": "1. Over deze voorwaarden",
+      "body": "La caisse wordt geëxploiteerd door Citizen Pay BV, een Belgische vennootschap met maatschappelijke zetel te Cantersteen 47, 1000 Brussel, ondernemingsnummer 1029.985.788. Deze voorwaarden vormen een bindende overeenkomst tussen u en Citizen Pay BV (« wij »)."
+    },
+    "eligibility": {
+      "heading": "2. Wie La caisse mag gebruiken",
+      "body": "U moet ten minste 18 jaar oud zijn, of de wettelijke meerderjarigheidsleeftijd in uw rechtsgebied, en bevoegd zijn om elke organisatie namens wie u handelt te binden."
+    },
+    "account": {
+      "heading": "3. Uw account",
+      "body": "U bent verantwoordelijk voor het veilig houden van uw inloggegevens en voor activiteit onder uw account. Meld vermoedens van ongeautoriseerde toegang onmiddellijk (security@lacaisse.eu)."
+    },
+    "acceptableUse": {
+      "heading": "4. Aanvaardbaar gebruik",
+      "intro": "U stemt ermee in om niet:",
+      "items": [
+        "La caisse te gebruiken voor onwettige doeleinden of in strijd met toepasselijke sancties;",
+        "technische limieten te omzeilen, de API te misbruiken of ongeautoriseerde toegang te proberen;",
+        "malware of inhoud te uploaden die illegaal, inbreukmakend of schadelijk is;",
+        "u voor anderen uit te geven of het doel van uw fonds onjuist voor te stellen."
+      ]
+    },
+    "billing": {
+      "heading": "5. Abonnement en facturatie",
+      "items": [
+        "Gehost plan: € 20/maand per fonds, maandelijks gefactureerd. Btw waar vereist toegepast.",
+        "Gratis voor non-profits en scholen: geregistreerde vzw's, liefdadigheidsinstellingen en onderwijsinstellingen gebruiken La caisse gratis. Bezorg een bewijs van registratie bij inschrijving of in uw accountinstellingen.",
+        "Zelf gehost: La caisse staat onder de AGPL-3.0-licentie — zelf-hosten is gratis, en deze voorwaarden dekken enkel de door Citizen Pay BV aangeboden gehoste dienst.",
+        "Terugbetalingen: maandelijkse kosten zijn niet terugbetaalbaar, maar u kunt op elk moment opzeggen; de opzegging gaat in op het einde van de huidige facturatieperiode."
+      ]
+    },
+    "openSource": {
+      "heading": "6. Open source",
+      "body": "La caisse is open source onder de GNU Affero General Public License v3.0. U mag de code inspecteren, forken, draaien en wijzigen conform de AGPL-3.0. Componenten van derden zijn vermeld op de Licenties-pagina."
+    },
+    "yourData": {
+      "heading": "7. Uw gegevens",
+      "body": "Uw gebruik van La caisse is ook onderworpen aan onze privacyverklaring. U behoudt eigendom over de gegevens die u uploadt en kunt fondsgegevens op elk moment exporteren via de fondsinstellingen."
+    },
+    "availability": {
+      "heading": "8. Beschikbaarheid van de dienst",
+      "body": "We doen redelijke inspanningen om La caisse beschikbaar te houden, maar bieden geen uptime-garantie voor het gratis of standaardplan. We kunnen onderhoud uitvoeren, met kennisgeving waar mogelijk."
+    },
+    "disclaimers": {
+      "heading": "9. Disclaimers",
+      "body": "La caisse wordt geleverd « as is ». Voor zover wettelijk toegestaan, sluiten we alle garanties uit — expliciet of impliciet — waaronder geschiktheid voor een bepaald doel, verkoopbaarheid en niet-inbreuk. La caisse is een tool die u beheert; u blijft verantwoordelijk voor de wettelijke werking van uw fonds en de financiële beslissingen die u ermee neemt."
+    },
+    "liability": {
+      "heading": "10. Beperking van aansprakelijkheid",
+      "body": "Voor zover wettelijk toegestaan is onze totale aansprakelijkheid voor elke claim die voortvloeit uit of verband houdt met deze voorwaarden beperkt tot het hoogste van (a) de bedragen die u ons hebt betaald in de 12 maanden voorafgaand aan de claim en (b) € 100. Wij zijn niet aansprakelijk voor indirecte, incidentele, gevolg-, bijzondere of punitieve schade."
+    },
+    "termination": {
+      "heading": "11. Beëindiging",
+      "items": [
+        "Door u: zeg op elk moment op via de accountinstellingen. Uw gegevens zijn 30 dagen na sluiting exporteerbaar en worden vervolgens verwijderd.",
+        "Door ons: we kunnen uw account opschorten of beëindigen als u deze voorwaarden schendt of La caisse onwettig gebruikt. Waar mogelijk geven we kennisgeving en gelegenheid tot rechtzetting."
+      ]
+    },
+    "changes": {
+      "heading": "12. Wijzigingen",
+      "body": "We kunnen deze voorwaarden bijwerken. Belangrijke wijzigingen worden per e-mail aangekondigd ten minste 30 dagen vóór de inwerkingtreding. Voortgezet gebruik na die datum geldt als aanvaarding."
+    },
+    "law": {
+      "heading": "13. Toepasselijk recht en bevoegde rechter",
+      "body": "Deze voorwaarden vallen onder Belgisch recht. Elk geschil dat voortvloeit uit of verband houdt met deze voorwaarden wordt voorgelegd aan de rechtbanken van Brussel, België, onverminderd dwingende consumentenbescherming in uw land van verblijf."
+    },
+    "contactSection": {
+      "heading": "14. Contact",
+      "body": "Citizen Pay BV — Cantersteen 47, 1000 Brussel — legal@lacaisse.eu."
+    }
   }
 }
