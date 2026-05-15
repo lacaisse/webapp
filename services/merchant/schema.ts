@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { z } from "zod";
 
 // Built-in merchant signup fields (per the form spec in the design pass):
@@ -33,8 +34,16 @@ export const BuiltinMerchantSignupSchema = z.object({
   }),
 });
 
+export const ExtraValueSchema = z.union([
+  z.string(),
+  z.array(z.string()),
+  z.boolean(),
+]);
+
+export type ExtraValue = z.infer<typeof ExtraValueSchema>;
+
 export const MerchantSignupFormSchema = BuiltinMerchantSignupSchema.extend({
-  extras: z.record(z.string(), z.string()).optional(),
+  extras: z.record(z.string(), ExtraValueSchema).optional(),
 });
 
 export type BuiltinMerchantSignupInput = z.infer<

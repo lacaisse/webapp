@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // 6-circle grid logo, drawn inline so it scales/animates cleanly with the rest
 // of the editorial type. Bottom-middle circle filled with the brand color.
 

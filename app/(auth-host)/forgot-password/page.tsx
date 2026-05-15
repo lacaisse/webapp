@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { getTranslations } from "next-intl/server";
 import Link from "next/link";
 import {

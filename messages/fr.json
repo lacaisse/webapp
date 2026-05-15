@@ -175,7 +175,78 @@
         "joined": "Inscrit le"
       },
       "unverified": "Email non vérifié",
-      "empty": "Aucun membre à afficher."
+      "empty": "Aucun membre à afficher.",
+      "detail": {
+        "back": "Tous les membres",
+        "unverified": "Email non vérifié",
+        "profile": {
+          "title": "Identité",
+          "description": "Coordonnées et ménage.",
+          "address": "Adresse",
+          "household": "Ménage",
+          "householdValue": "{adults} adultes · {children} enfants",
+          "joined": "Inscrit le",
+          "left": "Parti le"
+        },
+        "banking": {
+          "title": "Adhésion",
+          "description": "Palier, coordonnées bancaires et identifiants.",
+          "tier": "Palier",
+          "iban": "IBAN",
+          "reference": "Communication structurée",
+          "referralCode": "Code de parrainage",
+          "primaryCard": "Carte principale"
+        },
+        "applicationData": {
+          "title": "Données d'adhésion",
+          "description": "Champs personnalisés remplis par le membre."
+        },
+        "cards": {
+          "title": "Cartes",
+          "serial": "Série",
+          "holder": "Titulaire",
+          "status": "Statut",
+          "issued": "Émise le",
+          "balance": "Solde",
+          "primary": "Carte principale",
+          "lost": "Perdue",
+          "empty": "Aucune carte pour le moment."
+        },
+        "tokenOps": {
+          "title": "Opérations de jetons",
+          "date": "Date",
+          "type": "Type",
+          "tier": "Palier",
+          "period": "Période",
+          "amount": "Montant",
+          "status": "Statut",
+          "empty": "Aucune opération pour le moment."
+        },
+        "bank": {
+          "title": "Mouvements bancaires",
+          "date": "Date",
+          "reference": "Communication",
+          "period": "Période",
+          "amount": "Montant",
+          "empty": "Aucun mouvement bancaire lié."
+        },
+        "referrals": {
+          "sponsorTitle": "Parrainé par",
+          "sponsorDescription": "Le membre qui a parrainé cette inscription.",
+          "sponsorEmpty": "Pas de parrain.",
+          "sponsoredTitle": "Filleuls",
+          "sponsoredDescription": "{count} inscriptions avec le code de ce membre.",
+          "sponsoredEmpty": "Aucun filleul pour le moment."
+        },
+        "emails": {
+          "title": "Emails",
+          "date": "Date",
+          "type": "Type",
+          "to": "Destinataire",
+          "status": "Statut",
+          "empty": "Aucun email envoyé."
+        }
+      }
     },
     "cards": {
       "title": "Cartes",
@@ -253,6 +324,43 @@
           "archiving": "Archivage…"
         }
       },
+      "periodDetail": {
+        "back": "Toutes les périodes",
+        "range": "{starts} → {cutoff}",
+        "closedAt": "Clôturée le {date}",
+        "notes": "Notes",
+        "kpi": {
+          "deposits": "Dépôts collectés",
+          "depositsHint": "{count} mouvements bancaires",
+          "minted": "Jetons émis",
+          "mintedHint": "{count} opérations (confirmées)",
+          "members": "Membres contributeurs",
+          "membersHint": "Membres distincts avec un dépôt associé",
+          "status": "Statut",
+          "statusHints": {
+            "OPEN": "Accepte actuellement les dépôts.",
+            "IN_PROGRESS": "Date butoir atteinte, émission en cours.",
+            "CLOSED": "Émission terminée."
+          }
+        },
+        "deposits": {
+          "title": "Dépôts",
+          "date": "Date",
+          "member": "Membre",
+          "reference": "Communication",
+          "amount": "Montant",
+          "empty": "Aucun dépôt dans cette période."
+        },
+        "mints": {
+          "title": "Émissions",
+          "date": "Date",
+          "member": "Membre",
+          "tier": "Palier",
+          "amount": "Montant",
+          "status": "Statut",
+          "empty": "Aucune émission groupée pour l'instant."
+        }
+      },
       "schedule": {
         "title": "Calendrier d'allocation",
         "description": "Batchs en période fixe. Les caisses pay-and-go n'ont pas de périodes.",
@@ -290,7 +398,54 @@
         "tokensReceived": "Jetons reçus",
         "joined": "Inscrit le"
       },
-      "empty": "Aucun commerce à afficher."
+      "empty": "Aucun commerce à afficher.",
+      "detail": {
+        "back": "Tous les commerces",
+        "verified": "Email vérifié",
+        "unverified": "Email non vérifié",
+        "connected": "Citizen Pay connecté",
+        "notConnected": "Citizen Pay non connecté",
+        "contact": {
+          "title": "Contact",
+          "description": "Informations de contact publiques.",
+          "contactName": "Contact",
+          "email": "Email",
+          "phone": "Téléphone",
+          "website": "Site web",
+          "address": "Adresse"
+        },
+        "business": {
+          "title": "Entreprise",
+          "description": "Statut interne et lien Citizen Pay.",
+          "joined": "Inscrit le",
+          "position": "Position dans l'annuaire",
+          "conditions": "Conditions d'acceptation",
+          "citizenPayPlace": "Identifiant Citizen Pay",
+          "citizenPayActivated": "Activation Citizen Pay",
+          "reviewed": "Dernière revue",
+          "reviewNote": "Note de revue"
+        },
+        "applicationData": {
+          "title": "Données d'inscription",
+          "description": "Champs personnalisés remplis par le commerce."
+        },
+        "payouts": {
+          "title": "Versements",
+          "total": "{total} sur {count} transferts",
+          "date": "Date",
+          "reference": "Communication",
+          "amount": "Montant",
+          "empty": "Aucun versement pour le moment."
+        },
+        "emails": {
+          "title": "Emails",
+          "date": "Date",
+          "type": "Type",
+          "to": "Destinataire",
+          "status": "Statut",
+          "empty": "Aucun email envoyé."
+        }
+      }
     },
     "payments": {
       "title": "Paiements",
@@ -445,6 +600,55 @@
         "verifyMerchant": {
           "label": "Exiger la vérification email pour les commerces",
           "description": "Les commerces doivent cliquer sur un lien de confirmation avant que leur demande n'entre dans la file de validation."
+        },
+        "fieldsTitle": "Champs d'inscription",
+        "fieldsDescription": "Ajoutez des questions personnalisées aux formulaires d'inscription. Les champs de base (nom, email) sont toujours présents.",
+        "fields": {
+          "memberTitle": "Champs membres",
+          "memberDescription": "Questions affichées sur le formulaire /join des membres.",
+          "merchantTitle": "Champs commerces",
+          "merchantDescription": "Questions affichées sur le formulaire /join-merchant des commerces.",
+          "add": "Ajouter un champ",
+          "edit": "Modifier",
+          "required": "Requis",
+          "archived": "Archivé",
+          "empty": "Aucun champ pour le moment.",
+          "columns": {
+            "position": "#",
+            "label": "Libellé",
+            "key": "Clé",
+            "type": "Type",
+            "required": "Requis"
+          },
+          "dialog": {
+            "createTitle": "Ajouter un champ",
+            "editTitle": "Modifier le champ",
+            "description": "Les champs sont affichés dans l'ordre défini par leur position. La clé est enregistrée avec chaque candidature et ne peut plus changer.",
+            "key": "Clé",
+            "keyHint": "Identifiant en minuscules (lettres, chiffres, underscore). Utilisé en interne pour stocker la réponse.",
+            "type": "Type",
+            "label": "Libellé",
+            "helpText": "Texte d'aide",
+            "position": "Position",
+            "required": "Requis",
+            "options": "Options",
+            "optionsHint": "Une option par ligne. Utilisez \"valeur:libellé\" pour stocker une valeur différente, ou juste le libellé.",
+            "save": "Enregistrer",
+            "saving": "Enregistrement…",
+            "cancel": "Annuler"
+          },
+          "archive": {
+            "button": "Archiver",
+            "restore": "Restaurer",
+            "title": "Archiver ce champ ?",
+            "description": "Les champs archivés disparaissent des nouvelles candidatures. Les données existantes sont conservées.",
+            "restoreTitle": "Restaurer ce champ ?",
+            "restoreDescription": "Les champs restaurés réapparaissent sur les nouvelles candidatures à leur position précédente.",
+            "confirm": "Archiver",
+            "restoreConfirm": "Restaurer",
+            "saving": "Enregistrement…",
+            "cancel": "Annuler"
+          }
         }
       },
       "terms": {
@@ -470,6 +674,26 @@
       "orderingInvalid": "Minimum ≤ allocation ≤ maximum.",
       "nameTaken": "Un autre palier utilise déjà ce nom.",
       "notFound": "Palier introuvable."
+    }
+  },
+  "onboardingFields": {
+    "errors": {
+      "keyRequired": "La clé est requise.",
+      "keyInvalid": "La clé doit être en minuscules (lettres, chiffres ou underscore), commençant par une lettre.",
+      "keyTaken": "Un autre champ utilise déjà cette clé.",
+      "labelRequired": "Le libellé est requis.",
+      "optionEmpty": "Chaque option doit avoir une valeur et un libellé.",
+      "optionsRequired": "Ajoutez au moins une option.",
+      "notFound": "Champ introuvable."
+    }
+  },
+  "tokenOps": {
+    "errors": {
+      "amountInvalid": "Le montant doit être un nombre avec jusqu'à 2 décimales.",
+      "amountPositive": "Le montant doit être supérieur à zéro.",
+      "memberNotFound": "Membre introuvable dans cette caisse.",
+      "memberNotActive": "L'émission manuelle est réservée aux membres actifs.",
+      "noPrimaryAccount": "La carte principale de ce membre n'a pas encore été enregistrée chez Citizen Pay."
     }
   },
   "settings": {
@@ -570,6 +794,19 @@
         "confirm": "Ajouter la carte",
         "adding": "Ajout…",
         "serialRequired": "Le numéro de série de la carte est requis."
+      },
+      "mint": {
+        "button": "Émettre des jetons",
+        "title": "Émettre des jetons",
+        "description": "Émettre manuellement des jetons sur la carte principale de {memberName}. À utiliser pour des corrections ou un appoint exceptionnel hors flux d'allocation.",
+        "amountLabel": "Montant",
+        "amountHint": "Nombre de jetons à émettre, jusqu'à 2 décimales.",
+        "amountRequired": "Le montant est requis.",
+        "noteLabel": "Note (optionnel, interne)",
+        "notePlaceholder": "Motif de cette émission ? Enregistré pour l'audit.",
+        "cancel": "Annuler",
+        "confirm": "Émettre",
+        "minting": "Émission…"
       },
       "email": {
         "activated": {
@@ -1128,7 +1365,7 @@
         "features": "Fonctionnalités",
         "getStarted": "Commencer"
       },
-      "githubLink": "GitHub",
+      "sourceLink": "Source",
       "copyright": "© 2026 La caisse · AGPL-3.0",
       "licensesLink": "Licences",
       "privacyLink": "Confidentialité",
@@ -1306,5 +1543,17 @@
       "heading": "14. Contact",
       "body": "Citizen Pay BV — Cantersteen 47, 1000 Bruxelles — legal@lacaisse.eu."
     }
+  },
+  "source": {
+    "title": "Code source",
+    "intro": "La caisse est distribuée sous la licence publique générale GNU Affero v3.0. Conformément à la section 13 de l’AGPL, le code source de l’instance en cours d’exécution est mis à disposition ci-dessous.",
+    "repository": "Dépôt",
+    "commit": "Commit déployé",
+    "commitMissing": "Non enregistré pour ce build — consultez le dépôt pour la source actuelle.",
+    "license": "Licence",
+    "licenseValue": "Licence publique générale GNU Affero v3.0 (AGPL-3.0-or-later)",
+    "thirdParty": "Composants tiers",
+    "thirdPartyLink": "Voir /licenses",
+    "viewOnGithub": "Voir sur GitHub"
   }
 }

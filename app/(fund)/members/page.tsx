@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import Link from "next/link";
 import { getFormatter, getTranslations } from "next-intl/server";
 
 import { Badge } from "@/components/ui/badge";
@@ -111,7 +113,14 @@ export default async function MembersPage({
               const fullName = `${m.firstName} ${m.lastName}`.trim();
               return (
                 <TableRow key={m.id}>
-                  <TableCell className="font-medium">{fullName}</TableCell>
+                  <TableCell className="font-medium">
+                    <Link
+                      href={`/members/${m.id}`}
+                      className="hover:underline"
+                    >
+                      {fullName}
+                    </Link>
+                  </TableCell>
                   <TableCell>
                     <div className="text-sm">{m.email}</div>
                     {!m.emailVerifiedAt && (

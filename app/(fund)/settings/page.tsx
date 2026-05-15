@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { getTranslations } from "next-intl/server";
 
 import {
@@ -8,7 +9,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Tabs, resolveActiveTab } from "@/components/ui/tabs";
+import { prisma } from "@/services/db/prisma";
 import { requireCurrentFund } from "@/services/fund/server";
+import {
+  OnboardingFields,
+  type FieldRow,
+} from "./onboarding-fields";
 import { OnboardingSettings } from "./onboarding-settings";
 import {
   BrandingForm,
@@ -105,22 +111,13 @@ export default async function SettingsPage({
       )}
 
       {active === "onboarding" && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("onboarding.title")}</CardTitle>
-            <CardDescription>{t("onboarding.description")}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6 pb-4">
-            <OnboardingSettings
-              initialRequireMemberEmailVerification={
-                fund.requireMemberEmailVerification
-              }
-              initialRequireMerchantEmailVerification={
-                fund.requireMerchantEmailVerification
-              }
-            />
-          </CardContent>
-        </Card>
+        <OnboardingTab
+          fundId={fund.id}
+          requireMemberEmailVerification={fund.requireMemberEmailVerification}
+          requireMerchantEmailVerification={
+            fund.requireMerchantEmailVerification
+          }
+        />
       )}
 
       {active === "terms" && (
@@ -147,5 +144,72 @@ export default async function SettingsPage({
         </Card>
       )}
     </>
+  );
+}
+
+async function OnboardingTab({
+  fundId,
+  requireMemberEmailVerification,
+  requireMerchantEmailVerification,
+}: {
+  fundId: string;
+  requireMemberEmailVerification: boolean;
+  requireMerchantEmailVerification: boolean;
+}) {
+  const t = await getTranslations("fund.settings");
+
+  const allFields = await prisma.onboardingField.findMany({
+    where: { fundId },
+    orderBy: [{ archivedAt: "asc" }, { position: "asc" }],
+  });
+
+  const rowsFor = (target: "MEMBER" | "MERCHANT"): FieldRow[] =>
+    allFields
+      .filter((f) => f.target === target)
+      .map((f) => {
+        const config = (f.config as { options?: FieldRow["options"] } | null) ??
+          null;
+        return {
+          id: f.id,
+          key: f.key,
+          type: f.type,
+          label: f.label,
+          helpText: f.helpText,
+          required: f.required,
+          position: f.position,
+          options: config?.options ?? [],
+          archivedAt: f.archivedAt,
+        };
+      });
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("onboarding.title")}</CardTitle>
+          <CardDescription>{t("onboarding.description")}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6 pb-4">
+          <OnboardingSettings
+            initialRequireMemberEmailVerification={
+              requireMemberEmailVerification
+            }
+            initialRequireMerchantEmailVerification={
+              requireMerchantEmailVerification
+            }
+          />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("onboarding.fieldsTitle")}</CardTitle>
+          <CardDescription>{t("onboarding.fieldsDescription")}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-8 pb-4">
+          <OnboardingFields target="MEMBER" fields={rowsFor("MEMBER")} />
+          <OnboardingFields target="MERCHANT" fields={rowsFor("MERCHANT")} />
+        </CardContent>
+      </Card>
+    </div>
   );
 }

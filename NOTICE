@@ -1,0 +1,27 @@
+La caisse
+Copyright (C) 2026 Citizen Pay BV
+Cantersteen 47, 1000 Brussels, Belgium
+Company number 1029.985.788
+legal@lacaisse.eu
+
+This program is free software: you can redistribute it and/or modify it
+under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, version 3, or (at your option) any later
+version.
+
+This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public
+License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program (see the LICENSE file). If not, see
+<https://www.gnu.org/licenses/>.
+
+As required by section 13 of the AGPL, users who interact with this
+program over a network are offered the Corresponding Source of the
+running version. See the /source page of the running instance, or visit
+<https://github.com/lacaisse/webapp>.
+
+Third-party components are listed in the running instance at the
+/licenses page; each is distributed under its own terms.

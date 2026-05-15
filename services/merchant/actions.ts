@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 "use server";
 
 import { getTranslations } from "next-intl/server";
@@ -15,6 +16,7 @@ import { getFundUrl, requireCurrentFund } from "@/services/fund/server";
 import {
   BuiltinMerchantSignupSchema,
   type BuiltinMerchantSignupInput,
+  type ExtraValue,
 } from "./schema";
 
 export type SignupMerchantField =
@@ -36,7 +38,7 @@ export type SignupMerchantResult =
 
 export async function signupMerchantAction(input: {
   builtins: BuiltinMerchantSignupInput;
-  applicationData?: Record<string, string>;
+  applicationData?: Record<string, ExtraValue>;
 }): Promise<SignupMerchantResult> {
   const t = await getTranslations();
 
@@ -57,17 +59,19 @@ export async function signupMerchantAction(input: {
     select: { key: true, label: true, required: true },
   });
   const incoming = input.applicationData ?? {};
-  const filtered: Record<string, string> = {};
+  const filtered: Record<string, ExtraValue> = {};
   for (const field of fields) {
     const value = incoming[field.key];
-    if (field.required && (!value || value.trim() === "")) {
+    if (field.required && isExtraEmpty(value)) {
       return {
         error: t("merchants.signup.errors.fieldRequired" as never, {
           label: field.label,
         } as never),
       };
     }
-    if (value !== undefined && value !== "") filtered[field.key] = value;
+    if (!isExtraEmpty(value)) {
+      filtered[field.key] = normalizeExtra(value!);
+    }
   }
 
   const requireVerify = fund.requireMerchantEmailVerification;
@@ -181,6 +185,20 @@ export async function signupMerchantAction(input: {
     ok: true,
     redirectTo: `/join-merchant/thanks?id=${txResult.merchant.id}`,
   };
+}
+
+function isExtraEmpty(value: ExtraValue | undefined): boolean {
+  if (value === undefined || value === null) return true;
+  if (typeof value === "string") return value.trim() === "";
+  if (Array.isArray(value)) return value.length === 0;
+  if (typeof value === "boolean") return value === false;
+  return false;
+}
+
+function normalizeExtra(value: ExtraValue): ExtraValue {
+  if (typeof value === "string") return value.trim();
+  if (Array.isArray(value)) return value.map((v) => v.trim()).filter(Boolean);
+  return value;
 }
 
 function isP2002For(e: unknown, field: string): boolean {

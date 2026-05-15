@@ -1,9 +1,8 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { LandingLogo } from "./landing-logo";
-
-const GITHUB_URL = "https://github.com/lacaisse/webapp";
 
 export async function LandingFooter() {
   const t = await getTranslations("landing.footer");
@@ -77,14 +76,9 @@ export async function LandingFooter() {
               {t("licensesLink")}
             </Link>
             <span aria-hidden>·</span>
-            <a
-              href={GITHUB_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="no-underline hover:underline"
-            >
-              {t("githubLink")}
-            </a>
+            <Link href="/source" className="no-underline hover:underline">
+              {t("sourceLink")}
+            </Link>
           </div>
           <div className="flex items-center gap-4">
             <LocaleSwitcher />

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import Link from "next/link";
 import { Plus } from "lucide-react";
 import { getFormatter, getTranslations } from "next-intl/server";
 
@@ -99,7 +101,14 @@ export default async function MerchantsPage({
           ) : (
             merchants.map((m) => (
               <TableRow key={m.id}>
-                <TableCell className="font-medium">{m.name}</TableCell>
+                <TableCell className="font-medium">
+                  <Link
+                    href={`/merchants/${m.id}`}
+                    className="hover:underline"
+                  >
+                    {m.name}
+                  </Link>
+                </TableCell>
                 <TableCell>
                   <div className="text-sm">{m.contactName ?? "—"}</div>
                   <div className="text-xs text-muted-foreground">

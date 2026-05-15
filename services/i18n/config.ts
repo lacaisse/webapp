@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Plain module — safe to import from client and server. The list of locales
 // must NOT live in `locale.ts` (that file is `"use server"` and may only
 // export async functions; exporting constants from it produces a runtime

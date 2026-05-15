@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // `Fund.domain` always stores the canonical production hostname
 // (`<sub>.lacaisse.eu` for free funds, the verbatim domain for paid custom
 // domains). Dev runs on a different apex (`localhost`), so the proxy and

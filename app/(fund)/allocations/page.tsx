@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import Link from "next/link";
 import { getFormatter, getTranslations } from "next-intl/server";
 
 import { Badge } from "@/components/ui/badge";
@@ -259,7 +261,14 @@ async function ScheduleTab({
         ) : (
           periods.map((p) => (
             <TableRow key={p.id}>
-              <TableCell className="font-medium">{p.label}</TableCell>
+              <TableCell className="font-medium">
+                <Link
+                  href={`/allocations/periods/${p.id}`}
+                  className="hover:underline"
+                >
+                  {p.label}
+                </Link>
+              </TableCell>
               <TableCell className="text-sm text-muted-foreground">
                 {format.dateTime(p.startsAt, { dateStyle: "medium" })}
               </TableCell>

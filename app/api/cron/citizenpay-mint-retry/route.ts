@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { NextResponse, type NextRequest } from "next/server";
 
 import { retryPendingMints } from "@/services/token-operations/retry";

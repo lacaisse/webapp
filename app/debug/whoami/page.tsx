@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { cookies, headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { auth } from "@/services/auth/better-auth";

@@ -14,7 +14,7 @@ La Caisse is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0
 See LICENSE for the full text.
 
 If the AGPL-3.0 does not suit your use case, commercial licenses are available.
-Contact [your email] to discuss.
+Contact legal@lacaisse.eu to discuss.
 
 ## Features
 
@@ -127,10 +127,6 @@ Citizen Pay BV is the project's primary maintainer:
 - Review and integration of external contributions
 - Release and documentation management
 - Roadmap coordination
-
-## License
-
-[MIT](./LICENSE) — anyone may inspect, modify, deploy, and redistribute the code, including for commercial purposes, under the terms of the license.
 
 ## Contact
 

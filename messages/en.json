@@ -175,7 +175,78 @@
         "joined": "Joined"
       },
       "unverified": "Email not verified",
-      "empty": "No members to show."
+      "empty": "No members to show.",
+      "detail": {
+        "back": "All members",
+        "unverified": "Email not verified",
+        "profile": {
+          "title": "Identity",
+          "description": "Contact and household.",
+          "address": "Address",
+          "household": "Household",
+          "householdValue": "{adults} adults · {children} children",
+          "joined": "Joined",
+          "left": "Left"
+        },
+        "banking": {
+          "title": "Membership",
+          "description": "Tier, banking, and referral identifiers.",
+          "tier": "Tier",
+          "iban": "IBAN",
+          "reference": "Payment reference",
+          "referralCode": "Referral code",
+          "primaryCard": "Primary card"
+        },
+        "applicationData": {
+          "title": "Application data",
+          "description": "Custom onboarding fields submitted by the member."
+        },
+        "cards": {
+          "title": "Cards",
+          "serial": "Serial",
+          "holder": "Holder",
+          "status": "Status",
+          "issued": "Issued",
+          "balance": "Balance",
+          "primary": "Primary card",
+          "lost": "Lost",
+          "empty": "No cards yet."
+        },
+        "tokenOps": {
+          "title": "Token operations",
+          "date": "Date",
+          "type": "Type",
+          "tier": "Tier",
+          "period": "Period",
+          "amount": "Amount",
+          "status": "Status",
+          "empty": "No token operations yet."
+        },
+        "bank": {
+          "title": "Bank transactions",
+          "date": "Date",
+          "reference": "Reference",
+          "period": "Period",
+          "amount": "Amount",
+          "empty": "No bank transactions matched."
+        },
+        "referrals": {
+          "sponsorTitle": "Referred by",
+          "sponsorDescription": "The member who sponsored this signup.",
+          "sponsorEmpty": "No sponsor.",
+          "sponsoredTitle": "Referred members",
+          "sponsoredDescription": "{count} signups using this member's code.",
+          "sponsoredEmpty": "No referrals yet."
+        },
+        "emails": {
+          "title": "Emails",
+          "date": "Date",
+          "type": "Type",
+          "to": "To",
+          "status": "Status",
+          "empty": "No emails sent."
+        }
+      }
     },
     "cards": {
       "title": "Cards",
@@ -263,6 +334,43 @@
         "status": "Status",
         "closedAt": "Closed at",
         "empty": "No periods yet."
+      },
+      "periodDetail": {
+        "back": "All periods",
+        "range": "{starts} → {cutoff}",
+        "closedAt": "Closed {date}",
+        "notes": "Notes",
+        "kpi": {
+          "deposits": "Deposits collected",
+          "depositsHint": "{count} bank transactions",
+          "minted": "Tokens minted",
+          "mintedHint": "{count} operations (confirmed)",
+          "members": "Contributing members",
+          "membersHint": "Distinct members with a matched deposit",
+          "status": "Status",
+          "statusHints": {
+            "OPEN": "Currently accepting deposits.",
+            "IN_PROGRESS": "Cutoff hit, minting in flight.",
+            "CLOSED": "Minting complete."
+          }
+        },
+        "deposits": {
+          "title": "Deposits",
+          "date": "Date",
+          "member": "Member",
+          "reference": "Reference",
+          "amount": "Amount",
+          "empty": "No deposits in this period yet."
+        },
+        "mints": {
+          "title": "Mints",
+          "date": "Date",
+          "member": "Member",
+          "tier": "Tier",
+          "amount": "Amount",
+          "status": "Status",
+          "empty": "No mints batched yet."
+        }
       }
     },
     "merchants": {
@@ -290,7 +398,54 @@
         "tokensReceived": "Tokens received",
         "joined": "Joined"
       },
-      "empty": "No merchants to show."
+      "empty": "No merchants to show.",
+      "detail": {
+        "back": "All merchants",
+        "verified": "Email verified",
+        "unverified": "Email not verified",
+        "connected": "Citizen Pay connected",
+        "notConnected": "Citizen Pay not connected",
+        "contact": {
+          "title": "Contact",
+          "description": "Public-facing contact information.",
+          "contactName": "Contact",
+          "email": "Email",
+          "phone": "Phone",
+          "website": "Website",
+          "address": "Address"
+        },
+        "business": {
+          "title": "Business",
+          "description": "Internal status and Citizen Pay linkage.",
+          "joined": "Joined",
+          "position": "Directory position",
+          "conditions": "Acceptance conditions",
+          "citizenPayPlace": "Citizen Pay place ID",
+          "citizenPayActivated": "Citizen Pay activation",
+          "reviewed": "Last reviewed",
+          "reviewNote": "Review note"
+        },
+        "applicationData": {
+          "title": "Application data",
+          "description": "Custom onboarding fields submitted by the merchant."
+        },
+        "payouts": {
+          "title": "Payouts",
+          "total": "{total} across {count} transfers",
+          "date": "Date",
+          "reference": "Reference",
+          "amount": "Amount",
+          "empty": "No payouts yet."
+        },
+        "emails": {
+          "title": "Emails",
+          "date": "Date",
+          "type": "Type",
+          "to": "To",
+          "status": "Status",
+          "empty": "No emails sent."
+        }
+      }
     },
     "payments": {
       "title": "Payments",
@@ -445,6 +600,55 @@
         "verifyMerchant": {
           "label": "Require email verification for merchants",
           "description": "Merchants must click a link in a confirmation email before their application enters the admin review queue."
+        },
+        "fieldsTitle": "Application fields",
+        "fieldsDescription": "Add custom questions to the member and merchant signup forms. Built-in fields (name, email) are always present.",
+        "fields": {
+          "memberTitle": "Member fields",
+          "memberDescription": "Questions shown on the member /join form.",
+          "merchantTitle": "Merchant fields",
+          "merchantDescription": "Questions shown on the merchant /join-merchant form.",
+          "add": "Add field",
+          "edit": "Edit",
+          "required": "Required",
+          "archived": "Archived",
+          "empty": "No fields yet.",
+          "columns": {
+            "position": "#",
+            "label": "Label",
+            "key": "Key",
+            "type": "Type",
+            "required": "Required"
+          },
+          "dialog": {
+            "createTitle": "Add a field",
+            "editTitle": "Edit field",
+            "description": "Fields are shown to applicants in the order set by their position. Keys are stored alongside each application and can't change once set.",
+            "key": "Key",
+            "keyHint": "Lowercase identifier (letters, digits, underscore). Used internally to store the answer.",
+            "type": "Type",
+            "label": "Label",
+            "helpText": "Help text",
+            "position": "Position",
+            "required": "Required",
+            "options": "Options",
+            "optionsHint": "One option per line. Use \"value:label\" to set a different stored value, or just the label.",
+            "save": "Save",
+            "saving": "Saving…",
+            "cancel": "Cancel"
+          },
+          "archive": {
+            "button": "Archive",
+            "restore": "Restore",
+            "title": "Archive this field?",
+            "description": "Archived fields stop appearing on new applications. Existing application data referencing this field is preserved.",
+            "restoreTitle": "Restore this field?",
+            "restoreDescription": "Restored fields appear again on new applications at their previous position.",
+            "confirm": "Archive",
+            "restoreConfirm": "Restore",
+            "saving": "Saving…",
+            "cancel": "Cancel"
+          }
         }
       },
       "terms": {
@@ -470,6 +674,26 @@
       "orderingInvalid": "Minimum ≤ allocation ≤ maximum.",
       "nameTaken": "Another tier already uses this name.",
       "notFound": "Tier not found."
+    }
+  },
+  "onboardingFields": {
+    "errors": {
+      "keyRequired": "Key is required.",
+      "keyInvalid": "Key must be lowercase letters, digits, or underscore, starting with a letter.",
+      "keyTaken": "Another field already uses this key.",
+      "labelRequired": "Label is required.",
+      "optionEmpty": "Each option must have a value and a label.",
+      "optionsRequired": "Add at least one option.",
+      "notFound": "Field not found."
+    }
+  },
+  "tokenOps": {
+    "errors": {
+      "amountInvalid": "Amount must be a number with up to 2 decimal places.",
+      "amountPositive": "Amount must be greater than zero.",
+      "memberNotFound": "Member not found in this fund.",
+      "memberNotActive": "Manual mints are only allowed for active members.",
+      "noPrimaryAccount": "This member's primary card hasn't been registered with Citizen Pay yet."
     }
   },
   "settings": {
@@ -570,6 +794,19 @@
         "confirm": "Add card",
         "adding": "Adding…",
         "serialRequired": "Card serial number is required."
+      },
+      "mint": {
+        "button": "Mint tokens",
+        "title": "Mint tokens",
+        "description": "Manually mint tokens to {memberName}'s primary card. Use this for corrections or one-off top-ups outside the normal allocation flow.",
+        "amountLabel": "Amount",
+        "amountHint": "Number of tokens to mint, with up to 2 decimal places.",
+        "amountRequired": "Amount is required.",
+        "noteLabel": "Note (optional, internal)",
+        "notePlaceholder": "Why this mint? Recorded for audit.",
+        "cancel": "Cancel",
+        "confirm": "Mint",
+        "minting": "Minting…"
       },
       "email": {
         "activated": {
@@ -1099,7 +1336,7 @@
         "features": "Features",
         "getStarted": "Get started"
       },
-      "githubLink": "GitHub",
+      "sourceLink": "Source",
       "copyright": "© 2026 La caisse · AGPL-3.0",
       "licensesLink": "Licenses",
       "privacyLink": "Privacy",
@@ -1277,5 +1514,17 @@
       "heading": "14. Contact",
       "body": "Citizen Pay BV — Cantersteen 47, 1000 Brussels — legal@lacaisse.eu."
     }
+  },
+  "source": {
+    "title": "Source code",
+    "intro": "La caisse is distributed under the GNU Affero General Public License v3.0. As required by section 13 of the AGPL, the source of the running instance is made available below.",
+    "repository": "Repository",
+    "commit": "Running commit",
+    "commitMissing": "Not recorded for this build — visit the repository for the current source.",
+    "license": "License",
+    "licenseValue": "GNU Affero General Public License v3.0 (AGPL-3.0-or-later)",
+    "thirdParty": "Third-party components",
+    "thirdPartyLink": "See /licenses",
+    "viewOnGithub": "View on GitHub"
   }
 }

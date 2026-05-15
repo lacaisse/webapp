@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { headers } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/services/auth/better-auth";

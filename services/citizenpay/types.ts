@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Shared types for the CitizenPay client. Kept in a plain module (no
 // `server-only`) so types can be referenced from anywhere if needed; the
 // client itself enforces server-only.

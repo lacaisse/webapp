@@ -1,9 +1,10 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslations } from "next-intl";
 import { useTransition } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -17,26 +18,11 @@ import {
   MerchantSignupFormSchema,
   type MerchantSignupFormInput,
 } from "@/services/merchant/schema";
-
-type FieldType =
-  | "TEXT"
-  | "TEXTAREA"
-  | "EMAIL"
-  | "PHONE"
-  | "NUMBER"
-  | "SELECT"
-  | "MULTISELECT"
-  | "CHECKBOX"
-  | "DATE";
-
-type OnboardingFieldProps = {
-  id: string;
-  key: string;
-  type: FieldType;
-  label: string;
-  helpText: string | null;
-  required: boolean;
-};
+import {
+  OnboardingFieldInput,
+  type FieldValue,
+  type OnboardingFieldDef,
+} from "../onboarding-field-input";
 
 type BuiltinFieldName = Exclude<SignupMerchantField, never>;
 
@@ -64,7 +50,7 @@ const BUILTIN_FIELDS: BuiltinFieldSpec[] = [
 export function MerchantSignupForm({
   fields,
 }: {
-  fields: OnboardingFieldProps[];
+  fields: OnboardingFieldDef[];
 }) {
   const t = useTranslations("merchants.signup");
   const tFields = useTranslations("merchants.signup.fields");
@@ -85,7 +71,9 @@ export function MerchantSignupForm({
       postalCode: "",
       city: "",
       country: "",
-      extras: Object.fromEntries(fields.map((f) => [f.key, ""])),
+      extras: Object.fromEntries(
+        fields.map((f) => [f.key, defaultValueFor(f)]),
+      ),
     },
   });
 
@@ -144,25 +132,19 @@ export function MerchantSignupForm({
       })}
 
       {fields.map((field) => (
-        <div key={field.id} className="space-y-2">
-          <Label htmlFor={field.id}>
-            {field.label}
-            {field.required && (
-              <span className="ml-1 text-destructive" aria-hidden>
-                *
-              </span>
-            )}
-          </Label>
-          <Input
-            id={field.id}
-            type={inputTypeFor(field.type)}
-            required={field.required}
-            {...form.register(`extras.${field.key}` as `extras.${string}`)}
-          />
-          {field.helpText && (
-            <p className="text-xs text-muted-foreground">{field.helpText}</p>
+        <Controller
+          key={field.id}
+          control={form.control}
+          name={`extras.${field.key}` as `extras.${string}`}
+          render={({ field: rhfField, fieldState }) => (
+            <OnboardingFieldInput
+              field={field}
+              value={rhfField.value as FieldValue | undefined}
+              onChange={rhfField.onChange}
+              error={translateError(fieldState.error?.message) ?? undefined}
+            />
           )}
-        </div>
+        />
       ))}
 
       {errors.root && (
@@ -178,17 +160,8 @@ export function MerchantSignupForm({
   );
 }
 
-function inputTypeFor(fieldType: FieldType): string {
-  switch (fieldType) {
-    case "EMAIL":
-      return "email";
-    case "PHONE":
-      return "tel";
-    case "NUMBER":
-      return "number";
-    case "DATE":
-      return "date";
-    default:
-      return "text";
-  }
+function defaultValueFor(field: OnboardingFieldDef): FieldValue {
+  if (field.type === "MULTISELECT") return [];
+  if (field.type === "CHECKBOX") return false;
+  return "";
 }

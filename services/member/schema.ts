@@ -1,9 +1,11 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { z } from "zod";
 
 // Built-in signup fields per the choice in design: only firstName / lastName
 // / email are hardcoded in the form. Custom fields (any per-fund extras)
-// live in OnboardingField rows and are validated server-side against their
-// definitions; on the client they pass through as a record of strings.
+// live in OnboardingField rows; their values are validated server-side
+// against the field type. On the wire each extra can be a string, a string
+// array (MULTISELECT), or a boolean (CHECKBOX).
 
 export const NAME_MIN_LENGTH = 1;
 
@@ -17,8 +19,16 @@ export const BuiltinSignupSchema = z.object({
   email: z.string().email({ error: "members.signup.errors.emailInvalid" }),
 });
 
+export const ExtraValueSchema = z.union([
+  z.string(),
+  z.array(z.string()),
+  z.boolean(),
+]);
+
+export type ExtraValue = z.infer<typeof ExtraValueSchema>;
+
 export const SignupFormSchema = BuiltinSignupSchema.extend({
-  extras: z.record(z.string(), z.string()).optional(),
+  extras: z.record(z.string(), ExtraValueSchema).optional(),
 });
 
 export type BuiltinSignupInput = z.infer<typeof BuiltinSignupSchema>;

@@ -1128,7 +1128,7 @@
         "features": "Functies",
         "getStarted": "Aan de slag"
       },
-      "githubLink": "GitHub",
+      "sourceLink": "Broncode",
       "copyright": "© 2026 La caisse · AGPL-3.0",
       "licensesLink": "Licenties",
       "privacyLink": "Privacy",
@@ -1306,5 +1306,17 @@
       "heading": "14. Contact",
       "body": "Citizen Pay BV — Cantersteen 47, 1000 Brussel — legal@lacaisse.eu."
     }
+  },
+  "source": {
+    "title": "Broncode",
+    "intro": "La caisse wordt gedistribueerd onder de GNU Affero General Public License v3.0. Zoals vereist door sectie 13 van de AGPL wordt de broncode van de actief draaiende instantie hieronder beschikbaar gesteld.",
+    "repository": "Repository",
+    "commit": "Actieve commit",
+    "commitMissing": "Niet vastgelegd voor deze build — bezoek de repository voor de actuele broncode.",
+    "license": "Licentie",
+    "licenseValue": "GNU Affero General Public License v3.0 (AGPL-3.0-or-later)",
+    "thirdParty": "Componenten van derden",
+    "thirdPartyLink": "Zie /licenses",
+    "viewOnGithub": "Bekijk op GitHub"
   }
 }

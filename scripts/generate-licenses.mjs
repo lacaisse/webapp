@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Generates app/licenses/data.json from production dependencies for the
 // public /licenses page. Runs on `postinstall` and `prebuild` (see
 // package.json); the output is gitignored.

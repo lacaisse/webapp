@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { cookies, headers } from "next/headers";
 import { getRequestConfig } from "next-intl/server";
 import {

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 export function SectionDivider({ id, label }: { id: string; label: string }) {
   return (
     <div

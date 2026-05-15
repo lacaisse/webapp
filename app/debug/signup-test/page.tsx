@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { APIError } from "better-auth/api";
