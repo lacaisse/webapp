@@ -14,6 +14,7 @@ import {
   updateGeneralSettingsAction,
   updateLegalSettingsAction,
   updateReferralSettingsAction,
+  updateSignupRedirectsAction,
   updateTokenSettingsAction,
 } from "@/services/fund/settings-actions";
 
@@ -168,6 +169,8 @@ type Fund = {
   privacyUrl: string | null;
   citizenPayFundId: string | null;
   referralBonusAmount: string | null;
+  memberSignupSuccessUrl: string | null;
+  merchantSignupSuccessUrl: string | null;
 };
 
 export function GeneralForm({ fund }: { fund: Fund }) {
@@ -325,6 +328,41 @@ export function CitizenPayForm({ fund }: { fund: Fund }) {
           key: "citizenPayFundId",
           label: t("account"),
           hint: t("accountHint"),
+        },
+      ]}
+    />
+  );
+}
+
+export function SignupRedirectsForm({ fund }: { fund: Fund }) {
+  const t = useTranslations("fund.settings.onboarding.redirects");
+  const tRoot = useTranslations("fund.settings");
+  return (
+    <SettingsForm
+      saveLabel={tRoot("save")}
+      savingLabel={tRoot("saving")}
+      initial={{
+        memberSignupSuccessUrl: fund.memberSignupSuccessUrl ?? "",
+        merchantSignupSuccessUrl: fund.merchantSignupSuccessUrl ?? "",
+      }}
+      action={async (v) =>
+        updateSignupRedirectsAction({
+          memberSignupSuccessUrl: v.memberSignupSuccessUrl,
+          merchantSignupSuccessUrl: v.merchantSignupSuccessUrl,
+        })
+      }
+      fields={[
+        {
+          key: "memberSignupSuccessUrl",
+          label: t("member"),
+          hint: t("memberHint"),
+          type: "url",
+        },
+        {
+          key: "merchantSignupSuccessUrl",
+          label: t("merchant"),
+          hint: t("merchantHint"),
+          type: "url",
         },
       ]}
     />

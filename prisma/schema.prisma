@@ -204,6 +204,14 @@ model Fund {
   requireMemberEmailVerification   Boolean @default(true)
   requireMerchantEmailVerification Boolean @default(true)
 
+  // Post-signup redirect URLs. When set, the last step of a successful
+  // signup flow (form submit if no verification, otherwise the email-verify
+  // landing) sends the visitor to this URL instead of the in-app /thanks
+  // page. Funds with their own marketing site use this to keep the visitor
+  // on-site after applying.
+  memberSignupSuccessUrl   String?
+  merchantSignupSuccessUrl String?
+
   staff             FundMember[] // staff with admin access (OWNER/ADMIN/VIEWER)
   members           Member[] // demand-side recipients of allocations
   tiers             AllocationTier[] // contribution/allocation tiers

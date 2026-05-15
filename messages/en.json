@@ -601,6 +601,14 @@
           "label": "Require email verification for merchants",
           "description": "Merchants must click a link in a confirmation email before their application enters the admin review queue."
         },
+        "redirects": {
+          "title": "Post-signup redirects",
+          "description": "Send applicants to your own site once their signup is complete. Leave blank to use the built-in confirmation page.",
+          "member": "Member redirect URL",
+          "memberHint": "Where members land after their final signup step (after email verification, when enabled).",
+          "merchant": "Merchant redirect URL",
+          "merchantHint": "Where merchants land after their final signup step (after email verification, when enabled)."
+        },
         "fieldsTitle": "Application fields",
         "fieldsDescription": "Add custom questions to the member and merchant signup forms. Built-in fields (name, email) are always present.",
         "fields": {
@@ -702,7 +710,8 @@
       "localeUnsupported": "Unsupported language.",
       "timezoneRequired": "Timezone is required.",
       "colorInvalid": "Use a 6-digit hex color (e.g. #1a73e8).",
-      "amountInvalid": "Amount must be a number with up to 2 decimal places."
+      "amountInvalid": "Amount must be a number with up to 2 decimal places.",
+      "urlInvalid": "Enter a valid URL (must start with http:// or https://)."
     }
   },
   "members": {
@@ -732,7 +741,7 @@
         "fieldRequired": "{label} is required.",
         "generic": "Something went wrong. Please try again."
       },
-      "email": {
+      "emailTemplates": {
         "verify": {
           "subject": "Verify your email — {fundName}",
           "textBody": "Hi {firstName},\n\nConfirm your email address to complete your application to join {fundName}. Click the link below — it's valid for 24 hours:\n\n  {verifyUrl}\n\nIf you didn't apply, you can ignore this email.\n\nThe {fundName} team"

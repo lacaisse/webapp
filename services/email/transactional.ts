@@ -25,7 +25,7 @@ export async function sendMemberEmailVerification(args: {
   await dispatchTemplate({
     emailId: args.emailId,
     render: async () => {
-      const t = await getTranslations("members.signup.email.verify");
+      const t = await getTranslations("members.signup.emailTemplates.verify");
       const subject = t("subject", { fundName: args.fundName });
       const text = t("textBody", {
         firstName: args.firstName,
@@ -146,7 +146,7 @@ export async function sendMemberWelcome(args: {
   await dispatchTemplate({
     emailId: args.emailId,
     render: async () => {
-      const t = await getTranslations("members.signup.email.welcome");
+      const t = await getTranslations("members.signup.emailTemplates.welcome");
       const subject = t("subject", { fundName: args.fundName });
       const text = t("textBody", {
         firstName: args.firstName,

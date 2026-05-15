@@ -30,7 +30,12 @@ export default async function VerifyEmailPage({
   const result = await consumeVerificationToken(token);
 
   if ("error" in result) {
-    if (result.error === "consumed") redirect("/verify-email/success");
+    if (result.error === "consumed") {
+      // Already-consumed tokens land on the in-app success page — we can't
+      // tell which entity it belonged to, so we don't honor the configured
+      // redirect URL on this branch.
+      redirect("/verify-email/success");
+    }
     redirect(`/verify-email/error?reason=${result.error}`);
   }
 
@@ -50,7 +55,11 @@ export default async function VerifyEmailPage({
     }
   }
 
-  redirect("/verify-email/success");
+  const successUrl =
+    result.entity === "merchant"
+      ? fund.merchantSignupSuccessUrl
+      : fund.memberSignupSuccessUrl;
+  redirect(successUrl ?? "/verify-email/success");
 }
 
 async function dispatchMerchantWelcome(
@@ -98,7 +107,7 @@ async function dispatchMemberWelcome(
   });
   if (!member?.paymentReference) return;
 
-  const t = await getTranslations("members.signup.email.welcome");
+  const t = await getTranslations("members.signup.emailTemplates.welcome");
   const subject = t("subject", { fundName: fund.name });
   const emailRow = await prisma.email.create({
     data: {

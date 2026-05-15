@@ -181,10 +181,16 @@ export async function signupMerchantAction(input: {
     });
   }
 
-  return {
-    ok: true,
-    redirectTo: `/join-merchant/thanks?id=${txResult.merchant.id}`,
-  };
+  // If the form submit is the final step (no email verification), the
+  // fund's configured success URL — when set — replaces the in-app
+  // /thanks page. With verification on, the redirect happens after the
+  // verify-email landing instead.
+  const inAppThanks = `/join-merchant/thanks?id=${txResult.merchant.id}`;
+  const redirectTo =
+    !requireVerify && fund.merchantSignupSuccessUrl
+      ? fund.merchantSignupSuccessUrl
+      : inAppThanks;
+  return { ok: true, redirectTo };
 }
 
 function isExtraEmpty(value: ExtraValue | undefined): boolean {

@@ -66,6 +66,8 @@ export default async function ReferralsPage() {
               citizenPayFundId: fund.citizenPayFundId,
               referralBonusAmount:
                 fund.referralBonusAmount?.toString() ?? null,
+              memberSignupSuccessUrl: fund.memberSignupSuccessUrl,
+              merchantSignupSuccessUrl: fund.merchantSignupSuccessUrl,
             }}
           />
         </CardContent>

@@ -21,6 +21,7 @@ import {
   CitizenPayForm,
   GeneralForm,
   LegalForm,
+  SignupRedirectsForm,
   TokenForm,
 } from "./settings-forms";
 
@@ -57,6 +58,8 @@ export default async function SettingsPage({
     privacyUrl: fund.privacyUrl,
     citizenPayFundId: fund.citizenPayFundId,
     referralBonusAmount: fund.referralBonusAmount?.toString() ?? null,
+    memberSignupSuccessUrl: fund.memberSignupSuccessUrl,
+    merchantSignupSuccessUrl: fund.merchantSignupSuccessUrl,
   };
 
   return (
@@ -117,6 +120,7 @@ export default async function SettingsPage({
           requireMerchantEmailVerification={
             fund.requireMerchantEmailVerification
           }
+          fundForForms={fundForForms}
         />
       )}
 
@@ -151,10 +155,12 @@ async function OnboardingTab({
   fundId,
   requireMemberEmailVerification,
   requireMerchantEmailVerification,
+  fundForForms,
 }: {
   fundId: string;
   requireMemberEmailVerification: boolean;
   requireMerchantEmailVerification: boolean;
+  fundForForms: React.ComponentProps<typeof SignupRedirectsForm>["fund"];
 }) {
   const t = await getTranslations("fund.settings");
 
@@ -198,6 +204,17 @@ async function OnboardingTab({
               requireMerchantEmailVerification
             }
           />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("onboarding.redirects.title")}</CardTitle>
+          <CardDescription>
+            {t("onboarding.redirects.description")}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="pb-4">
+          <SignupRedirectsForm fund={fundForForms} />
         </CardContent>
       </Card>
       <Card>

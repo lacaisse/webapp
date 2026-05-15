@@ -98,14 +98,14 @@ export async function signupMemberAction(input: {
     const initialEmail = requireVerify
       ? {
           type: "MEMBER_EMAIL_VERIFICATION" as const,
-          subject: t("members.signup.email.verify.subject" as never, {
+          subject: t("members.signup.emailTemplates.verify.subject" as never, {
             fundName: fund.name,
           } as never),
           idempotencyKey: `MEMBER_EMAIL_VERIFICATION:token:${verificationToken}`,
         }
       : {
           type: "MEMBER_WELCOME" as const,
-          subject: t("members.signup.email.welcome.subject" as never, {
+          subject: t("members.signup.emailTemplates.welcome.subject" as never, {
             fundName: fund.name,
           } as never),
           // Filled with member id once we have it (the idempotency key
@@ -214,7 +214,16 @@ export async function signupMemberAction(input: {
       });
     }
 
-    return { ok: true, redirectTo: `/join/thanks?id=${txResult.member.id}` };
+    // If the form submit is the final step (no email verification), the
+    // fund's configured success URL — when set — replaces the in-app
+    // /thanks page. With verification on, the redirect happens after the
+    // verify-email landing instead.
+    const inAppThanks = `/join/thanks?id=${txResult.member.id}`;
+    const redirectTo =
+      !requireVerify && fund.memberSignupSuccessUrl
+        ? fund.memberSignupSuccessUrl
+        : inAppThanks;
+    return { ok: true, redirectTo };
   }
 
   return { error: t("members.signup.errors.generic" as never) };

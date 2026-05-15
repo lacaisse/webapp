@@ -102,6 +102,29 @@ export async function updateLegalSettingsAction(
   return runUpdate(LegalSchema, normaliseBlanks(input), "/settings");
 }
 
+// --- Signup redirects ----------------------------------------------------
+
+const SignupRedirectsSchema = z.object({
+  memberSignupSuccessUrl: z
+    .string()
+    .url({ error: "settings.errors.urlInvalid" })
+    .or(z.literal(""))
+    .nullable()
+    .optional(),
+  merchantSignupSuccessUrl: z
+    .string()
+    .url({ error: "settings.errors.urlInvalid" })
+    .or(z.literal(""))
+    .nullable()
+    .optional(),
+});
+
+export async function updateSignupRedirectsAction(
+  input: z.infer<typeof SignupRedirectsSchema>,
+): Promise<SettingsResult> {
+  return runUpdate(SignupRedirectsSchema, normaliseBlanks(input), "/settings");
+}
+
 // --- Citizen Pay ---------------------------------------------------------
 
 const CitizenPaySchema = z.object({

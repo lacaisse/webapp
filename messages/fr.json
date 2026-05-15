@@ -601,6 +601,14 @@
           "label": "Exiger la vérification email pour les commerces",
           "description": "Les commerces doivent cliquer sur un lien de confirmation avant que leur demande n'entre dans la file de validation."
         },
+        "redirects": {
+          "title": "Redirections après inscription",
+          "description": "Renvoyez les candidats vers votre propre site une fois leur inscription terminée. Laissez vide pour utiliser la page de confirmation intégrée.",
+          "member": "URL de redirection — membre",
+          "memberHint": "Où atterrissent les membres après la dernière étape d'inscription (après la vérification email, si activée).",
+          "merchant": "URL de redirection — commerce",
+          "merchantHint": "Où atterrissent les commerces après la dernière étape d'inscription (après la vérification email, si activée)."
+        },
         "fieldsTitle": "Champs d'inscription",
         "fieldsDescription": "Ajoutez des questions personnalisées aux formulaires d'inscription. Les champs de base (nom, email) sont toujours présents.",
         "fields": {
@@ -702,7 +710,8 @@
       "localeUnsupported": "Langue non prise en charge.",
       "timezoneRequired": "Le fuseau horaire est requis.",
       "colorInvalid": "Utilisez une couleur hex à 6 chiffres (ex. #1a73e8).",
-      "amountInvalid": "Le montant doit être un nombre avec jusqu'à 2 décimales."
+      "amountInvalid": "Le montant doit être un nombre avec jusqu'à 2 décimales.",
+      "urlInvalid": "Saisissez une URL valide (doit commencer par http:// ou https://)."
     }
   },
   "members": {
@@ -732,7 +741,7 @@
         "fieldRequired": "{label} est requis.",
         "generic": "Une erreur s'est produite. Réessayez."
       },
-      "email": {
+      "emailTemplates": {
         "verify": {
           "subject": "Vérifiez votre email — {fundName}",
           "textBody": "Bonjour {firstName},\n\nConfirmez votre adresse email pour finaliser votre demande de rejoindre {fundName}. Cliquez sur le lien ci-dessous — il est valable 24 heures :\n\n  {verifyUrl}\n\nSi vous n'avez pas fait cette demande, ignorez cet email.\n\nL'équipe {fundName}"
