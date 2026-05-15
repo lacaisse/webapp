@@ -38,13 +38,20 @@ export async function GET(request: NextRequest) {
       fundId: true,
       memberId: true,
       amount: true,
-      fund: { select: { name: true } },
+      fund: { select: { name: true, primaryColor: true, logoUrl: true } },
       member: { select: { email: true, firstName: true } },
       referral: {
         select: {
           id: true,
           sponsor: { select: { id: true, email: true, firstName: true } },
-          fund: { select: { name: true, referralBonusAmount: true } },
+          fund: {
+            select: {
+              name: true,
+              primaryColor: true,
+              logoUrl: true,
+              referralBonusAmount: true,
+            },
+          },
         },
       },
       // Just need to know whether sources exist (bank-sync-sourced mint).
@@ -88,7 +95,11 @@ export async function GET(request: NextRequest) {
           referralId: op.referral.id,
           sponsorEmail: op.referral.sponsor.email,
           sponsorFirstName: op.referral.sponsor.firstName,
-          fundName: op.referral.fund.name,
+          fundBranding: {
+            name: op.referral.fund.name,
+            primaryColor: op.referral.fund.primaryColor,
+            logoUrl: op.referral.fund.logoUrl,
+          },
           amount: op.referral.fund.referralBonusAmount.toString(),
         });
       } else if (op.sources.length > 0 && op.member?.email && op.memberId) {
@@ -98,7 +109,11 @@ export async function GET(request: NextRequest) {
           memberId: op.memberId,
           toEmail: op.member.email,
           firstName: op.member.firstName,
-          fundName: op.fund.name,
+          fundBranding: {
+            name: op.fund.name,
+            primaryColor: op.fund.primaryColor,
+            logoUrl: op.fund.logoUrl,
+          },
           amount: op.amount.toString(),
         });
       }
@@ -124,7 +139,7 @@ async function queueAndSendAllocationConfirmation(args: {
   memberId: string;
   toEmail: string;
   firstName: string;
-  fundName: string;
+  fundBranding: { name: string; primaryColor: string | null; logoUrl: string | null };
   amount: string;
 }) {
   const idempotencyKey = `ALLOCATION_CONFIRMATION:operation:${args.tokenOperationId}`;
@@ -144,7 +159,7 @@ async function queueAndSendAllocationConfirmation(args: {
       emailId: emailRow.id,
       toEmail: args.toEmail,
       firstName: args.firstName,
-      fundName: args.fundName,
+      fund: args.fundBranding,
       amount: args.amount,
     });
   } catch (e) {
@@ -160,7 +175,7 @@ async function queueAndSendReferralBonusEmail(args: {
   referralId: string;
   sponsorEmail: string;
   sponsorFirstName: string;
-  fundName: string;
+  fundBranding: { name: string; primaryColor: string | null; logoUrl: string | null };
   amount: string;
 }) {
   // Idempotency: one bonus-awarded email per referral, regardless of how
@@ -183,7 +198,7 @@ async function queueAndSendReferralBonusEmail(args: {
       emailId: emailRow.id,
       toEmail: args.sponsorEmail,
       firstName: args.sponsorFirstName,
-      fundName: args.fundName,
+      fund: args.fundBranding,
       amount: args.amount,
     });
   } catch (e) {

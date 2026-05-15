@@ -195,12 +195,17 @@ export async function signupMemberAction(input: {
     // Outside the transaction: fire the Resend send. The sender catches
     // its own errors and updates the email row's status; signup never
     // fails because of an email problem.
+    const fundBranding = {
+      name: fund.name,
+      primaryColor: fund.primaryColor,
+      logoUrl: fund.logoUrl,
+    };
     if (requireVerify) {
       const verifyUrl = `${getFundUrl(fund.domain)}/verify-email?token=${encodeURIComponent(verificationToken!)}`;
       await sendMemberEmailVerification({
         emailId: txResult.emailId,
         toEmail: txResult.member.email,
-        fundName: fund.name,
+        fund: fundBranding,
         firstName: txResult.member.firstName,
         verifyUrl,
       });
@@ -208,7 +213,7 @@ export async function signupMemberAction(input: {
       await sendMemberWelcome({
         emailId: txResult.emailId,
         toEmail: txResult.member.email,
-        fundName: fund.name,
+        fund: fundBranding,
         firstName: txResult.member.firstName,
         paymentReference: txResult.member.paymentReference,
       });

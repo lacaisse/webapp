@@ -163,12 +163,17 @@ export async function signupMerchantAction(input: {
 
   // Outside transaction: dispatch the Resend send. Failures don't block —
   // the merchant can request a resend later.
+  const fundBranding = {
+    name: fund.name,
+    primaryColor: fund.primaryColor,
+    logoUrl: fund.logoUrl,
+  };
   if (requireVerify) {
     const verifyUrl = `${getFundUrl(fund.domain)}/verify-email?token=${encodeURIComponent(verificationToken!)}`;
     await sendMerchantEmailVerification({
       emailId: txResult.emailId,
       toEmail: txResult.merchant.email,
-      fundName: fund.name,
+      fund: fundBranding,
       merchantName: txResult.merchant.name,
       verifyUrl,
     });
@@ -176,7 +181,7 @@ export async function signupMerchantAction(input: {
     await sendMerchantWelcome({
       emailId: txResult.emailId,
       toEmail: txResult.merchant.email,
-      fundName: fund.name,
+      fund: fundBranding,
       merchantName: txResult.merchant.name,
     });
   }

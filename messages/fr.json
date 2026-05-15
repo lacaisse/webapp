@@ -744,7 +744,8 @@
       "emailTemplates": {
         "verify": {
           "subject": "Vérifiez votre email — {fundName}",
-          "textBody": "Bonjour {firstName},\n\nConfirmez votre adresse email pour finaliser votre demande de rejoindre {fundName}. Cliquez sur le lien ci-dessous — il est valable 24 heures :\n\n  {verifyUrl}\n\nSi vous n'avez pas fait cette demande, ignorez cet email.\n\nL'équipe {fundName}"
+          "textBody": "Bonjour {firstName},\n\nConfirmez votre adresse email pour finaliser votre demande de rejoindre {fundName}. Cliquez sur le lien ci-dessous — il est valable 24 heures :\n\n  {verifyUrl}\n\nSi vous n'avez pas fait cette demande, ignorez cet email.\n\nL'équipe {fundName}",
+          "ctaLabel": "Vérifier mon email"
         },
         "welcome": {
           "subject": "Bienvenue chez {fundName}",
@@ -924,7 +925,8 @@
       "email": {
         "verify": {
           "subject": "Vérifiez votre email — {fundName}",
-          "textBody": "Bonjour {merchantName},\n\nConfirmez votre adresse email pour finaliser votre demande de rejoindre {fundName} en tant que commerce. Cliquez sur le lien ci-dessous — il est valable 24 heures :\n\n  {verifyUrl}\n\nSi vous n'avez pas fait cette demande, ignorez cet email.\n\nL'équipe {fundName}"
+          "textBody": "Bonjour {merchantName},\n\nConfirmez votre adresse email pour finaliser votre demande de rejoindre {fundName} en tant que commerce. Cliquez sur le lien ci-dessous — il est valable 24 heures :\n\n  {verifyUrl}\n\nSi vous n'avez pas fait cette demande, ignorez cet email.\n\nL'équipe {fundName}",
+          "ctaLabel": "Vérifier mon email"
         },
         "welcome": {
           "subject": "Demande reçue — {fundName}",
@@ -970,7 +972,8 @@
         "approved": {
           "subject": "Demande approuvée — {fundName}",
           "textBodyWithLink": "Bonjour {merchantName},\n\nVotre demande pour rejoindre {fundName} a été approuvée.\n\nProchaine étape : connectez votre commerce à Citizen Pay pour que votre terminal puisse accepter les jetons. Rendez-vous sur :\n\n  {citizenPayUrl}\n\nUne fois l'onboarding Citizen Pay terminé, vous serez actif dans le réseau {fundName}. Pour toute question, contactez l'administrateur de la caisse.\n\nL'équipe {fundName}",
-          "textBodyWithoutLink": "Bonjour {merchantName},\n\nVotre demande pour rejoindre {fundName} a été approuvée.\n\nL'administrateur de la caisse vous contactera avec les informations pour vous connecter à Citizen Pay et commencer à accepter les jetons.\n\nL'équipe {fundName}"
+          "textBodyWithoutLink": "Bonjour {merchantName},\n\nVotre demande pour rejoindre {fundName} a été approuvée.\n\nL'administrateur de la caisse vous contactera avec les informations pour vous connecter à Citizen Pay et commencer à accepter les jetons.\n\nL'équipe {fundName}",
+          "ctaLabel": "Ouvrir Citizen Pay"
         },
         "rejected": {
           "subject": "Mise à jour de votre demande — {fundName}",

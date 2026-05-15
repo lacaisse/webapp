@@ -34,6 +34,8 @@ type IngestionFund = {
   citizenPayLastSyncedAt: Date | null;
   allocationMode: "FIXED_PERIOD" | "PAY_AND_GO";
   name: string;
+  primaryColor: string | null;
+  logoUrl: string | null;
 };
 
 export async function syncFundBankTransactions(
@@ -288,7 +290,11 @@ async function dispatchPaymentConfirmation(args: {
       emailId: emailRow.id,
       toEmail: member.email,
       firstName: member.firstName,
-      fundName: args.fund.name,
+      fund: {
+        name: args.fund.name,
+        primaryColor: args.fund.primaryColor,
+        logoUrl: args.fund.logoUrl,
+      },
       amount: args.amount,
       occurredAt: args.occurredAt,
     });

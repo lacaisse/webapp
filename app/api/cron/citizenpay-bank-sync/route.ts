@@ -29,6 +29,8 @@ export async function GET(request: NextRequest) {
       citizenPayFundId: true,
       citizenPayLastSyncedAt: true,
       allocationMode: true,
+      primaryColor: true,
+      logoUrl: true,
     },
   });
 
@@ -42,6 +44,8 @@ export async function GET(request: NextRequest) {
         citizenPayFundId: f.citizenPayFundId,
         citizenPayLastSyncedAt: f.citizenPayLastSyncedAt,
         allocationMode: f.allocationMode,
+        primaryColor: f.primaryColor,
+        logoUrl: f.logoUrl,
       });
       results[f.id] = stats;
     } catch (e) {

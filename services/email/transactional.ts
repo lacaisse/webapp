@@ -4,6 +4,7 @@ import "server-only";
 import { getTranslations } from "next-intl/server";
 
 import { prisma } from "@/services/db/prisma";
+import { renderBrandedEmail } from "./template";
 import { sendEmail } from "./resend";
 
 // One function per EmailType that renders the body, calls Resend, and updates
@@ -11,28 +12,37 @@ import { sendEmail } from "./resend";
 // — these functions swallow them (with a console.error) so a missed send
 // never blocks the triggering business action (signup, approval, etc.).
 //
-// V1: simple inline HTML wrapper around the localised text body. When we
-// add @react-email/components, swap the templates out behind these same
-// function signatures.
+// Each function takes a `fund: FundBranding` arg so the rendered email
+// carries the tenant's own brand (name in the header, primary color on the
+// CTA, optional logo). The text body remains the plain-text version.
+
+export type FundBranding = {
+  name: string;
+  primaryColor: string | null;
+  logoUrl: string | null;
+};
 
 export async function sendMemberEmailVerification(args: {
   emailId: string;
   toEmail: string;
-  fundName: string;
+  fund: FundBranding;
   firstName: string;
   verifyUrl: string;
 }): Promise<void> {
   await dispatchTemplate({
     emailId: args.emailId,
+    fund: args.fund,
     render: async () => {
       const t = await getTranslations("members.signup.emailTemplates.verify");
-      const subject = t("subject", { fundName: args.fundName });
-      const text = t("textBody", {
-        firstName: args.firstName,
-        fundName: args.fundName,
-        verifyUrl: args.verifyUrl,
-      });
-      return { subject, text, html: textToBasicHtml(text) };
+      return {
+        subject: t("subject", { fundName: args.fund.name }),
+        text: t("textBody", {
+          firstName: args.firstName,
+          fundName: args.fund.name,
+          verifyUrl: args.verifyUrl,
+        }),
+        ctaLabel: t("ctaLabel"),
+      };
     },
     to: args.toEmail,
   });
@@ -41,23 +51,25 @@ export async function sendMemberEmailVerification(args: {
 export async function sendMemberActivated(args: {
   emailId: string;
   toEmail: string;
-  fundName: string;
+  fund: FundBranding;
   firstName: string;
   cardSerial: string;
   paymentReference: string;
 }): Promise<void> {
   await dispatchTemplate({
     emailId: args.emailId,
+    fund: args.fund,
     render: async () => {
       const t = await getTranslations("members.admin.email.activated");
-      const subject = t("subject", { fundName: args.fundName });
-      const text = t("textBody", {
-        firstName: args.firstName,
-        fundName: args.fundName,
-        cardSerial: args.cardSerial,
-        paymentReference: args.paymentReference,
-      });
-      return { subject, text, html: textToBasicHtml(text) };
+      return {
+        subject: t("subject", { fundName: args.fund.name }),
+        text: t("textBody", {
+          firstName: args.firstName,
+          fundName: args.fund.name,
+          cardSerial: args.cardSerial,
+          paymentReference: args.paymentReference,
+        }),
+      };
     },
     to: args.toEmail,
   });
@@ -67,20 +79,22 @@ export async function sendAllocationConfirmation(args: {
   emailId: string;
   toEmail: string;
   firstName: string;
-  fundName: string;
+  fund: FundBranding;
   amount: string;
 }): Promise<void> {
   await dispatchTemplate({
     emailId: args.emailId,
+    fund: args.fund,
     render: async () => {
       const t = await getTranslations("members.email.allocationConfirmation");
-      const subject = t("subject", { fundName: args.fundName });
-      const text = t("textBody", {
-        firstName: args.firstName,
-        fundName: args.fundName,
-        amount: args.amount,
-      });
-      return { subject, text, html: textToBasicHtml(text) };
+      return {
+        subject: t("subject", { fundName: args.fund.name }),
+        text: t("textBody", {
+          firstName: args.firstName,
+          fundName: args.fund.name,
+          amount: args.amount,
+        }),
+      };
     },
     to: args.toEmail,
   });
@@ -89,23 +103,25 @@ export async function sendAllocationConfirmation(args: {
 export async function sendReferralBonusAwarded(args: {
   emailId: string;
   toEmail: string;
-  fundName: string;
+  fund: FundBranding;
   firstName: string;
   amount: string;
 }): Promise<void> {
   await dispatchTemplate({
     emailId: args.emailId,
+    fund: args.fund,
     render: async () => {
       const t = await getTranslations(
         "members.admin.email.referralBonusAwarded",
       );
-      const subject = t("subject", { fundName: args.fundName });
-      const text = t("textBody", {
-        firstName: args.firstName,
-        fundName: args.fundName,
-        amount: args.amount,
-      });
-      return { subject, text, html: textToBasicHtml(text) };
+      return {
+        subject: t("subject", { fundName: args.fund.name }),
+        text: t("textBody", {
+          firstName: args.firstName,
+          fundName: args.fund.name,
+          amount: args.amount,
+        }),
+      };
     },
     to: args.toEmail,
   });
@@ -115,22 +131,24 @@ export async function sendPaymentConfirmation(args: {
   emailId: string;
   toEmail: string;
   firstName: string;
-  fundName: string;
+  fund: FundBranding;
   amount: string;
   occurredAt: string;
 }): Promise<void> {
   await dispatchTemplate({
     emailId: args.emailId,
+    fund: args.fund,
     render: async () => {
       const t = await getTranslations("members.email.paymentConfirmation");
-      const subject = t("subject", { fundName: args.fundName });
-      const text = t("textBody", {
-        firstName: args.firstName,
-        fundName: args.fundName,
-        amount: args.amount,
-        occurredAt: args.occurredAt,
-      });
-      return { subject, text, html: textToBasicHtml(text) };
+      return {
+        subject: t("subject", { fundName: args.fund.name }),
+        text: t("textBody", {
+          firstName: args.firstName,
+          fundName: args.fund.name,
+          amount: args.amount,
+          occurredAt: args.occurredAt,
+        }),
+      };
     },
     to: args.toEmail,
   });
@@ -139,21 +157,23 @@ export async function sendPaymentConfirmation(args: {
 export async function sendMemberWelcome(args: {
   emailId: string;
   toEmail: string;
-  fundName: string;
+  fund: FundBranding;
   firstName: string;
   paymentReference: string;
 }): Promise<void> {
   await dispatchTemplate({
     emailId: args.emailId,
+    fund: args.fund,
     render: async () => {
       const t = await getTranslations("members.signup.emailTemplates.welcome");
-      const subject = t("subject", { fundName: args.fundName });
-      const text = t("textBody", {
-        firstName: args.firstName,
-        fundName: args.fundName,
-        paymentReference: args.paymentReference,
-      });
-      return { subject, text, html: textToBasicHtml(text) };
+      return {
+        subject: t("subject", { fundName: args.fund.name }),
+        text: t("textBody", {
+          firstName: args.firstName,
+          fundName: args.fund.name,
+          paymentReference: args.paymentReference,
+        }),
+      };
     },
     to: args.toEmail,
   });
@@ -162,21 +182,23 @@ export async function sendMemberWelcome(args: {
 export async function sendMemberInvited(args: {
   emailId: string;
   toEmail: string;
-  fundName: string;
+  fund: FundBranding;
   firstName: string;
   paymentReference: string;
 }): Promise<void> {
   await dispatchTemplate({
     emailId: args.emailId,
+    fund: args.fund,
     render: async () => {
       const t = await getTranslations("members.admin.email.invited");
-      const subject = t("subject", { fundName: args.fundName });
-      const text = t("textBody", {
-        firstName: args.firstName,
-        fundName: args.fundName,
-        paymentReference: args.paymentReference,
-      });
-      return { subject, text, html: textToBasicHtml(text) };
+      return {
+        subject: t("subject", { fundName: args.fund.name }),
+        text: t("textBody", {
+          firstName: args.firstName,
+          fundName: args.fund.name,
+          paymentReference: args.paymentReference,
+        }),
+      };
     },
     to: args.toEmail,
   });
@@ -185,21 +207,24 @@ export async function sendMemberInvited(args: {
 export async function sendMerchantEmailVerification(args: {
   emailId: string;
   toEmail: string;
-  fundName: string;
+  fund: FundBranding;
   merchantName: string;
   verifyUrl: string;
 }): Promise<void> {
   await dispatchTemplate({
     emailId: args.emailId,
+    fund: args.fund,
     render: async () => {
       const t = await getTranslations("merchants.signup.email.verify");
-      const subject = t("subject", { fundName: args.fundName });
-      const text = t("textBody", {
-        merchantName: args.merchantName,
-        fundName: args.fundName,
-        verifyUrl: args.verifyUrl,
-      });
-      return { subject, text, html: textToBasicHtml(text) };
+      return {
+        subject: t("subject", { fundName: args.fund.name }),
+        text: t("textBody", {
+          merchantName: args.merchantName,
+          fundName: args.fund.name,
+          verifyUrl: args.verifyUrl,
+        }),
+        ctaLabel: t("ctaLabel"),
+      };
     },
     to: args.toEmail,
   });
@@ -208,28 +233,34 @@ export async function sendMerchantEmailVerification(args: {
 export async function sendMerchantApproved(args: {
   emailId: string;
   toEmail: string;
-  fundName: string;
+  fund: FundBranding;
   merchantName: string;
   citizenPayOnboardingUrl: string | null;
 }): Promise<void> {
   await dispatchTemplate({
     emailId: args.emailId,
+    fund: args.fund,
     render: async () => {
       const t = await getTranslations("merchants.admin.email.approved");
-      const subject = t("subject", { fundName: args.fundName });
       // Two body variants: with the CP onboarding URL (the prod path) and
       // without (env not set in dev → fall back to "admin will be in touch").
       const text = args.citizenPayOnboardingUrl
         ? t("textBodyWithLink", {
             merchantName: args.merchantName,
-            fundName: args.fundName,
+            fundName: args.fund.name,
             citizenPayUrl: args.citizenPayOnboardingUrl,
           })
         : t("textBodyWithoutLink", {
             merchantName: args.merchantName,
-            fundName: args.fundName,
+            fundName: args.fund.name,
           });
-      return { subject, text, html: textToBasicHtml(text) };
+      return {
+        subject: t("subject", { fundName: args.fund.name }),
+        text,
+        ctaLabel: args.citizenPayOnboardingUrl
+          ? t("ctaLabel")
+          : undefined,
+      };
     },
     to: args.toEmail,
   });
@@ -238,21 +269,23 @@ export async function sendMerchantApproved(args: {
 export async function sendMerchantRejected(args: {
   emailId: string;
   toEmail: string;
-  fundName: string;
+  fund: FundBranding;
   merchantName: string;
   reason: string;
 }): Promise<void> {
   await dispatchTemplate({
     emailId: args.emailId,
+    fund: args.fund,
     render: async () => {
       const t = await getTranslations("merchants.admin.email.rejected");
-      const subject = t("subject", { fundName: args.fundName });
-      const text = t("textBody", {
-        merchantName: args.merchantName,
-        fundName: args.fundName,
-        reason: args.reason,
-      });
-      return { subject, text, html: textToBasicHtml(text) };
+      return {
+        subject: t("subject", { fundName: args.fund.name }),
+        text: t("textBody", {
+          merchantName: args.merchantName,
+          fundName: args.fund.name,
+          reason: args.reason,
+        }),
+      };
     },
     to: args.toEmail,
   });
@@ -261,37 +294,55 @@ export async function sendMerchantRejected(args: {
 export async function sendMerchantWelcome(args: {
   emailId: string;
   toEmail: string;
-  fundName: string;
+  fund: FundBranding;
   merchantName: string;
 }): Promise<void> {
   await dispatchTemplate({
     emailId: args.emailId,
+    fund: args.fund,
     render: async () => {
       const t = await getTranslations("merchants.signup.email.welcome");
-      const subject = t("subject", { fundName: args.fundName });
-      const text = t("textBody", {
-        merchantName: args.merchantName,
-        fundName: args.fundName,
-      });
-      return { subject, text, html: textToBasicHtml(text) };
+      return {
+        subject: t("subject", { fundName: args.fund.name }),
+        text: t("textBody", {
+          merchantName: args.merchantName,
+          fundName: args.fund.name,
+        }),
+      };
     },
     to: args.toEmail,
   });
 }
 
+type RenderedTemplate = {
+  subject: string;
+  text: string;
+  ctaLabel?: string;
+};
+
 async function dispatchTemplate(args: {
   emailId: string;
   to: string;
-  render: () => Promise<{ subject: string; text: string; html: string }>;
+  fund: FundBranding;
+  render: () => Promise<RenderedTemplate>;
 }): Promise<void> {
-  let rendered: { subject: string; text: string; html: string } | null = null;
+  let rendered: RenderedTemplate | null = null;
+  let html: string | null = null;
   try {
     rendered = await args.render();
+    html = await renderBrandedEmail({
+      fundName: args.fund.name,
+      primaryColor: args.fund.primaryColor,
+      logoUrl: args.fund.logoUrl,
+      subject: rendered.subject,
+      text: rendered.text,
+      ctaLabel: rendered.ctaLabel,
+    });
     const { id } = await sendEmail({
       to: args.to,
       subject: rendered.subject,
       text: rendered.text,
-      html: rendered.html,
+      html,
     });
     await prisma.email.update({
       where: { id: args.emailId },
@@ -301,7 +352,7 @@ async function dispatchTemplate(args: {
         resendMessageId: id,
         subject: rendered.subject,
         bodyText: rendered.text,
-        bodyHtml: rendered.html,
+        bodyHtml: html,
       },
     });
   } catch (sendError) {
@@ -320,7 +371,7 @@ async function dispatchTemplate(args: {
             ? {
                 subject: rendered.subject,
                 bodyText: rendered.text,
-                bodyHtml: rendered.html,
+                ...(html ? { bodyHtml: html } : {}),
               }
             : {}),
         },
@@ -334,27 +385,4 @@ async function dispatchTemplate(args: {
     }
     console.error("[email] send failed", args.emailId, message);
   }
-}
-
-// Plaintext → minimal inline-styled HTML. Splits on blank lines into <p>
-// tags, single newlines become <br>. Escapes HTML entities. Enough for
-// transactional emails until proper React Email templates land.
-function textToBasicHtml(text: string): string {
-  const paragraphs = text.split(/\n{2,}/);
-  const body = paragraphs
-    .map((para) => {
-      const lines = para.split("\n").map(escapeHtml).join("<br />");
-      return `<p style="margin:0 0 1em 0;">${lines}</p>`;
-    })
-    .join("\n");
-  return `<!doctype html><html><body style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#111;line-height:1.5;">${body}</body></html>`;
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
 }

@@ -744,7 +744,8 @@
       "emailTemplates": {
         "verify": {
           "subject": "Verify your email — {fundName}",
-          "textBody": "Hi {firstName},\n\nConfirm your email address to complete your application to join {fundName}. Click the link below — it's valid for 24 hours:\n\n  {verifyUrl}\n\nIf you didn't apply, you can ignore this email.\n\nThe {fundName} team"
+          "textBody": "Hi {firstName},\n\nConfirm your email address to complete your application to join {fundName}. Click the link below — it's valid for 24 hours:\n\n  {verifyUrl}\n\nIf you didn't apply, you can ignore this email.\n\nThe {fundName} team",
+          "ctaLabel": "Verify email"
         },
         "welcome": {
           "subject": "Welcome to {fundName}",
@@ -895,7 +896,8 @@
       "email": {
         "verify": {
           "subject": "Verify your email — {fundName}",
-          "textBody": "Hello {merchantName},\n\nConfirm your email address to complete your application to join {fundName} as a merchant. Click the link below — it's valid for 24 hours:\n\n  {verifyUrl}\n\nIf you didn't apply, you can ignore this email.\n\nThe {fundName} team"
+          "textBody": "Hello {merchantName},\n\nConfirm your email address to complete your application to join {fundName} as a merchant. Click the link below — it's valid for 24 hours:\n\n  {verifyUrl}\n\nIf you didn't apply, you can ignore this email.\n\nThe {fundName} team",
+          "ctaLabel": "Verify email"
         },
         "welcome": {
           "subject": "Application received — {fundName}",
@@ -941,7 +943,8 @@
         "approved": {
           "subject": "Application approved — {fundName}",
           "textBodyWithLink": "Hello {merchantName},\n\nYour application to join {fundName} has been approved.\n\nNext step: connect your business with Citizen Pay so your terminal can accept tokens. Visit:\n\n  {citizenPayUrl}\n\nOnce you've completed Citizen Pay onboarding, you'll be live in the {fundName} network. If you have questions, contact the fund admin.\n\nThe {fundName} team",
-          "textBodyWithoutLink": "Hello {merchantName},\n\nYour application to join {fundName} has been approved.\n\nThe fund admin will be in touch with details for connecting to Citizen Pay so you can start accepting tokens.\n\nThe {fundName} team"
+          "textBodyWithoutLink": "Hello {merchantName},\n\nYour application to join {fundName} has been approved.\n\nThe fund admin will be in touch with details for connecting to Citizen Pay so you can start accepting tokens.\n\nThe {fundName} team",
+          "ctaLabel": "Open Citizen Pay"
         },
         "rejected": {
           "subject": "Application update — {fundName}",

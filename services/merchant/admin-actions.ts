@@ -64,7 +64,11 @@ export async function approveMerchantAction(input: {
   await sendMerchantApproved({
     emailId: emailRow.id,
     toEmail: merchant.email!,
-    fundName: fund.name,
+    fund: {
+      name: fund.name,
+      primaryColor: fund.primaryColor,
+      logoUrl: fund.logoUrl,
+    },
     merchantName: merchant.name,
     citizenPayOnboardingUrl: onboardingUrl,
   });
@@ -152,7 +156,11 @@ export async function rejectMerchantAction(input: {
   await sendMerchantRejected({
     emailId: emailRow.id,
     toEmail: merchant.email!,
-    fundName: fund.name,
+    fund: {
+      name: fund.name,
+      primaryColor: fund.primaryColor,
+      logoUrl: fund.logoUrl,
+    },
     merchantName: merchant.name,
     reason,
   });

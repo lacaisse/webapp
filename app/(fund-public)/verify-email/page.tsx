@@ -62,8 +62,15 @@ export default async function VerifyEmailPage({
   redirect(successUrl ?? "/verify-email/success");
 }
 
+type FundContext = {
+  id: string;
+  name: string;
+  primaryColor: string | null;
+  logoUrl: string | null;
+};
+
 async function dispatchMerchantWelcome(
-  fund: { id: string; name: string },
+  fund: FundContext,
   merchantId: string,
 ) {
   const merchant = await prisma.merchant.findUnique({
@@ -87,13 +94,17 @@ async function dispatchMerchantWelcome(
   await sendMerchantWelcome({
     emailId: emailRow.id,
     toEmail: merchant.email,
-    fundName: fund.name,
+    fund: {
+      name: fund.name,
+      primaryColor: fund.primaryColor,
+      logoUrl: fund.logoUrl,
+    },
     merchantName: merchant.name,
   });
 }
 
 async function dispatchMemberWelcome(
-  fund: { id: string; name: string },
+  fund: FundContext,
   memberId: string,
 ) {
   const member = await prisma.member.findUnique({
@@ -122,7 +133,11 @@ async function dispatchMemberWelcome(
   await sendMemberWelcome({
     emailId: emailRow.id,
     toEmail: member.email,
-    fundName: fund.name,
+    fund: {
+      name: fund.name,
+      primaryColor: fund.primaryColor,
+      logoUrl: fund.logoUrl,
+    },
     firstName: member.firstName,
     paymentReference: member.paymentReference,
   });

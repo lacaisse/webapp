@@ -198,7 +198,11 @@ export async function activateMemberAction(input: {
   await sendMemberActivated({
     emailId: tx.emailId,
     toEmail: member.email,
-    fundName: fund.name,
+    fund: {
+      name: fund.name,
+      primaryColor: fund.primaryColor,
+      logoUrl: fund.logoUrl,
+    },
     firstName: member.firstName,
     cardSerial: tx.cardSerial,
     paymentReference: member.paymentReference ?? "",
@@ -361,7 +365,11 @@ export async function inviteMemberAction(input: {
     await sendMemberInvited({
       emailId: result.emailId,
       toEmail: parsed.data.email,
-      fundName: fund.name,
+      fund: {
+        name: fund.name,
+        primaryColor: fund.primaryColor,
+        logoUrl: fund.logoUrl,
+      },
       firstName: parsed.data.firstName,
       paymentReference,
     });
