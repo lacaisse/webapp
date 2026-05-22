@@ -91,6 +91,7 @@ export async function HoldersTable({
       memberName: c.member
         ? `${c.member.firstName} ${c.member.lastName}`.trim()
         : "",
+      serialNumber: c.serialNumber,
     })),
     places,
     // Holders are bounded by the cards/places/minters universe — there are
