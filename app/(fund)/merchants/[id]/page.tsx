@@ -78,8 +78,14 @@ export default async function MerchantDetailPage({
         <MerchantRowActions
           merchantId={merchant.id}
           merchantName={merchant.name}
+          merchantEmail={merchant.email}
           emailVerified={emailVerified}
           status={merchant.status}
+          connected={merchant.citizenPayBusinessId !== null}
+          invitePending={
+            merchant.citizenPayInviteToken !== null &&
+            (merchant.citizenPayInviteExpiresAt?.getTime() ?? 0) > Date.now()
+          }
         />
       </div>
 

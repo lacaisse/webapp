@@ -15,13 +15,18 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   blockCardAction,
+  topUpCardAction,
   unblockCardAction,
+  withdrawFromCardAction,
 } from "@/services/card/admin-actions";
 
 // Block: ACTIVE → BLOCKED. Optionally also flag as lost in the same click.
 // Unblock: BLOCKED → ACTIVE. Optionally also clear the lost flag.
+// Top-up / withdraw available on ACTIVE cards with a CP-issued account.
 // INACTIVE cards (not yet CP-confirmed) render no actions.
 
 export function CardRowActions({
@@ -29,31 +34,51 @@ export function CardRowActions({
   status,
   isLost,
   holderLabel,
+  hasAccount,
+  tokenSymbol,
+  tokenDecimals,
 }: {
   cardId: string;
   status: "ACTIVE" | "INACTIVE" | "BLOCKED";
   isLost: boolean;
   holderLabel: string;
+  hasAccount: boolean;
+  tokenSymbol: string | null;
+  tokenDecimals: number | null;
 }) {
-  if (status === "ACTIVE") {
-    return (
-      <BlockDialog
-        cardId={cardId}
-        holderLabel={holderLabel}
-        initialReportedLost={isLost}
-      />
-    );
-  }
-  if (status === "BLOCKED") {
-    return (
-      <UnblockDialog
-        cardId={cardId}
-        holderLabel={holderLabel}
-        isLost={isLost}
-      />
-    );
-  }
-  return null;
+  const canTransact = status === "ACTIVE" && hasAccount && tokenDecimals != null;
+  return (
+    <div className="flex items-center justify-end gap-2">
+      {canTransact && (
+        <>
+          <TopUpDialog
+            cardId={cardId}
+            holderLabel={holderLabel}
+            tokenSymbol={tokenSymbol}
+          />
+          <WithdrawDialog
+            cardId={cardId}
+            holderLabel={holderLabel}
+            tokenSymbol={tokenSymbol}
+          />
+        </>
+      )}
+      {status === "ACTIVE" && (
+        <BlockDialog
+          cardId={cardId}
+          holderLabel={holderLabel}
+          initialReportedLost={isLost}
+        />
+      )}
+      {status === "BLOCKED" && (
+        <UnblockDialog
+          cardId={cardId}
+          holderLabel={holderLabel}
+          isLost={isLost}
+        />
+      )}
+    </div>
+  );
 }
 
 function BlockDialog({
@@ -125,6 +150,165 @@ function BlockDialog({
           <Button variant="destructive" onClick={onSubmit} disabled={pending}>
             {pending ? t("blocking") : t("confirm")}
           </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function TopUpDialog({
+  cardId,
+  holderLabel,
+  tokenSymbol,
+}: {
+  cardId: string;
+  holderLabel: string;
+  tokenSymbol: string | null;
+}) {
+  return (
+    <CardAmountDialog
+      cardId={cardId}
+      holderLabel={holderLabel}
+      tokenSymbol={tokenSymbol}
+      kind="topUp"
+      action={topUpCardAction}
+    />
+  );
+}
+
+function WithdrawDialog({
+  cardId,
+  holderLabel,
+  tokenSymbol,
+}: {
+  cardId: string;
+  holderLabel: string;
+  tokenSymbol: string | null;
+}) {
+  return (
+    <CardAmountDialog
+      cardId={cardId}
+      holderLabel={holderLabel}
+      tokenSymbol={tokenSymbol}
+      kind="withdraw"
+      action={withdrawFromCardAction}
+    />
+  );
+}
+
+function CardAmountDialog({
+  cardId,
+  holderLabel,
+  tokenSymbol,
+  kind,
+  action,
+}: {
+  cardId: string;
+  holderLabel: string;
+  tokenSymbol: string | null;
+  kind: "topUp" | "withdraw";
+  action: typeof topUpCardAction;
+}) {
+  const t = useTranslations(`cards.admin.${kind}`);
+  const tRoot = useTranslations();
+  const [open, setOpen] = useState(false);
+  const [amount, setAmount] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function onOpenChange(next: boolean) {
+    setOpen(next);
+    if (!next) {
+      setAmount("");
+      setError(null);
+      setSuccess(null);
+    }
+  }
+
+  const onSubmit = () => {
+    setError(null);
+    startTransition(async () => {
+      const result = await action({ cardId, amount });
+      if ("error" in result) {
+        setError(result.error);
+        return;
+      }
+      setSuccess(result.txHash);
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogTrigger
+        render={
+          <Button variant={kind === "topUp" ? "default" : "outline"} size="sm" />
+        }
+      >
+        {t("button")}
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t("title")}</DialogTitle>
+          <DialogDescription>
+            {t("description", { holderLabel })}
+          </DialogDescription>
+        </DialogHeader>
+        {success ? (
+          <div className="space-y-2">
+            <Alert>
+              <AlertDescription>
+                <div>{t("success")}</div>
+                <div className="mt-1 font-mono text-xs break-all">
+                  {success}
+                </div>
+              </AlertDescription>
+            </Alert>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <Label htmlFor={`${kind}-amount-${cardId}`}>
+              {t("amountLabel")}
+            </Label>
+            <div className="flex items-center gap-2">
+              <Input
+                id={`${kind}-amount-${cardId}`}
+                autoComplete="off"
+                inputMode="decimal"
+                placeholder="0.00"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+              />
+              {tokenSymbol && (
+                <span className="text-sm text-muted-foreground whitespace-nowrap">
+                  {tokenSymbol}
+                </span>
+              )}
+            </div>
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+          </div>
+        )}
+        <DialogFooter>
+          <Button
+            variant="ghost"
+            onClick={() => onOpenChange(false)}
+            disabled={pending}
+          >
+            {success ? tRoot("common.close") : tRoot("common.cancel")}
+          </Button>
+          {!success && (
+            <Button
+              variant={kind === "withdraw" ? "destructive" : "default"}
+              onClick={onSubmit}
+              disabled={pending}
+            >
+              {pending ? t("submitting") : t("confirm")}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -1,0 +1,116 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import "server-only";
+
+import { getCitizenPayClient } from "@/services/citizenpay/client";
+import type {
+  CardStatus as CpCardStatus,
+} from "@/services/citizenpay/types";
+import { prisma } from "@/services/db/prisma";
+
+// Shared helpers for the card-sync flow. Both the preview action (used to
+// populate the confirmation dialog) and the run action (which actually
+// pushes/pulls) start from `computeCardSyncPlan`. Lives outside the
+// `"use server"` file because a server-actions module can only export
+// async functions — non-action exports there get silently rewritten into
+// remote-callable proxies that explode at runtime.
+
+export type CardSyncPlan = {
+  // Local-only cards we need to push to CP (POST /v2/treasury/cards).
+  push: Array<{
+    cardId: string;
+    serialNumber: string;
+    holderName: string | null;
+  }>;
+  // CP-only cards we need to pull into our DB.
+  import: Array<{
+    serialNumber: string;
+    status: CpCardStatus;
+    account: string | null;
+    createdAt: string;
+  }>;
+  // Local is authoritative for status — if CP differs, push ours.
+  statusUpdate: Array<{
+    cardId: string;
+    serialNumber: string;
+    localStatus: CpCardStatus;
+    remoteStatus: CpCardStatus;
+  }>;
+};
+
+// Minimum fund shape the sync flow needs. Matches what
+// `requireFundRole("ADMIN")` returns (full fund row), but we only depend
+// on the credential columns for typing.
+export type SyncFund = {
+  id: string;
+  citizenPayApiKeyId: string | null;
+  citizenPayApiKeyEnc: string | null;
+};
+
+/**
+ * Compute the diff between the local Card table and the CP-side card list
+ * for the given fund. Throws if CP is unreachable — the caller decides
+ * whether to surface that or fail soft.
+ */
+export async function computeCardSyncPlan(
+  fund: SyncFund,
+): Promise<CardSyncPlan> {
+  const client = getCitizenPayClient(fund);
+  const [remote, local] = await Promise.all([
+    client.listCitizenPayCards(),
+    prisma.card.findMany({
+      where: { fundId: fund.id },
+      select: {
+        id: true,
+        serialNumber: true,
+        status: true,
+        account: true,
+        holderName: true,
+        member: { select: { firstName: true, lastName: true } },
+      },
+    }),
+  ]);
+
+  const remoteBySerial = new Map(
+    remote.cards.map((r) => [r.serialNumber, r]),
+  );
+  const localBySerial = new Map(local.map((l) => [l.serialNumber, l]));
+
+  const plan: CardSyncPlan = { push: [], import: [], statusUpdate: [] };
+
+  for (const l of local) {
+    const r = remoteBySerial.get(l.serialNumber);
+    if (!r) {
+      plan.push.push({
+        cardId: l.id,
+        serialNumber: l.serialNumber,
+        holderName:
+          l.holderName ||
+          (l.member
+            ? `${l.member.firstName} ${l.member.lastName}`.trim()
+            : null),
+      });
+    } else if (r.status !== l.status) {
+      plan.statusUpdate.push({
+        cardId: l.id,
+        serialNumber: l.serialNumber,
+        localStatus: l.status,
+        remoteStatus: r.status,
+      });
+    }
+  }
+
+  for (const r of remote.cards) {
+    if (!localBySerial.has(r.serialNumber)) {
+      // `account` isn't on the list endpoint — the run path fetches it
+      // per-card via `getCitizenPayCard`. Preview just shows the count.
+      plan.import.push({
+        serialNumber: r.serialNumber,
+        status: r.status,
+        account: null,
+        createdAt: r.createdAt,
+      });
+    }
+  }
+
+  return plan;
+}

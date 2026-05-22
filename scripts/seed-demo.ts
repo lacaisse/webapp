@@ -700,6 +700,7 @@ async function main() {
 
       const card = await prisma.card.create({
         data: {
+          fundId: fund.id,
           memberId: member.id,
           serialNumber: generateCardSerial(),
           account,
@@ -732,6 +733,7 @@ async function main() {
         const dependantFirst = pick(FIRST_NAMES, memberPlans.indexOf(plan) * 5 + 9);
         await prisma.card.create({
           data: {
+            fundId: fund.id,
             memberId: member.id,
             serialNumber: generateCardSerial(),
             account: generateAccountAddress(),

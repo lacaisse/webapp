@@ -3,9 +3,21 @@ import "server-only";
 
 import { randomBytes } from "node:crypto";
 
+import { decryptSecret } from "@/services/crypto/secret";
+
+import type { CitizenPayClient } from "./client-interface";
+import { LiveCitizenPayClient } from "./live-client";
 import type {
+  CardOperationInput,
+  CardOperationResult,
+  CitizenPayCardDetail,
+  CitizenPayInvite,
+  CitizenPayProfile,
   ListBankTransactionsInput,
   ListBankTransactionsResult,
+  ListCardsInput,
+  ListCardsResult,
+  ListPlacesResult,
   OperationStatusResult,
   RegisteredCard,
   RegisterCardInput,
@@ -13,56 +25,18 @@ import type {
   SubmittedOperation,
 } from "./types";
 
-// CitizenPay API surface we'll need. Each method represents a discrete
-// operation the CP API exposes (or will expose — the contract is still
-// being finalised, so this interface is what we *expect* it to look like).
-//
-// The mock implementation logs every call and returns plausible data so the
-// app can run end-to-end in dev without a live CP connection. When the real
-// CP integration is ready, write a LiveCitizenPayClient implementing the
-// same interface and switch the factory.
+// Re-export the interface so existing imports `from "@/services/citizenpay/client"`
+// continue to resolve.
+export type { CitizenPayClient } from "./client-interface";
 
-export interface CitizenPayClient {
-  /**
-   * Register a physical card with CitizenPay. The fund hands a card with a
-   * known NFC serial to a member; we call this to create the corresponding
-   * on-chain wallet on CP's side. Returns the wallet `account` we then
-   * store on the local Card row.
-   */
-  registerCard(input: RegisterCardInput): Promise<RegisteredCard>;
-
-  /**
-   * Tell CP to stop accepting charges from this card (member reported lost,
-   * suspicious activity, etc.). Idempotent — calling it on an already-
-   * blocked card is a no-op.
-   */
-  blockCard(serialNumber: string): Promise<void>;
-
-  /** Reverse of `blockCard`. Idempotent. */
-  unblockCard(serialNumber: string): Promise<void>;
-
-  /**
-   * Submit a mint to CP. Returns a tx hash we can poll later for
-   * confirmation. The mint itself is asynchronous on-chain — initial status
-   * is always PENDING.
-   */
-  submitMint(input: SubmitMintInput): Promise<SubmittedOperation>;
-
-  /**
-   * Poll CP for the current state of a previously-submitted operation.
-   * The polling cron uses this to flip PENDING rows to CONFIRMED / FAILED.
-   */
-  getOperationStatus(txHash: string): Promise<OperationStatusResult>;
-
-  /**
-   * Fetch bank movements CP has detected on the fund's account, optionally
-   * since a cursor. Bank-sync uses this to mirror deposits locally, match
-   * them to members, and trigger PAY_AND_GO mints.
-   */
-  listBankTransactions(
-    input: ListBankTransactionsInput,
-  ): Promise<ListBankTransactionsResult>;
-}
+// Minimum fund shape callers must `select` from Prisma. Keeping the column
+// names exactly as on the model so call sites can pass `{ ...fund }` without
+// renaming.
+export type FundCredentials = {
+  id: string;
+  citizenPayApiKeyId: string | null;
+  citizenPayApiKeyEnc: string | null;
+};
 
 // =============================================================================
 // Mock implementation
@@ -110,10 +84,93 @@ class MockCitizenPayClient implements CitizenPayClient {
     input: ListBankTransactionsInput,
   ): Promise<ListBankTransactionsResult> {
     this.log("listBankTransactions", input);
-    // Mock returns empty — bank-sync cron runs but does nothing in dev.
-    // When CP integration is live, this returns the real backlog of
-    // transactions since the cursor.
     return { transactions: [] };
+  }
+
+  async listPlaces(): Promise<ListPlacesResult> {
+    this.log("listPlaces", {});
+    return { places: [] };
+  }
+
+  async disconnectBusiness(businessId: string): Promise<void> {
+    this.log("disconnectBusiness", { businessId });
+  }
+
+  async createMerchantInvite(args: {
+    email: string;
+    redirectUri?: string;
+  }): Promise<CitizenPayInvite> {
+    this.log("createMerchantInvite", args);
+    const token = randomBytes(24).toString("hex");
+    return {
+      token,
+      inviteUrl: `https://my.citizenpay.xyz/treasury-invites/${token}`,
+      email: args.email,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      status: "pending",
+      emailSent: true,
+      emailSentAt: new Date().toISOString(),
+      acceptedBusinessId: null,
+    };
+  }
+
+  async getMerchantInvite(token: string): Promise<CitizenPayInvite | null> {
+    this.log("getMerchantInvite", { token });
+    // Mock can't know what state a token "should" be in. Return null —
+    // dev flow never hits the callback against the mock client anyway.
+    return null;
+  }
+
+  async getProfile(account: string): Promise<CitizenPayProfile | null> {
+    this.log("getProfile", { account });
+    return null;
+  }
+
+  async getProfiles(
+    accounts: string[],
+  ): Promise<Array<CitizenPayProfile | null>> {
+    this.log("getProfiles", { count: accounts.length });
+    return accounts.map(() => null);
+  }
+
+  async topUpCard(input: CardOperationInput): Promise<CardOperationResult> {
+    this.log("topUpCard", input);
+    return { txHash: `0x${randomBytes(32).toString("hex")}` };
+  }
+
+  async withdrawFromCard(
+    input: CardOperationInput,
+  ): Promise<CardOperationResult> {
+    this.log("withdrawFromCard", input);
+    return { txHash: `0x${randomBytes(32).toString("hex")}` };
+  }
+
+  async listCitizenPayCards(
+    input: ListCardsInput = {},
+  ): Promise<ListCardsResult> {
+    this.log("listCitizenPayCards", input);
+    return {
+      cards: [],
+      pagination: { page: 1, limit: input.limit ?? 100, total: 0, totalPages: 0 },
+    };
+  }
+
+  async setCardStatus(
+    serialNumber: string,
+    status: "ACTIVE" | "INACTIVE" | "BLOCKED",
+  ): Promise<void> {
+    this.log("setCardStatus", { serialNumber, status });
+  }
+
+  async deleteCard(serialNumber: string): Promise<void> {
+    this.log("deleteCard", { serialNumber });
+  }
+
+  async getCitizenPayCard(
+    serialNumber: string,
+  ): Promise<CitizenPayCardDetail | null> {
+    this.log("getCitizenPayCard", { serialNumber });
+    return null;
   }
 }
 
@@ -121,16 +178,47 @@ class MockCitizenPayClient implements CitizenPayClient {
 // Factory
 // =============================================================================
 
-let cached: CitizenPayClient | undefined;
+let warnedNoBaseUrl = false;
 
 /**
- * Returns the active CitizenPay client. Defaults to a mock that logs each
- * call and returns plausible data. The mock is used until a LiveCitizenPayClient
- * implementation is wired against the real CP API. Use everywhere CP needs to
- * be called — never instantiate the client directly from call sites.
+ * Returns a CitizenPay client scoped to the given fund.
+ *
+ * Mode is decided by `CITIZENPAY_API_BASE_URL`:
+ *   - **Unset**  → dev mode: an in-process mock that logs every call and
+ *                  returns plausible data. Fund creds are ignored.
+ *   - **Set**    → live mode: the fund **must** have both
+ *                  `citizenPayApiKeyId` and `citizenPayApiKeyEnc` populated.
+ *                  Missing creds throws — there's no silent fallback to the
+ *                  mock once we're in live mode.
+ *
+ * The encrypted secret is decrypted with `CITIZENPAY_CRED_KEY` via
+ * `services/citizenpay/crypto.ts`. Decrypt failures are fatal.
+ *
+ * No caching: clients are cheap to construct, and each call already has a
+ * fund in scope.
  */
-export function getCitizenPayClient(): CitizenPayClient {
-  if (cached) return cached;
-  cached = new MockCitizenPayClient();
-  return cached;
+export function getCitizenPayClient(fund: FundCredentials): CitizenPayClient {
+  const baseUrl = process.env.CITIZENPAY_API_BASE_URL;
+  if (!baseUrl) {
+    if (!warnedNoBaseUrl) {
+      console.log(
+        "[citizenpay] CITIZENPAY_API_BASE_URL not set — using mock client for all funds",
+      );
+      warnedNoBaseUrl = true;
+    }
+    return new MockCitizenPayClient();
+  }
+
+  if (!fund.citizenPayApiKeyId || !fund.citizenPayApiKeyEnc) {
+    throw new Error(
+      `[citizenpay] fund ${fund.id} is missing API credentials — set citizenPayApiKeyId + citizenPayApiKeyEnc (see scripts/encrypt-cp-secret.mjs)`,
+    );
+  }
+
+  const apiKey = decryptSecret(fund.citizenPayApiKeyEnc);
+  return new LiveCitizenPayClient({
+    baseUrl,
+    apiKeyId: fund.citizenPayApiKeyId,
+    apiKey,
+  });
 }

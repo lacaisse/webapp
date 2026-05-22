@@ -37,7 +37,14 @@ export async function closeExpiredPeriods(): Promise<ClosePeriodStats[]> {
       label: true,
       startsAt: true,
       cutoffDate: true,
-      fund: { select: { citizenPayFundId: true } },
+      fund: {
+        select: {
+          id: true,
+          citizenPayFundId: true,
+          citizenPayApiKeyId: true,
+          citizenPayApiKeyEnc: true,
+        },
+      },
     },
   });
 
@@ -59,7 +66,12 @@ type PeriodToClose = {
   label: string;
   startsAt: Date;
   cutoffDate: Date;
-  fund: { citizenPayFundId: string | null };
+  fund: {
+    id: string;
+    citizenPayFundId: string | null;
+    citizenPayApiKeyId: string | null;
+    citizenPayApiKeyEnc: string | null;
+  };
 };
 
 async function closePeriod(period: PeriodToClose): Promise<ClosePeriodStats> {
@@ -167,7 +179,7 @@ async function closePeriod(period: PeriodToClose): Promise<ClosePeriodStats> {
 
   // Outside the transaction: submit each mint to CP. Failures leave the op
   // PENDING with no txHash; the period stays CLOSED regardless.
-  const cp = getCitizenPayClient();
+  const cp = getCitizenPayClient(period.fund);
   let submitted = 0;
   for (const op of created) {
     try {

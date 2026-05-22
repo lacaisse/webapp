@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
   ArrowUpRight,
+  Coins,
   CreditCard,
   Gift,
   LayoutDashboard,
@@ -17,6 +18,7 @@ import {
   Wallet,
 } from "lucide-react";
 
+import { LocaleSwitcher } from "@/components/locale-switcher";
 import { cn } from "@/lib/utils";
 
 type Item = {
@@ -42,6 +44,7 @@ export function FundSidebar({
     { href: "/members", label: t("members"), icon: Users },
     { href: "/cards", label: t("cards"), icon: CreditCard },
     { href: "/allocations", label: t("allocations"), icon: Wallet },
+    { href: "/token", label: t("token"), icon: Coins },
     { href: "/merchants", label: t("merchants"), icon: Store },
     { href: "/payments", label: t("payments"), icon: Receipt },
     { href: "/referrals", label: t("referrals"), icon: Gift },
@@ -81,7 +84,7 @@ export function FundSidebar({
         </ul>
       </nav>
 
-      <div className="border-t border-border p-3">
+      <div className="flex flex-col gap-2 border-t border-border p-3">
         <a
           href={apexUrl}
           className="flex h-8 items-center gap-2 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent/50 hover:text-foreground"
@@ -89,6 +92,9 @@ export function FundSidebar({
           <ArrowUpRight className="size-4" />
           {t("backToApex")}
         </a>
+        <div className="px-2">
+          <LocaleSwitcher />
+        </div>
       </div>
     </aside>
   );

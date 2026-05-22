@@ -15,7 +15,6 @@ import {
   updateLegalSettingsAction,
   updateReferralSettingsAction,
   updateSignupRedirectsAction,
-  updateTokenSettingsAction,
 } from "@/services/fund/settings-actions";
 
 // Reusable form scaffold. Each tab passes its own fields + submit action;
@@ -163,8 +162,6 @@ type Fund = {
   allocationMode: "FIXED_PERIOD" | "PAY_AND_GO";
   logoUrl: string | null;
   primaryColor: string | null;
-  tokenName: string | null;
-  tokenSymbol: string | null;
   termsUrl: string | null;
   privacyUrl: string | null;
   citizenPayFundId: string | null;
@@ -255,26 +252,25 @@ export function BrandingForm({ fund }: { fund: Fund }) {
   );
 }
 
-export function TokenForm({ fund }: { fund: Fund }) {
-  const t = useTranslations("fund.settings.token");
+export function CitizenPayForm({ fund }: { fund: Fund }) {
+  const t = useTranslations("fund.settings.citizenpay");
   const tRoot = useTranslations("fund.settings");
   return (
     <SettingsForm
       saveLabel={tRoot("save")}
       savingLabel={tRoot("saving")}
-      initial={{
-        tokenName: fund.tokenName ?? "",
-        tokenSymbol: fund.tokenSymbol ?? "",
-      }}
+      initial={{ citizenPayFundId: fund.citizenPayFundId ?? "" }}
       action={async (v) =>
-        updateTokenSettingsAction({
-          tokenName: v.tokenName,
-          tokenSymbol: v.tokenSymbol,
+        updateCitizenPaySettingsAction({
+          citizenPayFundId: v.citizenPayFundId,
         })
       }
       fields={[
-        { key: "tokenName", label: t("name"), hint: t("nameHint") },
-        { key: "tokenSymbol", label: t("symbol"), hint: t("symbolHint") },
+        {
+          key: "citizenPayFundId",
+          label: t("account"),
+          hint: t("accountHint"),
+        },
       ]}
     />
   );
@@ -304,30 +300,6 @@ export function LegalForm({ fund }: { fund: Fund }) {
           label: t("privacy"),
           hint: t("privacyHint"),
           type: "url",
-        },
-      ]}
-    />
-  );
-}
-
-export function CitizenPayForm({ fund }: { fund: Fund }) {
-  const t = useTranslations("fund.settings.citizenpay");
-  const tRoot = useTranslations("fund.settings");
-  return (
-    <SettingsForm
-      saveLabel={tRoot("save")}
-      savingLabel={tRoot("saving")}
-      initial={{ citizenPayFundId: fund.citizenPayFundId ?? "" }}
-      action={async (v) =>
-        updateCitizenPaySettingsAction({
-          citizenPayFundId: v.citizenPayFundId,
-        })
-      }
-      fields={[
-        {
-          key: "citizenPayFundId",
-          label: t("account"),
-          hint: t("accountHint"),
         },
       ]}
     />

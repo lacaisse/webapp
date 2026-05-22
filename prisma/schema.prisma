@@ -172,6 +172,28 @@ model Fund {
   tokenName   String?
   tokenSymbol String?
 
+  // On-chain token configuration. Mint/burn run from this repo against the
+  // contract at `tokenAddress` on chain `tokenChainId` (Gnosis = 100 by
+  // default; chosen so the picker has a sensible value before the admin
+  // touches the form). `tokenDecimals` is cached from the contract's
+  // `decimals()` after the address is verified.
+  //
+  // The minter is an EOA (private key encrypted via APP_CRED_KEY — see
+  // services/crypto/secret.ts) that signs UserOps submitted through
+  // CitizenPay's bundler (`CITIZENPAY_BUNDLER_URL`). The smart-account
+  // address derived from CP's factory is what actually holds MINTER_ROLE
+  // on the token contract; we populate it once the factory + salt are
+  // wired (TBD pending bundler docs). `tokenMintEnabledAt` is set when we
+  // last verified `hasRole(MINTER_ROLE, smartAccount)` on-chain.
+  tokenChainId                   Int       @default(100)
+  tokenAddress                   String?
+  tokenDecimals                  Int?
+  tokenLogoUrl                   String?
+  tokenMinterPrivateKeyEnc       String?
+  tokenMinterEoaAddress          String?
+  tokenMinterSmartAccountAddress String?
+  tokenMintEnabledAt             DateTime?
+
   // Allocation mode. FIXED_PERIOD runs auto-allocations on a recurring
   // cadence (period entries live in a separate AllocationPeriod model
   // TBD); PAY_AND_GO mints immediately when CitizenPay reports a deposit.
@@ -190,8 +212,28 @@ model Fund {
   // CitizenPay linkage. `citizenPayFundId` is null until connected. The
   // sync timestamp lets the admin UI surface "last seen" / staleness;
   // "connected" is derived as `id != null && lastSyncedAt > threshold`.
-  citizenPayFundId       String?
-  citizenPayLastSyncedAt DateTime?
+  //
+  // Per-fund API credentials. `citizenPayApiKeyId` is the API key ID
+  // (Ethereum address, not sensitive on its own) stored plaintext.
+  // `citizenPayApiKeyEnc` is the paired secret, AES-256-GCM encrypted with
+  // CITIZENPAY_CRED_KEY — see services/citizenpay/crypto.ts. Set via the
+  // `scripts/encrypt-cp-secret.mjs` helper + SQL until an admin UI exists.
+  citizenPayFundId          String?
+  citizenPayApiKeyId        String?
+  citizenPayApiKeyEnc       String?
+  citizenPayApiKeyUpdatedAt DateTime? // last successful pickup-and-write
+  citizenPayLastSyncedAt    DateTime?
+
+  // 4337 stack identity. Cached from CP's `GET /v2/treasury` response —
+  // CP picks the entrypoint / factory / paymaster per treasury and we
+  // shouldn't second-guess. `paymasterType` is the classifier passed in
+  // `pm_ooSponsorUserOperation` params (e.g. "cw-safe"). All four are
+  // refreshed every time the API key is (re)issued — see
+  // services/citizenpay/sync.ts.
+  citizenPayEntrypointAddress     String?
+  citizenPayAccountFactoryAddress String?
+  citizenPayPaymasterAddress      String?
+  citizenPayPaymasterType         String?
 
   // Legal — links out to the fund's own ToS / privacy pages.
   termsUrl   String?
@@ -214,6 +256,7 @@ model Fund {
 
   staff             FundMember[] // staff with admin access (OWNER/ADMIN/VIEWER)
   members           Member[] // demand-side recipients of allocations
+  cards             Card[] // cards in the fund (may be member-bound or imported)
   tiers             AllocationTier[] // contribution/allocation tiers
   merchants         Merchant[] // shops in the fund's network
   onboardingFields  OnboardingField[] // per-fund extras on the signup forms
@@ -222,6 +265,9 @@ model Fund {
   allocationPeriods AllocationPeriod[] // FIXED_PERIOD scheduling windows
   referrals         Referral[] // referral programme records (5.3.4)
   emails            Email[] // transactional email outbox/log
+
+  citizenPayConnectAttempts CitizenPayConnectAttempt[] // in-flight CP connect handoffs
+  addressProfiles           AddressProfileCache[] // CP profile cache (token explorer / transfers)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -366,9 +412,19 @@ enum MemberStatus {
 }
 
 model Card {
-  id       String @id @default(cuid())
-  memberId String
-  member   Member @relation("MemberCards", fields: [memberId], references: [id], onDelete: Cascade)
+  id String @id @default(cuid())
+
+  // Fund scoping is direct (rather than via Member) so cards can exist
+  // without an owning member — e.g. cards imported from CitizenPay before
+  // being attached to a holder. Most cards are member-bound (created via
+  // member activation or addCard), but the import flow on /cards/sync
+  // creates them unattached.
+  fundId String
+  fund   Fund   @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  // Optional member binding. Null for imported / unattached cards.
+  memberId String?
+  member   Member? @relation("MemberCards", fields: [memberId], references: [id], onDelete: SetNull)
 
   // CitizenPay linkage. `serialNumber` is the NFC UUID (printed/scannable
   // on the physical card) — admin enters this at activation time. `account`
@@ -406,6 +462,7 @@ model Card {
   updatedAt DateTime @updatedAt
 
   @@index([memberId])
+  @@index([fundId])
   @@index([status])
 }
 
@@ -458,19 +515,50 @@ model Merchant {
   phone       String?
 
   // Postal address — kept for printed correspondence and the directory.
-  // Geo-coordinates live on CP and aren't mirrored here.
+  // Once the merchant connects on CitizenPay, the place row carries the
+  // canonical address + geo-coordinates; we cache them here so the
+  // directory + map don't need a CP round-trip per render.
   address    String?
   postalCode String?
   city       String?
   country    String?
+  // PostgreSQL DOUBLE PRECISION — sub-meter accuracy is overkill for
+  // displaying a merchant pin. Null until CP reports them.
+  latitude   Float?
+  longitude  Float?
 
   // CitizenPay linkage. `placeId` is null until the merchant connects.
   // Per-fund unique (within one fund a place maps to one merchant), but
   // the same `placeId` may appear under multiple funds — places in CP
   // can accept tokens from any fund the merchant has signed with.
+  //
+  // `businessId` is CP's parent identifier (a business has 1..N places).
+  // We cache it on every place row so the "disconnect" action — which
+  // hits a business-level endpoint and tears down ALL places of that
+  // business — can find sibling Merchant rows in the same fund without
+  // a round trip to CP.
+  //
+  // `placeAccount` is the on-chain wallet CP issued for the place.
+  // Cached so we can resolve "this address → which merchant" (token
+  // explorer, transfer labels) without re-listing places against CP on
+  // every render. May be null between place-create and account-issue on
+  // CP's side.
   citizenPayPlaceId      String?
+  citizenPayBusinessId   String?
+  citizenPayPlaceAccount String?
   citizenPayActivatedAt  DateTime? // CP-confirmed activation for this fund
   citizenPayLastSyncedAt DateTime? // last poll against CP
+
+  // In-flight invite tracking. CP keys invites by (treasury, email) and
+  // auto-rejects a prior pending invite when a new one is minted for the
+  // same pair — so we only ever need to track ONE invite per merchant,
+  // not a separate table. Fields are cleared once the callback lands
+  // (accepted → citizenPayBusinessId is set; rejected → cleared without
+  // a businessId).
+  citizenPayInviteToken     String?
+  citizenPayInviteEmail     String? // email actually sent the invite (may differ from current Merchant.email after edits)
+  citizenPayInviteSentAt    DateTime?
+  citizenPayInviteExpiresAt DateTime?
 
   // Lifecycle. Single intake: every merchant starts at PENDING — admin-
   // initiated adds also go through this state, the admin just immediately
@@ -518,7 +606,14 @@ model Merchant {
 
   @@unique([fundId, name])
   @@unique([fundId, citizenPayPlaceId])
+  // Callback looks up the merchant by the CP-issued token. Token is
+  // globally unique on CP's side, but we scope by fund as a guard — a
+  // token from another fund's treasury hitting this fund's callback
+  // shouldn't match.
+  @@unique([fundId, citizenPayInviteToken])
   @@index([fundId, status])
+  @@index([fundId, citizenPayBusinessId])
+  @@index([fundId, citizenPayPlaceAccount])
 }
 
 enum MerchantStatus {
@@ -671,6 +766,71 @@ model AuthExchange {
   consumedAt DateTime? // single-use; set atomically on consume
 
   @@index([expiresAt])
+}
+
+// =============================================================================
+// CitizenPay connect (treasury creation handoff)
+// =============================================================================
+// The admin initiates a "Connect to CitizenPay" flow from fund settings; we
+// redirect to CitizenPay with a random `state` token, they create the
+// treasury, and they redirect back with `?state=…&pickup=…`. The callback
+// route verifies `state` against this row, then GETs CP's pickup endpoint
+// once to receive {apiKey, apiKeyId, treasuryId} and writes them onto the
+// Fund. `consumedAt` makes the row single-use so a leaked redirect URL
+// can't be replayed. `returnHost` snapshots the host we asked CP to redirect
+// to (defence in depth — if CP returns to a different host it's rejected).
+//
+// Cleaned up by app/api/cron/auth-exchange-cleanup (which sweeps both
+// tables on the same schedule).
+
+model CitizenPayConnectAttempt {
+  state      String    @id // 32 bytes, base64url
+  fundId     String
+  fund       Fund      @relation(fields: [fundId], references: [id], onDelete: Cascade)
+  returnHost String // exact hostname we asked CP to redirect back to
+  createdAt  DateTime  @default(now())
+  expiresAt  DateTime // ~10 min after createdAt
+  consumedAt DateTime? // single-use; set atomically on callback
+
+  @@index([fundId])
+  @@index([expiresAt])
+}
+
+// =============================================================================
+// Address → profile cache
+// =============================================================================
+// Three-tier resolver feeds external addresses (anything that isn't a local
+// Card.account or Merchant.citizenPayPlaceAccount) into CitizenPay's batch
+// /v2/treasury/profiles endpoint. We persist the result so the hot path —
+// rendering a list of transfers — doesn't re-hit CP on every render.
+//
+// Scoping is per-fund: CP credentials are per-fund, and CP's profile
+// visibility may be scoped to the calling treasury.
+//
+// `notFound` is the negative cache: CP returned 404 for this address.
+// Resolver TTL distinguishes hits (24h) from misses (1h) so a newly-
+// registered profile appears promptly in the directory.
+
+model AddressProfileCache {
+  fundId  String
+  fund    Fund   @relation(fields: [fundId], references: [id], onDelete: Cascade)
+  // Lowercased 0x address. Lowercasing is enforced on write everywhere it
+  // matters (CP also normalises on its side).
+  address String
+
+  name        String?
+  username    String?
+  description String?
+  image       String?
+  imageMedium String?
+  imageSmall  String?
+  parent      String?
+
+  notFound  Boolean  @default(false)
+  fetchedAt DateTime @default(now())
+
+  @@id([fundId, address])
+  @@index([fundId, fetchedAt])
 }
 
 // =============================================================================

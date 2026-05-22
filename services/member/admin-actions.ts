@@ -18,23 +18,23 @@ const MAX_REFERENCE_RETRIES = 5;
 
 export type ActivateMemberResult = { ok: true } | { error: string };
 
-// Activation: admin scans a physical card, enters the NFC serial, the row
-// is created locally with `account = null` (CitizenPay will populate that
-// when we wire the registration call). Card.status stays INACTIVE until
-// CP confirms the terminal can charge; the member's status flips to ACTIVE
-// since they're a fully-onboarded recipient regardless of terminal state.
+// Activation: admin picks an existing unattached card (imported from
+// CitizenPay via the sync flow) and links it to the member. We don't
+// re-register with CP — the card is already known there. Card.status is
+// whatever CP last reported; we leave it alone. The member flips to
+// ACTIVE since they're a fully-onboarded recipient regardless of
+// terminal state.
 
 export async function activateMemberAction(input: {
   memberId: string;
-  cardSerial: string;
+  cardId: string;
   note?: string;
 }): Promise<ActivateMemberResult> {
   const t = await getTranslations();
   const { fund } = await requireFundRole("ADMIN");
 
-  const cardSerial = input.cardSerial.trim();
-  if (!cardSerial) {
-    return { error: t("members.admin.errors.serialRequired" as never) };
+  if (!input.cardId) {
+    return { error: t("members.admin.errors.cardRequired" as never) };
   }
 
   const member = await prisma.member.findFirst({
@@ -57,14 +57,17 @@ export async function activateMemberAction(input: {
     return { error: t("members.admin.errors.alreadyHasPrimaryCard" as never) };
   }
 
-  // Check serial isn't already used (globally — NFC UUIDs are universally
-  // unique, our constraint is too).
-  const existing = await prisma.card.findUnique({
-    where: { serialNumber: cardSerial },
-    select: { id: true },
+  // Pick must be a fund-scoped, unattached card. Anything else (foreign
+  // fund, already-linked) means the operator's picker is stale.
+  const card = await prisma.card.findFirst({
+    where: { id: input.cardId, fundId: fund.id },
+    select: { id: true, serialNumber: true, account: true, memberId: true },
   });
-  if (existing) {
-    return { error: t("members.admin.errors.serialTaken" as never) };
+  if (!card) {
+    return { error: t("members.admin.errors.cardNotFound" as never) };
+  }
+  if (card.memberId) {
+    return { error: t("members.admin.errors.cardTaken" as never) };
   }
 
   // Look up an existing PENDING referral where this member is the referee.
@@ -92,33 +95,18 @@ export async function activateMemberAction(input: {
     { fundName: fund.name } as never,
   );
 
-  // Pre-register the card with CitizenPay so we can store the on-chain
-  // account on the new row. If CP is unreachable / the call fails, we still
-  // create the local row with account=null — a future sync job retries.
-  const cp = getCitizenPayClient();
-  let cpAccount: string | null = null;
-  try {
-    const registered = await cp.registerCard({
-      serialNumber: cardSerial,
-      fundId: fund.id,
-      fundCitizenPayId: fund.citizenPayFundId,
-      holderName: `${member.firstName} ${member.lastName}`.trim(),
-    });
-    cpAccount = registered.account;
-  } catch (e) {
-    console.error("[citizenpay] registerCard failed during activation", e);
-  }
+  const cp = getCitizenPayClient(fund);
+  const holderName = `${member.firstName} ${member.lastName}`.trim();
 
   const tx = await prisma.$transaction(async (tx) => {
-    // 1. Create the card.
-    const card = await tx.card.create({
+    // 1. Bind the existing card to the member. We don't change `status`
+    //    or `account` — those mirror CitizenPay state and were populated
+    //    during the import sync.
+    await tx.card.update({
+      where: { id: card.id },
       data: {
         memberId: member.id,
-        serialNumber: cardSerial,
-        account: cpAccount,
-        holderName: `${member.firstName} ${member.lastName}`.trim(),
-        status: "INACTIVE", // CP confirms terminal-active separately
-        issuedAt: new Date(),
+        holderName,
       },
     });
 
@@ -170,7 +158,11 @@ export async function activateMemberAction(input: {
       referralOpId = op.id;
     }
 
-    return { emailId: emailRow.id, cardSerial, referralOpId };
+    return {
+      emailId: emailRow.id,
+      cardSerial: card.serialNumber,
+      referralOpId,
+    };
   });
 
   // Submit the referral mint to CitizenPay outside the transaction. On
@@ -264,7 +256,7 @@ export async function addCardAction(input: {
   // Register with CitizenPay first to claim the wallet address. Same
   // fail-soft behaviour as activation — local row is still created if CP
   // is unreachable.
-  const cp = getCitizenPayClient();
+  const cp = getCitizenPayClient(fund);
   let cpAccount: string | null = null;
   try {
     const registered = await cp.registerCard({
@@ -280,6 +272,7 @@ export async function addCardAction(input: {
 
   await prisma.card.create({
     data: {
+      fundId: fund.id,
       memberId: member.id,
       serialNumber: cardSerial,
       account: cpAccount,

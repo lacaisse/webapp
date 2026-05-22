@@ -2,11 +2,16 @@
   "common": {
     "or": "or",
     "cancel": "Cancel",
+    "close": "Close",
     "delete": "Delete",
     "back": "Back",
     "backToHome": "Back to home",
     "goHome": "Go home",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "copy": {
+      "label": "Copy to clipboard",
+      "copied": "Copied"
+    }
   },
   "locale": {
     "label": "Language",
@@ -113,6 +118,7 @@
       "members": "Members",
       "cards": "Cards",
       "allocations": "Allocations",
+      "token": "Token",
       "merchants": "Merchants",
       "payments": "Payments",
       "referrals": "Referrals",
@@ -262,13 +268,54 @@
         "holder": "Holder",
         "member": "Member",
         "status": "Status",
+        "balance": "Balance",
         "issued": "Issued"
       },
       "primary": "Primary card",
       "badges": {
         "lost": "Lost"
       },
-      "empty": "No cards to show."
+      "empty": "No cards to show.",
+      "prev": "Previous",
+      "next": "Next",
+      "searchPlaceholder": "Search by serial…",
+      "detail": {
+        "back": "All cards",
+        "balance": {
+          "title": "Balance",
+          "description": "Live on-chain token balance held by this card's wallet.",
+          "unavailable": "Balance unavailable — the card has no wallet yet, or the fund's token isn't connected."
+        },
+        "info": {
+          "title": "Card information",
+          "description": "Serial, wallet, and lifecycle events.",
+          "serial": "Serial",
+          "holder": "Holder",
+          "member": "Member",
+          "account": "Wallet",
+          "issued": "Issued",
+          "blocked": "Blocked",
+          "reportedLost": "Reported lost",
+          "lastTransaction": "Last transaction"
+        },
+        "transfers": {
+          "title": "Transfers",
+          "unavailable": "Transfers unavailable — the card has no wallet yet, or the fund's token isn't connected.",
+          "date": "When",
+          "from": "From",
+          "to": "To",
+          "amount": "Amount",
+          "empty": "No transfers for this card yet.",
+          "issued": "Issued",
+          "retired": "Retired",
+          "treasury": "Treasury",
+          "unknown": "External wallet",
+          "self": "This card",
+          "newer": "Newer",
+          "older": "Older",
+          "error": "Couldn't load on-chain transfers."
+        }
+      }
     },
     "allocations": {
       "title": "Allocations",
@@ -373,6 +420,73 @@
         }
       }
     },
+    "token": {
+      "title": "Token explorer",
+      "description": "On-chain activity for your community currency.",
+      "notConnected": "Connect this fund to a Citizen Pay treasury (in Settings → Citizen Pay) to see token activity here.",
+      "supply": "Supply:",
+      "manual": {
+        "success": "Transaction confirmed on-chain.",
+        "mint": {
+          "trigger": "Mint",
+          "title": "Mint tokens",
+          "description": "Send freshly-minted tokens to a card, place, or wallet address.",
+          "toLabel": "Recipient",
+          "amountLabel": "Amount",
+          "submit": "Mint"
+        },
+        "burn": {
+          "trigger": "Burn",
+          "title": "Burn tokens",
+          "description": "Remove tokens from circulation by burning from a card, place, or wallet address.",
+          "warning": "Burning is irreversible. The wallet must hold at least the amount you're burning.",
+          "fromLabel": "From",
+          "amountLabel": "Amount",
+          "submit": "Burn"
+        },
+        "picker": {
+          "placeholder": "Search by name, serial, or paste 0x address…",
+          "searchHint": "Type at least 2 characters to search cards and places, or paste a wallet address.",
+          "emptyHint": "No matching card or place. Paste a 0x address to send to an external wallet.",
+          "searching": "Searching…",
+          "external": "External wallet",
+          "externalWarning": "This address is not a known card or place. Double-check before submitting.",
+          "card": "Card",
+          "place": "Place",
+          "clear": "Clear selection"
+        }
+      },
+      "tabs": {
+        "transfers": "Transfers",
+        "holders": "Wallets"
+      },
+      "transfers": {
+        "date": "When",
+        "from": "From",
+        "to": "To",
+        "amount": "Amount",
+        "empty": "No transfers yet.",
+        "issued": "Issued",
+        "retired": "Retired",
+        "treasury": "Treasury",
+        "unknown": "External wallet",
+        "newer": "Newer",
+        "older": "Older",
+        "error": "Couldn't load on-chain transfers."
+      },
+      "holders": {
+        "holder": "Wallet",
+        "balance": "Balance",
+        "empty": "No wallets hold this token yet.",
+        "issued": "Burned",
+        "retired": "Burned",
+        "treasury": "Treasury",
+        "unknown": "External wallet",
+        "prev": "Previous",
+        "next": "Next",
+        "error": "Couldn't load wallet balances."
+      }
+    },
     "merchants": {
       "title": "Merchants",
       "description": "Onboard merchants and track their Citizen Pay connection.",
@@ -396,6 +510,7 @@
         "citizenpay": "Citizen Pay",
         "terminal": "Terminal",
         "tokensReceived": "Tokens received",
+        "balance": "Balance",
         "joined": "Joined"
       },
       "empty": "No merchants to show.",
@@ -584,11 +699,25 @@
       },
       "token": {
         "title": "Token",
-        "description": "Naming for your fund's token.",
-        "name": "Token name",
-        "nameHint": "Displayed in the UI when referring to the token.",
-        "symbol": "Symbol",
-        "symbolHint": "Short code displayed next to amounts."
+        "description": "On-chain token issued by your Citizen Pay treasury.",
+        "addressLabel": "Contract address",
+        "chainLabel": "Chain",
+        "decimalsLabel": "Decimals",
+        "readOnlyHint": "Token info is provided by Citizen Pay and refreshes whenever you re-issue the API key.",
+        "notConnected": "Connect this fund to a Citizen Pay treasury (in the Citizen Pay tab) to see its token here.",
+        "notSyncedYet": "Token info hasn't synced from Citizen Pay yet. Re-issue the API key from the Citizen Pay tab to refresh.",
+        "minter": {
+          "title": "Minter wallet",
+          "description": "Per-fund signing identity used to authorise mint and burn operations on-chain.",
+          "eoaLabel": "Signing address",
+          "smartAccountLabel": "Smart account",
+          "smartAccountPending": "Pending — provisioned when this fund connects to a Citizen Pay treasury.",
+          "notProvisioned": "Not provisioned yet.",
+          "permissionLabel": "Mint permission",
+          "permissionGranted": "Active",
+          "permissionMissing": "Missing",
+          "permissionUnknown": "Unknown"
+        }
       },
       "onboarding": {
         "title": "Onboarding",
@@ -671,7 +800,29 @@
         "title": "Citizen Pay",
         "description": "Connect this fund to its Citizen Pay account.",
         "account": "Citizen Pay fund ID",
-        "accountHint": "Your fund's identifier on Citizen Pay. Leave blank to disconnect."
+        "accountHint": "Your fund's identifier on Citizen Pay. Leave blank to disconnect.",
+        "connect": {
+          "issueKey": "Issue API key via Citizen Pay",
+          "rotateKey": "Rotate API key",
+          "apiKeyIdLabel": "API key ID",
+          "apiKeyUpdatedAtLabel": "Last updated",
+          "status": {
+            "connected": "Connected",
+            "noKeyYet": "Treasury saved. Issue the API key to finish connecting."
+          },
+          "rotateConfirm": {
+            "title": "Rotate the Citizen Pay API key?",
+            "description": "You'll be redirected to Citizen Pay to mint a new API key for this fund's treasury. The previous key stops working immediately once the new one is issued.",
+            "cancel": "Cancel",
+            "confirm": "Continue"
+          },
+          "flash": {
+            "ok": "Citizen Pay connection updated.",
+            "notConfigured": "Citizen Pay isn't configured on this deployment yet — ask the platform admin to set CITIZENPAY_API_BASE_URL.",
+            "notConnected": "Set the Citizen Pay treasury ID above before issuing a key.",
+            "failed": "Citizen Pay connection failed. Please try again."
+          }
+        }
       }
     }
   },
@@ -697,8 +848,11 @@
   },
   "tokenOps": {
     "errors": {
-      "amountInvalid": "Amount must be a number with up to 2 decimal places.",
+      "amountInvalid": "Amount must be a positive number.",
       "amountPositive": "Amount must be greater than zero.",
+      "addressInvalid": "Address must be a 0x-prefixed 40-character hex string.",
+      "tokenNotConfigured": "This fund has no token configured yet — connect to Citizen Pay first.",
+      "submitFailed": "On-chain submission failed. Check the operation log for details.",
       "memberNotFound": "Member not found in this fund.",
       "memberNotActive": "Manual mints are only allowed for active members.",
       "noPrimaryAccount": "This member's primary card hasn't been registered with Citizen Pay yet."
@@ -771,15 +925,20 @@
         "title": "Activate member",
         "description": "Issue a card to {memberName}. Their account becomes active immediately.",
         "unverifiedWarning": "This member hasn't verified their email yet. The activation email might bounce.",
-        "serialLabel": "Card serial number",
-        "serialPlaceholder": "e.g. 040039AA1D1291",
-        "serialHint": "Scan or type the NFC UUID printed on the physical card.",
+        "cardLabel": "Card",
+        "cardPlaceholder": "Search a card by serial number…",
+        "cardHint": "Pick a card already imported from CitizenPay. If you don't see it, sync the cards list first.",
+        "cardSearching": "Searching…",
+        "cardEmpty": "No unattached cards match this serial.",
+        "cardEmptyInitial": "No unattached cards available. Sync from the cards page.",
+        "cardNoAccount": "No on-chain account yet",
+        "cardClear": "Clear card",
+        "cardRequired": "Pick a card to activate.",
         "noteLabel": "Note (optional, internal)",
         "notePlaceholder": "Anything to record about this activation.",
         "cancel": "Cancel",
         "confirm": "Activate and issue card",
-        "activating": "Activating…",
-        "serialRequired": "Card serial number is required."
+        "activating": "Activating…"
       },
       "invite": {
         "title": "Invite a member",
@@ -842,6 +1001,9 @@
         "noPrimaryCard": "Activate the member first — they need a primary card before additional ones can be linked.",
         "serialRequired": "Card serial number is required.",
         "serialTaken": "This card is already registered to another member.",
+        "cardRequired": "Pick a card to activate.",
+        "cardNotFound": "That card is no longer available.",
+        "cardTaken": "That card was just linked to another member.",
         "tierNotFound": "Tier not found or archived.",
         "invalidStatusTransition": "That status change isn't allowed from the current state."
       },
@@ -862,7 +1024,109 @@
       }
     }
   },
+  "cards": {
+    "admin": {
+      "block": {
+        "button": "Block",
+        "title": "Block this card?",
+        "description": "{holderLabel} will no longer be able to use this card. You can unblock it later.",
+        "lostLabel": "The member reported the card as lost",
+        "lostDescription": "Records an internal flag in addition to the block. Useful for tracking lost cards.",
+        "cancel": "Cancel",
+        "confirm": "Block card",
+        "blocking": "Blocking…"
+      },
+      "unblock": {
+        "button": "Unblock",
+        "title": "Unblock this card?",
+        "description": "{holderLabel} will be able to use this card again.",
+        "clearLostLabel": "Clear the lost flag",
+        "clearLostDescription": "The member found the card. Uncheck to keep the lost flag in the audit log.",
+        "cancel": "Cancel",
+        "confirm": "Unblock card",
+        "unblocking": "Unblocking…"
+      },
+      "topUp": {
+        "button": "Top up",
+        "title": "Top up card",
+        "description": "Mint tokens to {holderLabel}'s card.",
+        "amountLabel": "Amount",
+        "confirm": "Top up",
+        "submitting": "Topping up…",
+        "success": "Top-up confirmed on-chain."
+      },
+      "withdraw": {
+        "button": "Withdraw",
+        "title": "Withdraw from card",
+        "description": "Burn tokens from {holderLabel}'s card.",
+        "amountLabel": "Amount",
+        "confirm": "Withdraw",
+        "submitting": "Withdrawing…",
+        "success": "Withdrawal confirmed on-chain."
+      },
+      "errors": {
+        "notFound": "Card not found.",
+        "alreadyBlocked": "This card is already blocked.",
+        "alreadyActive": "This card is already active.",
+        "noAccount": "This card has no on-chain account yet — it isn't fully registered with Citizen Pay.",
+        "amountInvalid": "Amount must be a number with up to 2 decimal places.",
+        "amountPositive": "Amount must be greater than zero.",
+        "tokenNotConfigured": "This fund has no token configured yet — connect to Citizen Pay first.",
+        "submitFailed": "On-chain submission failed. Check the token operations log for details."
+      },
+      "sync": {
+        "trigger": "Sync with Citizen Pay",
+        "title": "Sync with Citizen Pay",
+        "description": "Pull Citizen-Pay-only cards into local, reconcile status, then push local-only cards to Citizen Pay.",
+        "loadingPreview": "Checking what needs to change…",
+        "running": "Syncing…",
+        "summary": {
+          "push": "{count, plural, one {Push # card to Citizen Pay} other {Push # cards to Citizen Pay}}",
+          "import": "{count, plural, one {Import # card from Citizen Pay} other {Import # cards from Citizen Pay}}",
+          "statusUpdate": "{count, plural, one {Update # card status on Citizen Pay} other {Update # card statuses on Citizen Pay}}"
+        },
+        "nothingToSync": "Everything is already in sync.",
+        "confirm": "Sync now",
+        "steps": {
+          "import": "Importing from Citizen Pay",
+          "status": "Reconciling status",
+          "push": "Pushing new cards to Citizen Pay"
+        },
+        "errorsInStep": "{count, plural, one {# item failed} other {# items failed}}",
+        "errors": {
+          "previewFailed": "Couldn't reach Citizen Pay. Check your treasury connection and try again."
+        }
+      }
+    }
+  },
   "merchants": {
+    "inviteConfirmed": {
+      "ok": {
+        "title": "You're connected",
+        "description": "Your business now accepts {fundName}. You can close this tab.",
+        "nextSteps": "Future updates to your business profile happen on Citizen Pay — they'll show up here automatically."
+      },
+      "rejected": {
+        "title": "Invitation declined",
+        "description": "You declined the invitation from {fundName}.",
+        "nextSteps": "If this was a mistake, ask {fundName} to send a new invite."
+      },
+      "expired": {
+        "title": "Invitation expired",
+        "description": "This invitation to connect with {fundName} has expired.",
+        "nextSteps": "Ask {fundName} to send a new invite."
+      },
+      "pending": {
+        "title": "Almost there",
+        "description": "Citizen Pay hasn't finished processing your acceptance for {fundName} yet.",
+        "nextSteps": "Refresh this page in a moment. If the message persists, contact {fundName}."
+      },
+      "error": {
+        "title": "Something went wrong",
+        "description": "We couldn't confirm the connection to {fundName}.",
+        "nextSteps": "Try the link in your email again. If the problem persists, contact {fundName}."
+      }
+    },
     "signup": {
       "title": "Join {fundName} as a merchant",
       "description": "Tell us about your business. An admin will review and reach out.",
@@ -957,6 +1221,103 @@
         "alreadyRejected": "This merchant is already rejected.",
         "notRejected": "Only rejected merchants can be reconsidered.",
         "reasonRequired": "A reason is required."
+      },
+      "sync": {
+        "trigger": "Sync with Citizen Pay",
+        "title": "Reconcile merchants with Citizen Pay",
+        "description": "Link Citizen Pay places to local merchants where names match, create new merchants for the rest, and clear stale links.",
+        "loadingPreview": "Fetching places from Citizen Pay…",
+        "nothingToSync": "Everything's in sync — {count, plural, =0 {no merchants connected} one {1 merchant connected} other {# merchants connected}}.",
+        "confirm": "Confirm",
+        "running": "Syncing…",
+        "errorsInStep": "{count, plural, one {# item failed} other {# items failed}}",
+        "summary": {
+          "connected": "{count, plural, =0 {No merchants currently connected} one {1 merchant currently connected} other {# merchants currently connected}}."
+        },
+        "sections": {
+          "link": "Will link to existing ({count})",
+          "linkHelp": "Citizen Pay places that match an unconnected local merchant by exact name. Linking keeps the existing row and writes the Citizen Pay identifiers onto it.",
+          "linkRowSubtitle": "→ {merchant}",
+          "create": "Will create new ({count})",
+          "createHelp": "Citizen Pay places with no matching local merchant. A new row will be created from the Citizen Pay profile.",
+          "unlink": "Will clear stale links ({count})",
+          "unlinkHelp": "Local merchants pointing at a place Citizen Pay no longer reports. The merchant row stays — it just appears as not connected."
+        },
+        "steps": {
+          "link": "Linking places",
+          "create": "Creating merchants",
+          "unlink": "Clearing stale links"
+        },
+        "errors": {
+          "previewFailed": "Couldn't reach Citizen Pay to compute the sync plan."
+        }
+      },
+      "invite": {
+        "trigger": "Invite to Citizen Pay",
+        "triggerPending": "Re-invite",
+        "title": "Invite to Citizen Pay",
+        "description": "Citizen Pay will email {merchantName} a link. They sign in, pick a business, and the connection lands back here.",
+        "emailLabel": "Email",
+        "emailPlaceholder": "owner@example.com",
+        "reissueNote": "An invite is already pending for this merchant. Sending a new one will invalidate the previous link.",
+        "cancel": "Cancel",
+        "confirm": "Send invite",
+        "confirmReissue": "Send new invite",
+        "sending": "Sending…",
+        "sentOk": "Invite sent. Citizen Pay will redirect the merchant back here once they accept.",
+        "sentFallback": "Invite minted, but Citizen Pay couldn't send the email — share the link below directly.",
+        "urlLabel": "Invite link",
+        "copy": "Copy link",
+        "done": "Done",
+        "errors": {
+          "alreadyConnected": "This merchant is already connected to a Citizen Pay business.",
+          "mintFailed": "Couldn't reach Citizen Pay to mint the invite."
+        }
+      },
+      "archive": {
+        "trigger": "Archive",
+        "title": "Archive merchant?",
+        "description": "{merchantName} will be hidden from the active directory. You can restore them from the Archived tab.",
+        "cancel": "Cancel",
+        "confirm": "Archive",
+        "archiving": "Archiving…",
+        "restore": "Restore",
+        "restoring": "Restoring…",
+        "errors": {
+          "stillConnected": "Disconnect from Citizen Pay before archiving.",
+          "alreadyArchived": "This merchant is already archived.",
+          "notActive": "Only active merchants can be archived.",
+          "notArchived": "Only archived merchants can be restored."
+        }
+      },
+      "delete": {
+        "trigger": "Delete",
+        "title": "Delete {merchantName} permanently?",
+        "description": "The merchant row will be removed from this fund. Past bank transactions and email records stay in the ledger, but their link back to this merchant is lost.",
+        "irreversibleWarning": "This cannot be undone. If you might want to bring this merchant back later, leave them archived instead.",
+        "cancel": "Cancel",
+        "confirm": "Delete permanently",
+        "deleting": "Deleting…",
+        "errors": {
+          "notArchived": "Archive the merchant first — only archived merchants can be deleted.",
+          "stillConnected": "Disconnect from Citizen Pay before deleting."
+        }
+      },
+      "disconnect": {
+        "trigger": "Disconnect",
+        "title": "Disconnect from Citizen Pay?",
+        "description": "{merchantName} is part of a Citizen Pay business. Disconnecting removes this fund's token from every place under the business.",
+        "loading": "Looking up affected places…",
+        "affectedHeading": "{count, plural, one {# place will be disconnected} other {# places will be disconnected}}:",
+        "balanceBlock": "One or more places still hold a balance. Pay them out (or wait for the next sync if Citizen Pay hasn't reported a balance yet) before disconnecting.",
+        "cancel": "Cancel",
+        "confirm": "Disconnect",
+        "disconnecting": "Disconnecting…",
+        "errors": {
+          "notConnected": "This merchant isn't connected to a Citizen Pay business.",
+          "balanceNotZero": "Disconnect blocked — at least one place still has a balance. Pay it out and try again.",
+          "failed": "Couldn't reach Citizen Pay to disconnect."
+        }
       }
     }
   },
