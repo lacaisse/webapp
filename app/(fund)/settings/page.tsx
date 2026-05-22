@@ -16,13 +16,14 @@ import {
   type FieldRow,
 } from "./onboarding-fields";
 import { OnboardingSettings } from "./onboarding-settings";
+import { CitizenPayConnect } from "./citizenpay-connect";
+import { TokenInfo } from "./token-info";
 import {
   BrandingForm,
   CitizenPayForm,
   GeneralForm,
   LegalForm,
   SignupRedirectsForm,
-  TokenForm,
 } from "./settings-forms";
 
 const TABS = [
@@ -37,7 +38,7 @@ const TABS = [
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; connect?: string }>;
 }) {
   const t = await getTranslations("fund.settings");
   const fund = await requireCurrentFund();
@@ -52,8 +53,6 @@ export default async function SettingsPage({
     allocationMode: fund.allocationMode,
     logoUrl: fund.logoUrl,
     primaryColor: fund.primaryColor,
-    tokenName: fund.tokenName,
-    tokenSymbol: fund.tokenSymbol,
     termsUrl: fund.termsUrl,
     privacyUrl: fund.privacyUrl,
     citizenPayFundId: fund.citizenPayFundId,
@@ -108,7 +107,23 @@ export default async function SettingsPage({
             <CardDescription>{t("token.description")}</CardDescription>
           </CardHeader>
           <CardContent className="pb-4">
-            <TokenForm fund={fundForForms} />
+            <TokenInfo
+              token={{
+                address: fund.tokenAddress,
+                chainId: fund.tokenChainId,
+                decimals: fund.tokenDecimals,
+                name: fund.tokenName,
+                symbol: fund.tokenSymbol,
+                logoUrl: fund.tokenLogoUrl,
+              }}
+              minter={{
+                eoaAddress: fund.tokenMinterEoaAddress,
+                smartAccountAddress: fund.tokenMinterSmartAccountAddress,
+              }}
+              connected={Boolean(
+                fund.citizenPayFundId && fund.citizenPayApiKeyId,
+              )}
+            />
           </CardContent>
         </Card>
       )}
@@ -142,8 +157,17 @@ export default async function SettingsPage({
             <CardTitle>{t("citizenpay.title")}</CardTitle>
             <CardDescription>{t("citizenpay.description")}</CardDescription>
           </CardHeader>
-          <CardContent className="pb-4">
+          <CardContent className="space-y-6 pb-4">
             <CitizenPayForm fund={fundForForms} />
+            <CitizenPayConnect
+              status={{
+                treasuryId: fund.citizenPayFundId,
+                apiKeyId: fund.citizenPayApiKeyId,
+                apiKeyUpdatedAt:
+                  fund.citizenPayApiKeyUpdatedAt?.toISOString() ?? null,
+                flash: sp.connect ?? null,
+              }}
+            />
           </CardContent>
         </Card>
       )}

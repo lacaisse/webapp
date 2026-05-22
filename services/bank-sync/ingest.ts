@@ -31,6 +31,8 @@ type IngestStats = {
 type IngestionFund = {
   id: string;
   citizenPayFundId: string;
+  citizenPayApiKeyId: string | null;
+  citizenPayApiKeyEnc: string | null;
   citizenPayLastSyncedAt: Date | null;
   allocationMode: "FIXED_PERIOD" | "PAY_AND_GO";
   name: string;
@@ -41,7 +43,7 @@ type IngestionFund = {
 export async function syncFundBankTransactions(
   fund: IngestionFund,
 ): Promise<IngestStats> {
-  const cp = getCitizenPayClient();
+  const cp = getCitizenPayClient(fund);
   const stats: IngestStats = { ingested: 0, matched: 0, minted: 0, skipped: 0 };
 
   const result = await cp.listBankTransactions({
@@ -356,7 +358,7 @@ async function tryMintForPayAndGo(args: {
   });
 
   try {
-    const cp = getCitizenPayClient();
+    const cp = getCitizenPayClient(args.fund);
     const submitted = await cp.submitMint({
       fundCitizenPayId: args.fund.citizenPayFundId,
       toAccount: args.account,

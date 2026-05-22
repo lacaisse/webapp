@@ -59,8 +59,6 @@ export default async function ReferralsPage() {
               allocationMode: fund.allocationMode,
               logoUrl: fund.logoUrl,
               primaryColor: fund.primaryColor,
-              tokenName: fund.tokenName,
-              tokenSymbol: fund.tokenSymbol,
               termsUrl: fund.termsUrl,
               privacyUrl: fund.privacyUrl,
               citizenPayFundId: fund.citizenPayFundId,

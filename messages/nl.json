@@ -2,11 +2,16 @@
   "common": {
     "or": "of",
     "cancel": "Annuleren",
+    "close": "Sluiten",
     "delete": "Verwijderen",
     "back": "Terug",
     "backToHome": "Terug naar home",
     "goHome": "Naar home",
-    "signOut": "Uitloggen"
+    "signOut": "Uitloggen",
+    "copy": {
+      "label": "Naar klembord kopiëren",
+      "copied": "Gekopieerd"
+    }
   },
   "locale": {
     "label": "Taal",
@@ -113,6 +118,7 @@
       "members": "Leden",
       "cards": "Kaarten",
       "allocations": "Allocaties",
+      "token": "Token",
       "merchants": "Handelaars",
       "payments": "Betalingen",
       "referrals": "Doorverwijzingen",
@@ -191,13 +197,54 @@
         "holder": "Houder",
         "member": "Lid",
         "status": "Status",
+        "balance": "Saldo",
         "issued": "Uitgegeven"
       },
       "primary": "Primaire kaart",
       "badges": {
         "lost": "Verloren"
       },
-      "empty": "Geen kaarten om te tonen."
+      "empty": "Geen kaarten om te tonen.",
+      "prev": "Vorige",
+      "next": "Volgende",
+      "searchPlaceholder": "Zoek op serienummer…",
+      "detail": {
+        "back": "Alle kaarten",
+        "balance": {
+          "title": "Saldo",
+          "description": "Live on-chain tokensaldo van de wallet van deze kaart.",
+          "unavailable": "Saldo niet beschikbaar — de kaart heeft nog geen wallet, of het token van het fonds is niet verbonden."
+        },
+        "info": {
+          "title": "Kaartinformatie",
+          "description": "Serienummer, wallet en levensloopgebeurtenissen.",
+          "serial": "Serienummer",
+          "holder": "Houder",
+          "member": "Lid",
+          "account": "Wallet",
+          "issued": "Uitgegeven",
+          "blocked": "Geblokkeerd",
+          "reportedLost": "Verloren gemeld",
+          "lastTransaction": "Laatste transactie"
+        },
+        "transfers": {
+          "title": "Transfers",
+          "unavailable": "Transfers niet beschikbaar — de kaart heeft nog geen wallet, of het token van het fonds is niet verbonden.",
+          "date": "Wanneer",
+          "from": "Van",
+          "to": "Naar",
+          "amount": "Bedrag",
+          "empty": "Nog geen transfers voor deze kaart.",
+          "issued": "Uitgegeven",
+          "retired": "Ingetrokken",
+          "treasury": "Treasury",
+          "unknown": "Externe wallet",
+          "self": "Deze kaart",
+          "newer": "Nieuwer",
+          "older": "Ouder",
+          "error": "Kon on-chain transfers niet laden."
+        }
+      }
     },
     "allocations": {
       "title": "Allocaties",
@@ -265,6 +312,73 @@
         "empty": "Nog geen periodes."
       }
     },
+    "token": {
+      "title": "Token-verkenner",
+      "description": "On-chain activiteit van uw gemeenschapsmunt.",
+      "notConnected": "Verbind dit fonds met een Citizen Pay-treasury (Instellingen → Citizen Pay) om token-activiteit hier te zien.",
+      "supply": "In omloop:",
+      "manual": {
+        "success": "Transactie on-chain bevestigd.",
+        "mint": {
+          "trigger": "Uitgeven",
+          "title": "Tokens uitgeven",
+          "description": "Verstuur vers gemunte tokens naar een kaart, plaats of wallet-adres.",
+          "toLabel": "Ontvanger",
+          "amountLabel": "Bedrag",
+          "submit": "Uitgeven"
+        },
+        "burn": {
+          "trigger": "Verbranden",
+          "title": "Tokens verbranden",
+          "description": "Haal tokens uit circulatie door ze te verbranden vanuit een kaart, plaats of wallet-adres.",
+          "warning": "Verbranden is onomkeerbaar. De wallet moet minstens het op te branden bedrag bevatten.",
+          "fromLabel": "Bron",
+          "amountLabel": "Bedrag",
+          "submit": "Verbranden"
+        },
+        "picker": {
+          "placeholder": "Zoek op naam, serienummer of plak een 0x-adres…",
+          "searchHint": "Tik minstens 2 tekens om in kaarten en plaatsen te zoeken, of plak een wallet-adres.",
+          "emptyHint": "Geen overeenkomende kaart of plaats. Plak een 0x-adres om naar een externe wallet te versturen.",
+          "searching": "Zoeken…",
+          "external": "Externe wallet",
+          "externalWarning": "Dit adres is geen gekende kaart of plaats. Controleer voor verzending.",
+          "card": "Kaart",
+          "place": "Plaats",
+          "clear": "Selectie wissen"
+        }
+      },
+      "tabs": {
+        "transfers": "Overdrachten",
+        "holders": "Portemonnees"
+      },
+      "transfers": {
+        "date": "Wanneer",
+        "from": "Van",
+        "to": "Naar",
+        "amount": "Bedrag",
+        "empty": "Nog geen overdrachten.",
+        "issued": "Uitgegeven",
+        "retired": "Ingenomen",
+        "treasury": "Treasury",
+        "unknown": "Externe portemonnee",
+        "newer": "Nieuwer",
+        "older": "Ouder",
+        "error": "Kan on-chain overdrachten niet laden."
+      },
+      "holders": {
+        "holder": "Portemonnee",
+        "balance": "Saldo",
+        "empty": "Nog geen portemonnees houden deze token vast.",
+        "issued": "Verbrand",
+        "retired": "Verbrand",
+        "treasury": "Treasury",
+        "unknown": "Externe portemonnee",
+        "prev": "Vorige",
+        "next": "Volgende",
+        "error": "Kan portemonneesaldo's niet laden."
+      }
+    },
     "merchants": {
       "title": "Handelaars",
       "description": "Onboard handelaars en volg hun Citizen Pay-verbinding op.",
@@ -288,6 +402,7 @@
         "citizenpay": "Citizen Pay",
         "terminal": "Terminal",
         "tokensReceived": "Ontvangen tokens",
+        "balance": "Saldo",
         "joined": "Aangesloten op"
       },
       "empty": "Geen handelaars om te tonen."
@@ -429,11 +544,25 @@
       },
       "token": {
         "title": "Token",
-        "description": "Naamgeving van de token van het fonds.",
-        "name": "Tokennaam",
-        "nameHint": "Getoond in de UI.",
-        "symbol": "Symbool",
-        "symbolHint": "Korte code naast bedragen."
+        "description": "On-chain token uitgegeven door uw Citizen Pay-treasury.",
+        "addressLabel": "Contractadres",
+        "chainLabel": "Chain",
+        "decimalsLabel": "Decimalen",
+        "readOnlyHint": "Tokeninfo wordt geleverd door Citizen Pay en vernieuwt telkens wanneer u de API-sleutel opnieuw uitgeeft.",
+        "notConnected": "Verbind dit fonds met een Citizen Pay-treasury (tabblad Citizen Pay) om hier de token te zien.",
+        "notSyncedYet": "Tokeninfo is nog niet gesynchroniseerd vanuit Citizen Pay. Geef de API-sleutel opnieuw uit vanuit het tabblad Citizen Pay om te vernieuwen.",
+        "minter": {
+          "title": "Minter-wallet",
+          "description": "Fondsspecifieke ondertekenidentiteit waarmee mint- en burn-operaties on-chain worden geautoriseerd.",
+          "eoaLabel": "Ondertekenadres",
+          "smartAccountLabel": "Smart account",
+          "smartAccountPending": "In afwachting — wordt voorzien zodra dit fonds verbindt met een Citizen Pay-treasury.",
+          "notProvisioned": "Nog niet voorzien.",
+          "permissionLabel": "Mintrecht",
+          "permissionGranted": "Actief",
+          "permissionMissing": "Ontbreekt",
+          "permissionUnknown": "Onbekend"
+        }
       },
       "onboarding": {
         "title": "Onboarding",
@@ -459,7 +588,29 @@
         "title": "Citizen Pay",
         "description": "Koppel dit fonds aan zijn Citizen Pay-account.",
         "account": "Citizen Pay fonds-ID",
-        "accountHint": "Identificatie van uw fonds bij Citizen Pay. Leeg laten om te ontkoppelen."
+        "accountHint": "Identificatie van uw fonds bij Citizen Pay. Leeg laten om te ontkoppelen.",
+        "connect": {
+          "issueKey": "API-sleutel uitgeven via Citizen Pay",
+          "rotateKey": "API-sleutel roteren",
+          "apiKeyIdLabel": "API key ID",
+          "apiKeyUpdatedAtLabel": "Laatst bijgewerkt",
+          "status": {
+            "connected": "Verbonden",
+            "noKeyYet": "Treasury opgeslagen. Geef de API-sleutel uit om de verbinding te voltooien."
+          },
+          "rotateConfirm": {
+            "title": "Citizen Pay API-sleutel roteren?",
+            "description": "U wordt doorgestuurd naar Citizen Pay om een nieuwe API-sleutel aan te maken voor de treasury van dit fonds. De vorige sleutel werkt onmiddellijk niet meer.",
+            "cancel": "Annuleren",
+            "confirm": "Doorgaan"
+          },
+          "flash": {
+            "ok": "Citizen Pay-verbinding bijgewerkt.",
+            "notConfigured": "Citizen Pay is nog niet geconfigureerd op deze omgeving — vraag de platformbeheerder om CITIZENPAY_API_BASE_URL in te stellen.",
+            "notConnected": "Stel hierboven eerst de Citizen Pay treasury-id in voordat u een sleutel uitgeeft.",
+            "failed": "Verbinding met Citizen Pay is mislukt. Probeer het opnieuw."
+          }
+        }
       }
     }
   },
@@ -470,6 +621,18 @@
       "orderingInvalid": "Minimum ≤ allocatie ≤ maximum.",
       "nameTaken": "Een ander niveau gebruikt deze naam al.",
       "notFound": "Niveau niet gevonden."
+    }
+  },
+  "tokenOps": {
+    "errors": {
+      "amountInvalid": "Bedrag moet een positief getal zijn.",
+      "amountPositive": "Bedrag moet groter zijn dan nul.",
+      "addressInvalid": "Adres moet een hex-string van 40 tekens zijn met 0x-prefix.",
+      "tokenNotConfigured": "Dit fonds heeft nog geen token geconfigureerd — verbind eerst met Citizen Pay.",
+      "submitFailed": "On-chain-indiening mislukt. Bekijk het operatielog voor details.",
+      "memberNotFound": "Lid niet gevonden in dit fonds.",
+      "memberNotActive": "Handmatige uitgifte is alleen toegestaan voor actieve leden.",
+      "noPrimaryAccount": "De primaire kaart van dit lid is nog niet geregistreerd bij Citizen Pay."
     }
   },
   "settings": {
@@ -537,15 +700,20 @@
         "title": "Lid activeren",
         "description": "Geef een kaart uit aan {memberName}. Hun account wordt onmiddellijk actief.",
         "unverifiedWarning": "Dit lid heeft de e-mail nog niet geverifieerd. De activatiemail kan retour komen.",
-        "serialLabel": "Serienummer van de kaart",
-        "serialPlaceholder": "bv. 040039AA1D1291",
-        "serialHint": "Scan of typ de NFC-UUID die op de fysieke kaart staat.",
+        "cardLabel": "Kaart",
+        "cardPlaceholder": "Zoek een kaart op serienummer…",
+        "cardHint": "Kies een kaart die al vanuit CitizenPay is geïmporteerd. Synchroniseer de kaartenlijst als de kaart ontbreekt.",
+        "cardSearching": "Zoeken…",
+        "cardEmpty": "Geen niet-gekoppelde kaart komt overeen met dit serienummer.",
+        "cardEmptyInitial": "Geen niet-gekoppelde kaarten beschikbaar. Synchroniseer vanaf de kaartenpagina.",
+        "cardNoAccount": "Nog geen on-chain account",
+        "cardClear": "Kaart verwijderen",
+        "cardRequired": "Kies een kaart om te activeren.",
         "noteLabel": "Notitie (optioneel, intern)",
         "notePlaceholder": "Interne notitie over deze activering.",
         "cancel": "Annuleren",
         "confirm": "Activeren en kaart uitgeven",
-        "activating": "Activeren…",
-        "serialRequired": "Serienummer van de kaart is verplicht."
+        "activating": "Activeren…"
       },
       "invite": {
         "title": "Lid uitnodigen",
@@ -595,6 +763,9 @@
         "noPrimaryCard": "Activeer eerst het lid — het heeft een primaire kaart nodig voordat er extra kaarten kunnen worden gekoppeld.",
         "serialRequired": "Serienummer van de kaart is verplicht.",
         "serialTaken": "Deze kaart is al gekoppeld aan een ander lid.",
+        "cardRequired": "Kies een kaart om te activeren.",
+        "cardNotFound": "Die kaart is niet meer beschikbaar.",
+        "cardTaken": "Die kaart is zojuist aan een ander lid gekoppeld.",
         "tierNotFound": "Niveau niet gevonden of gearchiveerd.",
         "invalidStatusTransition": "Deze statuswijziging is niet toegestaan vanuit de huidige status."
       },
@@ -637,14 +808,87 @@
         "confirm": "Kaart deblokkeren",
         "unblocking": "Deblokkeren…"
       },
+      "topUp": {
+        "button": "Opwaarderen",
+        "title": "Kaart opwaarderen",
+        "description": "Tokens uitgeven op de kaart van {holderLabel}.",
+        "amountLabel": "Bedrag",
+        "confirm": "Opwaarderen",
+        "submitting": "Opwaarderen…",
+        "success": "Opwaardering bevestigd op de blockchain."
+      },
+      "withdraw": {
+        "button": "Opnemen",
+        "title": "Van kaart opnemen",
+        "description": "Tokens van de kaart van {holderLabel} verbranden.",
+        "amountLabel": "Bedrag",
+        "confirm": "Opnemen",
+        "submitting": "Opnemen…",
+        "success": "Opname bevestigd op de blockchain."
+      },
       "errors": {
         "notFound": "Kaart niet gevonden.",
         "alreadyBlocked": "Deze kaart is al geblokkeerd.",
-        "alreadyActive": "Deze kaart is al actief."
+        "alreadyActive": "Deze kaart is al actief.",
+        "noAccount": "Deze kaart heeft nog geen on-chain adres — ze is niet volledig geregistreerd bij Citizen Pay.",
+        "amountInvalid": "Het bedrag moet een getal zijn met maximaal 2 decimalen.",
+        "amountPositive": "Het bedrag moet groter zijn dan nul.",
+        "tokenNotConfigured": "Deze caisse heeft nog geen token geconfigureerd — verbind eerst met Citizen Pay.",
+        "submitFailed": "On-chain-indiening mislukt. Bekijk het log van tokenbewerkingen voor details."
+      },
+      "sync": {
+        "trigger": "Synchroniseren met Citizen Pay",
+        "title": "Synchroniseren met Citizen Pay",
+        "description": "Importeer Citizen-Pay-only kaarten lokaal, stem statussen af en push lokale kaarten naar Citizen Pay.",
+        "loadingPreview": "Controleren wat er moet veranderen…",
+        "running": "Synchroniseren…",
+        "summary": {
+          "push": "{count, plural, one {# kaart pushen naar Citizen Pay} other {# kaarten pushen naar Citizen Pay}}",
+          "import": "{count, plural, one {# kaart importeren van Citizen Pay} other {# kaarten importeren van Citizen Pay}}",
+          "statusUpdate": "{count, plural, one {# kaartstatus bijwerken op Citizen Pay} other {# kaartstatussen bijwerken op Citizen Pay}}"
+        },
+        "nothingToSync": "Alles is al gesynchroniseerd.",
+        "confirm": "Nu synchroniseren",
+        "steps": {
+          "import": "Importeren van Citizen Pay",
+          "status": "Statussen afstemmen",
+          "push": "Nieuwe kaarten naar Citizen Pay pushen"
+        },
+        "errorsInStep": "{count, plural, one {# item mislukt} other {# items mislukt}}",
+        "errors": {
+          "previewFailed": "Kan Citizen Pay niet bereiken. Controleer de treasury-verbinding en probeer opnieuw."
+        }
       }
     }
   },
   "merchants": {
+    "inviteConfirmed": {
+      "ok": {
+        "title": "Je bent verbonden",
+        "description": "Je bedrijf accepteert nu {fundName}. Je kunt dit tabblad sluiten.",
+        "nextSteps": "Toekomstige updates van je bedrijfsprofiel gebeuren op Citizen Pay — die verschijnen hier automatisch."
+      },
+      "rejected": {
+        "title": "Uitnodiging geweigerd",
+        "description": "Je hebt de uitnodiging van {fundName} geweigerd.",
+        "nextSteps": "Was dit een vergissing? Vraag {fundName} een nieuwe uitnodiging te sturen."
+      },
+      "expired": {
+        "title": "Uitnodiging verlopen",
+        "description": "Deze uitnodiging om verbinding te maken met {fundName} is verlopen.",
+        "nextSteps": "Vraag {fundName} om een nieuwe uitnodiging te sturen."
+      },
+      "pending": {
+        "title": "Bijna klaar",
+        "description": "Citizen Pay is nog niet klaar met het verwerken van je acceptatie voor {fundName}.",
+        "nextSteps": "Vernieuw deze pagina zo. Blijft het bericht hangen, neem contact op met {fundName}."
+      },
+      "error": {
+        "title": "Er ging iets mis",
+        "description": "We konden de verbinding met {fundName} niet bevestigen.",
+        "nextSteps": "Probeer de link in je e-mail opnieuw. Blijft het probleem bestaan, neem contact op met {fundName}."
+      }
+    },
     "signup": {
       "title": "Word handelaar bij {fundName}",
       "description": "Vertel ons over uw bedrijf. Een beheerder beoordeelt uw aanvraag en neemt contact op.",
@@ -737,6 +981,103 @@
         "alreadyRejected": "Deze handelaar is al afgewezen.",
         "notRejected": "Alleen afgewezen handelaars kunnen heroverwogen worden.",
         "reasonRequired": "Een reden is verplicht."
+      },
+      "sync": {
+        "trigger": "Synchroniseren met Citizen Pay",
+        "title": "Handelaars afstemmen met Citizen Pay",
+        "description": "Koppel Citizen Pay-locaties aan lokale handelaars wanneer de namen overeenkomen, maak nieuwe handelaars aan voor de rest en wis verouderde koppelingen.",
+        "loadingPreview": "Locaties ophalen van Citizen Pay…",
+        "nothingToSync": "Alles is in sync — {count, plural, =0 {geen handelaars verbonden} one {1 handelaar verbonden} other {# handelaars verbonden}}.",
+        "confirm": "Bevestigen",
+        "running": "Synchroniseren…",
+        "errorsInStep": "{count, plural, one {# item mislukt} other {# items mislukt}}",
+        "summary": {
+          "connected": "{count, plural, =0 {Momenteel geen handelaars verbonden} one {1 handelaar momenteel verbonden} other {# handelaars momenteel verbonden}}."
+        },
+        "sections": {
+          "link": "Te koppelen aan bestaande ({count})",
+          "linkHelp": "Citizen Pay-locaties die exact overeenkomen met een niet-verbonden lokale handelaar. De koppeling behoudt de bestaande rij en voegt de Citizen Pay-identifiers eraan toe.",
+          "linkRowSubtitle": "→ {merchant}",
+          "create": "Nieuw aan te maken ({count})",
+          "createHelp": "Citizen Pay-locaties zonder lokale match. Een nieuwe rij wordt aangemaakt vanuit het Citizen Pay-profiel.",
+          "unlink": "Verouderde koppelingen wissen ({count})",
+          "unlinkHelp": "Lokale handelaars die verwijzen naar een locatie die Citizen Pay niet meer meldt. De handelaarsrij blijft staan — hij verschijnt enkel als niet verbonden."
+        },
+        "steps": {
+          "link": "Locaties koppelen",
+          "create": "Handelaars aanmaken",
+          "unlink": "Verouderde koppelingen wissen"
+        },
+        "errors": {
+          "previewFailed": "Kon Citizen Pay niet bereiken om het synchronisatieplan te berekenen."
+        }
+      },
+      "invite": {
+        "trigger": "Uitnodigen voor Citizen Pay",
+        "triggerPending": "Opnieuw uitnodigen",
+        "title": "Uitnodigen voor Citizen Pay",
+        "description": "Citizen Pay stuurt {merchantName} een link per e-mail. De handelaar logt in, kiest een bedrijf en de verbinding landt hier terug.",
+        "emailLabel": "E-mail",
+        "emailPlaceholder": "owner@example.com",
+        "reissueNote": "Er staat al een uitnodiging open voor deze handelaar. Een nieuwe verzenden maakt de vorige link ongeldig.",
+        "cancel": "Annuleren",
+        "confirm": "Uitnodiging versturen",
+        "confirmReissue": "Nieuwe uitnodiging versturen",
+        "sending": "Versturen…",
+        "sentOk": "Uitnodiging verstuurd. Citizen Pay leidt de handelaar hierheen na acceptatie.",
+        "sentFallback": "Uitnodiging aangemaakt, maar Citizen Pay kon de e-mail niet versturen — deel de onderstaande link rechtstreeks.",
+        "urlLabel": "Uitnodigingslink",
+        "copy": "Link kopiëren",
+        "done": "Klaar",
+        "errors": {
+          "alreadyConnected": "Deze handelaar is al verbonden met een Citizen Pay-bedrijf.",
+          "mintFailed": "Kon Citizen Pay niet bereiken om de uitnodiging aan te maken."
+        }
+      },
+      "archive": {
+        "trigger": "Archiveren",
+        "title": "Handelaar archiveren?",
+        "description": "{merchantName} wordt verborgen uit de actieve directory. Je kunt hem herstellen vanaf het tabblad Gearchiveerd.",
+        "cancel": "Annuleren",
+        "confirm": "Archiveren",
+        "archiving": "Archiveren…",
+        "restore": "Herstellen",
+        "restoring": "Herstellen…",
+        "errors": {
+          "stillConnected": "Koppel los van Citizen Pay voordat je archiveert.",
+          "alreadyArchived": "Deze handelaar is al gearchiveerd.",
+          "notActive": "Alleen actieve handelaars kunnen worden gearchiveerd.",
+          "notArchived": "Alleen gearchiveerde handelaars kunnen worden hersteld."
+        }
+      },
+      "delete": {
+        "trigger": "Verwijderen",
+        "title": "{merchantName} definitief verwijderen?",
+        "description": "De handelaarsrij wordt verwijderd uit deze caisse. Eerdere banktransacties en e-mails blijven in het overzicht staan, maar verliezen hun link met deze handelaar.",
+        "irreversibleWarning": "Dit kan niet ongedaan worden gemaakt. Wil je de handelaar later misschien terughalen, laat hem dan gearchiveerd staan.",
+        "cancel": "Annuleren",
+        "confirm": "Definitief verwijderen",
+        "deleting": "Verwijderen…",
+        "errors": {
+          "notArchived": "Archiveer de handelaar eerst — alleen gearchiveerde handelaars kunnen worden verwijderd.",
+          "stillConnected": "Koppel los van Citizen Pay voordat je verwijdert."
+        }
+      },
+      "disconnect": {
+        "trigger": "Loskoppelen",
+        "title": "Loskoppelen van Citizen Pay?",
+        "description": "{merchantName} maakt deel uit van een Citizen Pay-bedrijf. Loskoppelen verwijdert het token van deze caisse uit elke locatie onder het bedrijf.",
+        "loading": "Betrokken locaties opzoeken…",
+        "affectedHeading": "{count, plural, one {# locatie wordt losgekoppeld} other {# locaties worden losgekoppeld}}:",
+        "balanceBlock": "Een of meerdere locaties hebben nog een saldo. Betaal het uit (of wacht op de volgende synchronisatie als Citizen Pay nog geen saldo heeft gemeld) voordat je loskoppelt.",
+        "cancel": "Annuleren",
+        "confirm": "Loskoppelen",
+        "disconnecting": "Loskoppelen…",
+        "errors": {
+          "notConnected": "Deze handelaar is niet aan een Citizen Pay-bedrijf gekoppeld.",
+          "balanceNotZero": "Loskoppelen geblokkeerd — minstens één locatie heeft nog een saldo. Betaal het uit en probeer opnieuw.",
+          "failed": "Kon Citizen Pay niet bereiken voor de loskoppeling."
+        }
       }
     }
   },

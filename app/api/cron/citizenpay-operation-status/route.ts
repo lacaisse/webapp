@@ -38,7 +38,16 @@ export async function GET(request: NextRequest) {
       fundId: true,
       memberId: true,
       amount: true,
-      fund: { select: { name: true, primaryColor: true, logoUrl: true } },
+      fund: {
+        select: {
+          id: true,
+          name: true,
+          primaryColor: true,
+          logoUrl: true,
+          citizenPayApiKeyId: true,
+          citizenPayApiKeyEnc: true,
+        },
+      },
       member: { select: { email: true, firstName: true } },
       referral: {
         select: {
@@ -59,7 +68,6 @@ export async function GET(request: NextRequest) {
     },
   });
 
-  const cp = getCitizenPayClient();
   let confirmed = 0;
   let failed = 0;
 
@@ -67,6 +75,7 @@ export async function GET(request: NextRequest) {
     if (!op.txHash) continue;
     let result;
     try {
+      const cp = getCitizenPayClient(op.fund);
       result = await cp.getOperationStatus(op.txHash);
     } catch (e) {
       console.error("[citizenpay-cron] getOperationStatus failed", op.id, e);

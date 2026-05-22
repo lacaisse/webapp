@@ -98,6 +98,36 @@ These are non-obvious facts about the Next 16 / Prisma 7 stack that bit us durin
 - Don't reach for the Resend SDK directly from a route or action — always go through `services/email/`. Same swap-out story as the rest of the service modules.
 - React Email isn't set up yet. When we need branded templates, install `@react-email/components` and add a `services/email/templates/` directory; render to HTML via `render()` and pass to `sendEmail({ html })`.
 
+### Crypto / secrets at rest
+- `services/crypto/secret.ts` is the **only** path to encrypt/decrypt secrets stored in Prisma rows. Don't roll a second AES helper. Envelope format is `v1:<iv‖tag‖ct>` base64; versioning lets us rotate algorithms later.
+- Key comes from `APP_CRED_KEY` (32 raw bytes / 64 hex). Missing / malformed key throws at first use — fail loudly, don't silently skip encryption.
+- Encrypted columns conventionally end in `*Enc`. CLI helper: `node scripts/encrypt-secret.mjs <plaintext>` (or pipe stdin) emits the envelope ready to paste into SQL.
+
+### CitizenPay API-key handoff (redirect)
+- We use **only** CP's "Mint a new key for an existing treasury" flow (Flow 2 in CP's spec). The treasury itself is created out of band on CP's side; the admin pastes the `citizenPayFundId` into fund settings, then `/api/citizenpay/connect` redirects to CP's `/v2/treasury/keys/register` to mint (or rotate) the matching API key. CP's treasury-registration flow (Flow 1) is intentionally **not wired** — re-introduce `initiateRegisterTreasury` from git history if/when needed.
+- One service entry point: `services/citizenpay/connect.ts::initiateKeyIssue`. The route picks "initial" vs "rotated" for the `key_name` (visible in CP's audit log) based on whether `citizenPayApiKeyId` is already set on the fund.
+- **CSRF model**: CP generates its own opaque `state` server-side and we have no way to validate it on its own. We mint a *fund state* (random, 30-min TTL, single-use) into `CitizenPayConnectAttempt` and **encode it as a URL path segment** in the `redirect_uri` we hand to CP: `https://<fund>.lacaisse.eu/api/citizenpay/callback/<fundState>`. Path-segment (not query) because CP unconditionally appends `?state=…&pickup=…&treasury_id=…` and a query-encoded fund state would collide with a second `?`.
+- **Allowlist** (CP-side, out of band): CP rejects any `redirect_uri` whose host isn't in their `TREASURY_REGISTER_ALLOWED_DOMAINS`. We need `*.lacaisse.eu` registered for prod and `localhost` for dev. If CP returns an "allowlist" error in step 1, ask CP ops to add the host before debugging anything on our side.
+- The callback at `app/api/citizenpay/callback/[fundState]/route.ts` is intentionally **public** (the user is mid-redirect; the session bridge may not have survived). Auth is the fund-state row + CP's pickup token — hitting it without a valid fund state can't do anything.
+- Cleanup: `app/api/cron/auth-exchange-cleanup` sweeps expired `CitizenPayConnectAttempt` rows on the same schedule as `AuthExchange`.
+
+### CitizenPay (Treasury API v2)
+- Live client lives at `services/citizenpay/live-client.ts`; the low-level OpenAPI-faithful wrapper is `services/citizenpay/api.ts` (one method per endpoint, integer-cents on the wire). Use `getCitizenPayClient(fund)` — never instantiate either directly.
+- **Per-fund credentials**, not platform-wide. Each `Fund` carries `citizenPayApiKeyId` (plaintext eth address) and `citizenPayApiKeyEnc` (AES-256-GCM encrypted via `APP_CRED_KEY` — see `services/crypto/secret.ts`). The factory takes the fund subset so every call site is type-checked to load these columns.
+- **Mock vs live is chosen by `CITIZENPAY_API_BASE_URL`** alone. Unset → in-process mock for everything (dev). Set → live mode and any fund missing creds **throws immediately** (no silent mock fallback). Match the env to the deployment.
+- **Token mint/burn does NOT go through this client.** Token ops use the CitizenPay bundler (`CITIZENPAY_BUNDLER_URL`) via `services/token/*` (TBD) — paymaster signature + UserOp submission. Don't add new mint methods to `CitizenPayClient`.
+- **`submitMint` takes a wallet address (`toAccount`) but the v2 endpoint identifies the card by serial.** The live client looks up `Card.serialNumber` via Prisma (`Card.account` is `@unique`). All call sites already pass the account — no change needed. This path will be removed once the token-service mint flow is wired.
+- **`getOperationStatus` has no v2 equivalent** — top-up / charge / withdraw are synchronous and return the on-chain `txHash` directly. The live impl always returns CONFIRMED, so the polling cron flips ops on its first tick. Don't add fake intermediate states.
+- **`listBankTransactions` has no v2 equivalent yet** — CP plans to ship historical bank-transfer endpoints; until then the live impl returns empty and logs a warning. The bank-sync cron no-ops against the live client until those endpoints land.
+- The spec also exposes Places, Payouts, bulk-card ops, and payment-request flows — they're all available via `api.ts` but not yet bolted onto the high-level interface. Add new methods to `CitizenPayClient` only when a call site actually needs them.
+
+### Token (Gnosis by default)
+- Mint + burn run from this repo. We do not call CitizenPay's REST API for token ops — UserOps go through the CitizenPay bundler (`CITIZENPAY_BUNDLER_URL`, paymaster-signature + UserOp-submission endpoints, docs TBD).
+- Read-side (balances, transfer history, on-chain `hasRole` check) goes via Alchemy on Gnosis: `ALCHEMY_API_KEY` for RPC + Token API + Transfers API. Alchemy AA / paymaster is **not** used — Alchemy doesn't support gas sponsorship on Gnosis.
+- **Token identity comes from the connected CP treasury, not from admin input.** `Fund.tokenAddress`, `tokenChainId`, `tokenDecimals`, `tokenName`, `tokenSymbol` are caches written by `services/citizenpay/sync.ts::fetchTokenInfo`, which is invoked from `consumeConnect` immediately after a successful pickup. The settings Token tab is **read-only**. To refresh, re-issue the API key from the CitizenPay tab.
+- The `treasury.get()` call in `services/citizenpay/api.ts` is a **guessed** shape against `GET /v2/treasury` — when CP confirms the endpoint, update the path + `TreasuryWire` shape + the normaliser in `sync.ts`. Both flat (`token_address`, `chain`, …) and nested (`token: { address, chain, … }`) shapes are accepted today.
+- Minter wallet fields on `Fund` (`tokenMinterPrivateKeyEnc`, `tokenMinterEoaAddress`, `tokenMinterSmartAccountAddress`, `tokenMintEnabledAt`) are still placeholders. The smart-account address is **counterfactual** from CP's factory; it can't be computed until the factory + salt convention are known (waiting on CP bundler docs). Don't try to derive it from `tokenMinterEoaAddress` alone.
+
 ### shadcn base-nova vs Radix shadcn
 - **No `asChild` prop on Button** (and other primitives). To style a `<Link>` like a button, use the exported `buttonVariants({ variant })` as a className. For dialog triggers and similar, Base UI primitives accept a **`render` prop** (e.g. `<DialogTrigger render={<Button>...</Button>} />`).
 - The `form` component (Form/FormField/FormItem/FormLabel/FormMessage) **does not exist** in base-nova. Compose RHF directly with `Input`/`Label`/`Alert` — see the auth forms for the canonical pattern.

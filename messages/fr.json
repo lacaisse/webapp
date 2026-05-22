@@ -2,11 +2,16 @@
   "common": {
     "or": "ou",
     "cancel": "Annuler",
+    "close": "Fermer",
     "delete": "Supprimer",
     "back": "Retour",
     "backToHome": "Retour à l'accueil",
     "goHome": "Aller à l'accueil",
-    "signOut": "Se déconnecter"
+    "signOut": "Se déconnecter",
+    "copy": {
+      "label": "Copier dans le presse-papiers",
+      "copied": "Copié"
+    }
   },
   "locale": {
     "label": "Langue",
@@ -113,6 +118,7 @@
       "members": "Membres",
       "cards": "Cartes",
       "allocations": "Allocations",
+      "token": "Jeton",
       "merchants": "Commerces",
       "payments": "Paiements",
       "referrals": "Parrainage",
@@ -262,13 +268,54 @@
         "holder": "Porteur",
         "member": "Membre",
         "status": "Statut",
+        "balance": "Solde",
         "issued": "Émise le"
       },
       "primary": "Carte principale",
       "badges": {
         "lost": "Perdue"
       },
-      "empty": "Aucune carte à afficher."
+      "empty": "Aucune carte à afficher.",
+      "prev": "Précédent",
+      "next": "Suivant",
+      "searchPlaceholder": "Rechercher par numéro de série…",
+      "detail": {
+        "back": "Toutes les cartes",
+        "balance": {
+          "title": "Solde",
+          "description": "Solde on-chain en direct du portefeuille de cette carte.",
+          "unavailable": "Solde indisponible — la carte n'a pas encore de portefeuille, ou le jeton de la caisse n'est pas connecté."
+        },
+        "info": {
+          "title": "Informations de la carte",
+          "description": "Numéro, portefeuille et événements du cycle de vie.",
+          "serial": "Numéro de série",
+          "holder": "Porteur",
+          "member": "Membre",
+          "account": "Portefeuille",
+          "issued": "Émise le",
+          "blocked": "Bloquée le",
+          "reportedLost": "Signalée perdue le",
+          "lastTransaction": "Dernière transaction"
+        },
+        "transfers": {
+          "title": "Transferts",
+          "unavailable": "Transferts indisponibles — la carte n'a pas encore de portefeuille, ou le jeton de la caisse n'est pas connecté.",
+          "date": "Quand",
+          "from": "De",
+          "to": "Vers",
+          "amount": "Montant",
+          "empty": "Aucun transfert pour cette carte.",
+          "issued": "Émis",
+          "retired": "Retiré",
+          "treasury": "Trésorerie",
+          "unknown": "Portefeuille externe",
+          "self": "Cette carte",
+          "newer": "Plus récents",
+          "older": "Plus anciens",
+          "error": "Impossible de charger les transferts on-chain."
+        }
+      }
     },
     "allocations": {
       "title": "Allocations",
@@ -373,6 +420,73 @@
         "empty": "Aucune période pour le moment."
       }
     },
+    "token": {
+      "title": "Explorateur du jeton",
+      "description": "Activité on-chain de votre monnaie citoyenne.",
+      "notConnected": "Connectez cette caisse à un trésor Citizen Pay (Paramètres → Citizen Pay) pour voir l'activité du jeton ici.",
+      "supply": "Émis :",
+      "manual": {
+        "success": "Transaction confirmée on-chain.",
+        "mint": {
+          "trigger": "Émettre",
+          "title": "Émettre des jetons",
+          "description": "Envoyer des jetons fraîchement émis vers une carte, un commerce ou une adresse de portefeuille.",
+          "toLabel": "Destinataire",
+          "amountLabel": "Montant",
+          "submit": "Émettre"
+        },
+        "burn": {
+          "trigger": "Détruire",
+          "title": "Détruire des jetons",
+          "description": "Retirer des jetons de la circulation en les brûlant depuis une carte, un commerce ou une adresse de portefeuille.",
+          "warning": "La destruction est irréversible. Le portefeuille doit détenir au moins le montant que vous voulez brûler.",
+          "fromLabel": "Source",
+          "amountLabel": "Montant",
+          "submit": "Détruire"
+        },
+        "picker": {
+          "placeholder": "Rechercher par nom, numéro de série ou coller une adresse 0x…",
+          "searchHint": "Tapez au moins 2 caractères pour chercher cartes et commerces, ou collez une adresse de portefeuille.",
+          "emptyHint": "Aucune carte ni commerce correspondant. Collez une adresse 0x pour envoyer vers un portefeuille externe.",
+          "searching": "Recherche…",
+          "external": "Portefeuille externe",
+          "externalWarning": "Cette adresse n'est ni une carte ni un commerce connu. Vérifiez avant d'envoyer.",
+          "card": "Carte",
+          "place": "Commerce",
+          "clear": "Effacer la sélection"
+        }
+      },
+      "tabs": {
+        "transfers": "Transferts",
+        "holders": "Portefeuilles"
+      },
+      "transfers": {
+        "date": "Quand",
+        "from": "De",
+        "to": "Vers",
+        "amount": "Montant",
+        "empty": "Aucun transfert pour le moment.",
+        "issued": "Émis",
+        "retired": "Retiré",
+        "treasury": "Trésor",
+        "unknown": "Portefeuille externe",
+        "newer": "Plus récents",
+        "older": "Plus anciens",
+        "error": "Impossible de charger les transferts on-chain."
+      },
+      "holders": {
+        "holder": "Portefeuille",
+        "balance": "Solde",
+        "empty": "Aucun portefeuille ne détient ce jeton pour le moment.",
+        "issued": "Brûlé",
+        "retired": "Brûlé",
+        "treasury": "Trésor",
+        "unknown": "Portefeuille externe",
+        "prev": "Précédent",
+        "next": "Suivant",
+        "error": "Impossible de charger les soldes des portefeuilles."
+      }
+    },
     "merchants": {
       "title": "Commerces",
       "description": "Onboardez les commerces et suivez leur connexion Citizen Pay.",
@@ -396,6 +510,7 @@
         "citizenpay": "Citizen Pay",
         "terminal": "Terminal",
         "tokensReceived": "Jetons reçus",
+        "balance": "Solde",
         "joined": "Inscrit le"
       },
       "empty": "Aucun commerce à afficher.",
@@ -584,11 +699,25 @@
       },
       "token": {
         "title": "Jeton",
-        "description": "Nommage du jeton de la caisse.",
-        "name": "Nom du jeton",
-        "nameHint": "Affiché dans l'UI lorsqu'on parle du jeton.",
-        "symbol": "Symbole",
-        "symbolHint": "Code court affiché à côté des montants."
+        "description": "Jeton on-chain émis par votre trésorerie Citizen Pay.",
+        "addressLabel": "Adresse du contrat",
+        "chainLabel": "Chaîne",
+        "decimalsLabel": "Décimales",
+        "readOnlyHint": "Les informations du jeton proviennent de Citizen Pay et sont actualisées à chaque émission de clé API.",
+        "notConnected": "Connectez cette caisse à une trésorerie Citizen Pay (onglet Citizen Pay) pour voir son jeton ici.",
+        "notSyncedYet": "Les informations du jeton ne sont pas encore synchronisées avec Citizen Pay. Réémettez la clé API depuis l'onglet Citizen Pay pour rafraîchir.",
+        "minter": {
+          "title": "Portefeuille émetteur",
+          "description": "Identité de signature propre à la caisse, utilisée pour autoriser l'émission et la destruction de jetons on-chain.",
+          "eoaLabel": "Adresse de signature",
+          "smartAccountLabel": "Smart account",
+          "smartAccountPending": "En attente — provisionné lors de la connexion à une trésorerie Citizen Pay.",
+          "notProvisioned": "Pas encore provisionné.",
+          "permissionLabel": "Permission d'émission",
+          "permissionGranted": "Active",
+          "permissionMissing": "Manquante",
+          "permissionUnknown": "Inconnue"
+        }
       },
       "onboarding": {
         "title": "Onboarding",
@@ -671,7 +800,29 @@
         "title": "Citizen Pay",
         "description": "Connectez cette caisse à son compte Citizen Pay.",
         "account": "Identifiant Citizen Pay",
-        "accountHint": "Identifiant de votre caisse sur Citizen Pay. Laissez vide pour déconnecter."
+        "accountHint": "Identifiant de votre caisse sur Citizen Pay. Laissez vide pour déconnecter.",
+        "connect": {
+          "issueKey": "Émettre la clé API via Citizen Pay",
+          "rotateKey": "Renouveler la clé API",
+          "apiKeyIdLabel": "Identifiant de clé API",
+          "apiKeyUpdatedAtLabel": "Dernière mise à jour",
+          "status": {
+            "connected": "Connectée",
+            "noKeyYet": "Trésorerie enregistrée. Émettez la clé API pour finaliser la connexion."
+          },
+          "rotateConfirm": {
+            "title": "Renouveler la clé API Citizen Pay ?",
+            "description": "Vous serez redirigé·e vers Citizen Pay pour générer une nouvelle clé API pour la trésorerie de cette caisse. La clé précédente cesse de fonctionner immédiatement.",
+            "cancel": "Annuler",
+            "confirm": "Continuer"
+          },
+          "flash": {
+            "ok": "Connexion à Citizen Pay mise à jour.",
+            "notConfigured": "Citizen Pay n'est pas configuré sur ce déploiement — demandez à l'administrateur de la plateforme de définir CITIZENPAY_API_BASE_URL.",
+            "notConnected": "Renseignez l'identifiant de trésorerie Citizen Pay ci-dessus avant d'émettre une clé.",
+            "failed": "La connexion à Citizen Pay a échoué. Veuillez réessayer."
+          }
+        }
       }
     }
   },
@@ -697,8 +848,11 @@
   },
   "tokenOps": {
     "errors": {
-      "amountInvalid": "Le montant doit être un nombre avec jusqu'à 2 décimales.",
+      "amountInvalid": "Le montant doit être un nombre positif.",
       "amountPositive": "Le montant doit être supérieur à zéro.",
+      "addressInvalid": "L'adresse doit être une chaîne hexadécimale de 40 caractères préfixée par 0x.",
+      "tokenNotConfigured": "Cette caisse n'a pas encore de jeton configuré — connectez-vous d'abord à Citizen Pay.",
+      "submitFailed": "L'envoi on-chain a échoué. Consultez le journal des opérations pour plus de détails.",
       "memberNotFound": "Membre introuvable dans cette caisse.",
       "memberNotActive": "L'émission manuelle est réservée aux membres actifs.",
       "noPrimaryAccount": "La carte principale de ce membre n'a pas encore été enregistrée chez Citizen Pay."
@@ -771,15 +925,20 @@
         "title": "Activer le membre",
         "description": "Attribuez une carte à {memberName}. Son compte devient actif immédiatement.",
         "unverifiedWarning": "Ce membre n'a pas encore vérifié son email. L'email d'activation pourrait revenir.",
-        "serialLabel": "Numéro de série de la carte",
-        "serialPlaceholder": "ex. 040039AA1D1291",
-        "serialHint": "Scannez ou saisissez le UUID NFC inscrit sur la carte physique.",
+        "cardLabel": "Carte",
+        "cardPlaceholder": "Recherchez une carte par numéro de série…",
+        "cardHint": "Choisissez une carte déjà importée depuis CitizenPay. Si elle n'apparaît pas, synchronisez d'abord la liste des cartes.",
+        "cardSearching": "Recherche…",
+        "cardEmpty": "Aucune carte non attribuée ne correspond à ce numéro.",
+        "cardEmptyInitial": "Aucune carte non attribuée. Synchronisez depuis la page des cartes.",
+        "cardNoAccount": "Pas encore de compte on-chain",
+        "cardClear": "Retirer la carte",
+        "cardRequired": "Choisissez une carte à activer.",
         "noteLabel": "Note (optionnel, interne)",
         "notePlaceholder": "Notes internes sur cette activation.",
         "cancel": "Annuler",
         "confirm": "Activer et attribuer la carte",
-        "activating": "Activation…",
-        "serialRequired": "Le numéro de série de la carte est requis."
+        "activating": "Activation…"
       },
       "invite": {
         "title": "Inviter un membre",
@@ -842,6 +1001,9 @@
         "noPrimaryCard": "Activez d'abord le membre — il a besoin d'une carte principale avant de pouvoir en lier d'autres.",
         "serialRequired": "Le numéro de série de la carte est requis.",
         "serialTaken": "Cette carte est déjà attribuée à un autre membre.",
+        "cardRequired": "Choisissez une carte à activer.",
+        "cardNotFound": "Cette carte n'est plus disponible.",
+        "cardTaken": "Cette carte vient d'être liée à un autre membre.",
         "tierNotFound": "Palier introuvable ou archivé.",
         "invalidStatusTransition": "Ce changement de statut n'est pas autorisé depuis l'état actuel."
       },
@@ -884,14 +1046,87 @@
         "confirm": "Débloquer la carte",
         "unblocking": "Déblocage…"
       },
+      "topUp": {
+        "button": "Recharger",
+        "title": "Recharger la carte",
+        "description": "Émettre des jetons sur la carte de {holderLabel}.",
+        "amountLabel": "Montant",
+        "confirm": "Recharger",
+        "submitting": "Rechargement…",
+        "success": "Rechargement confirmé sur la blockchain."
+      },
+      "withdraw": {
+        "button": "Retirer",
+        "title": "Retirer de la carte",
+        "description": "Brûler des jetons sur la carte de {holderLabel}.",
+        "amountLabel": "Montant",
+        "confirm": "Retirer",
+        "submitting": "Retrait…",
+        "success": "Retrait confirmé sur la blockchain."
+      },
       "errors": {
         "notFound": "Carte introuvable.",
         "alreadyBlocked": "Cette carte est déjà bloquée.",
-        "alreadyActive": "Cette carte est déjà active."
+        "alreadyActive": "Cette carte est déjà active.",
+        "noAccount": "Cette carte n'a pas encore d'adresse blockchain — elle n'est pas complètement enregistrée chez Citizen Pay.",
+        "amountInvalid": "Le montant doit être un nombre avec au maximum 2 décimales.",
+        "amountPositive": "Le montant doit être supérieur à zéro.",
+        "tokenNotConfigured": "Cette caisse n'a pas encore de jeton configuré — connectez-vous d'abord à Citizen Pay.",
+        "submitFailed": "L'envoi on-chain a échoué. Consultez le journal des opérations pour plus de détails."
+      },
+      "sync": {
+        "trigger": "Synchroniser avec Citizen Pay",
+        "title": "Synchroniser avec Citizen Pay",
+        "description": "Importer les cartes propres à Citizen Pay, réconcilier les statuts, puis pousser les cartes locales vers Citizen Pay.",
+        "loadingPreview": "Vérification des changements…",
+        "running": "Synchronisation…",
+        "summary": {
+          "push": "{count, plural, one {Pousser # carte vers Citizen Pay} other {Pousser # cartes vers Citizen Pay}}",
+          "import": "{count, plural, one {Importer # carte depuis Citizen Pay} other {Importer # cartes depuis Citizen Pay}}",
+          "statusUpdate": "{count, plural, one {Mettre à jour # statut de carte sur Citizen Pay} other {Mettre à jour # statuts de cartes sur Citizen Pay}}"
+        },
+        "nothingToSync": "Tout est déjà synchronisé.",
+        "confirm": "Synchroniser maintenant",
+        "steps": {
+          "import": "Importation depuis Citizen Pay",
+          "status": "Réconciliation des statuts",
+          "push": "Envoi des nouvelles cartes vers Citizen Pay"
+        },
+        "errorsInStep": "{count, plural, one {# élément en échec} other {# éléments en échec}}",
+        "errors": {
+          "previewFailed": "Impossible de contacter Citizen Pay. Vérifiez la connexion de la trésorerie et réessayez."
+        }
       }
     }
   },
   "merchants": {
+    "inviteConfirmed": {
+      "ok": {
+        "title": "Vous êtes connecté",
+        "description": "Votre commerce accepte désormais {fundName}. Vous pouvez fermer cet onglet.",
+        "nextSteps": "Les futures mises à jour de votre profil se font sur Citizen Pay — elles apparaîtront automatiquement ici."
+      },
+      "rejected": {
+        "title": "Invitation refusée",
+        "description": "Vous avez refusé l'invitation de {fundName}.",
+        "nextSteps": "Si c'est une erreur, demandez à {fundName} de vous renvoyer une invitation."
+      },
+      "expired": {
+        "title": "Invitation expirée",
+        "description": "Cette invitation à rejoindre {fundName} a expiré.",
+        "nextSteps": "Demandez à {fundName} de vous renvoyer une nouvelle invitation."
+      },
+      "pending": {
+        "title": "Presque terminé",
+        "description": "Citizen Pay n'a pas encore terminé de traiter votre acceptation pour {fundName}.",
+        "nextSteps": "Actualisez cette page dans un instant. Si le message persiste, contactez {fundName}."
+      },
+      "error": {
+        "title": "Quelque chose s'est mal passé",
+        "description": "Nous n'avons pas pu confirmer la connexion à {fundName}.",
+        "nextSteps": "Réessayez le lien dans votre email. Si le problème persiste, contactez {fundName}."
+      }
+    },
     "signup": {
       "title": "Devenir commerce partenaire de {fundName}",
       "description": "Parlez-nous de votre commerce. Un administrateur examinera votre demande et vous contactera.",
@@ -986,6 +1221,103 @@
         "alreadyRejected": "Ce commerce est déjà refusé.",
         "notRejected": "Seuls les commerces refusés peuvent être réexaminés.",
         "reasonRequired": "Un motif est requis."
+      },
+      "sync": {
+        "trigger": "Synchroniser avec Citizen Pay",
+        "title": "Réconcilier les commerces avec Citizen Pay",
+        "description": "Relier les lieux Citizen Pay aux commerces locaux quand les noms correspondent, créer de nouveaux commerces pour les autres et effacer les liens obsolètes.",
+        "loadingPreview": "Récupération des lieux depuis Citizen Pay…",
+        "nothingToSync": "Tout est à jour — {count, plural, =0 {aucun commerce connecté} one {1 commerce connecté} other {# commerces connectés}}.",
+        "confirm": "Confirmer",
+        "running": "Synchronisation…",
+        "errorsInStep": "{count, plural, one {# élément a échoué} other {# éléments ont échoué}}",
+        "summary": {
+          "connected": "{count, plural, =0 {Aucun commerce actuellement connecté} one {1 commerce actuellement connecté} other {# commerces actuellement connectés}}."
+        },
+        "sections": {
+          "link": "À relier à l'existant ({count})",
+          "linkHelp": "Lieux Citizen Pay qui correspondent à un commerce local non connecté (nom identique). Le lien préserve la fiche existante et y ajoute les identifiants Citizen Pay.",
+          "linkRowSubtitle": "→ {merchant}",
+          "create": "Nouveaux commerces à créer ({count})",
+          "createHelp": "Lieux Citizen Pay sans correspondance locale. Une nouvelle fiche sera créée depuis le profil Citizen Pay.",
+          "unlink": "Liens obsolètes à effacer ({count})",
+          "unlinkHelp": "Commerces locaux pointant vers un lieu que Citizen Pay ne signale plus. La fiche reste — elle apparaît seulement comme non connectée."
+        },
+        "steps": {
+          "link": "Liaison des lieux",
+          "create": "Création des commerces",
+          "unlink": "Suppression des liens obsolètes"
+        },
+        "errors": {
+          "previewFailed": "Impossible de joindre Citizen Pay pour calculer le plan de synchronisation."
+        }
+      },
+      "invite": {
+        "trigger": "Inviter sur Citizen Pay",
+        "triggerPending": "Renvoyer l'invitation",
+        "title": "Inviter sur Citizen Pay",
+        "description": "Citizen Pay enverra un lien par email à {merchantName}. Le commerçant se connecte, choisit une entreprise, et la connexion revient ici.",
+        "emailLabel": "Email",
+        "emailPlaceholder": "owner@example.com",
+        "reissueNote": "Une invitation est déjà en attente pour ce commerce. En envoyer une nouvelle invalidera le lien précédent.",
+        "cancel": "Annuler",
+        "confirm": "Envoyer l'invitation",
+        "confirmReissue": "Envoyer une nouvelle invitation",
+        "sending": "Envoi…",
+        "sentOk": "Invitation envoyée. Citizen Pay redirigera le commerce ici après acceptation.",
+        "sentFallback": "Invitation créée, mais Citizen Pay n'a pas pu envoyer l'email — partagez le lien ci-dessous directement.",
+        "urlLabel": "Lien d'invitation",
+        "copy": "Copier le lien",
+        "done": "Terminé",
+        "errors": {
+          "alreadyConnected": "Ce commerce est déjà connecté à une entreprise Citizen Pay.",
+          "mintFailed": "Impossible de joindre Citizen Pay pour créer l'invitation."
+        }
+      },
+      "archive": {
+        "trigger": "Archiver",
+        "title": "Archiver ce commerce ?",
+        "description": "{merchantName} sera masqué du répertoire actif. Vous pouvez le restaurer depuis l'onglet Archivés.",
+        "cancel": "Annuler",
+        "confirm": "Archiver",
+        "archiving": "Archivage…",
+        "restore": "Restaurer",
+        "restoring": "Restauration…",
+        "errors": {
+          "stillConnected": "Déconnectez de Citizen Pay avant d'archiver.",
+          "alreadyArchived": "Ce commerce est déjà archivé.",
+          "notActive": "Seuls les commerces actifs peuvent être archivés.",
+          "notArchived": "Seuls les commerces archivés peuvent être restaurés."
+        }
+      },
+      "delete": {
+        "trigger": "Supprimer",
+        "title": "Supprimer définitivement {merchantName} ?",
+        "description": "La fiche du commerce sera retirée de cette caisse. Les transactions bancaires et e-mails passés restent dans le journal, mais leur lien vers ce commerce est perdu.",
+        "irreversibleWarning": "Cette action est irréversible. Si vous pensez vouloir restaurer ce commerce plus tard, laissez-le archivé à la place.",
+        "cancel": "Annuler",
+        "confirm": "Supprimer définitivement",
+        "deleting": "Suppression…",
+        "errors": {
+          "notArchived": "Archivez d'abord le commerce — seuls les commerces archivés peuvent être supprimés.",
+          "stillConnected": "Déconnectez de Citizen Pay avant de supprimer."
+        }
+      },
+      "disconnect": {
+        "trigger": "Déconnecter",
+        "title": "Se déconnecter de Citizen Pay ?",
+        "description": "{merchantName} fait partie d'une entreprise Citizen Pay. La déconnexion retire le jeton de cette caisse de tous les lieux de l'entreprise.",
+        "loading": "Recherche des lieux concernés…",
+        "affectedHeading": "{count, plural, one {# lieu sera déconnecté} other {# lieux seront déconnectés}} :",
+        "balanceBlock": "Un ou plusieurs lieux ont encore un solde. Effectuez le paiement (ou attendez la prochaine synchronisation si Citizen Pay n'a pas encore signalé de solde) avant de vous déconnecter.",
+        "cancel": "Annuler",
+        "confirm": "Déconnecter",
+        "disconnecting": "Déconnexion…",
+        "errors": {
+          "notConnected": "Ce commerce n'est pas connecté à une entreprise Citizen Pay.",
+          "balanceNotZero": "Déconnexion bloquée — au moins un lieu a encore un solde. Effectuez le paiement et réessayez.",
+          "failed": "Impossible de joindre Citizen Pay pour la déconnexion."
+        }
       }
     }
   },

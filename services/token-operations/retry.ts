@@ -35,16 +35,23 @@ export async function retryPendingMints(): Promise<RetryStats> {
       id: true,
       account: true,
       amount: true,
-      fund: { select: { citizenPayFundId: true } },
+      fund: {
+        select: {
+          id: true,
+          citizenPayFundId: true,
+          citizenPayApiKeyId: true,
+          citizenPayApiKeyEnc: true,
+        },
+      },
     },
   });
 
-  const cp = getCitizenPayClient();
   let submitted = 0;
   let failed = 0;
 
   for (const op of ops) {
     try {
+      const cp = getCitizenPayClient(op.fund);
       const result = await cp.submitMint({
         fundCitizenPayId: op.fund.citizenPayFundId,
         toAccount: op.account,

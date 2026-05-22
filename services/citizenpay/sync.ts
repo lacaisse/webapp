@@ -1,0 +1,107 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import "server-only";
+
+import {
+  treasury as treasuryApi,
+  type CitizenPayApiCredentials,
+  type TreasuryWire,
+} from "./api";
+
+// Fetch the connected treasury's token info from CP and normalise it into
+// our `Fund.token*` columns. Called from `consumeConnect` immediately after
+// a successful pickup (best-effort — credentials still persist if this
+// fails; a follow-up rotate or a periodic sync can refresh later).
+//
+// All token-related columns on `Fund` are caches of CP truth:
+//   tokenAddress, tokenDecimals, tokenName, tokenSymbol, tokenChainId.
+// We do NOT expose these as editable in the UI.
+
+const CHAIN_IDS: Record<string, number> = {
+  gnosis: 100,
+  polygon: 137,
+  base: 8453,
+  optimism: 10,
+  arbitrum: 42161,
+  mainnet: 1,
+};
+
+export type TokenInfo = {
+  tokenAddress: string | null;
+  tokenChainId: number | null;
+  tokenDecimals: number | null;
+  tokenName: string | null;
+  tokenSymbol: string | null;
+  tokenLogoUrl: string | null;
+  // 4337 stack — entrypoint / factory / paymaster CP wants us to use for
+  // this treasury. Cached on Fund and read by services/token/userop.ts
+  // (no env-var indirection).
+  citizenPayEntrypointAddress: string | null;
+  citizenPayAccountFactoryAddress: string | null;
+  citizenPayPaymasterAddress: string | null;
+  citizenPayPaymasterType: string | null;
+};
+
+/**
+ * Pull the treasury's token info from CP. Tolerant of both flat and nested
+ * (`token: { ... }`) shapes since CP's exact response isn't documented yet
+ * — see the `TreasuryWire` TODO in api.ts.
+ *
+ * Returns null on any HTTP / parse failure so the caller can fall through
+ * without breaking the credentials write. Errors are logged here, not
+ * thrown.
+ */
+export async function fetchTokenInfo(
+  creds: CitizenPayApiCredentials,
+): Promise<TokenInfo | null> {
+  let wire: TreasuryWire;
+  try {
+    wire = await treasuryApi.get(creds);
+  } catch (e) {
+    console.warn(
+      "[citizenpay-sync] treasury.get failed; skipping token cache",
+      e,
+    );
+    return null;
+  }
+  return normaliseTreasury(wire);
+}
+
+function normaliseTreasury(wire: TreasuryWire): TokenInfo {
+  // Prefer nested `token.*` if present, fall back to top-level fields.
+  const t = wire.token ?? {};
+  const tokenAddress = t.address ?? wire.token_address ?? null;
+  const tokenName = t.name ?? wire.name ?? null;
+  const tokenSymbol = t.symbol ?? wire.symbol ?? null;
+  const tokenLogoUrl = t.logo ?? wire.logo ?? null;
+  const decimalsRaw = t.decimals ?? wire.decimals;
+  const tokenDecimals =
+    typeof decimalsRaw === "number" && Number.isFinite(decimalsRaw)
+      ? decimalsRaw
+      : null;
+
+  const chainRaw = (t.chain ?? wire.chain ?? "").toString().toLowerCase().trim();
+  let tokenChainId: number | null = null;
+  if (chainRaw) {
+    const mapped = CHAIN_IDS[chainRaw];
+    if (mapped !== undefined) {
+      tokenChainId = mapped;
+    } else {
+      console.warn(
+        `[citizenpay-sync] unknown chain "${chainRaw}" — leaving tokenChainId unchanged`,
+      );
+    }
+  }
+
+  return {
+    tokenAddress,
+    tokenChainId,
+    tokenDecimals,
+    tokenName,
+    tokenSymbol,
+    tokenLogoUrl,
+    citizenPayEntrypointAddress: wire.entrypoint_address ?? null,
+    citizenPayAccountFactoryAddress: wire.account_factory_address ?? null,
+    citizenPayPaymasterAddress: wire.paymaster_address ?? null,
+    citizenPayPaymasterType: wire.paymaster_type ?? null,
+  };
+}

@@ -5,6 +5,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { requireUser } from "@/services/auth/dal";
 import { prisma } from "@/services/db/prisma";
 import { isSupportedLocale } from "@/services/i18n/config";
+import { generateFundMinter } from "@/services/token/minter";
 import { FUND_APEX } from "./host";
 import {
   CreateFundSchema,
@@ -44,6 +45,13 @@ export async function createFundAction(
     ? creatorLocale
     : undefined; // schema default ("fr") if not supported
 
+  // Mint the per-fund token-minter keypair upfront so every fund has a
+  // signing identity for UserOp-based mint/burn from day one — see
+  // services/token/minter.ts. The smart-account address is derived later
+  // (in services/citizenpay/connect.ts::consumeConnect) once CP returns
+  // the per-treasury factory address.
+  const minter = generateFundMinter();
+
   try {
     // One nested create. Default tier values come from the scoping doc's
     // example (5.3.1): min €100 / target €150 / max €225 — admin can edit
@@ -53,6 +61,8 @@ export async function createFundAction(
         name: parsed.data.name,
         domain,
         ...(defaultLocale ? { defaultLocale } : {}),
+        tokenMinterPrivateKeyEnc: minter.privateKeyEnc,
+        tokenMinterEoaAddress: minter.eoaAddress,
         staff: { create: { userId: user.id, role: "OWNER" } },
         tiers: {
           create: {

@@ -76,18 +76,9 @@ export async function updateBrandingSettingsAction(
   return runUpdate(BrandingSchema, normaliseBlanks(input), "/settings");
 }
 
-// --- Token ---------------------------------------------------------------
-
-const TokenSchema = z.object({
-  tokenName: z.string().or(z.literal("")).nullable().optional(),
-  tokenSymbol: z.string().or(z.literal("")).nullable().optional(),
-});
-
-export async function updateTokenSettingsAction(
-  input: z.infer<typeof TokenSchema>,
-): Promise<SettingsResult> {
-  return runUpdate(TokenSchema, normaliseBlanks(input), "/settings");
-}
+// Token settings are NOT editable here — token info comes from the
+// connected CitizenPay treasury (see services/citizenpay/sync.ts) and
+// fills `Fund.token*` columns. The settings UI surfaces them read-only.
 
 // --- Legal ---------------------------------------------------------------
 
@@ -126,6 +117,8 @@ export async function updateSignupRedirectsAction(
 }
 
 // --- Citizen Pay ---------------------------------------------------------
+// Manual treasury_id entry. The matching API key is minted via the redirect
+// flow in /api/citizenpay/connect — see services/citizenpay/connect.ts.
 
 const CitizenPaySchema = z.object({
   citizenPayFundId: z.string().or(z.literal("")).nullable().optional(),

@@ -15,14 +15,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { activateMemberAction } from "@/services/member/admin-actions";
 
-// Activation = link a physical card. Admin scans / types the NFC serial
-// from the card they're handing out; we store it as the primary card and
-// flip Member.status to ACTIVE. The CitizenPay wallet address is populated
-// later when CP integration registers the card.
+import { UnattachedCardPicker } from "./unattached-card-picker";
+
+// Activation = link a physical card to the member. The admin picks an
+// already-imported (CitizenPay-synced) unattached card from the typeahead
+// rather than typing a serial — that way the on-chain account is already
+// known locally and we don't need a fresh CP registerCard roundtrip.
 
 export function MemberRowActions({
   memberId,
@@ -35,21 +36,32 @@ export function MemberRowActions({
 }) {
   const t = useTranslations("members.admin.activate");
   const [open, setOpen] = useState(false);
-  const [serial, setSerial] = useState("");
+  const [cardId, setCardId] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  const pickerLabels = {
+    field: t("cardLabel"),
+    placeholder: t("cardPlaceholder"),
+    hint: t("cardHint"),
+    searching: t("cardSearching"),
+    empty: t("cardEmpty"),
+    emptyInitial: t("cardEmptyInitial"),
+    noAccount: t("cardNoAccount"),
+    clear: t("cardClear"),
+  };
+
   const onActivate = () => {
     setError(null);
-    if (!serial.trim()) {
-      setError(t("serialRequired"));
+    if (!cardId) {
+      setError(t("cardRequired"));
       return;
     }
     startTransition(async () => {
       const result = await activateMemberAction({
         memberId,
-        cardSerial: serial,
+        cardId,
         note,
       });
       if ("error" in result) {
@@ -57,7 +69,7 @@ export function MemberRowActions({
         return;
       }
       setOpen(false);
-      setSerial("");
+      setCardId(null);
       setNote("");
     });
   };
@@ -79,23 +91,13 @@ export function MemberRowActions({
             <AlertDescription>{t("unverifiedWarning")}</AlertDescription>
           </Alert>
         )}
-        <div className="space-y-2">
-          <Label htmlFor={`serial-${memberId}`}>
-            {t("serialLabel")}
-            <span className="ml-1 text-destructive" aria-hidden>
-              *
-            </span>
-          </Label>
-          <Input
-            id={`serial-${memberId}`}
-            value={serial}
-            onChange={(e) => setSerial(e.target.value)}
-            placeholder={t("serialPlaceholder")}
-            autoComplete="off"
-            spellCheck={false}
-          />
-          <p className="text-xs text-muted-foreground">{t("serialHint")}</p>
-        </div>
+        <UnattachedCardPicker
+          id={`activate-card-${memberId}`}
+          labels={pickerLabels}
+          value={cardId}
+          onChange={(next) => setCardId(next?.id ?? null)}
+          error={null}
+        />
         <div className="space-y-2">
           <Label htmlFor={`activate-note-${memberId}`}>{t("noteLabel")}</Label>
           <textarea
