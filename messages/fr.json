@@ -520,6 +520,13 @@
         "unverified": "Email non vérifié",
         "connected": "Citizen Pay connecté",
         "notConnected": "Citizen Pay non connecté",
+        "invite": {
+          "title": "Invitation Citizen Pay",
+          "description": "Statut de l'invitation envoyée au commerce.",
+          "sentTo": "Invitation envoyée à {email}",
+          "on": "le {date}",
+          "expires": "Expire le {date}."
+        },
         "contact": {
           "title": "Contact",
           "description": "Informations de contact publiques.",
@@ -527,7 +534,10 @@
           "email": "Email",
           "phone": "Téléphone",
           "website": "Site web",
-          "address": "Adresse"
+          "address": "Adresse",
+          "location": "Localisation",
+          "coordinates": "{lat}, {lng}",
+          "emailVerifiedAt": "Email vérifié le"
         },
         "business": {
           "title": "Entreprise",
@@ -535,8 +545,15 @@
           "joined": "Inscrit le",
           "position": "Position dans l'annuaire",
           "conditions": "Conditions d'acceptation",
-          "citizenPayPlace": "Identifiant Citizen Pay",
+          "citizenPayPlace": "Identifiant du lieu Citizen Pay",
+          "citizenPayBusiness": "Identifiant entreprise Citizen Pay",
+          "citizenPayWallet": "Adresse du portefeuille",
+          "balance": "Solde",
+          "balanceUnavailable": "Indisponible",
           "citizenPayActivated": "Activation Citizen Pay",
+          "citizenPayLastSynced": "Dernière synchronisation",
+          "createdAt": "Créé le",
+          "updatedAt": "Mis à jour le",
           "reviewed": "Dernière revue",
           "reviewNote": "Note de revue"
         },
@@ -559,6 +576,23 @@
           "to": "Destinataire",
           "status": "Statut",
           "empty": "Aucun email envoyé."
+        },
+        "transfers": {
+          "title": "Historique des transferts",
+          "date": "Date",
+          "direction": "Sens",
+          "in": "Entrant",
+          "out": "Sortant",
+          "counterparty": "Contrepartie",
+          "amount": "Montant",
+          "empty": "Aucun transfert sur la chaîne pour le moment.",
+          "unavailable": "L'historique des transferts est indisponible pour le moment.",
+          "issued": "Émis",
+          "retired": "Retiré",
+          "treasury": "Trésorerie",
+          "unknown": "Inconnu",
+          "newer": "Plus récents",
+          "older": "Plus anciens"
         }
       }
     },
