@@ -1,9 +1,17 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import {
+  ArrowDownLeft,
+  ArrowLeft,
+  ArrowUpRight,
+  ChevronRight,
+  ExternalLink,
+  RotateCcw,
+} from "lucide-react";
 import { getFormatter, getTranslations } from "next-intl/server";
 
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -20,20 +28,35 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
+import { formatTokenAmount, isZeroAddress } from "@/services/alchemy/format";
+import { listTransfersForAccount } from "@/services/alchemy/transfers";
+import { getCitizenPayClient } from "@/services/citizenpay/client";
 import { prisma } from "@/services/db/prisma";
 import { requireCurrentFund } from "@/services/fund/server";
 
+import { AddressLabel, buildAddressDirectory } from "../../token/address-label";
+import { getPlacesForFund, getProfile } from "../../token/data";
 import { MerchantRowActions } from "../merchant-row-actions";
+
+// On-chain transfer history paginates 20 per page via the dual-stream cursor
+// from listTransfersForAccount — same scheme as the card detail page and the
+// token explorer. The cursor lives in the URL (?cursor=…) so back/forward and
+// shareable links work.
+const TRANSFERS_PAGE_SIZE = 20;
 
 export default async function MerchantDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ cursor?: string }>;
 }) {
   const t = await getTranslations("fund.merchants.detail");
   const format = await getFormatter();
   const fund = await requireCurrentFund();
   const { id } = await params;
+  const { cursor } = await searchParams;
 
   const merchant = await prisma.merchant.findFirst({
     where: { id, fundId: fund.id },
@@ -65,6 +88,169 @@ export default async function MerchantDetailPage({
     0,
   );
 
+  // Live CitizenPay balance for this merchant's place. Mirrors
+  // merchants-table.tsx: one listPlaces() call, find this place by id, read
+  // its balanceCents. Degrade silently on failure (mock mode, CP down) — the
+  // balance line just renders "unavailable".
+  let placeBalanceCents: number | null = null;
+  let cpBalanceUnavailable = false;
+  if (merchant.citizenPayPlaceId) {
+    try {
+      const { places } = await getCitizenPayClient(fund).listPlaces();
+      const place = places.find((p) => p.id === merchant.citizenPayPlaceId);
+      placeBalanceCents = place?.balanceCents ?? null;
+    } catch (e) {
+      console.warn("[merchant-detail] listPlaces failed", e);
+      cpBalanceUnavailable = true;
+    }
+  }
+
+  // On-chain transfer history for this merchant's wallet. Only attempt the
+  // Alchemy read when the merchant has a wallet AND the fund's token identity
+  // is fully cached (address + chain + decimals + symbol). Degrade silently on
+  // any failure (Alchemy unconfigured / down) — same posture as the balance
+  // call above. We reuse the token explorer's per-account transfers service
+  // and address directory so counterparties resolve to member/merchant names.
+  const tokenReady =
+    Boolean(fund.tokenAddress) &&
+    typeof fund.tokenChainId === "number" &&
+    typeof fund.tokenDecimals === "number" &&
+    Boolean(fund.tokenSymbol);
+  const transferAccount = merchant.citizenPayPlaceAccount;
+  const showTransfers = tokenReady && Boolean(transferAccount);
+
+  let transferRows: Array<{
+    uniqueId: string;
+    blockTimestamp: string | null;
+    direction: "in" | "out";
+    counterparty: string;
+    rawValue: string;
+  }> = [];
+  let transferDirectory: ReturnType<typeof buildAddressDirectory> | null = null;
+  let transfersNextPageKey: string | null = null;
+  let transfersUnavailable = false;
+
+  if (showTransfers && transferAccount) {
+    try {
+      const account = transferAccount.toLowerCase();
+      const [page, cards, placesResult, merchants] = await Promise.all([
+        listTransfersForAccount({
+          chainId: fund.tokenChainId!,
+          contractAddress: fund.tokenAddress!,
+          account: transferAccount,
+          pageSize: TRANSFERS_PAGE_SIZE,
+          cursor: cursor ?? null,
+        }),
+        prisma.card.findMany({
+          where: { account: { not: null }, fundId: fund.id },
+          include: { member: { select: { firstName: true, lastName: true } } },
+        }),
+        getPlacesForFund(
+          fund.id,
+          fund.citizenPayApiKeyId,
+          fund.citizenPayApiKeyEnc,
+        ),
+        prisma.merchant.findMany({
+          where: { fundId: fund.id, citizenPayPlaceId: { not: null } },
+          select: { citizenPayPlaceId: true, name: true },
+        }),
+      ]);
+
+      const merchantNameByPlaceId = new Map<string, string>();
+      for (const m of merchants) {
+        if (m.citizenPayPlaceId)
+          merchantNameByPlaceId.set(m.citizenPayPlaceId, m.name);
+      }
+
+      // Addresses we can already label locally — skip the CP profile fetch.
+      const knownLocal = new Set<string>();
+      for (const c of cards)
+        if (c.account) knownLocal.add(c.account.toLowerCase());
+      for (const p of placesResult)
+        if (p.account) knownLocal.add(p.account.toLowerCase());
+      if (fund.tokenMinterEoaAddress)
+        knownLocal.add(fund.tokenMinterEoaAddress.toLowerCase());
+      if (fund.tokenMinterSmartAccountAddress)
+        knownLocal.add(fund.tokenMinterSmartAccountAddress.toLowerCase());
+
+      // Counterparties on this page that we can't label locally — resolve a
+      // CP profile so they show a name instead of "Unknown".
+      const unresolved = new Set<string>();
+      for (const tx of page.transfers) {
+        const counter =
+          tx.from.toLowerCase() === account ? tx.to : tx.from;
+        const lower = counter.toLowerCase();
+        if (isZeroAddress(lower) || knownLocal.has(lower)) continue;
+        unresolved.add(lower);
+      }
+
+      const fetchedProfiles =
+        unresolved.size === 0
+          ? []
+          : await Promise.all(
+              [...unresolved].map(async (addr) => {
+                const p = await getProfile(
+                  fund.id,
+                  fund.citizenPayApiKeyId,
+                  fund.citizenPayApiKeyEnc,
+                  addr,
+                );
+                if (!p) return null;
+                const name = p.name?.trim() || p.username?.trim();
+                if (!name) return null;
+                return { account: addr, name, imageSmall: p.imageSmall };
+              }),
+            ).then((arr) =>
+              arr.filter((x): x is NonNullable<typeof x> => x != null),
+            );
+
+      transferDirectory = buildAddressDirectory({
+        cards: cards.map((c) => ({
+          account: c.account,
+          holderName: c.holderName,
+          memberName: c.member
+            ? `${c.member.firstName} ${c.member.lastName}`.trim()
+            : "",
+          serialNumber: c.serialNumber,
+        })),
+        places: placesResult.map((p) => ({
+          account: p.account,
+          name: merchantNameByPlaceId.get(p.id) ?? p.name,
+        })),
+        profiles: fetchedProfiles,
+        minterEoa: fund.tokenMinterEoaAddress,
+        minterSmartAccount: fund.tokenMinterSmartAccountAddress,
+      });
+
+      transferRows = page.transfers.map((tx) => {
+        const isOut = tx.from.toLowerCase() === account;
+        return {
+          uniqueId: tx.uniqueId,
+          blockTimestamp: tx.blockTimestamp,
+          direction: isOut ? ("out" as const) : ("in" as const),
+          counterparty: isOut ? tx.to : tx.from,
+          rawValue: tx.rawValue,
+        };
+      });
+
+      transfersNextPageKey = page.nextPageKey;
+    } catch (e) {
+      console.warn("[merchant-detail] transfers fetch failed", e);
+      transfersUnavailable = true;
+    }
+  }
+
+  const coords =
+    merchant.latitude !== null && merchant.longitude !== null
+      ? { lat: merchant.latitude, lng: merchant.longitude }
+      : null;
+  const mapsUrl = coords
+    ? `https://www.openstreetmap.org/?mlat=${coords.lat}&mlon=${coords.lng}#map=16/${coords.lat}/${coords.lng}`
+    : null;
+
+  const invitePendingState =
+    merchant.status === "PENDING" && merchant.citizenPayInviteEmail !== null;
+
   return (
     <>
       <div className="flex items-center justify-between gap-4">
@@ -89,25 +275,76 @@ export default async function MerchantDetailPage({
         />
       </div>
 
-      <header className="space-y-2">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="font-heading text-2xl font-medium">{merchant.name}</h1>
-          <StatusBadge status={merchant.status} />
-          {emailVerified ? (
-            <Badge variant="success">{t("verified")}</Badge>
-          ) : (
-            <Badge variant="warning">{t("unverified")}</Badge>
-          )}
-          {cpConnected ? (
-            <Badge variant="success">{t("connected")}</Badge>
-          ) : (
-            <Badge>{t("notConnected")}</Badge>
+      <header className="flex items-start gap-4">
+        {merchant.logoUrl && (
+          // Merchant-supplied arbitrary URL — use a plain <img> rather than
+          // next/image so we don't have to allowlist every possible host in
+          // next.config (and we don't route untrusted URLs through the optimizer).
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={merchant.logoUrl}
+            alt=""
+            width={56}
+            height={56}
+            className="size-14 shrink-0 rounded-lg border object-cover"
+          />
+        )}
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="font-heading text-2xl font-medium">
+              {merchant.name}
+            </h1>
+            <StatusBadge status={merchant.status} />
+            {emailVerified ? (
+              <Badge variant="success">{t("verified")}</Badge>
+            ) : (
+              <Badge variant="warning">{t("unverified")}</Badge>
+            )}
+            {cpConnected ? (
+              <Badge variant="success">{t("connected")}</Badge>
+            ) : (
+              <Badge>{t("notConnected")}</Badge>
+            )}
+          </div>
+          {merchant.description && (
+            <p className="text-sm text-muted-foreground">
+              {merchant.description}
+            </p>
           )}
         </div>
-        {merchant.description && (
-          <p className="text-sm text-muted-foreground">{merchant.description}</p>
-        )}
       </header>
+
+      {invitePendingState && (
+        <Card size="sm">
+          <CardHeader>
+            <CardTitle>{t("invite.title")}</CardTitle>
+            <CardDescription>{t("invite.description")}</CardDescription>
+          </CardHeader>
+          <CardContent className="pb-3 text-sm">
+            <p>
+              {t("invite.sentTo", {
+                email: merchant.citizenPayInviteEmail ?? "",
+              })}
+              {merchant.citizenPayInviteSentAt &&
+                ` ${t("invite.on", {
+                  date: format.dateTime(merchant.citizenPayInviteSentAt, {
+                    dateStyle: "medium",
+                  }),
+                })}`}
+              .
+            </p>
+            {merchant.citizenPayInviteExpiresAt && (
+              <p className="mt-1 text-muted-foreground">
+                {t("invite.expires", {
+                  date: format.dateTime(merchant.citizenPayInviteExpiresAt, {
+                    dateStyle: "medium",
+                  }),
+                })}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <section className="grid gap-3 lg:grid-cols-2">
         <Card size="sm">
@@ -144,6 +381,29 @@ export default async function MerchantDetailPage({
                   merchant.country,
                 )}
               </DtDd>
+              {mapsUrl && coords && (
+                <DtDd label={t("contact.location")}>
+                  <a
+                    href={mapsUrl}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="inline-flex items-center gap-1 hover:underline"
+                  >
+                    {t("contact.coordinates", {
+                      lat: coords.lat,
+                      lng: coords.lng,
+                    })}
+                    <ExternalLink className="size-3" />
+                  </a>
+                </DtDd>
+              )}
+              {merchant.emailVerifiedAt && (
+                <DtDd label={t("contact.emailVerifiedAt")}>
+                  {format.dateTime(merchant.emailVerifiedAt, {
+                    dateStyle: "medium",
+                  })}
+                </DtDd>
+              )}
             </dl>
           </CardContent>
         </Card>
@@ -165,12 +425,56 @@ export default async function MerchantDetailPage({
               <DtDd label={t("business.citizenPayPlace")} mono>
                 {merchant.citizenPayPlaceId ?? "—"}
               </DtDd>
+              {merchant.citizenPayBusinessId && (
+                <DtDd label={t("business.citizenPayBusiness")} mono>
+                  {merchant.citizenPayBusinessId}
+                </DtDd>
+              )}
+              {merchant.citizenPayPlaceAccount && (
+                <DtDd label={t("business.citizenPayWallet")} mono>
+                  {merchant.citizenPayPlaceAccount}
+                </DtDd>
+              )}
+              {merchant.citizenPayPlaceId && (
+                <DtDd label={t("business.balance")}>
+                  {cpBalanceUnavailable ? (
+                    <span className="text-muted-foreground">
+                      {t("business.balanceUnavailable")}
+                    </span>
+                  ) : placeBalanceCents !== null ? (
+                    <span className="tabular-nums">
+                      {(placeBalanceCents / 100).toFixed(2)}
+                      {fund.tokenSymbol && (
+                        <span className="ml-1 text-xs text-muted-foreground">
+                          {fund.tokenSymbol}
+                        </span>
+                      )}
+                    </span>
+                  ) : (
+                    "—"
+                  )}
+                </DtDd>
+              )}
               <DtDd label={t("business.citizenPayActivated")}>
                 {merchant.citizenPayActivatedAt
                   ? format.dateTime(merchant.citizenPayActivatedAt, {
                       dateStyle: "medium",
                     })
                   : "—"}
+              </DtDd>
+              {merchant.citizenPayLastSyncedAt && (
+                <DtDd label={t("business.citizenPayLastSynced")}>
+                  {format.dateTime(merchant.citizenPayLastSyncedAt, {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  })}
+                </DtDd>
+              )}
+              <DtDd label={t("business.createdAt")}>
+                {format.dateTime(merchant.createdAt, { dateStyle: "medium" })}
+              </DtDd>
+              <DtDd label={t("business.updatedAt")}>
+                {format.dateTime(merchant.updatedAt, { dateStyle: "medium" })}
               </DtDd>
               {merchant.reviewedAt && (
                 <DtDd label={t("business.reviewed")}>
@@ -295,7 +599,144 @@ export default async function MerchantDetailPage({
           </TableBody>
         </Table>
       </section>
+
+      {showTransfers && (
+        <section className="space-y-3">
+          <h2 className="font-heading text-lg font-medium">
+            {t("transfers.title")}
+          </h2>
+          {transfersUnavailable ? (
+            <div className="rounded-lg border border-dashed bg-muted/30 p-6 text-sm text-muted-foreground">
+              {t("transfers.unavailable")}
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t("transfers.date")}</TableHead>
+                  <TableHead>{t("transfers.direction")}</TableHead>
+                  <TableHead>{t("transfers.counterparty")}</TableHead>
+                  <TableHead className="text-right">
+                    {t("transfers.amount")}
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {transferRows.length === 0 || !transferDirectory ? (
+                  <TableEmpty colSpan={4}>{t("transfers.empty")}</TableEmpty>
+                ) : (
+                  transferRows.map((tx) => (
+                    <TableRow key={tx.uniqueId}>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {tx.blockTimestamp
+                          ? format.dateTime(new Date(tx.blockTimestamp), {
+                              dateStyle: "medium",
+                              timeStyle: "short",
+                            })
+                          : "—"}
+                      </TableCell>
+                      <TableCell>
+                        {tx.direction === "in" ? (
+                          <span className="inline-flex items-center gap-1.5 text-sm">
+                            <ArrowDownLeft className="size-3.5 text-success" />
+                            {t("transfers.in")}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 text-sm">
+                            <ArrowUpRight className="size-3.5 text-muted-foreground" />
+                            {t("transfers.out")}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <AddressLabel
+                          address={tx.counterparty}
+                          directory={transferDirectory}
+                          // The counterparty's role in the transfer is the
+                          // opposite of the merchant's: an incoming transfer
+                          // means the counterparty was the sender ("from").
+                          side={tx.direction === "in" ? "from" : "to"}
+                          labels={{
+                            issued: t("transfers.issued"),
+                            retired: t("transfers.retired"),
+                            treasury: t("transfers.treasury"),
+                            unknown: t("transfers.unknown"),
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell className="text-right font-medium tabular-nums">
+                        {formatTokenAmount(tx.rawValue, fund.tokenDecimals)}
+                        {fund.tokenSymbol && (
+                          <span className="ml-1 text-xs text-muted-foreground">
+                            {fund.tokenSymbol}
+                          </span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          )}
+          {!transfersUnavailable && (
+            <TransfersPager
+              cursor={cursor ?? null}
+              nextPageKey={transfersNextPageKey}
+              labels={{
+                newer: t("transfers.newer"),
+                older: t("transfers.older"),
+              }}
+            />
+          )}
+        </section>
+      )}
     </>
+  );
+}
+
+// Cursor-only pager mirroring the card detail page. The merchant route has
+// no other query params to preserve, so "Newer" drops the cursor (first page)
+// and "Older" sets ?cursor=<nextPageKey>. Both render as <Link> so they're
+// shareable and survive SSR. Forward-only — Alchemy's pageKey can't go back.
+function TransfersPager({
+  cursor,
+  nextPageKey,
+  labels,
+}: {
+  cursor: string | null;
+  nextPageKey: string | null;
+  labels: { newer: string; older: string };
+}) {
+  if (!cursor && !nextPageKey) return null;
+  return (
+    <div className="flex items-center justify-end gap-2 pt-3">
+      <Link
+        href={{ query: {} }}
+        scroll={false}
+        aria-disabled={!cursor}
+        tabIndex={cursor ? undefined : -1}
+        className={cn(
+          buttonVariants({ variant: "outline", size: "sm" }),
+          !cursor && "pointer-events-none opacity-50",
+        )}
+      >
+        <RotateCcw className="size-3.5" />
+        {labels.newer}
+      </Link>
+      <Link
+        href={{ query: { cursor: nextPageKey ?? undefined } }}
+        scroll={false}
+        aria-disabled={!nextPageKey}
+        tabIndex={nextPageKey ? undefined : -1}
+        className={cn(
+          buttonVariants({ variant: "outline", size: "sm" }),
+          !nextPageKey && "pointer-events-none opacity-50",
+        )}
+      >
+        {labels.older}
+        <ChevronRight className="size-3.5" />
+      </Link>
+    </div>
   );
 }
 

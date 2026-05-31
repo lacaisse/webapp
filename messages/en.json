@@ -520,6 +520,13 @@
         "unverified": "Email not verified",
         "connected": "Citizen Pay connected",
         "notConnected": "Citizen Pay not connected",
+        "invite": {
+          "title": "Citizen Pay invite",
+          "description": "Status of the invite sent to the merchant.",
+          "sentTo": "Invite sent to {email}",
+          "on": "on {date}",
+          "expires": "Expires on {date}."
+        },
         "contact": {
           "title": "Contact",
           "description": "Public-facing contact information.",
@@ -527,7 +534,10 @@
           "email": "Email",
           "phone": "Phone",
           "website": "Website",
-          "address": "Address"
+          "address": "Address",
+          "location": "Location",
+          "coordinates": "{lat}, {lng}",
+          "emailVerifiedAt": "Email verified on"
         },
         "business": {
           "title": "Business",
@@ -536,7 +546,14 @@
           "position": "Directory position",
           "conditions": "Acceptance conditions",
           "citizenPayPlace": "Citizen Pay place ID",
+          "citizenPayBusiness": "Citizen Pay business ID",
+          "citizenPayWallet": "Wallet address",
+          "balance": "Balance",
+          "balanceUnavailable": "Unavailable",
           "citizenPayActivated": "Citizen Pay activation",
+          "citizenPayLastSynced": "Last synced",
+          "createdAt": "Created",
+          "updatedAt": "Updated",
           "reviewed": "Last reviewed",
           "reviewNote": "Review note"
         },
@@ -559,6 +576,23 @@
           "to": "To",
           "status": "Status",
           "empty": "No emails sent."
+        },
+        "transfers": {
+          "title": "Transfer history",
+          "date": "Date",
+          "direction": "Direction",
+          "in": "In",
+          "out": "Out",
+          "counterparty": "Counterparty",
+          "amount": "Amount",
+          "empty": "No on-chain transfers yet.",
+          "unavailable": "Transfer history is unavailable right now.",
+          "issued": "Issued",
+          "retired": "Retired",
+          "treasury": "Treasury",
+          "unknown": "Unknown",
+          "newer": "Newer",
+          "older": "Older"
         }
       }
     },
