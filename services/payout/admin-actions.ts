@@ -258,14 +258,17 @@ export async function findOrderBankTransactionAction(input: {
   const ref = `cp-order-${input.orderId}`;
   try {
     // `contains` narrows in SQL; the regex guard rejects prefix collisions
-    // (e.g. cp-order-447 inside cp-order-44790) by requiring no trailing digit.
-    const guard = new RegExp(`cp-order-${input.orderId}(?!\\d)`);
+    // (e.g. cp-order-447 inside cp-order-44790) by requiring no trailing
+    // digit. Banks normalise references inconsistently — we see both
+    // `cp-order-43414` and `CP-ORDER-43414` in the wild — so both the SQL
+    // narrow and the JS guard are case-insensitive.
+    const guard = new RegExp(`cp-order-${input.orderId}(?!\\d)`, "i");
     const candidates = await prisma.bankTransaction.findMany({
       where: {
         fundId: fund.id,
         OR: [
-          { counterpartReference: { contains: ref } },
-          { remittanceInfo: { contains: ref } },
+          { counterpartReference: { contains: ref, mode: "insensitive" } },
+          { remittanceInfo: { contains: ref, mode: "insensitive" } },
         ],
       },
       orderBy: { occurredAt: "desc" },
