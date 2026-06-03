@@ -438,18 +438,26 @@ function publicClientFor(chainId: number): PublicClient {
 
 type RpcResponse<T> = { result?: T; error?: { code: number; message: string } };
 
-function bundlerRpcUrl(chainId: number, paymaster: string): string {
-  const root = requireEnv("CITIZENPAY_BUNDLER_URL").replace(/\/$/, "");
-  return `${root}/v1/${chainId}/rpc/${paymaster}`;
+function bundlerRoot(): string {
+  return requireEnv("CITIZENPAY_BUNDLER_URL").replace(/\/$/, "");
 }
 
-async function bundlerRpc<T>(
-  chainId: number,
-  paymaster: string,
+// Sponsor/submit methods are scoped to a paymaster (it's bound into the URL).
+function bundlerRpcUrl(chainId: number, paymaster: string): string {
+  return `${bundlerRoot()}/v1/${chainId}/rpc/${paymaster}`;
+}
+
+// Plain chain reads (eth_*) don't need a paymaster — the node answers them at
+// the chain-scoped endpoint.
+function bundlerReadRpcUrl(chainId: number): string {
+  return `${bundlerRoot()}/v1/${chainId}/rpc`;
+}
+
+async function bundlerRpcAt<T>(
+  url: string,
   method: string,
   params: unknown[],
 ): Promise<T> {
-  const url = bundlerRpcUrl(chainId, paymaster);
   const res = await fetch(url, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -476,6 +484,15 @@ async function bundlerRpc<T>(
     );
   }
   return body.result;
+}
+
+async function bundlerRpc<T>(
+  chainId: number,
+  paymaster: string,
+  method: string,
+  params: unknown[],
+): Promise<T> {
+  return bundlerRpcAt<T>(bundlerRpcUrl(chainId, paymaster), method, params);
 }
 
 // =============================================================================
@@ -626,6 +643,39 @@ async function awaitUserOpSuccess(args: {
     "tx_failed",
     `UserOp ${args.userOpHash} did not confirm within ${USEROP_POLL_TIMEOUT_MS}ms`,
   );
+}
+
+type EthReceipt = { status?: string; blockNumber?: string } | null;
+
+/**
+ * Fetch a plain on-chain receipt via the bundler URL (which is a full
+ * JSON-RPC node — `eth_getTransactionReceipt` is supported there, and even
+ * resolves userOp hashes to their settlement tx). This is a chain read, so
+ * it hits the chain-scoped endpoint and needs no paymaster. Returns null
+ * when the tx isn't mined / isn't known to the node, and never throws.
+ */
+export async function getBundlerTxReceipt(args: {
+  chainId: number;
+  txHash: string;
+}): Promise<{ status: "success" | "reverted"; blockNumber: number | null } | null> {
+  try {
+    const r = await bundlerRpcAt<EthReceipt>(
+      bundlerReadRpcUrl(args.chainId),
+      "eth_getTransactionReceipt",
+      [args.txHash],
+    );
+    if (!r) return null; // not mined / unknown to the node
+    return {
+      status: r.status === "0x1" ? "success" : "reverted",
+      blockNumber: r.blockNumber ? Number.parseInt(r.blockNumber, 16) : null,
+    };
+  } catch (e) {
+    console.warn("[receipts] eth_getTransactionReceipt failed", {
+      hash: args.txHash,
+      error: e instanceof Error ? e.message : String(e),
+    });
+    return null;
+  }
 }
 
 // =============================================================================

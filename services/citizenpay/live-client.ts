@@ -5,9 +5,11 @@ import { Prisma } from "@/services/db/generated/client";
 import { prisma } from "@/services/db/prisma";
 
 import {
+  banking as apiBanking,
   businesses as apiBusinesses,
   cards as apiCards,
   invites as apiInvites,
+  payouts as apiPayouts,
   places as apiPlaces,
   profiles as apiProfiles,
   PROFILES_BATCH_MAX,
@@ -15,9 +17,21 @@ import {
   CitizenPayApiError,
   type InviteWire,
   type PaginatedCards,
+  type PayoutDraftWire,
+  type PayoutListPageWire,
+  type PayoutListWire,
+  type PayoutOrderWire,
+  type BankTransactionWire,
 } from "./api";
 import type { CitizenPayClient } from "./client-interface";
 import type {
+  ArchivedPayout,
+  BankBalance,
+  BankingStatus,
+  BankTransactionPayload,
+  BankTransactionPayloadPage,
+  BankTransactionsPage,
+  BurnPayoutResult,
   CardOperationInput,
   CardOperationResult,
   CardStatus,
@@ -25,12 +39,22 @@ import type {
   CitizenPayCardDetail,
   CitizenPayInvite,
   CitizenPayProfile,
+  CreatedPayout,
+  CreatedPayoutOrder,
+  CreatePayoutOrderInput,
+  CreatePayoutPaymentResult,
   ListBankTransactionsInput,
   ListBankTransactionsResult,
   ListCardsInput,
   ListCardsResult,
   ListPlacesResult,
   OperationStatusResult,
+  Payout,
+  PayoutDraft,
+  PayoutDraftPreview,
+  PayoutOrder,
+  PayoutOrdersPage,
+  PayoutStatusDetail,
   RegisteredCard,
   RegisterCardInput,
   SubmitMintInput,
@@ -50,16 +74,110 @@ import type {
 // → CitizenPay"):
 //   - `getOperationStatus`: top-up/charge/withdraw are synchronous in the
 //     v2 API. We return CONFIRMED for any txHash the polling cron passes in.
-//   - `listBankTransactions`: the v2 API has no equivalent. We return empty
-//     and log so the cron doesn't crash. The intended replacement is the
-//     `/{id}/payments/request` flow (member-initiated PSD2 SCA), which is
-//     a different shape and needs a UI redesign.
+//   - `listBankTransactions` (bank-sync cron) is served by the same
+//     `/v2/treasury/banking/transactions` feed the Bank page reads. It's
+//     cursor-paginated newest-first, so we page backwards until we cross the
+//     `since` watermark (or exhaust history on the initial full load) and
+//     adapt the wire shape (signed amount → direction + magnitude) to the
+//     ingest payload.
 
 function toCents(decimal: string | Prisma.Decimal): number {
   const d = decimal instanceof Prisma.Decimal ? decimal : new Prisma.Decimal(decimal);
   // Round to 2dp first to avoid floating-point hex from a previously-stored
   // value like "1.234999..." sneaking through.
   return d.mul(100).toDecimalPlaces(0, Prisma.Decimal.ROUND_HALF_UP).toNumber();
+}
+
+function centsToDecimal(cents: number | null | undefined): string {
+  // Live payout rows occasionally omit a numeric field (e.g. total_fees /
+  // manual_deduction on older completed payouts). Treat anything non-finite
+  // as 0 rather than throwing a DecimalError mid-render.
+  const n = typeof cents === "number" && Number.isFinite(cents) ? cents : 0;
+  return new Prisma.Decimal(n).div(100).toFixed(2);
+}
+
+// Adapt a banking-feed transaction (signed amount, Ponto field names) to the
+// ingest payload (direction + magnitude). `counterpartReference` from the feed
+// is the counterpart's IBAN, so it maps to `counterpartIban` (where the member
+// matcher expects it) rather than `counterpartReference`. The member payment
+// reference travels in the structured remittance info.
+function payloadFromBankingWire(
+  tx: BankTransactionWire,
+  occurredAt: string,
+): BankTransactionPayload {
+  return {
+    externalId: tx.id,
+    direction: tx.amount < 0 ? "OUTGOING" : "INCOMING",
+    amount: new Prisma.Decimal(tx.amount).abs().toFixed(2),
+    currency: tx.currency || "EUR",
+    occurredAt,
+    counterpartName: tx.counterpartName ?? null,
+    counterpartIban: tx.counterpartReference ?? null,
+    counterpartReference: null,
+    remittanceInfo: tx.remittanceInformation ?? null,
+    rawData: tx,
+  };
+}
+
+function payoutFromListWire(w: PayoutListWire): Payout {
+  return {
+    id: w.payoutId,
+    businessId: w.businessId,
+    placeId: w.placeId,
+    businessName: w.businessName ?? null,
+    placeName: w.placeName ?? null,
+    placeImage: w.placeImage || null,
+    startDate: w.startDate,
+    endDate: w.endDate,
+    totalAmount: centsToDecimal(w.total),
+    totalFees: centsToDecimal(w.fees),
+    manualDeduction: centsToDecimal(w.manualDeduction),
+    manualDeductionComment: null,
+    net: centsToDecimal(w.net),
+    status: w.status,
+    // Burn hashes / ponto id / emails aren't in the list shape — they live
+    // on the order/status endpoints. Surface what the list gives us.
+    burnTxHashes: [],
+    pontoPaymentId: null,
+    pontoPaymentStatus: w.pontoPaymentStatus ?? null,
+    emailRecipient: null,
+    emailSentAt: null,
+    createdAt: w.createdAt,
+    updatedAt: w.updatedAt,
+  };
+}
+
+function draftFromWire(w: PayoutDraftWire): PayoutDraft {
+  return {
+    businessId: w.businessId,
+    placeId: w.placeId,
+    placeName: w.placeName,
+    placeImage: w.placeImage || null,
+    orderCount: w.orderCount,
+    total: centsToDecimal(w.total),
+    fees: centsToDecimal(w.fees),
+    net: centsToDecimal(w.net),
+  };
+}
+
+function payoutOrderFromWire(w: PayoutOrderWire): PayoutOrder {
+  const totalC = typeof w.total === "number" ? w.total : 0;
+  const feesC = typeof w.fees === "number" ? w.fees : 0;
+  return {
+    id: w.id,
+    total: centsToDecimal(totalC),
+    fees: centsToDecimal(feesC),
+    // net = total − fees, computed from cents (the wire `due` is unreliable).
+    net: centsToDecimal(totalC - feesC),
+    due: centsToDecimal(w.due),
+    status: w.status,
+    type: w.type,
+    description: w.description ?? null,
+    items: Array.isArray(w.items) ? w.items : [],
+    txHash: w.txHash ?? w.tx_hash ?? null,
+    account: w.account || null,
+    completedAt: w.completed_at ?? w.date ?? null,
+  };
 }
 
 function statusFromWire(s: "active" | "inactive" | "blocked"): CardStatus {
@@ -174,17 +292,69 @@ export class LiveCitizenPayClient implements CitizenPayClient {
     return { txHash, status: "CONFIRMED" };
   }
 
+  async getBankTransactionPayloadPage(
+    query: { limit?: number; cursor?: string } = {},
+  ): Promise<BankTransactionPayloadPage> {
+    // One page of `/v2/treasury/banking/transactions` (the same feed the Bank
+    // page reads), adapted to the ingest payload shape. Newest-first; pass the
+    // returned cursor back for older pages.
+    const w = await apiBanking.transactions(this.creds, {
+      limit: query.limit ?? 100,
+      cursor: query.cursor,
+    });
+    const raw = w.transactions ?? [];
+    const transactions: BankTransactionPayload[] = [];
+    for (const tx of raw) {
+      const occurredAt = tx.executionDate ?? tx.valueDate ?? tx.createdAt;
+      // Can't place it in time → can't store a sane occurredAt. Skip rather
+      // than guess.
+      if (!occurredAt) continue;
+      transactions.push(payloadFromBankingWire(tx, occurredAt));
+    }
+    return { transactions, nextCursor: w.nextCursor ?? null, fetched: raw.length };
+  }
+
   async listBankTransactions(
     input: ListBankTransactionsInput,
   ): Promise<ListBankTransactionsResult> {
-    // The v2 API doesn't expose bank movements. The bank-sync cron is a
-    // no-op against the live client until we wire the
-    // `/{id}/payments/request` flow (or another bank-feed source).
-    console.warn(
-      "[citizenpay] listBankTransactions is not supported by the v2 API — returning empty",
-      { fundCitizenPayId: input.fundCitizenPayId, since: input.since },
-    );
-    return { transactions: [] };
+    // Cron path: page the banking feed (newest-first) and stop as soon as we
+    // cross the `since` watermark. With no `since` (first sync) we page until
+    // history is exhausted. The ingest upsert is idempotent on
+    // (fundId, externalId), so incidental overlap on the boundary is harmless.
+    const PAGE_SIZE = 100;
+    // Runaway guard for the first full sync. 200 pages × 100 = 20k rows; we
+    // log if we hit it so a silently-truncated history is visible.
+    const MAX_PAGES = 200;
+    const sinceMs = input.since ? Date.parse(input.since) : null;
+
+    const out: BankTransactionPayload[] = [];
+    let cursor: string | undefined;
+    let reachedWatermark = false;
+    let page = 0;
+    for (; page < MAX_PAGES; page++) {
+      const { transactions, nextCursor, fetched } =
+        await this.getBankTransactionPayloadPage({ limit: PAGE_SIZE, cursor });
+      for (const tx of transactions) {
+        if (sinceMs !== null && Date.parse(tx.occurredAt) <= sinceMs) {
+          reachedWatermark = true;
+          break;
+        }
+        out.push(tx);
+      }
+      // Stop on the watermark, an empty raw page (nothing left even if a stale
+      // cursor lingers), or an absent next cursor.
+      if (reachedWatermark || fetched === 0 || !nextCursor) break;
+      cursor = nextCursor;
+    }
+
+    if (page >= MAX_PAGES && !reachedWatermark) {
+      console.warn(
+        "[citizenpay] listBankTransactions hit MAX_PAGES — older transactions may be unsynced",
+        { fundCitizenPayId: input.fundCitizenPayId, maxPages: MAX_PAGES },
+      );
+    }
+
+    return { transactions: out };
   }
 
   async listPlaces(): Promise<ListPlacesResult> {
@@ -401,6 +571,219 @@ export class LiveCitizenPayClient implements CitizenPayClient {
     return responses.flatMap((r) =>
       r.profiles.map((wire) => (wire ? wireToProfile(wire) : null)),
     );
+  }
+
+  async listPayoutDrafts(
+    query: { from?: string; to?: string } = {},
+  ): Promise<PayoutDraft[]> {
+    const { drafts } = await apiPayouts.listDrafts(this.creds, query);
+    return (drafts ?? []).map(draftFromWire);
+  }
+
+  async previewPayoutDraft(args: {
+    placeId: string;
+    from: string;
+    to: string;
+  }): Promise<PayoutDraftPreview> {
+    const w = await apiPayouts.previewDraft(this.creds, args);
+    return { ...draftFromWire(w), from: w.from, to: w.to };
+  }
+
+  async createPayout(args: {
+    placeId: string;
+    from: string;
+    to: string;
+  }): Promise<CreatedPayout> {
+    const w = await apiPayouts.create(this.creds, args);
+    return {
+      payoutId: w.payoutId,
+      status: w.status,
+      orderCount: w.orderCount,
+      total: centsToDecimal(w.total),
+      fees: centsToDecimal(w.fees),
+      net: centsToDecimal(w.net),
+      startDate: w.startDate,
+      endDate: w.endDate,
+    };
+  }
+
+  async getPayoutOrders(
+    payoutId: string,
+    query: { limit?: number; offset?: number } = {},
+  ): Promise<PayoutOrdersPage> {
+    const res = await apiPayouts.orders(this.creds, payoutId, query);
+    const orders = (res.orders ?? []).map(payoutOrderFromWire);
+    return {
+      orders,
+      total: res.total ?? orders.length,
+      limit: res.limit,
+      offset: res.offset,
+      placeAccountAddress: res.placeAccountAddress
+        ? res.placeAccountAddress.toLowerCase()
+        : null,
+    };
+  }
+
+  async recordOrderTxHash(
+    payoutId: string,
+    orderId: number,
+    txHash: string,
+  ): Promise<void> {
+    await apiPayouts.setOrderTxHash(this.creds, payoutId, orderId, txHash);
+  }
+
+  async createPayoutOrder(
+    payoutId: string,
+    input: CreatePayoutOrderInput,
+  ): Promise<CreatedPayoutOrder> {
+    const res = await apiPayouts.createOrder(this.creds, payoutId, {
+      total: toCents(input.total),
+      fees: toCents(input.fees),
+      description: input.description,
+    });
+    return {
+      order: payoutOrderFromWire(res.order),
+      payout: {
+        payoutId: res.payout.payoutId,
+        total: centsToDecimal(res.payout.total),
+        fees: centsToDecimal(res.payout.fees),
+        net: centsToDecimal(res.payout.net),
+      },
+    };
+  }
+
+  async archiveOrder(
+    payoutId: string,
+    orderId: number,
+  ): Promise<ArchivedPayout> {
+    const { payout } = await apiPayouts.archiveOrder(
+      this.creds,
+      payoutId,
+      orderId,
+    );
+    return {
+      payoutId: payout.payoutId,
+      total: centsToDecimal(payout.total),
+      fees: centsToDecimal(payout.fees),
+      net: centsToDecimal(payout.net),
+    };
+  }
+
+  async getBankingStatus(): Promise<BankingStatus> {
+    const w = await apiBanking.status(this.creds);
+    return {
+      connected: Boolean(w.connected),
+      status: w.status || "not_connected",
+      accountReference: w.accountReference ?? null,
+      accountName: w.accountName ?? null,
+      onboardingComplete: Boolean(w.onboardingComplete),
+      paymentInitiationEnabled: Boolean(w.paymentInitiationEnabled),
+      paymentInitiationRequested: Boolean(w.paymentInitiationRequested),
+      paymentRequestsEnabled: Boolean(w.paymentRequestsEnabled),
+      ready: Boolean(w.ready),
+    };
+  }
+
+  async getBankingBalance(): Promise<BankBalance> {
+    const w = await apiBanking.balance(this.creds);
+    return {
+      accountId: w.accountId,
+      reference: w.reference ?? null,
+      currency: w.currency || "EUR",
+      availableBalance:
+        typeof w.availableBalance === "number" ? w.availableBalance : null,
+      currentBalance:
+        typeof w.currentBalance === "number" ? w.currentBalance : null,
+    };
+  }
+
+  async getBankingTransactions(
+    query: { limit?: number; cursor?: string } = {},
+  ): Promise<BankTransactionsPage> {
+    const w = await apiBanking.transactions(this.creds, query);
+    return {
+      transactions: (w.transactions ?? []).map((tx) => ({
+        id: tx.id,
+        amount: typeof tx.amount === "number" ? tx.amount : 0,
+        currency: tx.currency || "EUR",
+        executionDate: tx.executionDate ?? null,
+        valueDate: tx.valueDate ?? null,
+        counterpartName: tx.counterpartName ?? null,
+        counterpartReference: tx.counterpartReference ?? null,
+        remittanceInformation: tx.remittanceInformation ?? null,
+        remittanceInformationType: tx.remittanceInformationType ?? null,
+        description: tx.description ?? null,
+        createdAt: tx.createdAt ?? null,
+      })),
+      nextCursor: w.nextCursor ?? null,
+    };
+  }
+
+  async listPendingPayouts(): Promise<Payout[]> {
+    return this.collectPayouts((query) =>
+      apiPayouts.listPending(this.creds, query),
+    );
+  }
+
+  async listCompletedPayouts(): Promise<Payout[]> {
+    return this.collectPayouts((query) =>
+      apiPayouts.listCompleted(this.creds, query),
+    );
+  }
+
+  // The list endpoints are paginated (`{ payouts, total, limit, offset }`).
+  // Page through to the full set so the views don't silently truncate;
+  // advance by the actual rows returned (the server may cap the page size
+  // below what we request), with a hard stop as a runaway guard.
+  private async collectPayouts(
+    fetchPage: (query: { limit: number; offset: number }) => Promise<PayoutListPageWire>,
+  ): Promise<Payout[]> {
+    const LIMIT = 100;
+    const all: PayoutListWire[] = [];
+    let offset = 0;
+    for (let i = 0; i < 100; i++) {
+      const page = await fetchPage({ limit: LIMIT, offset });
+      const rows = page.payouts ?? [];
+      all.push(...rows);
+      const total = page.total ?? all.length;
+      offset += rows.length;
+      if (rows.length === 0 || all.length >= total) break;
+    }
+    return all.map(payoutFromListWire);
+  }
+
+  async getPayoutStatus(
+    payoutId: string,
+    opts: { redirectUrl?: string } = {},
+  ): Promise<PayoutStatusDetail> {
+    const res = await apiPayouts.status(this.creds, payoutId, {
+      redirectUrl: opts.redirectUrl,
+    });
+    return { status: res.status, signingUrl: res.signingUrl ?? null };
+  }
+
+  async createPayoutPayment(
+    payoutId: string,
+    args: { redirectUrl?: string } = {},
+  ): Promise<CreatePayoutPaymentResult> {
+    const res = await apiPayouts.createPayment(this.creds, payoutId, {
+      redirectUrl: args.redirectUrl,
+    });
+    if (res.alreadyCreated) return { alreadyCreated: true };
+    return {
+      alreadyCreated: false,
+      paymentId: res.paymentId,
+      signingUrl: res.signingUrl,
+    };
+  }
+
+  async burnPayout(payoutId: string): Promise<BurnPayoutResult> {
+    const { txHash } = await apiPayouts.burn(this.creds, payoutId);
+    return { txHash };
+  }
+
+  async completePayout(payoutId: string): Promise<void> {
+    await apiPayouts.complete(this.creds, payoutId);
   }
 }
 

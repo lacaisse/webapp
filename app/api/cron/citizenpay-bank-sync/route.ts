@@ -11,8 +11,17 @@ import { prisma } from "@/services/db/prisma";
 //
 // A fund is "connected" when Fund.citizenPayFundId is set. Funds without
 // it are skipped — there's nothing to ask CP about.
+//
+// Production only. We never auto-poll CP from dev or preview deployments —
+// dev runs against the in-process mock and we don't want preview branches
+// racing prod for the same treasuries. Admins can still trigger a sync
+// manually from the Bank page (see services/bank/admin-actions.ts).
 
 export async function GET(request: NextRequest) {
+  if (process.env.VERCEL_ENV !== "production") {
+    return NextResponse.json({ skipped: "non-production" });
+  }
+
   const expected = process.env.CRON_SECRET;
   if (expected) {
     const auth = request.headers.get("authorization");

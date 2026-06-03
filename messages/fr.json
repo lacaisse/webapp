@@ -121,10 +121,76 @@
       "token": "Jeton",
       "merchants": "Commerces",
       "payments": "Paiements",
+      "bank": "Banque",
       "referrals": "Parrainage",
       "emails": "Emails",
       "settings": "Paramètres",
       "backToApex": "Retour à mes caisses"
+    },
+    "bank": {
+      "title": "Banque",
+      "description": "La connexion bancaire de votre caisse, utilisée pour payer les commerces.",
+      "status": {
+        "ready": "Prêt",
+        "notReady": "Pas prêt",
+        "noAccount": "Aucun compte bancaire connecté"
+      },
+      "flags": {
+        "connected": "Banque connectée",
+        "onboardingComplete": "Intégration terminée",
+        "paymentInitiationEnabled": "Initiation de paiement activée",
+        "paymentRequestsEnabled": "Demandes de paiement activées"
+      },
+      "notice": {
+        "connect": "Aucune banque n'est encore connectée. Connectez votre banque dans le tableau de bord CitizenPay pour activer les virements.",
+        "activate": "Votre banque est connectée mais l'initiation de paiement n'est pas encore activée. Activez-la dans le tableau de bord CitizenPay pour initier des virements."
+      },
+      "balance": {
+        "available": "Solde disponible",
+        "current": "Solde actuel"
+      },
+      "transactions": {
+        "title": "Transactions",
+        "date": "Date",
+        "counterpart": "Contrepartie",
+        "reference": "Référence",
+        "member": "Membre",
+        "amount": "Montant",
+        "empty": "Aucune transaction pour le moment.",
+        "emptyRange": "Aucune transaction sur cette période.",
+        "prev": "Précédent",
+        "next": "Suivant",
+        "total": "{count, plural, =1 {# transaction} other {# transactions}}"
+      },
+      "fullSync": {
+        "trigger": "Synchronisation complète",
+        "confirmTitle": "Lancer une synchronisation bancaire complète ?",
+        "confirmDescription": "Cela récupère tout l'historique des transactions bancaires depuis CitizenPay et le copie localement. Les nouveaux virements entrants associés à un membre peuvent déclencher des émissions de jetons. L'opération peut être relancée sans risque — les transactions déjà synchronisées sont ignorées.",
+        "confirmCancel": "Annuler",
+        "confirmRun": "Lancer la synchronisation",
+        "running": "Synchronisation…",
+        "progress": "{ingested, plural, =1 {# transaction synchronisée} other {# transactions synchronisées}} · {matched} associées · {minted} émises",
+        "pages": "{pages, plural, =1 {# page} other {# pages}}",
+        "stop": "Arrêter",
+        "completeTitle": "Synchronisation complète terminée",
+        "completeSummary": "{ingested, plural, =1 {# transaction synchronisée} other {# transactions synchronisées}} · {matched} associées · {minted} émises",
+        "errorTitle": "Synchronisation interrompue",
+        "error": "Impossible de terminer la synchronisation bancaire. Veuillez réessayer.",
+        "resume": "Reprendre",
+        "notConnected": "Connectez un compte bancaire avant de lancer une synchronisation.",
+        "stalled": "Le flux bancaire n'avance plus. Reprenez pour réessayer.",
+        "limitReached": "En pause après un grand lot. Reprenez pour continuer à synchroniser les transactions plus anciennes."
+      },
+      "range": {
+        "today": "Aujourd'hui",
+        "last7": "7 derniers jours",
+        "last30": "30 derniers jours",
+        "thisMonth": "Ce mois-ci",
+        "lastMonth": "Le mois dernier",
+        "custom": "Personnalisé",
+        "from": "Du",
+        "to": "Au"
+      }
     },
     "dashboard": {
       "title": "Tableau de bord",
@@ -602,7 +668,9 @@
       "tabs": {
         "transactions": "Transactions",
         "unmatched": "Non attribuées",
-        "payouts": "Virements"
+        "drafts": "Brouillons",
+        "pending": "En attente",
+        "completed": "Réglés"
       },
       "transactions": {
         "date": "Date",
@@ -614,12 +682,198 @@
         "unmatched": "Non attribuée",
         "empty": "Aucune transaction pour le moment."
       },
-      "payouts": {
-        "date": "Date",
-        "merchant": "Commerce",
-        "reference": "Référence",
-        "amount": "Montant",
-        "empty": "Aucun virement pour le moment."
+      "settlement": {
+        "place": "Commerce",
+        "period": "Période",
+        "orderCount": "Commandes",
+        "total": "Total",
+        "fees": "Frais",
+        "net": "Net",
+        "placeBalance": "Solde du commerce",
+        "placeBalanceEnough": "Suffisant pour brûler",
+        "placeBalanceLow": "Inférieur au montant net",
+        "status": "Statut",
+        "burnTx": "Tx de burn",
+        "loadError": "Impossible de charger les virements depuis CitizenPay. Réessayez bientôt.",
+        "drafts": {
+          "description": "Commandes payées pas encore intégrées à un virement, groupées par commerce. Choisissez un commerce et une période pour créer un virement.",
+          "empty": "Aucune commande à régler."
+        },
+        "pending": {
+          "description": "Virements créés en attente de règlement — brûlez les jetons et payez le commerce (dans n’importe quel ordre).",
+          "empty": "Aucun virement en attente de règlement."
+        },
+        "completed": {
+          "description": "Virements dont le paiement bancaire et le burn de jetons sont terminés.",
+          "empty": "Aucun virement réglé pour le moment."
+        },
+        "statuses": {
+          "pending": "En attente",
+          "payment-pending": "Paiement en cours",
+          "burnt": "Brûlé",
+          "complete": "Terminé"
+        },
+        "signed": {
+          "title": "Paiement signé",
+          "description": "Votre virement bancaire a été signé.",
+          "close": "Vous pouvez fermer cet onglet."
+        },
+        "process": {
+          "title": "Traiter le virement",
+          "refresh": "Actualiser le statut",
+          "steps": {
+            "pending": "En attente",
+            "burnt": "Brûlé",
+            "awaitingSignature": "En attente de signature",
+            "complete": "Terminé"
+          },
+          "burn": {
+            "hint": "Brûle le montant net du compte du commerce on-chain."
+          },
+          "pay": {
+            "hint": "Crée le paiement bancaire au commerce ; vous signerez le virement à votre banque.",
+            "notEnabled": "L'initiation de paiement n'est pas activée sur votre connexion bancaire ; le virement ne peut donc pas encore être créé.",
+            "openBank": "Configurez-la dans Banque"
+          },
+          "awaiting": {
+            "hint": "En attente de la signature du virement bancaire."
+          },
+          "sign": {
+            "create": "Payer le commerce",
+            "hint": "Signez le virement bancaire pour finaliser le versement.",
+            "browser": "Compléter dans le navigateur",
+            "qrHint": "Ou scannez ce QR code pour signer sur votre téléphone."
+          },
+          "complete": {
+            "hint": "Ce virement est réglé."
+          },
+          "markComplete": {
+            "hint": "Réglé autrement ?",
+            "button": "Marquer comme terminé",
+            "title": "Marquer le versement comme terminé ?",
+            "description": "Marque ce versement comme terminé sans brûler de jetons ni initier de virement bancaire. À utiliser uniquement si vous avez déjà réglé le marchand d'une autre manière.",
+            "warning": "Cela contourne le règlement et est irréversible.",
+            "confirm": "Marquer comme terminé"
+          }
+        },
+        "create": {
+          "trigger": "Créer un virement",
+          "title": "Créer un virement — {place}",
+          "description": "Regroupez les commandes payées de ce commerce sur une période dans un virement en attente. La période est semi-ouverte : la date de fin est exclue.",
+          "from": "Du",
+          "to": "Au (exclu)",
+          "rangeHint": "Prévisualisez pour voir combien de commandes tombent dans la période avant de créer.",
+          "preview": "Prévisualiser",
+          "previewOrders": "{count, plural, =0 {Aucune commande} one {# commande} other {# commandes}} dans la période",
+          "confirm": "Créer le virement"
+        },
+        "createOrder": {
+          "trigger": "Ajouter une commande",
+          "title": "Ajouter une commande",
+          "description": "Ajoutez une commande à ce versement — choisissez un virement entrant ou saisissez le montant vous-même.",
+          "modeManual": "Saisie manuelle",
+          "modeBank": "Depuis un virement",
+          "pickHint": "Choisissez un virement entrant — sa référence devient la description de la commande.",
+          "loadingTransactions": "Chargement des virements…",
+          "noTransactions": "Aucun virement entrant à sélectionner.",
+          "unknownCounterpart": "Expéditeur inconnu",
+          "amount": "Montant",
+          "fee": "Frais",
+          "descriptionLabel": "Description",
+          "descriptionPlaceholder": "Objet de la commande",
+          "net": "Net",
+          "confirm": "Ajouter la commande"
+        },
+        "pay": {
+          "button": "Payer le commerce",
+          "openSigning": "Ouvrir la page de signature",
+          "alreadyCreated": "Paiement déjà créé."
+        },
+        "burn": {
+          "button": "Brûler les jetons",
+          "title": "Brûler les jetons du virement ?",
+          "description": "Cette action brûle les jetons on-chain correspondant à ce virement. Le burn et le paiement bancaire sont indépendants — dans n’importe quel ordre.",
+          "warning": "Cette action est irréversible. Les jetons de ce virement seront définitivement brûlés.",
+          "confirm": "Brûler les jetons",
+          "success": "Jetons brûlés. Hash de transaction :"
+        },
+        "orders": {
+          "title": "Commandes",
+          "id": "ID",
+          "date": "Date",
+          "type": "Type",
+          "orderStatus": "Statut",
+          "amount": "Montant",
+          "empty": "Aucune commande dans ce virement.",
+          "tabConfirmed": "Confirmées",
+          "tabIssues": "Problèmes",
+          "issuesEmpty": "Aucun problème — toutes les commandes sont réglées.",
+          "truncated": "Liste tronquée — toutes les commandes ne sont pas affichées.",
+          "loadError": "Impossible de charger les commandes. Réessayez bientôt.",
+          "verifying": "Vérification {checked}/{total}…",
+          "verifyingLabel": "Vérification des transactions",
+          "verifyingEmpty": "Vérification des commandes…",
+          "range": "Affichage {from}–{to}",
+          "prev": "Précédent",
+          "next": "Suivant",
+          "receipt": {
+            "success": "Confirmé",
+            "reverted": "Échec",
+            "pending": "Non confirmé"
+          }
+        },
+        "statusCheck": {
+          "button": "Statut",
+          "title": "Vérifier le statut de règlement en direct (fait avancer et finalise le virement)"
+        },
+        "reconcile": {
+          "pending": "Réconciliation…",
+          "fix": {
+            "button": "Corriger",
+            "title": "Réconcilier la commande",
+            "mintOnly": "Émettre {net} vers le commerce pour régler cette commande on-chain.",
+            "burnMint": "Brûler {total} du payeur ({account}) et émettre {net} vers le commerce (les frais sont la différence).",
+            "noPlaceAccount": "Ce commerce n’a pas encore de compte on-chain — impossible d’émettre vers lui.",
+            "warning": "Cette action déplace de vrais jetons on-chain et est irréversible.",
+            "insufficient": "Le payeur ne détient plus les {total} à brûler, l’opération ne peut donc pas aboutir. Archivez plutôt la commande.",
+            "confirm": "Confirmer",
+            "success": "Terminé. Transaction d’émission :",
+            "payerBalance": "Solde du payeur",
+            "payerNoHistory": "Aucune transaction trouvée pour ce compte."
+          },
+          "archive": {
+            "button": "Archiver",
+            "title": "Archiver cette commande ?",
+            "description": "La commande est retirée du virement et les totaux sont recalculés. Elle ne sera incluse dans aucun virement futur.",
+            "confirm": "Archiver la commande"
+          }
+        },
+        "details": "Détails",
+        "detail": {
+          "back": "Retour aux virements",
+          "untitled": "Virement"
+        },
+        "errors": {
+          "payFailed": "Impossible de créer le paiement. Réessayez bientôt.",
+          "burnFailed": "Impossible de brûler les jetons. Réessayez bientôt.",
+          "previewFailed": "Impossible de prévisualiser la période. Réessayez bientôt.",
+          "createFailed": "Impossible de créer le virement. Réessayez bientôt.",
+          "statusFailed": "Impossible de récupérer le statut. Réessayez bientôt.",
+          "ordersFailed": "Impossible de charger les commandes. Réessayez bientôt.",
+          "rangeInvalid": "Choisissez une date de début et de fin valides.",
+          "rangeOrder": "La date de fin doit être postérieure à la date de début.",
+          "noPlaceAccount": "Ce commerce n’a pas de compte on-chain pour recevoir l’émission.",
+          "recordFailed": "Émis on-chain mais impossible de l’enregistrer sur le virement.",
+          "archiveFailed": "Impossible d’archiver la commande. Réessayez bientôt.",
+          "payerFailed": "Impossible de charger le compte du payeur.",
+          "createOrderFailed": "Impossible d'ajouter la commande. Réessayez bientôt.",
+          "amountInvalid": "Saisissez un montant valide.",
+          "feeInvalid": "Saisissez des frais valides.",
+          "amountPositive": "Le montant doit être supérieur à zéro.",
+          "feeTooHigh": "Les frais ne peuvent pas dépasser le montant.",
+          "descriptionTooLong": "La description est trop longue.",
+          "completeFailed": "Impossible de marquer le versement comme terminé. Réessayez bientôt."
+        }
       },
       "admin": {
         "link": {

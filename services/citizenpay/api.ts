@@ -105,26 +105,129 @@ export type PaginatedOrders = {
   offset: number;
 };
 
-export type PayoutWire = {
-  id: string;
-  business_id: string;
-  place_id: string;
-  start_date: string;
-  end_date: string;
-  total_amount: number; // cents
-  status: "pending" | "burnt" | "payment-pending" | "complete";
-  burn_tx_hashes?: Record<string, unknown> | null;
-  ponto_payment_id?: string | null;
-  ponto_payment_status?: string | null;
-  tokens: string[];
-  total_fees: number;
-  email_sent_at?: string | null;
-  email_recipient?: string | null;
-  email_id?: string | null;
-  manual_deduction: number;
-  manual_deduction_comment?: string | null;
-  created_at: string;
-  updated_at: string;
+// A payout as returned by the LIST endpoints (`/payouts/pending` and
+// `/payouts/completed`). camelCase + integer cents, with `net` precomputed
+// and the place/business labels denormalised. The list only ever carries
+// the STORED status (`pending` | `complete`) — the live lifecycle (`burnt`,
+// `payment-pending`) comes from `/status`. Burn tx hashes / ponto payment
+// id / emails are NOT in the list shape.
+export type PayoutListWire = {
+  payoutId: string;
+  businessId: string;
+  placeId: string;
+  businessName?: string | null;
+  placeName?: string | null;
+  placeImage?: string | null;
+  status: "pending" | "complete";
+  total?: number | null; // cents
+  fees?: number | null; // cents
+  manualDeduction?: number | null; // cents
+  net?: number | null; // cents — what the merchant is paid
+  tokens?: string[];
+  pontoPaymentStatus?: string | null;
+  startDate: string;
+  endDate: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+// The list endpoints are paginated: `{ payouts, total, limit, offset }`.
+// `payouts` is null when the page is empty.
+export type PayoutListPageWire = {
+  payouts: PayoutListWire[] | null;
+  total?: number;
+  limit?: number;
+  offset?: number;
+};
+
+// A draft payout: a computed summary of paid/refunded orders for one place
+// that don't yet belong to a payout. Not stored — recomputed on every read.
+// camelCase + integer cents on the wire. `net = total - fees`.
+export type PayoutDraftWire = {
+  businessId: string;
+  placeId: string;
+  placeName: string;
+  placeImage?: string | null;
+  orderCount: number;
+  total: number; // cents
+  fees: number; // cents
+  net: number; // cents
+};
+
+// Single-place preview (the same shape as a draft row, echoing the range).
+export type PayoutDraftPreviewWire = PayoutDraftWire & {
+  from: string;
+  to: string;
+};
+
+// 201 response from POST /v2/treasury/payouts.
+export type CreatedPayoutWire = {
+  payoutId: string;
+  status: "pending";
+  orderCount: number;
+  total: number; // cents
+  fees: number; // cents
+  net: number; // cents
+  startDate: string;
+  endDate: string;
+};
+
+// An order inside a payout (snake_case; `completed_at`, not `date`).
+export type PayoutOrderWire = {
+  id: number;
+  total: number; // cents
+  fees: number; // cents
+  due: number; // cents (total - fees)
+  status: string; // paid | refund | refunded | correction | …
+  type: string; // web | pos | terminal | …
+  description?: string | null; // omitted when null
+  items?: unknown[] | null; // raw line-items array
+  // The orders endpoint has used both `completed_at` and a plain `date`
+  // across CP revisions — accept either.
+  completed_at?: string | null;
+  date?: string | null;
+  created_at?: string | null;
+  // Settlement hash (userOp resolved via the bundler, or a plain tx). CP has
+  // used both `txHash` and `tx_hash` across revisions — accept either.
+  txHash?: string | null;
+  tx_hash?: string | null;
+  account?: string | null; // payer account; empty ⇒ "no account" fix branch
+  [k: string]: unknown;
+};
+
+export type PaginatedPayoutOrders = {
+  orders: PayoutOrderWire[];
+  total?: number;
+  limit: number;
+  offset: number;
+  // The place's on-chain wallet — the mint destination when reconciling an
+  // unsettled order. Returned once in the envelope, not per order.
+  placeAccountAddress?: string | null;
+};
+
+// Response of POST /payouts/{id}/orders/{orderId}/archive — the recomputed
+// payout totals so the dashboard can update without a refetch.
+export type ArchiveOrderWire = {
+  success: boolean;
+  payout: {
+    payoutId: string;
+    total: number; // cents
+    fees: number; // cents
+    net: number; // cents
+  };
+};
+
+// Response of POST /payouts/{id}/orders (201) — the manually-created order
+// plus the payout's recomputed totals (same recompute shape as archive).
+export type CreatePayoutOrderWire = {
+  success: boolean;
+  order: PayoutOrderWire;
+  payout: {
+    payoutId: string;
+    total: number; // cents
+    fees: number; // cents
+    net: number; // cents
+  };
 };
 
 export type PaymentRequestCreated = {
@@ -520,17 +623,67 @@ export const businesses = {
 // =============================================================================
 
 export const payouts = {
-  listPending(creds: CitizenPayApiCredentials): Promise<PayoutWire[]> {
-    return request(creds, "GET", "/v2/treasury/payouts/pending");
+  // List drafts — paid/refunded orders with no payout, grouped by place.
+  // Optional `from`/`to` (RFC3339) narrow the window; no range = all
+  // unassigned orders. Only places with positive net are returned.
+  listDrafts(
+    creds: CitizenPayApiCredentials,
+    query: { from?: string; to?: string } = {},
+  ): Promise<{ drafts: PayoutDraftWire[] | null }> {
+    return request(creds, "GET", "/v2/treasury/payouts/drafts", { query });
   },
-  listCompleted(creds: CitizenPayApiCredentials): Promise<PayoutWire[]> {
-    return request(creds, "GET", "/v2/treasury/payouts/completed");
+  // Preview one place over a (required) half-open [from, to) range. Returns
+  // a single object (no `drafts` wrapper). 400 if from >= to.
+  previewDraft(
+    creds: CitizenPayApiCredentials,
+    args: { placeId: string; from: string; to: string },
+  ): Promise<PayoutDraftPreviewWire> {
+    return request(creds, "GET", "/v2/treasury/payouts/drafts", {
+      query: { placeId: args.placeId, from: args.from, to: args.to },
+    });
   },
+  // Materialise a pending payout — atomically claims the matching orders.
+  create(
+    creds: CitizenPayApiCredentials,
+    body: { placeId: string; from: string; to: string },
+  ): Promise<CreatedPayoutWire> {
+    return request(creds, "POST", "/v2/treasury/payouts", {
+      body,
+      timeoutMs: 30_000,
+    });
+  },
+  // Paginated. `payouts` is null on an empty page; callers normalise and
+  // page through via limit/offset.
+  listPending(
+    creds: CitizenPayApiCredentials,
+    query: { limit?: number; offset?: number } = {},
+  ): Promise<PayoutListPageWire> {
+    return request(creds, "GET", "/v2/treasury/payouts/pending", { query });
+  },
+  listCompleted(
+    creds: CitizenPayApiCredentials,
+    query: { limit?: number; offset?: number } = {},
+  ): Promise<PayoutListPageWire> {
+    return request(creds, "GET", "/v2/treasury/payouts/completed", { query });
+  },
+  // Live lifecycle status (unlike the list endpoints, which only ever
+  // return the stored pending/complete). `signingUrl` is included only when
+  // status is `payment-pending` AND a `redirectUrl` is supplied (Ponto needs
+  // a post-sign redirect — https only — to mint the signing link).
   status(
     creds: CitizenPayApiCredentials,
     payoutId: string,
-  ): Promise<{ status: PayoutWire["status"] }> {
-    return request(creds, "GET", `/v2/treasury/payouts/${encodeURIComponent(payoutId)}/status`);
+    query: { redirectUrl?: string } = {},
+  ): Promise<{
+    status: "pending" | "burnt" | "payment-pending" | "complete";
+    signingUrl?: string | null;
+  }> {
+    return request(
+      creds,
+      "GET",
+      `/v2/treasury/payouts/${encodeURIComponent(payoutId)}/status`,
+      { query },
+    );
   },
   createPayment(
     creds: CitizenPayApiCredentials,
@@ -553,16 +706,77 @@ export const payouts = {
       timeoutMs: 30_000,
     });
   },
+  // Admin override: mark a payout `complete` without burning tokens or
+  // initiating a SEPA payment (the treasury settled with the merchant another
+  // way). Pure status flip, allowed from any non-complete status. 409 when the
+  // payout is already complete.
+  complete(
+    creds: CitizenPayApiCredentials,
+    payoutId: string,
+  ): Promise<{ success: boolean; status?: string }> {
+    return request(
+      creds,
+      "POST",
+      `/v2/treasury/payouts/${encodeURIComponent(payoutId)}/complete`,
+      { timeoutMs: 30_000 },
+    );
+  },
   orders(
     creds: CitizenPayApiCredentials,
     payoutId: string,
     query: { limit?: number; offset?: number } = {},
-  ): Promise<PaginatedOrders> {
+  ): Promise<PaginatedPayoutOrders> {
     return request(
       creds,
       "GET",
       `/v2/treasury/payouts/${encodeURIComponent(payoutId)}/orders`,
       { query },
+    );
+  },
+  // Record a new tx hash on an order after the dashboard mints. The server
+  // re-runs its confirmation lifecycle against this hash.
+  setOrderTxHash(
+    creds: CitizenPayApiCredentials,
+    payoutId: string,
+    orderId: number,
+    txHash: string,
+  ): Promise<{ success: boolean }> {
+    return request(
+      creds,
+      "POST",
+      `/v2/treasury/payouts/${encodeURIComponent(payoutId)}/orders/${orderId}/tx-hash`,
+      { body: { txHash }, timeoutMs: 30_000 },
+    );
+  },
+  // Manually add an order to a pending payout — for amounts that exist
+  // off-CP (a bank transfer reconciled by hand, a manual adjustment, …).
+  // Integer cents on the wire like every other money field. The order is
+  // created payable (status=paid, type=manual) with no on-chain settlement
+  // yet; the response carries the archive-style totals recompute. 400 on a
+  // bad amount, 409 when the payout isn't pending.
+  createOrder(
+    creds: CitizenPayApiCredentials,
+    payoutId: string,
+    body: { total: number; fees: number; description?: string | null },
+  ): Promise<CreatePayoutOrderWire> {
+    return request(
+      creds,
+      "POST",
+      `/v2/treasury/payouts/${encodeURIComponent(payoutId)}/orders`,
+      { body, timeoutMs: 30_000 },
+    );
+  },
+  // Archive an order out of the payout (unlink + recompute totals).
+  archiveOrder(
+    creds: CitizenPayApiCredentials,
+    payoutId: string,
+    orderId: number,
+  ): Promise<ArchiveOrderWire> {
+    return request(
+      creds,
+      "POST",
+      `/v2/treasury/payouts/${encodeURIComponent(payoutId)}/orders/${orderId}/archive`,
+      { timeoutMs: 30_000 },
     );
   },
 };
@@ -633,5 +847,77 @@ export const payments = {
       if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
     }
     return url.toString();
+  },
+};
+
+// =============================================================================
+// Banking (Ponto connection status)
+// =============================================================================
+
+// Whether the treasury's bank connection is active and payment initiation is
+// enabled. Degrades to `{ connected:false, status:"not_connected", … }` when
+// there's no business/connection yet — never errors — so the dashboard can
+// render a "connect bank" step.
+export type BankingStatusWire = {
+  connected: boolean;
+  status: string; // "active" | "not_connected" | …
+  accountReference?: string | null;
+  accountName?: string | null;
+  onboardingComplete?: boolean;
+  paymentInitiationEnabled?: boolean;
+  paymentInitiationRequested?: boolean;
+  paymentRequestsEnabled?: boolean;
+  ready?: boolean;
+};
+
+// Account balance. Native signed decimals in the account currency (NOT
+// cents) — this is external bank data, passed through as-is. Balances are
+// nullable (Ponto sometimes omits them).
+export type BankingBalanceWire = {
+  accountId: string;
+  reference?: string | null;
+  currency: string;
+  availableBalance?: number | null;
+  currentBalance?: number | null;
+};
+
+// A bank-account transaction (Ponto). `amount < 0` = debit (money out),
+// `> 0` = credit. Native decimals in `currency`.
+export type BankTransactionWire = {
+  id: string;
+  amount: number;
+  currency: string;
+  executionDate?: string | null;
+  valueDate?: string | null;
+  counterpartName?: string | null;
+  counterpartReference?: string | null;
+  remittanceInformation?: string | null;
+  remittanceInformationType?: string | null;
+  description?: string | null;
+  createdAt?: string | null;
+};
+
+// Cursor-paginated, newest-first. Pass `nextCursor` back as `?cursor=` for
+// older pages; null/absent `nextCursor` means no more.
+export type BankTransactionsWire = {
+  transactions: BankTransactionWire[] | null;
+  nextCursor?: string | null;
+  limit?: number;
+};
+
+export const banking = {
+  status(creds: CitizenPayApiCredentials): Promise<BankingStatusWire> {
+    return request(creds, "GET", "/v2/treasury/banking/status");
+  },
+  balance(creds: CitizenPayApiCredentials): Promise<BankingBalanceWire> {
+    return request(creds, "GET", "/v2/treasury/banking/balance");
+  },
+  transactions(
+    creds: CitizenPayApiCredentials,
+    query: { limit?: number; cursor?: string } = {},
+  ): Promise<BankTransactionsWire> {
+    return request(creds, "GET", "/v2/treasury/banking/transactions", {
+      query,
+    });
   },
 };

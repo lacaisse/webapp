@@ -121,10 +121,76 @@
       "token": "Token",
       "merchants": "Handelaars",
       "payments": "Betalingen",
+      "bank": "Bank",
       "referrals": "Doorverwijzingen",
       "emails": "E-mails",
       "settings": "Instellingen",
       "backToApex": "Terug naar mijn fondsen"
+    },
+    "bank": {
+      "title": "Bank",
+      "description": "De bankkoppeling van je fonds, gebruikt om handelaren uit te betalen.",
+      "status": {
+        "ready": "Gereed",
+        "notReady": "Niet gereed",
+        "noAccount": "Geen bankrekening gekoppeld"
+      },
+      "flags": {
+        "connected": "Bank gekoppeld",
+        "onboardingComplete": "Onboarding voltooid",
+        "paymentInitiationEnabled": "Betalingsinitiatie ingeschakeld",
+        "paymentRequestsEnabled": "Betalingsverzoeken ingeschakeld"
+      },
+      "notice": {
+        "connect": "Er is nog geen bank gekoppeld. Koppel je bank in het CitizenPay-dashboard om uitbetalingen mogelijk te maken.",
+        "activate": "Je bank is gekoppeld maar betalingsinitiatie is nog niet ingeschakeld. Activeer het in het CitizenPay-dashboard om uitbetalingen te kunnen starten."
+      },
+      "balance": {
+        "available": "Beschikbaar saldo",
+        "current": "Huidig saldo"
+      },
+      "transactions": {
+        "title": "Transacties",
+        "date": "Datum",
+        "counterpart": "Tegenpartij",
+        "reference": "Referentie",
+        "member": "Lid",
+        "amount": "Bedrag",
+        "empty": "Nog geen transacties.",
+        "emptyRange": "Geen transacties in dit bereik.",
+        "prev": "Vorige",
+        "next": "Volgende",
+        "total": "{count, plural, =1 {# transactie} other {# transacties}}"
+      },
+      "fullSync": {
+        "trigger": "Volledige synchronisatie",
+        "confirmTitle": "Een volledige banksynchronisatie uitvoeren?",
+        "confirmDescription": "Dit haalt de volledige banktransactiegeschiedenis op uit CitizenPay en spiegelt die lokaal. Nieuwe inkomende overschrijvingen die aan een lid gekoppeld zijn, kunnen het aanmaken van tokens activeren. Het is veilig om dit meerdere keren uit te voeren — reeds gesynchroniseerde transacties worden overgeslagen.",
+        "confirmCancel": "Annuleren",
+        "confirmRun": "Synchronisatie starten",
+        "running": "Synchroniseren…",
+        "progress": "{ingested, plural, =1 {# transactie} other {# transacties}} gesynchroniseerd · {matched} gekoppeld · {minted} aangemaakt",
+        "pages": "{pages, plural, =1 {# pagina} other {# pagina's}}",
+        "stop": "Stoppen",
+        "completeTitle": "Volledige synchronisatie voltooid",
+        "completeSummary": "{ingested, plural, =1 {# transactie} other {# transacties}} gesynchroniseerd · {matched} gekoppeld · {minted} aangemaakt",
+        "errorTitle": "Synchronisatie onderbroken",
+        "error": "Kon de banksynchronisatie niet voltooien. Probeer het opnieuw.",
+        "resume": "Hervatten",
+        "notConnected": "Koppel een bankrekening voordat je een synchronisatie uitvoert.",
+        "stalled": "De bankfeed gaat niet verder. Hervat om opnieuw te proberen.",
+        "limitReached": "Gepauzeerd na een grote batch. Hervat om oudere transacties te blijven synchroniseren."
+      },
+      "range": {
+        "today": "Vandaag",
+        "last7": "Laatste 7 dagen",
+        "last30": "Laatste 30 dagen",
+        "thisMonth": "Deze maand",
+        "lastMonth": "Vorige maand",
+        "custom": "Aangepast",
+        "from": "Van",
+        "to": "Tot"
+      }
     },
     "dashboard": {
       "title": "Dashboard",
@@ -413,7 +479,9 @@
       "tabs": {
         "transactions": "Transacties",
         "unmatched": "Niet gekoppeld",
-        "payouts": "Uitbetalingen"
+        "drafts": "Concepten",
+        "pending": "In afwachting",
+        "completed": "Afgehandeld"
       },
       "transactions": {
         "date": "Datum",
@@ -425,12 +493,198 @@
         "unmatched": "Niet gekoppeld",
         "empty": "Nog geen transacties."
       },
-      "payouts": {
-        "date": "Datum",
-        "merchant": "Handelaar",
-        "reference": "Referentie",
-        "amount": "Bedrag",
-        "empty": "Nog geen uitbetalingen."
+      "settlement": {
+        "place": "Handelaar",
+        "period": "Periode",
+        "orderCount": "Bestellingen",
+        "total": "Totaal",
+        "fees": "Kosten",
+        "net": "Netto",
+        "placeBalance": "Saldo handelaar",
+        "placeBalanceEnough": "Genoeg om te verbranden",
+        "placeBalanceLow": "Lager dan het nettobedrag",
+        "status": "Status",
+        "burnTx": "Burn-tx",
+        "loadError": "Kon de uitbetalingen niet laden van CitizenPay. Probeer het zo opnieuw.",
+        "drafts": {
+          "description": "Betaalde bestellingen die nog niet in een uitbetaling zitten, gegroepeerd per handelaar. Kies een handelaar en periode om een uitbetaling aan te maken.",
+          "empty": "Geen bestellingen om af te handelen."
+        },
+        "pending": {
+          "description": "Aangemaakte uitbetalingen die op afhandeling wachten — verbrand de tokens en betaal de handelaar (in willekeurige volgorde).",
+          "empty": "Geen uitbetalingen die op afhandeling wachten."
+        },
+        "completed": {
+          "description": "Uitbetalingen waarvan de bankbetaling en token-burn zijn voltooid.",
+          "empty": "Nog geen afgehandelde uitbetalingen."
+        },
+        "statuses": {
+          "pending": "In afwachting",
+          "payment-pending": "Betaling in behandeling",
+          "burnt": "Verbrand",
+          "complete": "Voltooid"
+        },
+        "signed": {
+          "title": "Betaling ondertekend",
+          "description": "Je bankoverschrijving is ondertekend.",
+          "close": "Je kunt dit tabblad sluiten."
+        },
+        "process": {
+          "title": "Uitbetaling verwerken",
+          "refresh": "Status vernieuwen",
+          "steps": {
+            "pending": "In afwachting",
+            "burnt": "Verbrand",
+            "awaitingSignature": "Wacht op ondertekening",
+            "complete": "Voltooid"
+          },
+          "burn": {
+            "hint": "Verbrandt het nettobedrag van het account van de handelaar on-chain."
+          },
+          "pay": {
+            "hint": "Maakt de bankbetaling aan de handelaar aan; je ondertekent de overschrijving bij je bank.",
+            "notEnabled": "Betalingsinitiatie is niet ingeschakeld op je bankkoppeling, dus de overschrijving kan nog niet worden aangemaakt.",
+            "openBank": "Stel het in bij Bank"
+          },
+          "awaiting": {
+            "hint": "Wacht op ondertekening van de bankoverschrijving."
+          },
+          "sign": {
+            "create": "Handelaar betalen",
+            "hint": "Onderteken de bankoverschrijving om de uitbetaling te voltooien.",
+            "browser": "In browser voltooien",
+            "qrHint": "Of scan deze QR-code om op je telefoon te ondertekenen."
+          },
+          "complete": {
+            "hint": "Deze uitbetaling is afgehandeld."
+          },
+          "markComplete": {
+            "hint": "Anders afgehandeld?",
+            "button": "Markeren als voltooid",
+            "title": "Uitbetaling als voltooid markeren?",
+            "description": "Markeert deze uitbetaling als voltooid zonder tokens te verbranden of een bankbetaling te starten. Gebruik dit alleen als je de handelaar al op een andere manier hebt afgerekend.",
+            "warning": "Dit omzeilt de afwikkeling en kan niet ongedaan worden gemaakt.",
+            "confirm": "Markeren als voltooid"
+          }
+        },
+        "create": {
+          "trigger": "Uitbetaling aanmaken",
+          "title": "Uitbetaling aanmaken — {place}",
+          "description": "Bundel de betaalde bestellingen van deze handelaar binnen een periode in een uitbetaling in afwachting. De periode is half-open: de einddatum is uitgesloten.",
+          "from": "Van",
+          "to": "Tot (uitgesloten)",
+          "rangeHint": "Bekijk een voorbeeld om te zien hoeveel bestellingen in de periode vallen voordat je aanmaakt.",
+          "preview": "Voorbeeld",
+          "previewOrders": "{count, plural, =0 {Geen bestellingen} one {# bestelling} other {# bestellingen}} in periode",
+          "confirm": "Uitbetaling aanmaken"
+        },
+        "createOrder": {
+          "trigger": "Order toevoegen",
+          "title": "Order toevoegen",
+          "description": "Voeg een order toe aan deze uitbetaling — kies een inkomende overboeking of voer het bedrag zelf in.",
+          "modeManual": "Handmatig invoeren",
+          "modeBank": "Vanuit overboeking",
+          "pickHint": "Kies een inkomende overboeking — de referentie wordt de omschrijving van de order.",
+          "loadingTransactions": "Overboekingen laden…",
+          "noTransactions": "Geen inkomende overboekingen om te kiezen.",
+          "unknownCounterpart": "Onbekende afzender",
+          "amount": "Bedrag",
+          "fee": "Kosten",
+          "descriptionLabel": "Omschrijving",
+          "descriptionPlaceholder": "Waarvoor deze order is",
+          "net": "Netto",
+          "confirm": "Order toevoegen"
+        },
+        "pay": {
+          "button": "Handelaar betalen",
+          "openSigning": "Ondertekenpagina openen",
+          "alreadyCreated": "Betaling al aangemaakt."
+        },
+        "burn": {
+          "button": "Tokens verbranden",
+          "title": "Token-uitbetaling verbranden?",
+          "description": "Dit verbrandt de on-chain tokens achter deze uitbetaling. Burn en bankbetaling staan los van elkaar — in willekeurige volgorde.",
+          "warning": "Dit is onomkeerbaar. De tokens voor deze uitbetaling worden permanent verbrand.",
+          "confirm": "Tokens verbranden",
+          "success": "Tokens verbrand. Transactiehash:"
+        },
+        "orders": {
+          "title": "Bestellingen",
+          "id": "ID",
+          "date": "Datum",
+          "type": "Type",
+          "orderStatus": "Status",
+          "amount": "Bedrag",
+          "empty": "Geen bestellingen in deze uitbetaling.",
+          "tabConfirmed": "Bevestigd",
+          "tabIssues": "Problemen",
+          "issuesEmpty": "Geen problemen — alle bestellingen zijn afgewikkeld.",
+          "truncated": "Lijst ingekort — niet alle bestellingen worden getoond.",
+          "loadError": "Kon de bestellingen niet laden. Probeer het zo opnieuw.",
+          "verifying": "Verifiëren {checked}/{total}…",
+          "verifyingLabel": "Transacties verifiëren",
+          "verifyingEmpty": "Bestellingen verifiëren…",
+          "range": "Toont {from}–{to}",
+          "prev": "Vorige",
+          "next": "Volgende",
+          "receipt": {
+            "success": "Bevestigd",
+            "reverted": "Teruggedraaid",
+            "pending": "Niet bevestigd"
+          }
+        },
+        "statusCheck": {
+          "button": "Status",
+          "title": "Controleer de live afhandelingsstatus (zet de uitbetaling door en rondt af)"
+        },
+        "reconcile": {
+          "pending": "Afstemmen…",
+          "fix": {
+            "button": "Herstellen",
+            "title": "Bestelling afstemmen",
+            "mintOnly": "Mint {net} naar de handelaar om deze bestelling on-chain af te wikkelen.",
+            "burnMint": "Verbrand {total} van de betaler ({account}) en mint {net} naar de handelaar (de kosten zijn het verschil).",
+            "noPlaceAccount": "Deze handelaar heeft nog geen on-chain account — kan er niet naartoe minten.",
+            "warning": "Dit verplaatst echte tokens on-chain en is onomkeerbaar.",
+            "insufficient": "De betaler heeft de te verbranden {total} niet meer, dus dit kan niet worden voltooid. Archiveer in plaats daarvan de bestelling.",
+            "confirm": "Bevestigen",
+            "success": "Klaar. Mint-transactie:",
+            "payerBalance": "Saldo betaler",
+            "payerNoHistory": "Geen transacties gevonden voor dit account."
+          },
+          "archive": {
+            "button": "Archiveren",
+            "title": "Deze bestelling archiveren?",
+            "description": "De bestelling wordt uit de uitbetaling verwijderd en de totalen worden herberekend. Ze wordt in geen enkele toekomstige uitbetaling opgenomen.",
+            "confirm": "Bestelling archiveren"
+          }
+        },
+        "details": "Details",
+        "detail": {
+          "back": "Terug naar uitbetalingen",
+          "untitled": "Uitbetaling"
+        },
+        "errors": {
+          "payFailed": "Kon de betaling niet aanmaken. Probeer het zo opnieuw.",
+          "burnFailed": "Kon de tokens niet verbranden. Probeer het zo opnieuw.",
+          "previewFailed": "Kon het voorbeeld niet laden. Probeer het zo opnieuw.",
+          "createFailed": "Kon de uitbetaling niet aanmaken. Probeer het zo opnieuw.",
+          "statusFailed": "Kon de status niet ophalen. Probeer het zo opnieuw.",
+          "ordersFailed": "Kon de bestellingen niet laden. Probeer het zo opnieuw.",
+          "rangeInvalid": "Kies een geldige begin- en einddatum.",
+          "rangeOrder": "De einddatum moet na de begindatum liggen.",
+          "noPlaceAccount": "Deze handelaar heeft geen on-chain account om naartoe te minten.",
+          "recordFailed": "On-chain gemint, maar kon het niet op de uitbetaling vastleggen.",
+          "archiveFailed": "Kon de bestelling niet archiveren. Probeer het zo opnieuw.",
+          "payerFailed": "Kon het account van de betaler niet laden.",
+          "createOrderFailed": "Kon de order niet toevoegen. Probeer het zo opnieuw.",
+          "amountInvalid": "Voer een geldig bedrag in.",
+          "feeInvalid": "Voer geldige kosten in.",
+          "amountPositive": "Het bedrag moet groter dan nul zijn.",
+          "feeTooHigh": "De kosten mogen niet hoger zijn dan het bedrag.",
+          "descriptionTooLong": "De omschrijving is te lang.",
+          "completeFailed": "Kon de uitbetaling niet als voltooid markeren. Probeer het zo opnieuw."
+        }
       },
       "admin": {
         "link": {
@@ -660,17 +914,6 @@
       "description": "Vul uw gegevens in om lid te worden. Een beheerder beoordeelt uw aanvraag en neemt contact op.",
       "firstName": "Voornaam",
       "lastName": "Achternaam",
-      "email": "E-mail",
-      "submit": "Aanvragen",
-      "submitting": "Verzenden…",
-      "errors": {
-        "firstNameRequired": "Voornaam is verplicht.",
-        "lastNameRequired": "Achternaam is verplicht.",
-        "emailInvalid": "Voer een geldig e-mailadres in.",
-        "emailTaken": "Er bestaat al een aanvraag met dit e-mailadres voor dit fonds.",
-        "fieldRequired": "{label} is verplicht.",
-        "generic": "Er is iets misgegaan. Probeer opnieuw."
-      },
       "email": {
         "verify": {
           "subject": "Bevestig uw e-mail — {fundName}",
@@ -680,6 +923,16 @@
           "subject": "Welkom bij {fundName}",
           "textBody": "Hallo {firstName},\n\nWelkom bij {fundName}. Uw aanvraag wordt beoordeeld — een beheerder neemt binnenkort contact op.\n\nWanneer u klaar bent om bij te dragen, vermeld dan deze referentie op uw bankoverschrijving:\n  {paymentReference}\n\nBedankt,\nHet {fundName}-team"
         }
+      },
+      "submit": "Aanvragen",
+      "submitting": "Verzenden…",
+      "errors": {
+        "firstNameRequired": "Voornaam is verplicht.",
+        "lastNameRequired": "Achternaam is verplicht.",
+        "emailInvalid": "Voer een geldig e-mailadres in.",
+        "emailTaken": "Er bestaat al een aanvraag met dit e-mailadres voor dit fonds.",
+        "fieldRequired": "{label} is verplicht.",
+        "generic": "Er is iets misgegaan. Probeer opnieuw."
       },
       "thanks": {
         "checkEmail": {

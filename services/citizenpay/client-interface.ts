@@ -4,17 +4,32 @@
 // can implement it without an import cycle through the factory.
 
 import type {
+  ArchivedPayout,
+  BankBalance,
+  BankingStatus,
+  BankTransactionPayloadPage,
+  BankTransactionsPage,
+  BurnPayoutResult,
   CardOperationInput,
   CardOperationResult,
   CitizenPayCardDetail,
   CitizenPayInvite,
   CitizenPayProfile,
+  CreatedPayout,
+  CreatedPayoutOrder,
+  CreatePayoutOrderInput,
+  CreatePayoutPaymentResult,
   ListBankTransactionsInput,
   ListBankTransactionsResult,
   ListCardsInput,
   ListCardsResult,
   ListPlacesResult,
   OperationStatusResult,
+  Payout,
+  PayoutDraft,
+  PayoutDraftPreview,
+  PayoutOrdersPage,
+  PayoutStatusDetail,
   RegisteredCard,
   RegisterCardInput,
   SubmitMintInput,
@@ -55,15 +70,27 @@ export interface CitizenPayClient {
   getOperationStatus(txHash: string): Promise<OperationStatusResult>;
 
   /**
-   * Fetch bank movements CP has detected on the fund's account, optionally
-   * since a cursor. Bank-sync uses this to mirror deposits locally, match
-   * them to members, and trigger PAY_AND_GO mints. Not exposed by the v2
-   * Treasury API — the live impl returns empty + logs a warning until we
-   * wire a different bank feed.
+   * Fetch bank movements CP has detected on the fund's account, since the
+   * fund's last-sync watermark. Bank-sync uses this to mirror deposits
+   * locally, match them to members, and trigger PAY_AND_GO mints. Backed by
+   * the same banking feed as `getBankTransactionPayloadPage` — it pages until
+   * it crosses the watermark.
    */
   listBankTransactions(
     input: ListBankTransactionsInput,
   ): Promise<ListBankTransactionsResult>;
+
+  /**
+   * One cursor-paginated page of ingest-shaped bank transactions
+   * (newest-first), for the manual full-sync. Pass the returned `nextCursor`
+   * back to load the next (older) page; a `null` cursor means history is
+   * exhausted. Same feed as `listBankTransactions`, but caller-paged so the
+   * UI can show progress without one long-running request.
+   */
+  getBankTransactionPayloadPage(query?: {
+    limit?: number;
+    cursor?: string;
+  }): Promise<BankTransactionPayloadPage>;
 
   /**
    * List all merchant places connected to this treasury, with their on-chain
@@ -162,4 +189,153 @@ export interface CitizenPayClient {
   getCitizenPayCard(
     serialNumber: string,
   ): Promise<CitizenPayCardDetail | null>;
+
+  /**
+   * Draft payouts: paid/refunded orders not yet attached to a payout,
+   * grouped by place. Computed live — calling it never mutates anything.
+   * Optional half-open `[from, to)` window narrows the orders considered;
+   * omitted means all unassigned orders. Only places with positive net
+   * are returned. Drives the Payments → Payouts "Drafts" view.
+   */
+  listPayoutDrafts(query?: {
+    from?: string;
+    to?: string;
+  }): Promise<PayoutDraft[]>;
+
+  /**
+   * Live count/total for one place over a required `[from, to)` range —
+   * what the create-payout dialog shows before the admin commits. Same
+   * shape as a draft row plus the echoed range.
+   */
+  previewPayoutDraft(args: {
+    placeId: string;
+    from: string;
+    to: string;
+  }): Promise<PayoutDraftPreview>;
+
+  /**
+   * Materialise a pending payout from a place + range — atomically claims
+   * the matching orders (they drop out of drafts). Throws on no payable
+   * orders / bad range (the API returns 400) or a place that isn't ours
+   * (403).
+   */
+  createPayout(args: {
+    placeId: string;
+    from: string;
+    to: string;
+  }): Promise<CreatedPayout>;
+
+  /**
+   * The exact orders inside a payout, paginated (limit max 50). Drives the
+   * order-review + reconciliation step. Each order carries its settlement
+   * `txHash` + payer `account`; the page envelope carries the place's
+   * `placeAccountAddress` (the mint destination).
+   */
+  getPayoutOrders(
+    payoutId: string,
+    query?: { limit?: number; offset?: number },
+  ): Promise<PayoutOrdersPage>;
+
+  /**
+   * Record a new settlement hash on an order after the dashboard has minted
+   * (the no-tx-hash / unsettled case). The server re-runs its confirmation
+   * lifecycle against the hash. Only valid while the payout is pending.
+   */
+  recordOrderTxHash(
+    payoutId: string,
+    orderId: number,
+    txHash: string,
+  ): Promise<void>;
+
+  /**
+   * Manually add an order to a pending payout — for an amount that exists
+   * off-CP (a bank transfer reconciled by hand, a manual adjustment, …).
+   * EUR decimal amounts; `description` carries the bank-transfer reference
+   * when created from a transaction. Returns the created order + the payout's
+   * recomputed totals. Only valid while the payout is pending (CP returns 409
+   * otherwise). Backed by `POST /v2/treasury/payouts/{id}/orders`.
+   */
+  createPayoutOrder(
+    payoutId: string,
+    input: CreatePayoutOrderInput,
+  ): Promise<CreatedPayoutOrder>;
+
+  /**
+   * Archive an order out of a pending payout (unlink + recompute totals).
+   * Returns the payout's recomputed totals so the UI can update in place.
+   */
+  archiveOrder(payoutId: string, orderId: number): Promise<ArchivedPayout>;
+
+  /**
+   * The treasury's bank-connection status (Ponto). Read-only — activation
+   * runs through the merchant dashboard's OAuth flow, not a treasury API key.
+   * Degrades to a "not connected" status rather than throwing.
+   */
+  getBankingStatus(): Promise<BankingStatus>;
+
+  /**
+   * The connected bank account's balance (native decimals, not cents).
+   * Throws (422) when there's no connection — callers degrade.
+   */
+  getBankingBalance(): Promise<BankBalance>;
+
+  /**
+   * One cursor-paginated page of bank-account transactions, newest-first.
+   * Pass the returned `nextCursor` back to load older pages. Throws (422)
+   * when there's no connection.
+   */
+  getBankingTransactions(query?: {
+    limit?: number;
+    cursor?: string;
+  }): Promise<BankTransactionsPage>;
+
+  /**
+   * Merchant payouts awaiting settlement — CP has aggregated the tokens a
+   * place collected over a period but the treasury hasn't paid the fiat
+   * leg yet. Drives the pending side of the Payments → Payouts view.
+   */
+  listPendingPayouts(): Promise<Payout[]>;
+
+  /**
+   * Payouts whose settlement has run (burnt / complete). Drives the
+   * completed side of the Payments → Payouts view.
+   */
+  listCompletedPayouts(): Promise<Payout[]>;
+
+  /**
+   * Live status of a single payout, plus the Ponto `signingUrl` while it's
+   * `payment-pending`. The signing link is only returned when `redirectUrl`
+   * is supplied (an https URL Ponto sends the operator to after signing).
+   */
+  getPayoutStatus(
+    payoutId: string,
+    opts?: { redirectUrl?: string },
+  ): Promise<PayoutStatusDetail>;
+
+  /**
+   * Step 1 of settlement: ask CP to create the SEPA payment for this payout.
+   * Returns a `signingUrl` the admin opens at their bank to authorise the
+   * transfer, or `{ alreadyCreated: true }` when CP already has a live
+   * payment (nothing new to sign).
+   */
+  createPayoutPayment(
+    payoutId: string,
+    args?: { redirectUrl?: string },
+  ): Promise<CreatePayoutPaymentResult>;
+
+  /**
+   * Step 2 of settlement: burn the on-chain tokens backing this payout once
+   * the fiat leg is paid. Returns the burn tx hash. Irreversible — always
+   * confirm with the admin before calling.
+   */
+  burnPayout(payoutId: string): Promise<BurnPayoutResult>;
+
+  /**
+   * Admin override: mark a payout `complete` without burning tokens or
+   * initiating a SEPA payment — for when the treasury settled with the
+   * merchant some other way. Pure status flip, allowed from any non-complete
+   * status. Backed by `POST /v2/treasury/payouts/{id}/complete`. Confirm with
+   * the admin first — it bypasses settlement and can't be undone.
+   */
+  completePayout(payoutId: string): Promise<void>;
 }
