@@ -154,41 +154,43 @@ export function CreateOrderDialog({ payoutId }: { payoutId: string }) {
                   {t("loadingTransactions")}
                 </div>
               ) : txns && txns.length > 0 ? (
-                <ul className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-border p-1">
+                <div className="max-h-48 space-y-1 overflow-x-hidden overflow-y-auto rounded-lg border border-border p-1">
                   {txns.map((tx) => (
-                    <li key={tx.id}>
-                      <button
-                        type="button"
-                        onClick={() => pickTransaction(tx)}
-                        className={cn(
-                          "flex w-full items-center justify-between gap-3 rounded-md px-2.5 py-2 text-left transition-colors",
-                          selectedTxId === tx.id
-                            ? "bg-primary/10 ring-1 ring-primary/30"
-                            : "hover:bg-muted",
-                        )}
-                      >
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm">
-                            {tx.counterpartName ?? t("unknownCounterpart")}
-                          </span>
-                          <span className="block truncate font-mono text-xs text-muted-foreground">
-                            {tx.reference ?? "—"}
-                          </span>
-                        </span>
-                        <span className="shrink-0 text-right">
-                          <span className="block text-sm font-medium tabular-nums">
-                            {euro(tx.amount)}
-                          </span>
-                          <span className="block text-xs text-muted-foreground">
-                            {format.dateTime(new Date(tx.occurredAt), {
-                              dateStyle: "medium",
-                            })}
-                          </span>
-                        </span>
-                      </button>
-                    </li>
+                    <button
+                      key={tx.id}
+                      type="button"
+                      onClick={() => pickTransaction(tx)}
+                      className={cn(
+                        "flex w-full items-center justify-between gap-3 rounded-md px-2.5 py-2 text-left transition-colors",
+                        selectedTxId === tx.id
+                          ? "bg-primary/10 ring-1 ring-primary/30"
+                          : "hover:bg-muted",
+                      )}
+                    >
+                      {/* min-w-0 lets the flex item shrink below content width
+                          so the long bank reference truncates instead of
+                          pushing the whole dialog wider than its max-w-sm. */}
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm">
+                          {tx.counterpartName ?? t("unknownCounterpart")}
+                        </div>
+                        <div className="truncate font-mono text-xs text-muted-foreground">
+                          {tx.reference ?? "—"}
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <div className="text-sm font-medium tabular-nums">
+                          {euro(tx.amount)}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {format.dateTime(new Date(tx.occurredAt), {
+                            dateStyle: "medium",
+                          })}
+                        </div>
+                      </div>
+                    </button>
                   ))}
-                </ul>
+                </div>
               ) : (
                 <div className="rounded-lg border border-border py-6 text-center text-sm text-muted-foreground">
                   {t("noTransactions")}
