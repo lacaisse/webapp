@@ -423,6 +423,22 @@ class MockCitizenPayClient implements CitizenPayClient {
           description: "Incoming transfer",
           createdAt: new Date().toISOString(),
         },
+        {
+          // Bank-transfer-paid order (no on-chain payer account). The
+          // structured reference `cp-order-{orderId}` lets the Fix dialog
+          // surface this as the backing transfer for mock order 44792.
+          id: "mock-tx-3",
+          amount: 5.5,
+          currency: "EUR",
+          executionDate: "2026-05-25",
+          valueDate: "2026-05-25",
+          counterpartName: "Marie Dupont",
+          counterpartReference: null,
+          remittanceInformation: "cp-order-44792",
+          remittanceInformationType: "structured",
+          description: "Order payment",
+          createdAt: new Date().toISOString(),
+        },
       ],
       nextCursor: null,
     };

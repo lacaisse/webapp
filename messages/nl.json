@@ -650,7 +650,10 @@
             "confirm": "Bevestigen",
             "success": "Klaar. Mint-transactie:",
             "payerBalance": "Saldo betaler",
-            "payerNoHistory": "Geen transacties gevonden voor dit account."
+            "payerNoHistory": "Geen transacties gevonden voor dit account.",
+            "bankMatch": "Dekkende overboeking",
+            "bankMatchUnknown": "Onbekende afzender",
+            "bankMatchNone": "Nog geen overboeking gevonden die overeenkomt met {ref}."
           },
           "archive": {
             "button": "Archiveren",

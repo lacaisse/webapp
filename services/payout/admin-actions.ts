@@ -231,6 +231,79 @@ export async function getPayerAccountAction(input: {
   }
 }
 
+// An order with no on-chain payer account was paid by bank transfer; the
+// incoming transfer carries `cp-order-{orderId}` in its reference. We surface
+// the matching transfer in the Fix dialog so the operator can confirm the
+// fiat actually landed before minting (the mint has no burn to back it).
+export type OrderBankMatch = {
+  id: string;
+  direction: "INCOMING" | "OUTGOING";
+  occurredAt: string; // ISO 8601
+  amount: string; // unsigned magnitude, 2dp
+  currency: string;
+  counterpartName: string | null;
+  reference: string | null;
+};
+
+export type FindOrderBankTransactionResult =
+  | { error: string }
+  | { ok: true; transaction: OrderBankMatch | null };
+
+export async function findOrderBankTransactionAction(input: {
+  orderId: number;
+}): Promise<FindOrderBankTransactionResult> {
+  const t = await getTranslations("fund.payments.settlement.errors");
+  const { fund } = await requireFundRole("ADMIN");
+
+  const ref = `cp-order-${input.orderId}`;
+  try {
+    // `contains` narrows in SQL; the regex guard rejects prefix collisions
+    // (e.g. cp-order-447 inside cp-order-44790) by requiring no trailing digit.
+    const guard = new RegExp(`cp-order-${input.orderId}(?!\\d)`);
+    const candidates = await prisma.bankTransaction.findMany({
+      where: {
+        fundId: fund.id,
+        OR: [
+          { counterpartReference: { contains: ref } },
+          { remittanceInfo: { contains: ref } },
+        ],
+      },
+      orderBy: { occurredAt: "desc" },
+      take: 10,
+      select: {
+        id: true,
+        direction: true,
+        amount: true,
+        currency: true,
+        occurredAt: true,
+        counterpartName: true,
+        counterpartReference: true,
+        remittanceInfo: true,
+      },
+    });
+    const tx = candidates.find((b) =>
+      guard.test(`${b.counterpartReference ?? ""} ${b.remittanceInfo ?? ""}`),
+    );
+    return {
+      ok: true,
+      transaction: tx
+        ? {
+            id: tx.id,
+            direction: tx.direction,
+            occurredAt: tx.occurredAt.toISOString(),
+            amount: tx.amount.toFixed(2),
+            currency: tx.currency,
+            counterpartName: tx.counterpartName,
+            reference: tx.counterpartReference ?? tx.remittanceInfo ?? null,
+          }
+        : null,
+    };
+  } catch (e) {
+    console.error("[payout] findOrderBankTransaction failed", input.orderId, e);
+    return { error: t("payerFailed") };
+  }
+}
+
 export type FixOrderResult =
   | { error: string }
   | { ok: true; txHash: string };

@@ -839,7 +839,10 @@
             "confirm": "Confirm",
             "success": "Done. Mint transaction:",
             "payerBalance": "Payer balance",
-            "payerNoHistory": "No transfers found for this account."
+            "payerNoHistory": "No transfers found for this account.",
+            "bankMatch": "Backing bank transfer",
+            "bankMatchUnknown": "Unknown sender",
+            "bankMatchNone": "No transfer found matching {ref} yet."
           },
           "archive": {
             "button": "Archive",

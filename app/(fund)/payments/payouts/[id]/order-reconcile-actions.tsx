@@ -25,8 +25,10 @@ import {
 } from "@/components/ui/dialog";
 import {
   archiveOrderAction,
+  findOrderBankTransactionAction,
   fixOrderAction,
   getPayerAccountAction,
+  type OrderBankMatch,
   type PayerTransfer,
 } from "@/services/payout/admin-actions";
 import { cn } from "@/lib/utils";
@@ -118,6 +120,13 @@ function FixDialog({
     transfers: PayerTransfer[];
   } | null>(null);
 
+  // No-account orders were paid by bank transfer; look up the matching
+  // incoming transfer (reference `cp-order-{orderId}`) so the operator can
+  // confirm the fiat landed before minting.
+  const [bankPending, startBank] = useTransition();
+  const [bankLoaded, setBankLoaded] = useState(false);
+  const [bankMatch, setBankMatch] = useState<OrderBankMatch | null>(null);
+
   const fmt = (v: string) => (symbol ? `${v} ${symbol}` : v);
 
   function onOpenChange(next: boolean) {
@@ -128,6 +137,13 @@ function FixDialog({
         if (!("error" in result)) {
           setPayer({ balance: result.balance, transfers: result.transfers });
         }
+      });
+    }
+    if (next && !account && !bankLoaded && !bankPending) {
+      startBank(async () => {
+        const result = await findOrderBankTransactionAction({ orderId });
+        if (!("error" in result)) setBankMatch(result.transaction);
+        setBankLoaded(true);
       });
     }
     if (!next) {
@@ -254,6 +270,50 @@ function FixDialog({
               <p className="border-t border-border pt-2 text-xs text-muted-foreground">
                 {t("payerNoHistory")}
               </p>
+            )}
+          </div>
+        )}
+
+        {!account && (
+          <div className="space-y-2 rounded-lg border border-border p-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-muted-foreground">
+                {t("bankMatch")}
+              </span>
+              {bankPending && (
+                <Loader2 className="size-4 animate-spin text-muted-foreground" />
+              )}
+            </div>
+            {bankMatch ? (
+              <div className="space-y-0.5 border-t border-border pt-2">
+                <div className="flex items-center justify-between gap-2 text-sm">
+                  <span className="truncate">
+                    {bankMatch.counterpartName ?? t("bankMatchUnknown")}
+                  </span>
+                  <span className="shrink-0 font-medium tabular-nums">
+                    {format.number(Number(bankMatch.amount), {
+                      style: "currency",
+                      currency: bankMatch.currency,
+                    })}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                  <span className="truncate font-mono">
+                    {bankMatch.reference ?? "—"}
+                  </span>
+                  <span className="shrink-0">
+                    {format.dateTime(new Date(bankMatch.occurredAt), {
+                      dateStyle: "medium",
+                    })}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              bankLoaded && (
+                <p className="border-t border-border pt-2 text-xs text-muted-foreground">
+                  {t("bankMatchNone", { ref: `cp-order-${orderId}` })}
+                </p>
+              )
             )}
           </div>
         )}

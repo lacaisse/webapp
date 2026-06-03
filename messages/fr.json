@@ -839,7 +839,10 @@
             "confirm": "Confirmer",
             "success": "Terminé. Transaction d’émission :",
             "payerBalance": "Solde du payeur",
-            "payerNoHistory": "Aucune transaction trouvée pour ce compte."
+            "payerNoHistory": "Aucune transaction trouvée pour ce compte.",
+            "bankMatch": "Virement de couverture",
+            "bankMatchUnknown": "Expéditeur inconnu",
+            "bankMatchNone": "Aucun virement correspondant à {ref} pour le moment."
           },
           "archive": {
             "button": "Archiver",
