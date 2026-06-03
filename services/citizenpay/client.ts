@@ -8,17 +8,34 @@ import { decryptSecret } from "@/services/crypto/secret";
 import type { CitizenPayClient } from "./client-interface";
 import { LiveCitizenPayClient } from "./live-client";
 import type {
+  ArchivedPayout,
+  BankBalance,
+  BankingStatus,
+  BankTransactionPayloadPage,
+  BankTransactionsPage,
+  BurnPayoutResult,
   CardOperationInput,
   CardOperationResult,
   CitizenPayCardDetail,
   CitizenPayInvite,
   CitizenPayProfile,
+  CreatedPayout,
+  CreatedPayoutOrder,
+  CreatePayoutOrderInput,
+  CreatePayoutPaymentResult,
   ListBankTransactionsInput,
   ListBankTransactionsResult,
   ListCardsInput,
   ListCardsResult,
   ListPlacesResult,
   OperationStatusResult,
+  Payout,
+  PayoutDraft,
+  PayoutDraftPreview,
+  PayoutOrder,
+  PayoutOrdersPage,
+  PayoutStatus,
+  PayoutStatusDetail,
   RegisteredCard,
   RegisterCardInput,
   SubmitMintInput,
@@ -172,6 +189,400 @@ class MockCitizenPayClient implements CitizenPayClient {
     this.log("getCitizenPayCard", { serialNumber });
     return null;
   }
+
+  async listPayoutDrafts(
+    query: { from?: string; to?: string } = {},
+  ): Promise<PayoutDraft[]> {
+    this.log("listPayoutDrafts", query);
+    return [
+      {
+        businessId: "mock-business-1",
+        placeId: "mock-place-1",
+        placeName: "Mock Grocer",
+        placeImage: null,
+        orderCount: 42,
+        total: "510.00",
+        fees: "10.00",
+        net: "500.00",
+      },
+      {
+        businessId: "mock-business-2",
+        placeId: "mock-place-2",
+        placeName: "Mock Bakery",
+        placeImage: null,
+        orderCount: 7,
+        total: "84.00",
+        fees: "0.00",
+        net: "84.00",
+      },
+    ];
+  }
+
+  async previewPayoutDraft(args: {
+    placeId: string;
+    from: string;
+    to: string;
+  }): Promise<PayoutDraftPreview> {
+    this.log("previewPayoutDraft", args);
+    return {
+      businessId: "mock-business-1",
+      placeId: args.placeId,
+      placeName: "Mock Grocer",
+      placeImage: null,
+      orderCount: 18,
+      total: "204.00",
+      fees: "4.00",
+      net: "200.00",
+      from: args.from,
+      to: args.to,
+    };
+  }
+
+  async createPayout(args: {
+    placeId: string;
+    from: string;
+    to: string;
+  }): Promise<CreatedPayout> {
+    this.log("createPayout", args);
+    return {
+      payoutId: `mock-payout-${randomBytes(4).toString("hex")}`,
+      status: "pending",
+      orderCount: 18,
+      total: "204.00",
+      fees: "4.00",
+      net: "200.00",
+      startDate: args.from,
+      endDate: args.to,
+    };
+  }
+
+  async getPayoutOrders(
+    payoutId: string,
+    query: { limit?: number; offset?: number } = {},
+  ): Promise<PayoutOrdersPage> {
+    this.log("getPayoutOrders", { payoutId, ...query });
+    const orders: PayoutOrder[] = [
+      {
+        id: 44790,
+        total: "28.32",
+        fees: "1.42",
+        net: "26.90",
+        due: "26.90",
+        status: "paid",
+        type: "web",
+        description: "Weekly grocery order",
+        items: [
+          { name: "Apples", quantity: 3, price: 450 },
+          { name: "Bread", quantity: 1, price: 280 },
+        ],
+        // Settled: has a hash and a payer account.
+        txHash: `0x${randomBytes(32).toString("hex")}`,
+        account: `0x${randomBytes(20).toString("hex")}`,
+        completedAt: new Date().toISOString(),
+      },
+      {
+        id: 44791,
+        total: "12.00",
+        fees: "0.00",
+        net: "12.00",
+        due: "12.00",
+        status: "paid",
+        type: "pos",
+        description: null,
+        items: [],
+        // Unsettled with a payer account → burn+mint fix branch.
+        txHash: null,
+        account: `0x${randomBytes(20).toString("hex")}`,
+        completedAt: new Date().toISOString(),
+      },
+      {
+        id: 44792,
+        total: "5.50",
+        fees: "0.00",
+        net: "5.50",
+        due: "5.50",
+        status: "paid",
+        type: "pos",
+        description: null,
+        items: [],
+        // Unsettled with no payer account → mint-only fix branch.
+        txHash: null,
+        account: null,
+        completedAt: new Date().toISOString(),
+      },
+    ];
+    return {
+      orders,
+      total: orders.length,
+      limit: query.limit ?? 50,
+      offset: query.offset ?? 0,
+      placeAccountAddress: `0x${randomBytes(20).toString("hex")}`,
+    };
+  }
+
+  async recordOrderTxHash(
+    payoutId: string,
+    orderId: number,
+    txHash: string,
+  ): Promise<void> {
+    this.log("recordOrderTxHash", { payoutId, orderId, txHash });
+  }
+
+  async createPayoutOrder(
+    payoutId: string,
+    input: CreatePayoutOrderInput,
+  ): Promise<CreatedPayoutOrder> {
+    this.log("createPayoutOrder", { payoutId, ...input });
+    const total = Number(input.total);
+    const fees = Number(input.fees);
+    const net = (total - fees).toFixed(2);
+    return {
+      order: {
+        id: parseInt(randomBytes(4).toString("hex"), 16),
+        total: total.toFixed(2),
+        fees: fees.toFixed(2),
+        net,
+        due: net,
+        status: "paid",
+        type: "manual",
+        description: input.description,
+        items: [],
+        // Manual orders have no on-chain settlement yet → reconcile branch.
+        txHash: null,
+        account: null,
+        completedAt: new Date().toISOString(),
+      },
+      payout: { payoutId, total: total.toFixed(2), fees: fees.toFixed(2), net },
+    };
+  }
+
+  async archiveOrder(
+    payoutId: string,
+    orderId: number,
+  ): Promise<ArchivedPayout> {
+    this.log("archiveOrder", { payoutId, orderId });
+    return { payoutId, total: "100.00", fees: "2.00", net: "98.00" };
+  }
+
+  async getBankingStatus(): Promise<BankingStatus> {
+    this.log("getBankingStatus", {});
+    return {
+      connected: true,
+      status: "active",
+      accountReference: "BE68 5390 0754 7034",
+      accountName: "Mock Treasury Account",
+      onboardingComplete: true,
+      paymentInitiationEnabled: true,
+      paymentInitiationRequested: false,
+      paymentRequestsEnabled: true,
+      ready: true,
+    };
+  }
+
+  async getBankingBalance(): Promise<BankBalance> {
+    this.log("getBankingBalance", {});
+    return {
+      accountId: "mock-account-1",
+      reference: "BE68 5390 0754 7034",
+      currency: "EUR",
+      availableBalance: 12345.67,
+      currentBalance: 12345.67,
+    };
+  }
+
+  async getBankingTransactions(
+    query: { limit?: number; cursor?: string } = {},
+  ): Promise<BankTransactionsPage> {
+    this.log("getBankingTransactions", query);
+    if (query.cursor) return { transactions: [], nextCursor: null };
+    return {
+      transactions: [
+        {
+          id: "mock-tx-1",
+          amount: -28.32,
+          currency: "EUR",
+          executionDate: "2026-05-27",
+          valueDate: "2026-05-27",
+          counterpartName: "BEES Coop",
+          counterpartReference: "BE71 0961 2345 6769",
+          remittanceInformation: "cp-order-44790",
+          remittanceInformationType: "structured",
+          description: "Merchant payout",
+          createdAt: new Date().toISOString(),
+        },
+        {
+          id: "mock-tx-2",
+          amount: 500,
+          currency: "EUR",
+          executionDate: "2026-05-26",
+          valueDate: "2026-05-26",
+          counterpartName: "Jane Member",
+          counterpartReference: null,
+          remittanceInformation: "Top-up",
+          remittanceInformationType: "unstructured",
+          description: "Incoming transfer",
+          createdAt: new Date().toISOString(),
+        },
+        {
+          // Bank-transfer-paid order (no on-chain payer account). The
+          // structured reference `cp-order-{orderId}` lets the Fix dialog
+          // surface this as the backing transfer for mock order 44792.
+          id: "mock-tx-3",
+          amount: 5.5,
+          currency: "EUR",
+          executionDate: "2026-05-25",
+          valueDate: "2026-05-25",
+          counterpartName: "Marie Dupont",
+          counterpartReference: null,
+          remittanceInformation: "cp-order-44792",
+          remittanceInformationType: "structured",
+          description: "Order payment",
+          createdAt: new Date().toISOString(),
+        },
+      ],
+      nextCursor: null,
+    };
+  }
+
+  async getBankTransactionPayloadPage(
+    query: { limit?: number; cursor?: string } = {},
+  ): Promise<BankTransactionPayloadPage> {
+    this.log("getBankTransactionPayloadPage", query);
+    // Reuse the same fixtures as the Bank page, adapted to the ingest shape so
+    // the manual full-sync surfaces something to ingest in dev.
+    const { transactions, nextCursor } = await this.getBankingTransactions(query);
+    return {
+      fetched: transactions.length,
+      transactions: transactions.map((tx) => ({
+        externalId: tx.id,
+        direction: tx.amount < 0 ? "OUTGOING" : "INCOMING",
+        amount: Math.abs(tx.amount).toFixed(2),
+        currency: tx.currency,
+        occurredAt:
+          tx.executionDate ?? tx.valueDate ?? tx.createdAt ?? "2026-01-01",
+        counterpartName: tx.counterpartName,
+        counterpartIban: tx.counterpartReference,
+        counterpartReference: null,
+        remittanceInfo: tx.remittanceInformation,
+        rawData: tx,
+      })),
+      nextCursor,
+    };
+  }
+
+  async listPendingPayouts(): Promise<Payout[]> {
+    this.log("listPendingPayouts", {});
+    // Drop any the operator manually marked complete this session so dev
+    // mirrors the real lists moving the payout pending → completed.
+    return MOCK_PENDING_PAYOUTS.filter(
+      (p) => !completedMockPayouts.has(p.id),
+    ).map((p) => mockPayout(p.id, p.status, p.amount));
+  }
+
+  async listCompletedPayouts(): Promise<Payout[]> {
+    this.log("listCompletedPayouts", {});
+    const manuallyCompleted = MOCK_PENDING_PAYOUTS.filter((p) =>
+      completedMockPayouts.has(p.id),
+    ).map((p) => mockPayout(p.id, "complete", p.amount));
+    return [
+      ...manuallyCompleted,
+      {
+        ...mockPayout("mock-payout-0", "complete", "320.00"),
+        burnTxHashes: [`0x${randomBytes(32).toString("hex")}`],
+      },
+    ];
+  }
+
+  async getPayoutStatus(
+    payoutId: string,
+    opts: { redirectUrl?: string } = {},
+  ): Promise<PayoutStatusDetail> {
+    this.log("getPayoutStatus", { payoutId, ...opts });
+    // A manual "mark complete" wins over the fixture's lifecycle stage.
+    if (completedMockPayouts.has(payoutId)) {
+      return { status: "complete", signingUrl: null };
+    }
+    // Map the mock payouts so dev sees each lifecycle stage (and the signing
+    // QR for the payment-pending one).
+    if (payoutId === "mock-payout-2") {
+      return {
+        status: "payment-pending",
+        signingUrl: "https://myponto.com/sign/mock-payout-2",
+      };
+    }
+    if (payoutId === "mock-payout-0") {
+      return { status: "complete", signingUrl: null };
+    }
+    return { status: "pending", signingUrl: null };
+  }
+
+  async createPayoutPayment(
+    payoutId: string,
+    args: { redirectUrl?: string } = {},
+  ): Promise<CreatePayoutPaymentResult> {
+    this.log("createPayoutPayment", { payoutId, ...args });
+    const paymentId = randomBytes(8).toString("hex");
+    return {
+      alreadyCreated: false,
+      paymentId,
+      signingUrl: `https://my.citizenpay.xyz/sign/${paymentId}`,
+    };
+  }
+
+  async burnPayout(payoutId: string): Promise<BurnPayoutResult> {
+    this.log("burnPayout", { payoutId });
+    return { txHash: `0x${randomBytes(32).toString("hex")}` };
+  }
+
+  async completePayout(payoutId: string): Promise<void> {
+    this.log("completePayout", { payoutId });
+    completedMockPayouts.add(payoutId);
+  }
+}
+
+// The pending fixtures, lifted to module scope so `completePayout` can move one
+// to the completed list. `completedMockPayouts` persists across requests within
+// the dev server process (the factory builds a fresh client per call) and
+// resets on restart — good enough for dev.
+const MOCK_PENDING_PAYOUTS: {
+  id: string;
+  status: PayoutStatus;
+  amount: string;
+}[] = [
+  { id: "mock-payout-1", status: "pending", amount: "150.00" },
+  { id: "mock-payout-2", status: "payment-pending", amount: "42.50" },
+];
+const completedMockPayouts = new Set<string>();
+
+// Plausible dev payout. The place id is arbitrary — the mock `listPlaces`
+// returns no places, so the settlement view falls back to showing the raw
+// place id when it can't resolve a local Merchant.
+function mockPayout(id: string, status: PayoutStatus, amount: string): Payout {
+  const end = new Date();
+  const start = new Date(end.getTime() - 14 * 24 * 60 * 60 * 1000);
+  return {
+    id,
+    businessId: "mock-business-1",
+    placeId: "mock-place-1",
+    businessName: "Mock Grocer",
+    placeName: "Mock Grocer",
+    placeImage: null,
+    startDate: start.toISOString(),
+    endDate: end.toISOString(),
+    totalAmount: amount,
+    totalFees: "0.00",
+    manualDeduction: "0.00",
+    manualDeductionComment: null,
+    net: amount,
+    status,
+    burnTxHashes: [],
+    pontoPaymentId: null,
+    pontoPaymentStatus: null,
+    emailRecipient: null,
+    emailSentAt: null,
+    createdAt: start.toISOString(),
+    updatedAt: end.toISOString(),
+  };
 }
 
 // =============================================================================

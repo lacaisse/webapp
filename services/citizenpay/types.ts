@@ -67,6 +67,21 @@ export type ListBankTransactionsResult = {
   transactions: BankTransactionPayload[];
 };
 
+// One cursor-paginated page of ingest-shaped bank transactions (newest-first).
+// Used by the manual full-sync, which walks pages client-side so each request
+// stays short. `nextCursor === null` means there are no older pages.
+// `fetched` is the raw count CP returned for this page (before we drop undated
+// rows) — `fetched === 0` is a reliable end-of-feed signal even if a stale
+// cursor is still present. Note `transactions.length` can be smaller than
+// `fetched` (undated rows dropped) and `fetched` can be smaller than the
+// requested limit on a non-final page (the server may cap page size), so
+// neither length is a safe end signal on its own.
+export type BankTransactionPayloadPage = {
+  transactions: BankTransactionPayload[];
+  nextCursor: string | null;
+  fetched: number;
+};
+
 // A merchant location ("place") as known to CitizenPay. CP's wire shape uses
 // snake_case keys and integer cents; we surface a normalised camelCase shape
 // here and let the live adapter convert. `account` may be null when CP
@@ -178,4 +193,204 @@ export type ListCardsInput = {
 export type ListCardsResult = {
   cards: CitizenPayCard[];
   pagination: { page: number; limit: number; total: number; totalPages: number };
+};
+
+// =============================================================================
+// Merchant payouts (settlement)
+// =============================================================================
+// CitizenPay aggregates the token payments a merchant place received over a
+// period into a "payout" the treasury then settles in two steps:
+//   1. createPayoutPayment → the admin signs a SEPA transfer to the merchant
+//      (CP returns a signing URL the admin opens at their bank).
+//   2. burnPayout → the matching tokens are burned on-chain once the fiat
+//      leg is paid.
+// Lifecycle: pending → payment-pending → burnt → complete.
+
+export type PayoutStatus = "pending" | "payment-pending" | "burnt" | "complete";
+
+// Live status from `GET /payouts/{id}/status`. `signingUrl` is present only
+// while `payment-pending` (the Ponto signing link) — null otherwise.
+export type PayoutStatusDetail = {
+  status: PayoutStatus;
+  signingUrl: string | null;
+};
+
+// Normalised view of CP's `PayoutWire`. Cents-on-the-wire amounts are
+// surfaced as Decimal strings (EUR) so the UI formats them like every other
+// money value in the app. `net = totalAmount - totalFees - manualDeduction`.
+export type Payout = {
+  id: string;
+  businessId: string;
+  placeId: string;
+  // Denormalised labels from the list endpoints; null on older rows.
+  businessName: string | null;
+  placeName: string | null;
+  placeImage: string | null;
+  startDate: string; // ISO 8601 — start of the settlement period
+  endDate: string; // ISO 8601 — end of the settlement period
+  totalAmount: string; // Decimal string, EUR — gross tokens collected
+  totalFees: string; // Decimal string, EUR — platform fees
+  manualDeduction: string; // Decimal string, EUR — admin adjustment
+  manualDeductionComment: string | null;
+  net: string; // Decimal string, EUR — what the merchant is paid
+  status: PayoutStatus;
+  // On-chain burn tx hashes once the burn step runs (CP returns one per
+  // token batch). Empty until burnt.
+  burnTxHashes: string[];
+  pontoPaymentId: string | null;
+  pontoPaymentStatus: string | null;
+  emailRecipient: string | null;
+  emailSentAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+// A draft payout: paid/refunded orders for one place that aren't yet in a
+// payout. Computed, never stored. `net = total - fees`.
+export type PayoutDraft = {
+  businessId: string;
+  placeId: string;
+  placeName: string;
+  placeImage: string | null;
+  orderCount: number;
+  total: string; // Decimal string, EUR
+  fees: string; // Decimal string, EUR
+  net: string; // Decimal string, EUR
+};
+
+// Single-place preview echoing the queried range.
+export type PayoutDraftPreview = PayoutDraft & {
+  from: string; // ISO 8601
+  to: string; // ISO 8601
+};
+
+// Result of creating a pending payout (POST /v2/treasury/payouts).
+export type CreatedPayout = {
+  payoutId: string;
+  status: "pending";
+  orderCount: number;
+  total: string; // Decimal string, EUR
+  fees: string; // Decimal string, EUR
+  net: string; // Decimal string, EUR
+  startDate: string;
+  endDate: string;
+};
+
+// A single order inside a payout (review view).
+export type PayoutOrder = {
+  id: number;
+  total: string; // Decimal string, EUR — the payer paid this
+  fees: string; // Decimal string, EUR
+  // What the place is owed for this order: total − fees. Computed locally —
+  // the wire `due` field means "amount still owed" (often 0) and is NOT this.
+  net: string; // Decimal string, EUR
+  due: string; // Decimal string, EUR (wire passthrough)
+  status: string; // paid | refund | refunded | correction | …
+  type: string; // web | pos | terminal | …
+  description: string | null;
+  // Raw line-items array — shape is treasury/POS-specific, so kept opaque
+  // and rendered defensively in the UI.
+  items: unknown[];
+  // On-chain settlement hash for this order (userOp or tx); null when CP
+  // hasn't recorded one — that's the "needs minting" case.
+  txHash: string | null;
+  // Payer account. Null/empty ⇒ reconcile by minting to the place only;
+  // non-empty ⇒ burn from this account + mint to the place.
+  account: string | null;
+  completedAt: string | null;
+};
+
+export type PayoutOrdersPage = {
+  orders: PayoutOrder[];
+  total: number;
+  limit: number;
+  offset: number;
+  // The place's on-chain wallet — mint destination when reconciling.
+  placeAccountAddress: string | null;
+};
+
+// Recomputed payout totals returned after archiving an order.
+export type ArchivedPayout = {
+  payoutId: string;
+  total: string; // Decimal string, EUR
+  fees: string; // Decimal string, EUR
+  net: string; // Decimal string, EUR
+};
+
+// Input for manually adding an order to a pending payout — an amount that
+// exists off-CP (e.g. a bank transfer the operator reconciles by hand).
+// EUR Decimal strings (the adapter converts to cents). `description` carries
+// the bank-transfer reference when the order is created from a transaction.
+export type CreatePayoutOrderInput = {
+  total: string; // EUR decimal — gross amount
+  fees: string; // EUR decimal — platform/handling fee (may be "0")
+  description: string | null;
+};
+
+// Result of manually creating an order: the new order plus the payout's
+// recomputed totals, so the UI can update the header + list in place.
+export type CreatedPayoutOrder = {
+  order: PayoutOrder;
+  payout: ArchivedPayout;
+};
+
+// =============================================================================
+// Banking (Ponto connection status)
+// =============================================================================
+
+// Whether the treasury's bank connection is active and payment initiation is
+// enabled. `ready` = connected && onboardingComplete && paymentInitiationEnabled
+// — the gate for initiating payouts. When not connected, `status` is
+// "not_connected" and the rest are false; the UI shows a "connect bank" step.
+export type BankingStatus = {
+  connected: boolean;
+  status: string;
+  accountReference: string | null;
+  accountName: string | null;
+  onboardingComplete: boolean;
+  paymentInitiationEnabled: boolean;
+  paymentInitiationRequested: boolean;
+  paymentRequestsEnabled: boolean;
+  ready: boolean;
+};
+
+// Bank-account balance. Native decimals (not cents) in `currency`.
+export type BankBalance = {
+  accountId: string;
+  reference: string | null;
+  currency: string;
+  availableBalance: number | null;
+  currentBalance: number | null;
+};
+
+// A bank-account transaction (Ponto). `amount < 0` = debit, `> 0` = credit.
+export type BankTransaction = {
+  id: string;
+  amount: number;
+  currency: string;
+  executionDate: string | null;
+  valueDate: string | null;
+  counterpartName: string | null;
+  counterpartReference: string | null;
+  remittanceInformation: string | null;
+  remittanceInformationType: string | null;
+  description: string | null;
+  createdAt: string | null;
+};
+
+// One cursor-paginated page of transactions (newest-first). `nextCursor` is
+// null when there are no older pages.
+export type BankTransactionsPage = {
+  transactions: BankTransaction[];
+  nextCursor: string | null;
+};
+
+// Result of `createPayoutPayment`. `alreadyCreated` means CP had a live
+// payment for this payout already — there's no fresh signing URL to open.
+export type CreatePayoutPaymentResult =
+  | { alreadyCreated: true }
+  | { alreadyCreated: false; paymentId: string; signingUrl: string };
+
+export type BurnPayoutResult = {
+  txHash: string;
 };

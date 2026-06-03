@@ -21,7 +21,7 @@ import { sendPaymentConfirmation } from "@/services/email/transactional";
 // transaction with the current open AllocationPeriod (if any). The period
 // close cron is responsible for batch minting.
 
-type IngestStats = {
+export type IngestStats = {
   ingested: number;
   matched: number;
   minted: number;
@@ -40,18 +40,51 @@ type IngestionFund = {
   logoUrl: string | null;
 };
 
+// Cron path: incremental sync since the fund's last-sync watermark.
 export async function syncFundBankTransactions(
   fund: IngestionFund,
 ): Promise<IngestStats> {
   const cp = getCitizenPayClient(fund);
-  const stats: IngestStats = { ingested: 0, matched: 0, minted: 0, skipped: 0 };
 
   const result = await cp.listBankTransactions({
     fundCitizenPayId: fund.citizenPayFundId,
     since: fund.citizenPayLastSyncedAt?.toISOString(),
   });
 
-  for (const payload of result.transactions) {
+  const stats = await ingestPayloads(fund, result.transactions);
+  await touchLastSyncedAt(fund.id);
+  return stats;
+}
+
+// Manual full-sync, one page at a time. The Bank page drives this in a loop
+// (passing back `nextCursor`) so each request stays short and progress is
+// visible. We ignore the watermark — this re-pulls the full history — and only
+// bump `citizenPayLastSyncedAt` on the final page so a mid-run abort leaves the
+// cron's watermark untouched. Idempotent on (fundId, externalId), so a resumed
+// or restarted run just skips rows it already ingested.
+export async function runFullBankSyncPage(
+  fund: IngestionFund,
+  cursor?: string,
+): Promise<{ stats: IngestStats; nextCursor: string | null; done: boolean }> {
+  const cp = getCitizenPayClient(fund);
+  const page = await cp.getBankTransactionPayloadPage({ limit: 100, cursor });
+  const stats = await ingestPayloads(fund, page.transactions);
+  // End of history when CP gives no next cursor, or returns an empty page even
+  // with a (stale) cursor still present — there's nothing left to ingest.
+  const done = page.nextCursor === null || page.fetched === 0;
+  if (done) await touchLastSyncedAt(fund.id);
+  return { stats, nextCursor: done ? null : page.nextCursor, done };
+}
+
+// Ingest one batch of payloads. One bad payload is logged and skipped — it
+// shouldn't halt the batch, and (fundId, externalId) uniqueness makes a rerun
+// safe.
+async function ingestPayloads(
+  fund: IngestionFund,
+  payloads: BankTransactionPayload[],
+): Promise<IngestStats> {
+  const stats: IngestStats = { ingested: 0, matched: 0, minted: 0, skipped: 0 };
+  for (const payload of payloads) {
     try {
       const r = await ingestOne(fund, payload);
       if (r === "skipped") stats.skipped++;
@@ -62,17 +95,16 @@ export async function syncFundBankTransactions(
       }
     } catch (e) {
       console.error("[bank-sync] ingest failed", payload.externalId, e);
-      // Continue with the rest of the batch — one bad payload shouldn't
-      // halt sync. (fundId, externalId) uniqueness means rerun is safe.
     }
   }
+  return stats;
+}
 
-  await prisma.fund.update({
-    where: { id: fund.id },
+function touchLastSyncedAt(fundId: string): Promise<unknown> {
+  return prisma.fund.update({
+    where: { id: fundId },
     data: { citizenPayLastSyncedAt: new Date() },
   });
-
-  return stats;
 }
 
 type IngestOneResult = "skipped" | { matched: boolean; minted: boolean };
