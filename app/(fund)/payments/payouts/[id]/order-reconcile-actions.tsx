@@ -275,7 +275,7 @@ function FixDialog({
         )}
 
         {!account && (
-          <div className="space-y-2 rounded-lg border border-border p-3">
+          <div className="space-y-2 overflow-hidden rounded-lg border border-border p-3">
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs text-muted-foreground">
                 {t("bankMatch")}
@@ -287,30 +287,33 @@ function FixDialog({
             {bankMatch ? (
               <div className="space-y-0.5 border-t border-border pt-2">
                 <div className="flex items-center justify-between gap-2 text-sm">
-                  <span className="truncate">
+                  {/* min-w-0 lets the flex item shrink below content width so
+                      the long bank reference truncates instead of pushing the
+                      modal past its max-w-sm. */}
+                  <div className="min-w-0 flex-1 truncate">
                     {bankMatch.counterpartName ?? t("bankMatchUnknown")}
-                  </span>
-                  <span className="shrink-0 font-medium tabular-nums">
+                  </div>
+                  <div className="shrink-0 font-medium tabular-nums">
                     {format.number(Number(bankMatch.amount), {
                       style: "currency",
                       currency: bankMatch.currency,
                     })}
-                  </span>
+                  </div>
                 </div>
                 <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                  <span className="truncate font-mono">
+                  <div className="min-w-0 flex-1 truncate font-mono">
                     {bankMatch.reference ?? "—"}
-                  </span>
-                  <span className="shrink-0">
+                  </div>
+                  <div className="shrink-0">
                     {format.dateTime(new Date(bankMatch.occurredAt), {
                       dateStyle: "medium",
                     })}
-                  </span>
+                  </div>
                 </div>
               </div>
             ) : (
               bankLoaded && (
-                <p className="border-t border-border pt-2 text-xs text-muted-foreground">
+                <p className="border-t border-border pt-2 text-xs break-words text-muted-foreground">
                   {t("bankMatchNone", { ref: `cp-order-${orderId}` })}
                 </p>
               )
