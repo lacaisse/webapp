@@ -130,5 +130,5 @@ Citizen Pay BV is the project's primary maintainer:
 
 ## Contact
 
-- **Maintainer**: Citizen Pay BV — [citizenpay.be](https://citizenpay.be)
+- **Maintainer**: Citizen Pay BV — [citizenpay.eu](https://citizenpay.eu)
 - **Issues**: [github.com/citizenpay/lacaisse/issues](https://github.com/citizenpay/lacaisse/issues)
