@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 "use client";
 
-import { CheckCircle2, Loader2, Plus } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Loader2, Plus, Search } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -44,10 +44,19 @@ export function CreateOrderDialog({ payoutId }: { payoutId: string }) {
   const [description, setDescription] = useState("");
   const [selectedTxId, setSelectedTxId] = useState<string | null>(null);
 
+  const [search, setSearch] = useState("");
   const [txns, setTxns] = useState<PickableBankTransaction[] | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadingTxns, startLoadTxns] = useTransition();
+  const [loadingMore, startLoadMore] = useTransition();
   const [creating, startCreate] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  // Outcome of a successful create: the order always lands; minting may or may
+  // not have. Drives the confirmation/warning state (and stops a second
+  // submit creating a duplicate order).
+  const [done, setDone] = useState<
+    { kind: "minted"; txHash: string } | { kind: "mintFailed"; message: string } | null
+  >(null);
 
   function reset() {
     setMode("manual");
@@ -55,7 +64,11 @@ export function CreateOrderDialog({ payoutId }: { payoutId: string }) {
     setFees("0");
     setDescription("");
     setSelectedTxId(null);
+    setSearch("");
+    setTxns(null);
+    setNextCursor(null);
     setError(null);
+    setDone(null);
   }
 
   function onOpenChange(next: boolean) {
@@ -66,14 +79,39 @@ export function CreateOrderDialog({ payoutId }: { payoutId: string }) {
   function switchMode(next: Mode) {
     setMode(next);
     setError(null);
-    // Lazy-load the transaction list the first time the operator opens the
-    // bank tab — it's a DB read we don't want on every payout-detail render.
-    if (next === "bank" && txns === null && !loadingTxns) {
+  }
+
+  // Load the first page whenever the bank tab is open, debounced on the search
+  // term so each keystroke doesn't fire a query. The DB read is lazy (only
+  // while the bank tab is active) — we don't want it on every payout render.
+  useEffect(() => {
+    if (!open || mode !== "bank") return;
+    const handle = setTimeout(() => {
       startLoadTxns(async () => {
-        const res = await listIncomingBankTransactionsAction();
-        setTxns("error" in res ? [] : res.transactions);
+        const res = await listIncomingBankTransactionsAction({ search });
+        if ("error" in res) {
+          setTxns([]);
+          setNextCursor(null);
+          return;
+        }
+        setTxns(res.transactions);
+        setNextCursor(res.nextCursor);
       });
-    }
+    }, 200);
+    return () => clearTimeout(handle);
+  }, [open, mode, search]);
+
+  function loadMore() {
+    if (!nextCursor) return;
+    startLoadMore(async () => {
+      const res = await listIncomingBankTransactionsAction({
+        search,
+        cursor: nextCursor,
+      });
+      if ("error" in res) return;
+      setTxns((prev) => [...(prev ?? []), ...res.transactions]);
+      setNextCursor(res.nextCursor);
+    });
   }
 
   function pickTransaction(tx: PickableBankTransaction) {
@@ -91,11 +129,17 @@ export function CreateOrderDialog({ payoutId }: { payoutId: string }) {
         fees: fees.trim() || "0",
         description: description.trim() || null,
       });
+      // Only a pre-create failure is a retryable error. Once the order exists
+      // the result is always ok — minted or with a mintError to surface.
       if ("error" in result) {
         setError(result.error);
         return;
       }
-      onOpenChange(false);
+      setDone(
+        "txHash" in result
+          ? { kind: "minted", txHash: result.txHash }
+          : { kind: "mintFailed", message: result.mintError },
+      );
     });
   };
 
@@ -128,7 +172,37 @@ export function CreateOrderDialog({ payoutId }: { payoutId: string }) {
           <DialogDescription>{t("description")}</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        {/* min-w-0: this is a grid item of DialogContent (display:grid). Grid
+            items default to min-width:auto and won't shrink below their
+            content's intrinsic width — the long, unbreakable bank-transfer
+            references would otherwise force the track wider than the dialog's
+            max-w-sm, defeating the per-row `truncate` and painting past the
+            card's edge. Allowing it to shrink lets truncation kick in. */}
+        <div className="min-w-0 space-y-4">
+          {done ? (
+            done.kind === "minted" ? (
+              <Alert>
+                <CheckCircle2 className="size-4" />
+                <AlertDescription>
+                  <div>{t("successMinted")}</div>
+                  <div className="mt-1 font-mono text-xs break-all">
+                    {done.txHash}
+                  </div>
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <Alert variant="warning">
+                <AlertTriangle className="size-4" />
+                <AlertDescription>
+                  <div>{t("mintFailed")}</div>
+                  <div className="mt-1 text-xs break-words opacity-90">
+                    {done.message}
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )
+          ) : (
+            <>
           {/* Mode toggle */}
           <div className="inline-flex w-full items-center gap-0.5 rounded-lg bg-muted p-0.5 text-sm">
             <ModeButton
@@ -148,7 +222,22 @@ export function CreateOrderDialog({ payoutId }: { payoutId: string }) {
           {mode === "bank" && (
             <div className="space-y-2">
               <p className="text-xs text-muted-foreground">{t("pickHint")}</p>
-              {loadingTxns ? (
+
+              <div className="relative">
+                <Search className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder={t("searchPlaceholder")}
+                  autoComplete="off"
+                  className="pl-8"
+                />
+                {loadingTxns && (
+                  <Loader2 className="absolute top-1/2 right-2.5 size-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+                )}
+              </div>
+
+              {loadingTxns && txns === null ? (
                 <div className="flex items-center justify-center gap-2 rounded-lg border border-border py-6 text-sm text-muted-foreground">
                   <Loader2 className="size-4 animate-spin" />
                   {t("loadingTransactions")}
@@ -190,10 +279,23 @@ export function CreateOrderDialog({ payoutId }: { payoutId: string }) {
                       </div>
                     </button>
                   ))}
+                  {nextCursor && (
+                    <button
+                      type="button"
+                      onClick={loadMore}
+                      disabled={loadingMore}
+                      className="flex w-full items-center justify-center gap-2 rounded-md px-2.5 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted disabled:opacity-60"
+                    >
+                      {loadingMore && (
+                        <Loader2 className="size-4 animate-spin" />
+                      )}
+                      {t("loadMore")}
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="rounded-lg border border-border py-6 text-center text-sm text-muted-foreground">
-                  {t("noTransactions")}
+                  {search ? t("noMatches") : t("noTransactions")}
                 </div>
               )}
             </div>
@@ -255,29 +357,43 @@ export function CreateOrderDialog({ payoutId }: { payoutId: string }) {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
+            </>
+          )}
         </div>
 
         <DialogFooter>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => onOpenChange(false)}
-            disabled={creating}
-          >
-            {tRoot("common.cancel")}
-          </Button>
-          <Button
-            type="button"
-            onClick={onCreate}
-            disabled={creating || !netValid}
-          >
-            {creating ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <CheckCircle2 className="size-4" />
-            )}
-            {t("confirm")}
-          </Button>
+          {done ? (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => onOpenChange(false)}
+            >
+              {tRoot("common.close")}
+            </Button>
+          ) : (
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => onOpenChange(false)}
+                disabled={creating}
+              >
+                {tRoot("common.cancel")}
+              </Button>
+              <Button
+                type="button"
+                onClick={onCreate}
+                disabled={creating || !netValid}
+              >
+                {creating ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="size-4" />
+                )}
+                {t("confirm")}
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

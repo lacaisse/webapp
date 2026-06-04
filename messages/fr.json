@@ -775,15 +775,20 @@
           "modeManual": "Saisie manuelle",
           "modeBank": "Depuis un virement",
           "pickHint": "Choisissez un virement entrant — sa référence devient la description de la commande.",
+          "searchPlaceholder": "Rechercher par nom, référence ou montant…",
           "loadingTransactions": "Chargement des virements…",
+          "loadMore": "Afficher plus",
           "noTransactions": "Aucun virement entrant à sélectionner.",
+          "noMatches": "Aucun virement ne correspond à votre recherche.",
           "unknownCounterpart": "Expéditeur inconnu",
           "amount": "Montant",
           "fee": "Frais",
           "descriptionLabel": "Description",
           "descriptionPlaceholder": "Objet de la commande",
           "net": "Net",
-          "confirm": "Ajouter la commande"
+          "confirm": "Ajouter la commande",
+          "successMinted": "Commande ajoutée et net émis vers le commerce.",
+          "mintFailed": "Commande ajoutée, mais l’émission automatique a échoué. Réconciliez-la depuis l’onglet Problèmes."
         },
         "pay": {
           "button": "Payer le commerce",

@@ -775,15 +775,20 @@
           "modeManual": "Enter manually",
           "modeBank": "From bank transfer",
           "pickHint": "Pick an incoming bank transfer — its reference becomes the order description.",
+          "searchPlaceholder": "Search by name, reference or amount…",
           "loadingTransactions": "Loading transfers…",
+          "loadMore": "Show more",
           "noTransactions": "No incoming bank transfers to pick from.",
+          "noMatches": "No transfers match your search.",
           "unknownCounterpart": "Unknown sender",
           "amount": "Amount",
           "fee": "Fee",
           "descriptionLabel": "Description",
           "descriptionPlaceholder": "What this order is for",
           "net": "Net",
-          "confirm": "Add order"
+          "confirm": "Add order",
+          "successMinted": "Order added and net minted to the place.",
+          "mintFailed": "Order added, but automatic minting failed. Reconcile it from the Issues tab."
         },
         "pay": {
           "button": "Pay merchant",
