@@ -16,7 +16,7 @@ import {
   type SignupInput,
 } from "../schemas";
 
-export function SignupForm() {
+export function SignupForm({ returnTo }: { returnTo?: string }) {
   const t = useTranslations("auth.signup");
   const tRoot = useTranslations();
 
@@ -30,7 +30,7 @@ export function SignupForm() {
   const onSubmit = (data: SignupInput) =>
     startTransition(async () => {
       setOkMessage(null);
-      const result = await signupAction(data);
+      const result = await signupAction(data, returnTo);
       if (!result) return; // server-action redirected
       if ("error" in result) {
         form.setError("root", { message: result.error });

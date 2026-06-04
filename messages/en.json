@@ -125,8 +125,26 @@
       "bank": "Bank",
       "referrals": "Referrals",
       "emails": "Emails",
+      "team": "Team",
       "settings": "Settings",
       "backToApex": "Back to your funds"
+    },
+    "team": {
+      "title": "Team",
+      "description": "Manage who can administer this fund.",
+      "invite": "Invite co-administrator",
+      "staffHeading": "Administrators",
+      "pendingHeading": "Pending invitations",
+      "noPending": "No pending invitations.",
+      "you": "(you)",
+      "columns": {
+        "name": "Name",
+        "email": "Email",
+        "role": "Role",
+        "joined": "Joined",
+        "invitedBy": "Invited by",
+        "expires": "Expires"
+      }
     },
     "bank": {
       "title": "Bank",
@@ -1164,6 +1182,75 @@
       "amountInvalid": "Amount must be a number with up to 2 decimal places.",
       "urlInvalid": "Enter a valid URL (must start with http:// or https://)."
     }
+  },
+  "team": {
+    "roles": {
+      "OWNER": "Owner",
+      "ADMIN": "Admin",
+      "VIEWER": "Viewer"
+    },
+    "admin": {
+      "invite": {
+        "title": "Invite a co-administrator",
+        "description": "They'll get an email invitation to join this fund's team. They join once they sign in and accept.",
+        "emailLabel": "Email",
+        "roleLabel": "Role",
+        "cancel": "Cancel",
+        "confirm": "Send invitation",
+        "inviting": "Sending…"
+      },
+      "email": {
+        "invited": {
+          "subject": "You've been invited to administer {fundName}",
+          "textBody": "Hello,\n\nYou've been invited to join {fundName} as {role}. Accept the invitation to get access:\n\n{acceptUrl}\n\nIf you weren't expecting this, you can safely ignore this email.\n\nThe {fundName} team",
+          "ctaLabel": "Accept invitation"
+        }
+      }
+    },
+    "actions": {
+      "roleLabel": "Role",
+      "remove": "Remove",
+      "removeTitle": "Remove administrator",
+      "removeDescription": "Remove {memberName} from this fund's team? They'll immediately lose admin access.",
+      "removing": "Removing…",
+      "confirmRemove": "Remove",
+      "cancel": "Cancel",
+      "revoke": "Revoke",
+      "revokeTitle": "Revoke invitation",
+      "revokeDescription": "Revoke the pending invitation for {email}? The invitation link will stop working.",
+      "revoking": "Revoking…",
+      "confirmRevoke": "Revoke"
+    },
+    "errors": {
+      "emailInvalid": "Enter a valid email address.",
+      "roleInvalid": "Pick a valid role.",
+      "cannotGrantOwner": "You don't have permission to grant that role.",
+      "alreadyMember": "That person is already on this fund's team.",
+      "notFound": "That team member could not be found.",
+      "cannotModifyOwner": "Only an owner can change another owner.",
+      "lastOwner": "This is the only owner — promote someone else to owner first.",
+      "inviteInvalid": "This invitation is invalid or has already been used.",
+      "inviteExpired": "This invitation has expired. Ask an administrator to send a new one.",
+      "emailMismatch": "This invitation was sent to a different email address."
+    }
+  },
+  "joinTeam": {
+    "title": "Join {fundName}",
+    "invalidTitle": "Invitation not found",
+    "invalidBody": "This invitation link is invalid or has already been used.",
+    "acceptedTitle": "Already accepted",
+    "acceptedBody": "This invitation has already been accepted.",
+    "expiredTitle": "Invitation expired",
+    "expiredBody": "This invitation has expired. Ask an administrator to send a new one.",
+    "authPrompt": "You've been invited to join {fundName} as {role}. Sign in or create an account with {email} to accept.",
+    "createAccount": "Create an account",
+    "signIn": "Sign in",
+    "mismatchTitle": "Wrong account",
+    "mismatchBody": "You're signed in as {signedInAs}, but this invitation was sent to {invitedEmail}. Switch accounts to accept it.",
+    "switchAccount": "Switch account",
+    "readyBody": "Accept to join {fundName} as {role}.",
+    "accept": "Accept invitation",
+    "accepting": "Joining…"
   },
   "members": {
     "email": {

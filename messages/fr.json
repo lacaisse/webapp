@@ -125,8 +125,26 @@
       "bank": "Banque",
       "referrals": "Parrainage",
       "emails": "Emails",
+      "team": "Équipe",
       "settings": "Paramètres",
       "backToApex": "Retour à mes caisses"
+    },
+    "team": {
+      "title": "Équipe",
+      "description": "Gérez qui peut administrer cette caisse.",
+      "invite": "Inviter un co-administrateur",
+      "staffHeading": "Administrateurs",
+      "pendingHeading": "Invitations en attente",
+      "noPending": "Aucune invitation en attente.",
+      "you": "(vous)",
+      "columns": {
+        "name": "Nom",
+        "email": "Email",
+        "role": "Rôle",
+        "joined": "Membre depuis",
+        "invitedBy": "Invité par",
+        "expires": "Expire le"
+      }
     },
     "bank": {
       "title": "Banque",
@@ -1164,6 +1182,75 @@
       "amountInvalid": "Le montant doit être un nombre avec jusqu'à 2 décimales.",
       "urlInvalid": "Saisissez une URL valide (doit commencer par http:// ou https://)."
     }
+  },
+  "team": {
+    "roles": {
+      "OWNER": "Propriétaire",
+      "ADMIN": "Administrateur",
+      "VIEWER": "Observateur"
+    },
+    "admin": {
+      "invite": {
+        "title": "Inviter un co-administrateur",
+        "description": "Cette personne recevra une invitation par email à rejoindre l'équipe de cette caisse. Elle rejoint l'équipe après s'être connectée et avoir accepté.",
+        "emailLabel": "Email",
+        "roleLabel": "Rôle",
+        "cancel": "Annuler",
+        "confirm": "Envoyer l'invitation",
+        "inviting": "Envoi…"
+      },
+      "email": {
+        "invited": {
+          "subject": "Vous êtes invité à administrer {fundName}",
+          "textBody": "Bonjour,\n\nVous avez été invité à rejoindre {fundName} en tant que {role}. Acceptez l'invitation pour obtenir l'accès :\n\n{acceptUrl}\n\nSi vous ne vous attendiez pas à ce message, vous pouvez l'ignorer.\n\nL'équipe {fundName}",
+          "ctaLabel": "Accepter l'invitation"
+        }
+      }
+    },
+    "actions": {
+      "roleLabel": "Rôle",
+      "remove": "Retirer",
+      "removeTitle": "Retirer l'administrateur",
+      "removeDescription": "Retirer {memberName} de l'équipe de cette caisse ? Cette personne perdra immédiatement son accès administrateur.",
+      "removing": "Retrait…",
+      "confirmRemove": "Retirer",
+      "cancel": "Annuler",
+      "revoke": "Révoquer",
+      "revokeTitle": "Révoquer l'invitation",
+      "revokeDescription": "Révoquer l'invitation en attente pour {email} ? Le lien d'invitation cessera de fonctionner.",
+      "revoking": "Révocation…",
+      "confirmRevoke": "Révoquer"
+    },
+    "errors": {
+      "emailInvalid": "Saisissez une adresse email valide.",
+      "roleInvalid": "Choisissez un rôle valide.",
+      "cannotGrantOwner": "Vous n'avez pas la permission d'attribuer ce rôle.",
+      "alreadyMember": "Cette personne fait déjà partie de l'équipe de cette caisse.",
+      "notFound": "Ce membre de l'équipe est introuvable.",
+      "cannotModifyOwner": "Seul un propriétaire peut modifier un autre propriétaire.",
+      "lastOwner": "C'est le seul propriétaire — promouvez d'abord quelqu'un d'autre comme propriétaire.",
+      "inviteInvalid": "Cette invitation est invalide ou a déjà été utilisée.",
+      "inviteExpired": "Cette invitation a expiré. Demandez à un administrateur d'en envoyer une nouvelle.",
+      "emailMismatch": "Cette invitation a été envoyée à une autre adresse email."
+    }
+  },
+  "joinTeam": {
+    "title": "Rejoindre {fundName}",
+    "invalidTitle": "Invitation introuvable",
+    "invalidBody": "Ce lien d'invitation est invalide ou a déjà été utilisé.",
+    "acceptedTitle": "Déjà acceptée",
+    "acceptedBody": "Cette invitation a déjà été acceptée.",
+    "expiredTitle": "Invitation expirée",
+    "expiredBody": "Cette invitation a expiré. Demandez à un administrateur d'en envoyer une nouvelle.",
+    "authPrompt": "Vous avez été invité à rejoindre {fundName} en tant que {role}. Connectez-vous ou créez un compte avec {email} pour accepter.",
+    "createAccount": "Créer un compte",
+    "signIn": "Se connecter",
+    "mismatchTitle": "Mauvais compte",
+    "mismatchBody": "Vous êtes connecté en tant que {signedInAs}, mais cette invitation a été envoyée à {invitedEmail}. Changez de compte pour l'accepter.",
+    "switchAccount": "Changer de compte",
+    "readyBody": "Acceptez pour rejoindre {fundName} en tant que {role}.",
+    "accept": "Accepter l'invitation",
+    "accepting": "Adhésion…"
   },
   "members": {
     "email": {

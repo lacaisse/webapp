@@ -58,6 +58,7 @@ model User {
   globalRole    GlobalRole @default(USER)
 
   memberships       FundMember[]
+  fundInvitesSent   FundInvite[] @relation("FundInvitesSent") // staff invites this user created
   passkeys          Passkey[]
   accounts          Account[]
   sessions          Session[]
@@ -255,6 +256,7 @@ model Fund {
   merchantSignupSuccessUrl String?
 
   staff             FundMember[] // staff with admin access (OWNER/ADMIN/VIEWER)
+  invites           FundInvite[] // pending staff invitations
   members           Member[] // demand-side recipients of allocations
   cards             Card[] // cards in the fund (may be member-bound or imported)
   tiers             AllocationTier[] // contribution/allocation tiers
@@ -291,6 +293,36 @@ model FundMember {
   updatedAt DateTime @updatedAt
 
   @@unique([userId, fundId])
+  @@index([fundId])
+}
+
+// A pending invitation for someone to become fund *staff* (a FundMember).
+// Keyed by email because the invitee may not have a User account yet —
+// Better Auth only creates the User row at signup, and FundMember.userId is
+// a hard FK, so we can't pre-create the membership. The invite is
+// materialized into a FundMember when the invitee signs in/up with the
+// matching email and accepts (see services/fund-team). One pending invite
+// per (fund, email); re-inviting replaces it with a fresh token.
+model FundInvite {
+  id     String @id @default(cuid())
+  fundId String
+  fund   Fund   @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  email String // normalized lowercase
+  role  FundRole // OWNER | ADMIN granted on accept (VIEWER unused here)
+  token String @unique // random, carried in the accept URL
+
+  invitedById String @db.Uuid
+  invitedBy   User   @relation("FundInvitesSent", fields: [invitedById], references: [id], onDelete: Cascade)
+
+  expiresAt    DateTime
+  acceptedAt   DateTime?
+  acceptedById String?   @db.Uuid // User who accepted (audit; no FK)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([fundId, email])
   @@index([fundId])
 }
 
@@ -1177,6 +1209,7 @@ enum EmailType {
   MEMBER_WELCOME
   MEMBER_INVITED
   MEMBER_ACTIVATED
+  FUND_INVITED
   MERCHANT_EMAIL_VERIFICATION
   MERCHANT_WELCOME
   MERCHANT_APPROVED
