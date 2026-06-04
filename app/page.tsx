@@ -17,8 +17,13 @@ import { prisma } from "@/services/db/prisma";
 import { getApexUrl, getFundUrl } from "@/services/fund/server";
 import { getHostType } from "@/services/host/server";
 import { LandingPage } from "./_landing/landing-page";
+import { PasskeySuggestion } from "./passkey-suggestion";
 
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ welcome?: string }>;
+}) {
   const hostType = await getHostType();
 
   // Auth host has no top-level page of its own — `/` exists only so post-
@@ -43,11 +48,20 @@ export default async function HomePage() {
 
   const t = await getTranslations("funds.yourFunds");
   const tCommon = await getTranslations("common");
+  const tAccount = await getTranslations("account");
   const memberships = await prisma.fundMember.findMany({
     where: { userId: user.id },
     include: { fund: true },
     orderBy: { fund: { name: "asc" } },
   });
+
+  // Right after sign-up the user is sent here with `?welcome=passkey`. Offer a
+  // one-tap passkey setup, but only if they don't already have one (e.g. a
+  // refresh, or they registered on a previous visit).
+  const { welcome } = await searchParams;
+  const suggestPasskey =
+    welcome === "passkey" &&
+    (await prisma.passkey.count({ where: { userId: user.id } })) === 0;
 
   return (
     <div className="flex flex-1 items-start justify-center bg-muted/40 px-4 py-12">
@@ -69,15 +83,25 @@ export default async function HomePage() {
               <p className="text-muted-foreground">{t("description")}</p>
             </div>
           </div>
-          {/* /auth/logout clears the Better Auth session — a single cookie
-              clear that spans every subdomain. POST so a navigation prefetch
-              never accidentally signs the user out. */}
-          <form action="/auth/logout" method="post">
-            <Button type="submit" variant="ghost" size="sm">
-              {tCommon("signOut")}
-            </Button>
-          </form>
+          <div className="flex items-center gap-1">
+            <Link
+              href="/account/security"
+              className={buttonVariants({ variant: "ghost", size: "sm" })}
+            >
+              {tAccount("title")}
+            </Link>
+            {/* /auth/logout clears the Better Auth session — a single cookie
+                clear that spans every subdomain. POST so a navigation prefetch
+                never accidentally signs the user out. */}
+            <form action="/auth/logout" method="post">
+              <Button type="submit" variant="ghost" size="sm">
+                {tCommon("signOut")}
+              </Button>
+            </form>
+          </div>
         </div>
+
+        {suggestPasskey && <PasskeySuggestion />}
 
         {memberships.length === 0 ? (
           <Card>

@@ -73,7 +73,8 @@
       "passkeyVerifyFailed": "Impossible de vérifier la réponse de la passkey.",
       "signInFailed": "Échec de la connexion.",
       "sessionExpired": "Session expirée. Réessayez.",
-      "establishSessionFailed": "Impossible d'établir la session."
+      "establishSessionFailed": "Impossible d'établir la session.",
+      "incorrectPassword": "Votre mot de passe actuel est incorrect."
     },
     "emails": {
       "resetPassword": {
@@ -1630,6 +1631,25 @@
     }
   },
   "account": {
+    "title": "Compte",
+    "backToFunds": "Vos caisses",
+    "security": {
+      "passwordTitle": "Mot de passe",
+      "passwordDescription": "Modifiez le mot de passe utilisé pour vous connecter. Cette modification vous déconnecte de vos autres appareils.",
+      "currentPassword": "Mot de passe actuel",
+      "newPassword": "Nouveau mot de passe",
+      "confirmPassword": "Confirmer le nouveau mot de passe",
+      "submit": "Mettre à jour le mot de passe",
+      "submitting": "Mise à jour…",
+      "success": "Votre mot de passe a été mis à jour."
+    },
+    "suggestPasskey": {
+      "title": "Ajouter une passkey ?",
+      "description": "Évitez le mot de passe la prochaine fois — connectez-vous avec votre empreinte, votre visage ou une clé de sécurité. Les passkeys fonctionnent sur tous les sous-domaines de caisse.",
+      "accept": "Configurer une passkey",
+      "accepting": "En attente de l'authentificateur…",
+      "dismiss": "Plus tard"
+    },
     "passkeys": {
       "title": "Passkeys",
       "description": "Connectez-vous sans mot de passe avec une empreinte, un scan facial, ou une clé de sécurité. Les passkeys enregistrées ici fonctionnent sur toutes vos caisses.",

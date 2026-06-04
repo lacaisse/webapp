@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { auth } from "@/services/auth/better-auth";
 import { buildPostAuthRedirect } from "@/services/auth/redirects";
+import { getApexUrl } from "@/services/fund/server";
 import { getAuthUrl } from "@/services/host/server";
 import {
   ForgotPasswordSchema,
@@ -102,10 +103,16 @@ export async function signupAction(
   // apex picker (its empty state shows a "create your first fund" CTA). No
   // return_to honoured — a fund subdomain would just bounce off
   // requireFundRole on arrival.
+  //
+  // `welcome=passkey` rides along through the exchange (it's preserved as the
+  // return_to path) so the apex picker can offer the just-registered user a
+  // one-tap passkey setup. The apex is a subdomain of rpID (= APP_DOMAIN), so
+  // the WebAuthn ceremony works there.
   redirect(
     await buildPostAuthRedirect({
       userId: result.user.id,
       email: result.user.email,
+      returnTo: getApexUrl("/?welcome=passkey"),
     }),
   );
 }
