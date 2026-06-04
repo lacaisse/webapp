@@ -1,6 +1,6 @@
 # La Caisse
 
-Open source platform for managing local solidarity food funds.
+Open source platform for managing local solidarity funds.
 
 ## About
 
