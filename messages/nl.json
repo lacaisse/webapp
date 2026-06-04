@@ -125,8 +125,26 @@
       "bank": "Bank",
       "referrals": "Doorverwijzingen",
       "emails": "E-mails",
+      "team": "Team",
       "settings": "Instellingen",
       "backToApex": "Terug naar mijn fondsen"
+    },
+    "team": {
+      "title": "Team",
+      "description": "Beheer wie dit fonds mag beheren.",
+      "invite": "Mede-beheerder uitnodigen",
+      "staffHeading": "Beheerders",
+      "pendingHeading": "Openstaande uitnodigingen",
+      "noPending": "Geen openstaande uitnodigingen.",
+      "you": "(jij)",
+      "columns": {
+        "name": "Naam",
+        "email": "E-mail",
+        "role": "Rol",
+        "joined": "Lid sinds",
+        "invitedBy": "Uitgenodigd door",
+        "expires": "Verloopt op"
+      }
     },
     "bank": {
       "title": "Bank",
@@ -901,6 +919,75 @@
       "colorInvalid": "Gebruik een hexkleur met 6 tekens (bv. #1a73e8).",
       "amountInvalid": "Bedrag moet een getal zijn met maximaal 2 decimalen."
     }
+  },
+  "team": {
+    "roles": {
+      "OWNER": "Eigenaar",
+      "ADMIN": "Beheerder",
+      "VIEWER": "Lezer"
+    },
+    "admin": {
+      "invite": {
+        "title": "Een mede-beheerder uitnodigen",
+        "description": "Deze persoon ontvangt een e-mailuitnodiging om lid te worden van het team van dit fonds. Ze worden lid zodra ze inloggen en accepteren.",
+        "emailLabel": "E-mail",
+        "roleLabel": "Rol",
+        "cancel": "Annuleren",
+        "confirm": "Uitnodiging versturen",
+        "inviting": "Versturen…"
+      },
+      "email": {
+        "invited": {
+          "subject": "Je bent uitgenodigd om {fundName} te beheren",
+          "textBody": "Hallo,\n\nJe bent uitgenodigd om lid te worden van {fundName} als {role}. Accepteer de uitnodiging om toegang te krijgen:\n\n{acceptUrl}\n\nAls je dit niet verwachtte, kun je deze e-mail negeren.\n\nHet {fundName}-team",
+          "ctaLabel": "Uitnodiging accepteren"
+        }
+      }
+    },
+    "actions": {
+      "roleLabel": "Rol",
+      "remove": "Verwijderen",
+      "removeTitle": "Beheerder verwijderen",
+      "removeDescription": "{memberName} uit het team van dit fonds verwijderen? Ze verliezen onmiddellijk hun beheerderstoegang.",
+      "removing": "Verwijderen…",
+      "confirmRemove": "Verwijderen",
+      "cancel": "Annuleren",
+      "revoke": "Intrekken",
+      "revokeTitle": "Uitnodiging intrekken",
+      "revokeDescription": "De openstaande uitnodiging voor {email} intrekken? De uitnodigingslink werkt dan niet meer.",
+      "revoking": "Intrekken…",
+      "confirmRevoke": "Intrekken"
+    },
+    "errors": {
+      "emailInvalid": "Voer een geldig e-mailadres in.",
+      "roleInvalid": "Kies een geldige rol.",
+      "cannotGrantOwner": "Je hebt geen toestemming om die rol toe te kennen.",
+      "alreadyMember": "Die persoon zit al in het team van dit fonds.",
+      "notFound": "Dat teamlid kon niet worden gevonden.",
+      "cannotModifyOwner": "Alleen een eigenaar kan een andere eigenaar wijzigen.",
+      "lastOwner": "Dit is de enige eigenaar — maak eerst iemand anders eigenaar.",
+      "inviteInvalid": "Deze uitnodiging is ongeldig of is al gebruikt.",
+      "inviteExpired": "Deze uitnodiging is verlopen. Vraag een beheerder om een nieuwe te sturen.",
+      "emailMismatch": "Deze uitnodiging is naar een ander e-mailadres gestuurd."
+    }
+  },
+  "joinTeam": {
+    "title": "Lid worden van {fundName}",
+    "invalidTitle": "Uitnodiging niet gevonden",
+    "invalidBody": "Deze uitnodigingslink is ongeldig of is al gebruikt.",
+    "acceptedTitle": "Al geaccepteerd",
+    "acceptedBody": "Deze uitnodiging is al geaccepteerd.",
+    "expiredTitle": "Uitnodiging verlopen",
+    "expiredBody": "Deze uitnodiging is verlopen. Vraag een beheerder om een nieuwe te sturen.",
+    "authPrompt": "Je bent uitgenodigd om lid te worden van {fundName} als {role}. Log in of maak een account aan met {email} om te accepteren.",
+    "createAccount": "Account aanmaken",
+    "signIn": "Inloggen",
+    "mismatchTitle": "Verkeerd account",
+    "mismatchBody": "Je bent ingelogd als {signedInAs}, maar deze uitnodiging is gestuurd naar {invitedEmail}. Wissel van account om te accepteren.",
+    "switchAccount": "Van account wisselen",
+    "readyBody": "Accepteer om lid te worden van {fundName} als {role}.",
+    "accept": "Uitnodiging accepteren",
+    "accepting": "Toetreden…"
   },
   "members": {
     "email": {

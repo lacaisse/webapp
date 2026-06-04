@@ -15,6 +15,7 @@ import {
   Receipt,
   Settings,
   Store,
+  UserCog,
   Users,
   Wallet,
 } from "lucide-react";
@@ -51,6 +52,7 @@ export function FundSidebar({
     { href: "/bank", label: t("bank"), icon: Landmark },
     { href: "/referrals", label: t("referrals"), icon: Gift },
     { href: "/emails", label: t("emails"), icon: Mail },
+    { href: "/team", label: t("team"), icon: UserCog },
     { href: "/settings", label: t("settings"), icon: Settings },
   ];
 

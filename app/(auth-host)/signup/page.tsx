@@ -46,7 +46,7 @@ export default async function SignupPage({
         <CardDescription>{t("description")}</CardDescription>
       </CardHeader>
       <CardContent>
-        <SignupForm />
+        <SignupForm returnTo={return_to} />
       </CardContent>
       <CardFooter className="text-sm text-muted-foreground">
         {t("haveAccount")}&nbsp;

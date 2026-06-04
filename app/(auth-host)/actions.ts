@@ -69,6 +69,7 @@ export async function loginAction(
 
 export async function signupAction(
   input: SignupInput,
+  returnTo?: string,
 ): Promise<ActionResult> {
   const t = await getTranslations("auth");
   const parsed = SignupSchema.safeParse(input);
@@ -99,12 +100,14 @@ export async function signupAction(
     throw e;
   }
 
-  // Fresh signups have no fund memberships, so we always send them to the
-  // apex picker (its empty state shows a "create your first fund" CTA). No
-  // return_to honoured — a fund subdomain would just bounce off
-  // requireFundRole on arrival.
+  // When an explicit `returnTo` rode in (e.g. a staff-invite accept page on a
+  // fund host), honour it — `buildPostAuthRedirect` validates the target host
+  // and falls back to the apex if it's not allowed. Those public landing
+  // pages don't bounce off requireFundRole, so a fresh signup is safe there.
   //
-  // `welcome=passkey` rides along through the exchange (it's preserved as the
+  // Otherwise fresh signups have no fund memberships, so we send them to the
+  // apex picker (its empty state shows a "create your first fund" CTA).
+  // `welcome=passkey` rides along through the exchange (preserved as the
   // return_to path) so the apex picker can offer the just-registered user a
   // one-tap passkey setup. The apex is a subdomain of rpID (= APP_DOMAIN), so
   // the WebAuthn ceremony works there.
@@ -112,7 +115,7 @@ export async function signupAction(
     await buildPostAuthRedirect({
       userId: result.user.id,
       email: result.user.email,
-      returnTo: getApexUrl("/?welcome=passkey"),
+      returnTo: returnTo || getApexUrl("/?welcome=passkey"),
     }),
   );
 }

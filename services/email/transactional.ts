@@ -204,6 +204,34 @@ export async function sendMemberInvited(args: {
   });
 }
 
+export async function sendFundInvited(args: {
+  emailId: string;
+  toEmail: string;
+  fund: FundBranding;
+  role: string;
+  acceptUrl: string;
+}): Promise<void> {
+  await dispatchTemplate({
+    emailId: args.emailId,
+    fund: args.fund,
+    render: async () => {
+      const t = await getTranslations("team.admin.email.invited");
+      const roleLabel = await getTranslations("team.roles");
+      return {
+        subject: t("subject", { fundName: args.fund.name }),
+        // The bare-URL paragraph renders as the primary CTA button.
+        text: t("textBody", {
+          fundName: args.fund.name,
+          role: roleLabel(args.role as never),
+          acceptUrl: args.acceptUrl,
+        }),
+        ctaLabel: t("ctaLabel"),
+      };
+    },
+    to: args.toEmail,
+  });
+}
+
 export async function sendMerchantEmailVerification(args: {
   emailId: string;
   toEmail: string;
