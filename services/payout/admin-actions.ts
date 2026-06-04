@@ -15,6 +15,7 @@ import type {
   PayoutOrder,
   PayoutStatus,
 } from "@/services/citizenpay/types";
+import { Prisma } from "@/services/db/generated/client";
 import { prisma } from "@/services/db/prisma";
 import {
   manualBurnDirectAction,
@@ -391,7 +392,11 @@ export async function archiveOrderAction(input: {
 
 export type CreatePayoutOrderResult =
   | { error: string }
-  | { ok: true; order: PayoutOrder; payout: ArchivedPayout };
+  // Order created AND its net minted to the place (txHash recorded).
+  | { ok: true; order: PayoutOrder; payout: ArchivedPayout; txHash: string }
+  // Order created but the automatic mint failed — it lands in "Issues" for a
+  // manual Fix. `mintError` explains why so the operator isn't left guessing.
+  | { ok: true; order: PayoutOrder; payout: ArchivedPayout; mintError: string };
 
 export async function createPayoutOrderAction(input: {
   payoutId: string;
@@ -408,22 +413,68 @@ export async function createPayoutOrderAction(input: {
     return { error: t(key.split(".").pop() as never) };
   }
 
+  const client = getCitizenPayClient(fund);
+
+  // 1. Create the order (rolls its amount into the payout totals). A failure
+  //    here is safe to retry — nothing has been created yet.
+  let order: PayoutOrder;
+  let payout: ArchivedPayout;
   try {
-    const client = getCitizenPayClient(fund);
-    const { order, payout } = await client.createPayoutOrder(
-      parsed.data.payoutId,
-      {
-        total: parsed.data.total,
-        fees: parsed.data.fees,
-        description: parsed.data.description?.trim() || null,
-      },
-    );
-    revalidatePath(`/payments/payouts/${parsed.data.payoutId}`);
-    return { ok: true, order, payout };
+    ({ order, payout } = await client.createPayoutOrder(parsed.data.payoutId, {
+      total: parsed.data.total,
+      fees: parsed.data.fees,
+      description: parsed.data.description?.trim() || null,
+    }));
   } catch (e) {
     console.error("[payout] createPayoutOrder failed", input, e);
     return { error: toMessage(e, t("createOrderFailed")) };
   }
+
+  // The order now exists. Show it immediately, then reconcile it the same way
+  // the per-order "Fix" does: mint the net to the place and record the hash.
+  // A manual order has no payer account, so this is mint-only (no burn).
+  // Past this point we never return a bare { error } — the order is created, so
+  // any mint failure comes back as { ok, mintError } to avoid duplicate creates.
+  revalidatePath(`/payments/payouts/${parsed.data.payoutId}`);
+
+  let placeAccount: string | null = null;
+  try {
+    const page = await client.getPayoutOrders(parsed.data.payoutId, {
+      limit: 1,
+      offset: 0,
+    });
+    placeAccount = page.placeAccountAddress ?? null;
+  } catch (e) {
+    console.error("[payout] resolve place account failed", parsed.data, e);
+  }
+  if (!placeAccount) {
+    return { ok: true, order, payout, mintError: t("noPlaceAccount") };
+  }
+
+  const mint = await manualMintDirectAction({
+    to: placeAccount,
+    amount: order.net,
+  });
+  if ("error" in mint) {
+    return { ok: true, order, payout, mintError: mint.error };
+  }
+
+  // Record the mint hash so the order reads as confirmed. If this fails the
+  // tokens have already moved — surface the hash so it isn't re-minted.
+  try {
+    await client.recordOrderTxHash(parsed.data.payoutId, order.id, mint.txHash);
+  } catch (e) {
+    console.error("[payout] recordOrderTxHash failed", order.id, e);
+    return {
+      ok: true,
+      order,
+      payout,
+      mintError: `${toMessage(e, t("recordFailed"))} (tx ${mint.txHash})`,
+    };
+  }
+
+  revalidatePath(`/payments/payouts/${parsed.data.payoutId}`);
+  return { ok: true, order, payout, txHash: mint.txHash };
 }
 
 // Incoming bank transactions the operator can turn into a manual order. Read
@@ -440,17 +491,67 @@ export type PickableBankTransaction = {
 
 export type ListIncomingBankTransactionsResult =
   | { error: string }
-  | { ok: true; transactions: PickableBankTransaction[] };
+  | { ok: true; transactions: PickableBankTransaction[]; nextCursor: string | null };
 
-export async function listIncomingBankTransactionsAction(): Promise<ListIncomingBankTransactionsResult> {
+// One screenful per request. The operator searches / "loads more" instead of
+// us shipping the whole (potentially huge) transaction history up front.
+const BANK_TX_PAGE_SIZE = 20;
+
+// Strip combining diacritics so a search for "François" also matches the
+// un-accented "FRANCOIS" that bank (SEPA) feeds emit. NFD separates a letter
+// from its accent; we drop the accent range. Case is handled separately by
+// Prisma's `mode: "insensitive"`.
+function stripAccents(s: string): string {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+// Search + keyset-paginate the incoming bank transactions. `cursor` is the id
+// of the last row from the previous page; pass it back to fetch the next page
+// (newest-first). `search` matches counterpart name / reference / remittance /
+// IBAN case-insensitively, and the exact amount when it parses as a number.
+export async function listIncomingBankTransactionsAction(input?: {
+  search?: string;
+  cursor?: string;
+}): Promise<ListIncomingBankTransactionsResult> {
   const t = await getTranslations("fund.payments.settlement.errors");
   const { fund } = await requireFundRole("ADMIN");
 
+  const search = input?.search?.trim() ?? "";
+  const cursor = input?.cursor?.trim() || null;
+
   try {
+    const where: Prisma.BankTransactionWhereInput = {
+      fundId: fund.id,
+      direction: "INCOMING",
+    };
+    if (search) {
+      // Match the term as typed AND with accents stripped, so "François" finds
+      // the un-accented "FRANCOIS" that bank feeds emit. Dedupe in case the
+      // term has no accents. Case is handled by `mode: "insensitive"`.
+      const terms = [...new Set([search, stripAccents(search)])];
+      const or: Prisma.BankTransactionWhereInput[] = terms.flatMap((term) => {
+        const insensitive = { contains: term, mode: "insensitive" as const };
+        return [
+          { counterpartName: insensitive },
+          { counterpartReference: insensitive },
+          { remittanceInfo: insensitive },
+          { counterpartIban: insensitive },
+        ];
+      });
+      // Allow "2.40" / "2,40" to match the transaction amount exactly.
+      const amount = Number(search.replace(",", "."));
+      if (Number.isFinite(amount)) or.push({ amount });
+      where.OR = or;
+    }
+
+    // Fetch one extra row to learn whether another page exists without a
+    // second count query. Tiebreak occurredAt with id so the keyset cursor
+    // is stable across same-second transactions.
     const rows = await prisma.bankTransaction.findMany({
-      where: { fundId: fund.id, direction: "INCOMING" },
-      orderBy: { occurredAt: "desc" },
-      take: 50,
+      where,
+      orderBy: [{ occurredAt: "desc" }, { id: "desc" }],
+      take: BANK_TX_PAGE_SIZE + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       select: {
         id: true,
         amount: true,
@@ -461,9 +562,13 @@ export async function listIncomingBankTransactionsAction(): Promise<ListIncoming
         remittanceInfo: true,
       },
     });
+
+    const hasMore = rows.length > BANK_TX_PAGE_SIZE;
+    const page = hasMore ? rows.slice(0, BANK_TX_PAGE_SIZE) : rows;
+
     return {
       ok: true,
-      transactions: rows.map((b) => ({
+      transactions: page.map((b) => ({
         id: b.id,
         occurredAt: b.occurredAt.toISOString(),
         amount: b.amount.toFixed(2),
@@ -471,6 +576,7 @@ export async function listIncomingBankTransactionsAction(): Promise<ListIncoming
         counterpartName: b.counterpartName,
         reference: b.counterpartReference ?? b.remittanceInfo ?? null,
       })),
+      nextCursor: hasMore ? page[page.length - 1].id : null,
     };
   } catch (e) {
     console.error("[payout] listIncomingBankTransactions failed", e);
