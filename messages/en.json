@@ -73,7 +73,8 @@
       "passkeyVerifyFailed": "Could not verify the passkey response.",
       "signInFailed": "Sign-in failed.",
       "sessionExpired": "Sign-in session expired. Try again.",
-      "establishSessionFailed": "Could not establish session."
+      "establishSessionFailed": "Could not establish session.",
+      "incorrectPassword": "Your current password is incorrect."
     },
     "emails": {
       "resetPassword": {
@@ -1630,6 +1631,25 @@
     }
   },
   "account": {
+    "title": "Account",
+    "backToFunds": "Your funds",
+    "security": {
+      "passwordTitle": "Password",
+      "passwordDescription": "Change the password you use to sign in. Updating it signs you out on your other devices.",
+      "currentPassword": "Current password",
+      "newPassword": "New password",
+      "confirmPassword": "Confirm new password",
+      "submit": "Update password",
+      "submitting": "Updating…",
+      "success": "Your password has been updated."
+    },
+    "suggestPasskey": {
+      "title": "Add a passkey?",
+      "description": "Skip the password next time — sign in with your fingerprint, face, or a security key. Passkeys work across every fund subdomain.",
+      "accept": "Set up a passkey",
+      "accepting": "Waiting for authenticator…",
+      "dismiss": "Maybe later"
+    },
     "passkeys": {
       "title": "Passkeys",
       "description": "Sign in without a password using a fingerprint, face scan, or security key. Passkeys you register here work on every fund subdomain.",

@@ -27,9 +27,41 @@ const AUTH_HOST = isProd
   ? `https://auth.${APP_DOMAIN}`
   : `http://auth.${APP_DOMAIN}:${process.env.PORT ?? 3000}`;
 
+// The auth handler is mounted at /api/auth on EVERY host (apex, auth, fund
+// subdomains, paid custom domains). Server actions (`auth.api.*`, e.g.
+// login/signup) carry no Origin header so they skip Better Auth's CSRF origin
+// check — but browser-driven flows like the passkey ceremony POST to the
+// current origin and DO get checked. trustedOrigins defaults to only the
+// baseURL (the auth host), so a passkey registration on `localhost:3000` (or
+// `acme.lacaisse.eu`) is rejected with "Invalid origin". List every host we
+// serve. Patterns: `*.<APP_DOMAIN>` covers the auth host + all free fund
+// subdomains; the apex needs its own entry (the wildcard requires a label).
+const APP_SCHEME = isProd ? "https" : "http";
+const PORT_SUFFIX = isProd ? "" : `:${process.env.PORT ?? 3000}`;
+const APEX_ORIGIN = `${APP_SCHEME}://${APP_DOMAIN}${PORT_SUFFIX}`;
+const WILDCARD_ORIGIN = `${APP_SCHEME}://*.${APP_DOMAIN}${PORT_SUFFIX}`;
+
 export const auth = betterAuth({
   baseURL: AUTH_HOST,
   database: prismaAdapter(prisma, { provider: "postgresql" }),
+
+  // Merged with the default (baseURL) list. A function so paid custom domains —
+  // which aren't subdomains of APP_DOMAIN and so escape the wildcard — can be
+  // trusted per-request: proxy.ts already validated the host against
+  // `Fund.domain` and stamped a (spoof-proof) `x-fund-domain` header, so if the
+  // request rode in on a custom domain we trust exactly that origin.
+  trustedOrigins: async (request) => {
+    const origins = [APEX_ORIGIN, WILDCARD_ORIGIN];
+    const fundDomain = request?.headers.get("x-fund-domain");
+    if (
+      fundDomain &&
+      fundDomain !== APP_DOMAIN &&
+      !fundDomain.endsWith(`.${APP_DOMAIN}`)
+    ) {
+      origins.push(`${APP_SCHEME}://${fundDomain}${PORT_SUFFIX}`);
+    }
+    return origins;
+  },
 
   advanced: {
     // UUIDs at the app layer — keeps User.id @db.Uuid and all existing

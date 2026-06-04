@@ -73,7 +73,8 @@
       "passkeyVerifyFailed": "Kan de passkey-respons niet verifiëren.",
       "signInFailed": "Inloggen mislukt.",
       "sessionExpired": "Sessie verlopen. Probeer opnieuw.",
-      "establishSessionFailed": "Kan sessie niet tot stand brengen."
+      "establishSessionFailed": "Kan sessie niet tot stand brengen.",
+      "incorrectPassword": "Je huidige wachtwoord is onjuist."
     },
     "emails": {
       "resetPassword": {
@@ -1355,6 +1356,25 @@
     }
   },
   "account": {
+    "title": "Account",
+    "backToFunds": "Uw fondsen",
+    "security": {
+      "passwordTitle": "Wachtwoord",
+      "passwordDescription": "Wijzig het wachtwoord waarmee je inlogt. Bij wijziging word je op je andere apparaten uitgelogd.",
+      "currentPassword": "Huidig wachtwoord",
+      "newPassword": "Nieuw wachtwoord",
+      "confirmPassword": "Bevestig nieuw wachtwoord",
+      "submit": "Wachtwoord bijwerken",
+      "submitting": "Bijwerken…",
+      "success": "Je wachtwoord is bijgewerkt."
+    },
+    "suggestPasskey": {
+      "title": "Een passkey toevoegen?",
+      "description": "Sla de volgende keer het wachtwoord over — log in met je vingerafdruk, gezicht of een beveiligingssleutel. Passkeys werken op elk fonds-subdomein.",
+      "accept": "Passkey instellen",
+      "accepting": "Wachten op authenticator…",
+      "dismiss": "Later"
+    },
     "passkeys": {
       "title": "Passkeys",
       "description": "Log in zonder wachtwoord met een vingerafdruk, gezichtsscan of beveiligingssleutel. Passkeys die u hier registreert werken op alle fondsen.",
