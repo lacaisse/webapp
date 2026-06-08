@@ -18,7 +18,8 @@
     "label": "Langue",
     "fr": "Français",
     "en": "English",
-    "nl": "Nederlands"
+    "nl": "Nederlands",
+    "es": "Español"
   },
   "auth": {
     "login": {

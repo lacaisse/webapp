@@ -200,9 +200,9 @@ export function GeneralForm({ fund }: { fund: Fund }) {
       action={async (v) =>
         updateGeneralSettingsAction({
           name: v.name,
-          // Cast: the SettingsForm state holds `string`, but the action
-          // validates locale via Zod refine. Same for allocationMode.
-          defaultLocale: v.defaultLocale as "en" | "fr" | "nl",
+          // The action validates locale via a Zod refine, so it accepts a
+          // plain string here. allocationMode is a Zod enum, hence the cast.
+          defaultLocale: v.defaultLocale,
           timezone: v.timezone,
           allocationMode: v.allocationMode as "FIXED_PERIOD" | "PAY_AND_GO",
         })
@@ -218,6 +218,7 @@ export function GeneralForm({ fund }: { fund: Fund }) {
             { value: "fr", label: "Français" },
             { value: "en", label: "English" },
             { value: "nl", label: "Nederlands" },
+            { value: "es", label: "Español" },
           ],
         },
         { key: "timezone", label: t("timezone"), hint: t("timezoneHint") },
