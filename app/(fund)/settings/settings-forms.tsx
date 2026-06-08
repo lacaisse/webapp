@@ -17,6 +17,7 @@ import {
   updateReferralSettingsAction,
   updateSignupRedirectsAction,
 } from "@/services/fund/settings-actions";
+import type { SupportedLocale } from "@/services/i18n/config";
 
 // Reusable form scaffold. Each tab passes its own fields + submit action;
 // this handles the submit / error / pending plumbing identically.
@@ -200,9 +201,10 @@ export function GeneralForm({ fund }: { fund: Fund }) {
       action={async (v) =>
         updateGeneralSettingsAction({
           name: v.name,
-          // The action validates locale via a Zod refine, so it accepts a
-          // plain string here. allocationMode is a Zod enum, hence the cast.
-          defaultLocale: v.defaultLocale,
+          // The SettingsForm state holds plain `string`, but the action's
+          // schema narrows these (locale via a type-guard refine, allocation
+          // mode via a Zod enum), so cast back at the call boundary.
+          defaultLocale: v.defaultLocale as SupportedLocale,
           timezone: v.timezone,
           allocationMode: v.allocationMode as "FIXED_PERIOD" | "PAY_AND_GO",
         })
