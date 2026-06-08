@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { NextResponse, type NextRequest } from "next/server";
+import { cronGate } from "@/services/cron/guard";
 import { prisma } from "@/services/db/prisma";
 
 // Vercel cron entry — see vercel.json. Sweeps expired short-lived rows so
@@ -19,13 +20,8 @@ import { prisma } from "@/services/db/prisma";
 const GRACE_MS = 24 * 60 * 60 * 1000;
 
 export async function GET(request: NextRequest) {
-  const expected = process.env.CRON_SECRET;
-  if (expected) {
-    const auth = request.headers.get("authorization");
-    if (auth !== `Bearer ${expected}`) {
-      return new NextResponse("Unauthorized", { status: 401 });
-    }
-  }
+  const gate = cronGate(request);
+  if (gate) return gate;
 
   const cutoff = new Date(Date.now() - GRACE_MS);
   const [authExchange, citizenPayConnect] = await Promise.all([

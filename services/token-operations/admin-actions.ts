@@ -122,7 +122,7 @@ export async function manualMintAction(input: {
 // row for audit regardless of outcome.
 
 export type ManualMintDirectResult =
-  | { ok: true; txHash: string }
+  | { ok: true; txHash: string; userOpHash: string }
   | { error: string; field?: "to" | "amount" };
 
 export async function manualMintDirectAction(input: {
@@ -166,7 +166,7 @@ export async function manualMintDirectAction(input: {
   });
 
   try {
-    const { txHash } = await mintToken({
+    const { txHash, userOpHash } = await mintToken({
       fund: fund as FundMinterContext,
       to: parsed.data.to as `0x${string}`,
       amount: amountUnits,
@@ -176,7 +176,7 @@ export async function manualMintDirectAction(input: {
       data: { status: "CONFIRMED", txHash, confirmedAt: new Date() },
     });
     revalidatePath("/token");
-    return { ok: true, txHash };
+    return { ok: true, txHash, userOpHash };
   } catch (e) {
     const errorMessage =
       e instanceof UserOpError ? `${e.code}: ${e.message}` : String(e);
@@ -190,7 +190,7 @@ export async function manualMintDirectAction(input: {
 }
 
 export type ManualBurnDirectResult =
-  | { ok: true; txHash: string }
+  | { ok: true; txHash: string; userOpHash: string }
   | { error: string; field?: "from" | "amount" };
 
 export async function manualBurnDirectAction(input: {
@@ -234,7 +234,7 @@ export async function manualBurnDirectAction(input: {
   });
 
   try {
-    const { txHash } = await burnFromToken({
+    const { txHash, userOpHash } = await burnFromToken({
       fund: fund as FundMinterContext,
       from: parsed.data.from as `0x${string}`,
       amount: amountUnits,
@@ -244,7 +244,7 @@ export async function manualBurnDirectAction(input: {
       data: { status: "CONFIRMED", txHash, confirmedAt: new Date() },
     });
     revalidatePath("/token");
-    return { ok: true, txHash };
+    return { ok: true, txHash, userOpHash };
   } catch (e) {
     const errorMessage =
       e instanceof UserOpError ? `${e.code}: ${e.message}` : String(e);

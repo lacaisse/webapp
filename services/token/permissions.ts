@@ -18,8 +18,6 @@ import {
   polygon,
 } from "viem/chains";
 
-import { alchemyNetwork } from "@/services/alchemy/client";
-
 // Read-only on-chain role lookups against an OpenZeppelin AccessControl
 // ERC20 (mint, burnFrom, transfer, role helpers — see app/abi/ERC20.abi.json).
 // Used by the Token settings tab to surface "does this fund's smart
@@ -69,14 +67,15 @@ export async function checkMinterRole(args: {
 }): Promise<RoleStatus> {
   if (!isAddress(args.tokenAddress) || !isAddress(args.account)) return "unknown";
   const chain = CHAIN_BY_ID[args.chainId];
-  const network = alchemyNetwork(args.chainId);
-  const key = process.env.ALCHEMY_API_KEY;
-  if (!chain || !network || !key) return "unknown";
+  // Plain hasRole eth_call — route through the CitizenPay bundler RPC (a full
+  // node), not Alchemy (reserved for the enhanced balance/transfer APIs).
+  const bundler = process.env.CITIZENPAY_BUNDLER_URL;
+  if (!chain || !bundler) return "unknown";
 
   try {
     const client = createPublicClient({
       chain,
-      transport: http(`https://${network}.g.alchemy.com/v2/${key}`),
+      transport: http(`${bundler.replace(/\/$/, "")}/v1/${args.chainId}/rpc`),
     });
     const has = (await client.readContract({
       address: args.tokenAddress as Address,

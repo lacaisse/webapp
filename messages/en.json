@@ -3,6 +3,7 @@
     "or": "or",
     "cancel": "Cancel",
     "close": "Close",
+    "save": "Save",
     "delete": "Delete",
     "back": "Back",
     "backToHome": "Back to home",
@@ -120,6 +121,7 @@
       "cards": "Cards",
       "allocations": "Allocations",
       "token": "Token",
+      "accounts": "Accounts",
       "merchants": "Merchants",
       "payments": "Payments",
       "bank": "Bank",
@@ -128,6 +130,98 @@
       "team": "Team",
       "settings": "Settings",
       "backToApex": "Back to your funds"
+    },
+    "annotations": {
+      "PAYOUT_BURN": "Payout burn",
+      "PAYOUT_FEE": "Payout fee",
+      "ACCOUNT_MINT": "Mint",
+      "ACCOUNT_BURN": "Burn",
+      "ACCOUNT_TRANSFER": "Transfer",
+      "edit": "Annotate",
+      "title": "Annotate transaction",
+      "noteLabel": "Note",
+      "notePlaceholder": "What was this for?",
+      "errors": {
+        "invalidHash": "Invalid transaction hash.",
+        "noteTooLong": "Note is too long (max 280 characters).",
+        "saveFailed": "Couldn't save the annotation. Try again shortly."
+      }
+    },
+    "accounts": {
+      "title": "Accounts",
+      "description": "Named accounts derived from the fund's key. See each one's balance and token transaction history.",
+      "notConnected": "Connect this fund to Citizen Pay first to create accounts.",
+      "balancesError": "Couldn't load on-chain balances. Try again shortly.",
+      "empty": "No accounts yet. Create one to get started.",
+      "defaultName": "Main account",
+      "defaultBadge": "Default",
+      "table": { "name": "Name", "address": "Address", "balance": "Balance" },
+      "detail": { "back": "All accounts", "balance": "Balance" },
+      "create": {
+        "trigger": "New account",
+        "title": "Create account",
+        "description": "A new on-chain account derived from the fund's key.",
+        "name": "Name",
+        "namePlaceholder": "e.g. Reserve, Fees, Events",
+        "confirm": "Create account"
+      },
+      "rename": {
+        "trigger": "Rename",
+        "title": "Rename account",
+        "name": "Name"
+      },
+      "archive": {
+        "trigger": "Remove",
+        "title": "Remove this account?",
+        "description": "The account is removed from the list. Its on-chain address and tokens still exist — you can recreate it later.",
+        "confirm": "Remove"
+      },
+      "move": {
+        "inTrigger": "Add tokens",
+        "outTrigger": "Remove tokens",
+        "inTitle": "Add tokens",
+        "outTitle": "Remove tokens",
+        "inDescription": "Mint tokens to this account.",
+        "outDescription": "Burn tokens from this account.",
+        "amount": "Amount",
+        "confirm": "Confirm",
+        "success": "Transaction submitted."
+      },
+      "transfer": {
+        "trigger": "Transfer",
+        "title": "Transfer tokens",
+        "description": "Send tokens from this account to another account or address.",
+        "destination": "Destination",
+        "pickAccount": "Pick an account…",
+        "amount": "Amount",
+        "confirm": "Transfer",
+        "success": "Transaction submitted."
+      },
+      "transfers": {
+        "title": "Transaction history",
+        "empty": "No transactions yet.",
+        "direction": "Direction",
+        "counterparty": "Counterparty",
+        "date": "Date",
+        "amount": "Amount",
+        "loadMore": "Show more",
+        "loadError": "Couldn't load on-chain history.",
+        "directions": { "in": "Received", "out": "Sent", "self": "Internal" }
+      },
+      "errors": {
+        "nameRequired": "Name is required.",
+        "nameTooLong": "Name is too long (max 80 characters).",
+        "notFound": "Account not found.",
+        "cannotRemoveDefault": "The main account can't be removed.",
+        "notConnected": "Connect this fund to Citizen Pay first.",
+        "deriveFailed": "Couldn't derive the account address. Try again shortly.",
+        "createFailed": "Couldn't create the account. Try again shortly.",
+        "amountInvalid": "Amount must be a valid number.",
+        "amountPositive": "Amount must be greater than zero.",
+        "addressInvalid": "Enter a valid 0x address (40 hex characters).",
+        "transferFailed": "On-chain transfer failed. Try again shortly.",
+        "transfersFailed": "Couldn't load transactions. Try again shortly."
+      }
     },
     "team": {
       "title": "Team",
@@ -390,9 +484,10 @@
           "from": "From",
           "to": "To",
           "amount": "Amount",
+          "note": "Note",
           "empty": "No transfers for this card yet.",
           "issued": "Issued",
-          "retired": "Retired",
+          "retired": "Destroyed",
           "treasury": "Treasury",
           "unknown": "External wallet",
           "self": "This card",
@@ -550,9 +645,10 @@
         "from": "From",
         "to": "To",
         "amount": "Amount",
+        "note": "Note",
         "empty": "No transfers yet.",
         "issued": "Issued",
-        "retired": "Retired",
+        "retired": "Destroyed",
         "treasury": "Treasury",
         "unknown": "External wallet",
         "newer": "Newer",
@@ -673,7 +769,7 @@
           "empty": "No on-chain transfers yet.",
           "unavailable": "Transfer history is unavailable right now.",
           "issued": "Issued",
-          "retired": "Retired",
+          "retired": "Destroyed",
           "treasury": "Treasury",
           "unknown": "Unknown",
           "newer": "Newer",
@@ -708,6 +804,7 @@
         "total": "Total",
         "fees": "Fees",
         "net": "Net",
+        "manualDeduction": "Manual deduction",
         "placeBalance": "Place balance",
         "placeBalanceEnough": "Enough to burn",
         "placeBalanceLow": "Below the net amount",
@@ -808,6 +905,19 @@
           "successMinted": "Order added and net minted to the place.",
           "mintFailed": "Order added, but automatic minting failed. Reconcile it from the Issues tab."
         },
+        "deduction": {
+          "trigger": "Add deduction",
+          "edit": "Edit deduction",
+          "title": "Manual deduction",
+          "description": "A ledger adjustment that lowers the net paid to the merchant. No on-chain effect.",
+          "amount": "Deduction amount",
+          "amountHint": "Maximum {max}. Enter 0 to clear the deduction.",
+          "comment": "Comment",
+          "commentPlaceholder": "Reason for the adjustment",
+          "net": "Net after deduction",
+          "confirm": "Save",
+          "remove": "Remove"
+        },
         "pay": {
           "button": "Pay merchant",
           "openSigning": "Open signing page",
@@ -819,7 +929,14 @@
           "description": "This burns the on-chain tokens backing this payout. Burn and bank payment are independent — do them in either order.",
           "warning": "This is irreversible. The tokens for this payout will be permanently burned.",
           "confirm": "Burn tokens",
-          "success": "Tokens burned. Transaction hash:"
+          "success": "Tokens burned. Transaction hash:",
+          "feeSwept": "Fees transferred to the fund account: {amount}",
+          "feeNotSwept": "Tokens burned, but the fees haven't been transferred yet."
+        },
+        "feeTransfer": {
+          "pending": "This payout's fees haven't been transferred yet.",
+          "button": "Transfer fees",
+          "done": "Fees transferred. Transaction hash:"
         },
         "orders": {
           "title": "Orders",
@@ -883,6 +1000,14 @@
         "errors": {
           "payFailed": "Couldn't create the payment. Try again shortly.",
           "burnFailed": "Couldn't burn the tokens. Try again shortly.",
+          "notBurnable": "This payout is no longer at the burn step (already burnt or settled).",
+          "payoutNotFound": "Payout not found.",
+          "deductionFailed": "Couldn't save the deduction. Try again shortly.",
+          "deductionTooHigh": "The deduction can't exceed total minus fees.",
+          "deductionNotPending": "The manual deduction can only be changed while the payout is pending.",
+          "reportFailed": "Tokens burned on-chain, but couldn't report it to Citizen Pay. Don't retry — keep the transaction hash for reconciliation.",
+          "noFeeDestination": "No fee destination account. Connect the fund to Citizen Pay first.",
+          "feeTransferFailed": "The fee transfer failed. Try again shortly.",
           "previewFailed": "Couldn't preview the range. Try again shortly.",
           "createFailed": "Couldn't create the payout. Try again shortly.",
           "statusFailed": "Couldn't fetch the status. Try again shortly.",
@@ -988,7 +1113,8 @@
         "token": "Token",
         "onboarding": "Onboarding",
         "terms": "Terms",
-        "citizenpay": "Citizen Pay"
+        "citizenpay": "Citizen Pay",
+        "fees": "Fees"
       },
       "general": {
         "title": "General",
@@ -1138,6 +1264,14 @@
             "failed": "Citizen Pay connection failed. Please try again."
           }
         }
+      },
+      "fees": {
+        "title": "Fees",
+        "description": "Commission taken on payments to merchants. Configured here, then pushed to Citizen Pay.",
+        "rate": "Fee rate (%)",
+        "rateHint": "Percentage taken on each payment (e.g. 2.5 for 2.5%). Leave empty to use Citizen Pay's default rate.",
+        "syncPending": "Saved locally, but not yet confirmed by Citizen Pay. Save again to retry the sync.",
+        "syncFailed": "Rate saved, but the sync to Citizen Pay failed. Save again to retry."
       }
     }
   },
@@ -1180,7 +1314,9 @@
       "timezoneRequired": "Timezone is required.",
       "colorInvalid": "Use a 6-digit hex color (e.g. #1a73e8).",
       "amountInvalid": "Amount must be a number with up to 2 decimal places.",
-      "urlInvalid": "Enter a valid URL (must start with http:// or https://)."
+      "urlInvalid": "Enter a valid URL (must start with http:// or https://).",
+      "feeInvalid": "Fee rate must be a number with up to 2 decimal places.",
+      "feeTooHigh": "Fee rate can't exceed 100%."
     }
   },
   "team": {

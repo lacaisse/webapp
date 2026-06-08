@@ -140,16 +140,39 @@ export async function consumeConnect(args: {
   // create-time). Re-derive on every (re)connect so a treasury that
   // changes factory address rolls the SA forward in the same write.
   let smartAccountAddress: string | null = null;
-  if (tokenInfo?.citizenPayAccountFactoryAddress) {
+  // Fee reconciliation against CP's echo. The fee is canonical here, so we
+  // never clobber a locally-set value — we only use CP's reported value to
+  // confirm the sync landed or to seed a first value.
+  let feeWrite: { payoutFeePercentage?: string; payoutFeeSynced: boolean } | null =
+    null;
+  if (tokenInfo) {
     const fundRow = await prisma.fund.findUnique({
       where: { id: row.fundId },
-      select: { tokenMinterEoaAddress: true },
+      select: { tokenMinterEoaAddress: true, payoutFeePercentage: true },
     });
-    if (fundRow?.tokenMinterEoaAddress) {
+
+    if (tokenInfo.citizenPayAccountFactoryAddress && fundRow?.tokenMinterEoaAddress) {
       smartAccountAddress = await deriveSmartAccountAddress({
         eoaAddress: fundRow.tokenMinterEoaAddress,
         factoryAddress: tokenInfo.citizenPayAccountFactoryAddress,
       });
+    }
+
+    const localFee = fundRow?.payoutFeePercentage ?? null;
+    const cpFee = tokenInfo.payoutFeePercentage;
+    if (localFee == null) {
+      // No local value yet — adopt CP's as the seed (if any). Either way
+      // there's nothing pending locally, so we're in sync.
+      feeWrite =
+        cpFee != null
+          ? { payoutFeePercentage: cpFee, payoutFeeSynced: true }
+          : { payoutFeeSynced: true };
+    } else {
+      // Local value wins. CP echoing the same number confirms our push
+      // landed; anything else means CP is stale → flag for a re-push.
+      feeWrite = {
+        payoutFeeSynced: cpFee != null && Number(cpFee) === Number(localFee),
+      };
     }
   }
 
@@ -201,6 +224,9 @@ export async function consumeConnect(args: {
         ...(smartAccountAddress != null && {
           tokenMinterSmartAccountAddress: smartAccountAddress,
         }),
+        // Fee reconciliation (seed and/or sync flag) — never overwrites a
+        // locally-set fee value; see feeWrite above.
+        ...(feeWrite ?? {}),
       },
     }),
     prisma.citizenPayConnectAttempt.update({
@@ -208,6 +234,28 @@ export async function consumeConnect(args: {
       data: { consumedAt: now },
     }),
   ]);
+
+  // Materialise the minter's own Safe (salt 0) as the fund's default, non-
+  // deletable token account so it shows up alongside named accounts with a
+  // balance + history. Best-effort and idempotent — keyed on (fundId, salt 0),
+  // address refreshed if the factory (and thus the derived address) changed.
+  // Empty name → the UI renders a localised "main account" label.
+  if (smartAccountAddress) {
+    try {
+      await prisma.fundTokenAccount.upsert({
+        where: { fundId_saltNonce: { fundId: row.fundId, saltNonce: 0 } },
+        create: {
+          fundId: row.fundId,
+          name: "",
+          saltNonce: 0,
+          address: smartAccountAddress,
+        },
+        update: { address: smartAccountAddress },
+      });
+    } catch (e) {
+      console.warn("[citizenpay] default token account upsert failed", e);
+    }
+  }
 
   return { treasuryId: creds.treasury_id, apiKeyId: creds.api_key_id };
 }

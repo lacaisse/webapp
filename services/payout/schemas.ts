@@ -53,3 +53,22 @@ export const CreatePayoutOrderSchema = z
   });
 
 export type CreatePayoutOrderFormInput = z.infer<typeof CreatePayoutOrderSchema>;
+
+// Setting a payout's manual deduction. `amount` is a EUR decimal string (up to
+// 2dp); "0" clears the deduction. `comment` is an optional short note. The
+// upper bound (≤ total − fees) is enforced in the action, which has the
+// payout's totals; here we only validate shape.
+export const SetManualDeductionSchema = z.object({
+  payoutId: z.string().min(1, "fund.payments.settlement.errors.deductionFailed"),
+  amount: z.string().regex(MONEY, "fund.payments.settlement.errors.amountInvalid"),
+  comment: z
+    .string()
+    .trim()
+    .max(500, "fund.payments.settlement.errors.descriptionTooLong")
+    .optional()
+    .nullable(),
+});
+
+export type SetManualDeductionFormInput = z.infer<
+  typeof SetManualDeductionSchema
+>;

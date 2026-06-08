@@ -15,6 +15,11 @@ import {
 // All token-related columns on `Fund` are caches of CP truth:
 //   tokenAddress, tokenDecimals, tokenName, tokenSymbol, tokenChainId.
 // We do NOT expose these as editable in the UI.
+//
+// The one EXCEPTION is `payoutFeePercentage`: that value is canonical on our
+// side (admin sets it in settings → we push it to CP). We surface CP's echo
+// here only so the caller can reconcile (confirm sync / seed) — it must NOT
+// blindly overwrite a locally-set fee. See consumeConnect in connect.ts.
 
 const CHAIN_IDS: Record<string, number> = {
   gnosis: 100,
@@ -39,6 +44,9 @@ export type TokenInfo = {
   citizenPayAccountFactoryAddress: string | null;
   citizenPayPaymasterAddress: string | null;
   citizenPayPaymasterType: string | null;
+  // CP's echo of the platform fee, normalised to a 2-decimal percent string
+  // (e.g. "2.50"). Canonical on our side — reconciled, not cached. See header.
+  payoutFeePercentage: string | null;
 };
 
 /**
@@ -92,6 +100,15 @@ function normaliseTreasury(wire: TreasuryWire): TokenInfo {
     }
   }
 
+  // Fee: prefer integer basis points (what we send), fall back to a decimal
+  // percent. Normalise to a 2-decimal percent string for the Fund column.
+  let payoutFeePercentage: string | null = null;
+  if (typeof wire.fee_percentage_bps === "number" && Number.isFinite(wire.fee_percentage_bps)) {
+    payoutFeePercentage = (wire.fee_percentage_bps / 100).toFixed(2);
+  } else if (typeof wire.fee_percentage === "number" && Number.isFinite(wire.fee_percentage)) {
+    payoutFeePercentage = wire.fee_percentage.toFixed(2);
+  }
+
   return {
     tokenAddress,
     tokenChainId,
@@ -103,5 +120,6 @@ function normaliseTreasury(wire: TreasuryWire): TokenInfo {
     citizenPayAccountFactoryAddress: wire.account_factory_address ?? null,
     citizenPayPaymasterAddress: wire.paymaster_address ?? null,
     citizenPayPaymasterType: wire.paymaster_type ?? null,
+    payoutFeePercentage,
   };
 }

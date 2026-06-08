@@ -125,6 +125,11 @@ export type PayoutListWire = {
   net?: number | null; // cents — what the merchant is paid
   tokens?: string[];
   pontoPaymentStatus?: string | null;
+  // Outstanding-sweep flags: `feeTransferPending` is true on a burned payout
+  // whose retained cut hasn't been swept yet; `feeTransferTxHash` is the proof
+  // once it has.
+  feeTransferPending?: boolean;
+  feeTransferTxHash?: string | null;
   startDate: string;
   endDate: string;
   createdAt: string;
@@ -138,6 +143,12 @@ export type PayoutListPageWire = {
   total?: number;
   limit?: number;
   offset?: number;
+};
+
+// Single-payout detail (`GET /v2/treasury/payouts/{id}`). Same shape as a list
+// row plus the manual-deduction comment.
+export type PayoutDetailWire = PayoutListWire & {
+  manualDeductionComment?: string | null;
 };
 
 // A draft payout: a computed summary of paid/refunded orders for one place
@@ -226,6 +237,20 @@ export type CreatePayoutOrderWire = {
     payoutId: string;
     total: number; // cents
     fees: number; // cents
+    net: number; // cents
+  };
+};
+
+// Response of POST /payouts/{id}/manual-deduction — the recomputed totals,
+// here also carrying the deduction + its comment (net = total − fees − deduction).
+export type ManualDeductionWire = {
+  success: boolean;
+  payout: {
+    payoutId: string;
+    total: number; // cents
+    fees: number; // cents
+    manualDeduction: number; // cents
+    manualDeductionComment: string | null;
     net: number; // cents
   };
 };
@@ -361,11 +386,31 @@ export type TreasuryWire = {
   account_factory_address?: string;
   paymaster_address?: string;
   paymaster_type?: string;
+  // Platform fee CP holds for this treasury — an echo of what we set via
+  // PATCH /v2/treasury (see treasury.updateFee). Unlike the token fields,
+  // the fee is canonical on OUR side; we read it back only to confirm the
+  // sync landed (and to seed an initial value). Integer basis points
+  // preferred (what we send); `fee_percentage` decimal accepted as a
+  // fallback until CP confirms the field name.
+  fee_percentage_bps?: number;
+  fee_percentage?: number;
 };
 
 export const treasury = {
   get(creds: CitizenPayApiCredentials): Promise<TreasuryWire> {
     return request(creds, "GET", "/v2/treasury");
+  },
+  // Set the platform fee on merchant payments, in integer basis points
+  // (250 = 2.5%). Treasury-level (per fund); per-business overrides are
+  // future work. ⚠️ ASSUMED endpoint — CP has not shipped this yet; confirm
+  // the path + body field name when they do and adjust here only.
+  updateFee(
+    creds: CitizenPayApiCredentials,
+    feePercentageBps: number,
+  ): Promise<{ success: boolean }> {
+    return request(creds, "PATCH", "/v2/treasury", {
+      body: { feePercentageBps },
+    });
   },
 };
 
@@ -666,6 +711,19 @@ export const payouts = {
   ): Promise<PayoutListPageWire> {
     return request(creds, "GET", "/v2/treasury/payouts/completed", { query });
   },
+  // Single-payout detail. Carries the stored status (`pending` | `complete`)
+  // like the list rows — the live lifecycle (`burnt` / `payment-pending`)
+  // still comes from `status` below. 404 when the id isn't found.
+  get(
+    creds: CitizenPayApiCredentials,
+    payoutId: string,
+  ): Promise<PayoutDetailWire> {
+    return request(
+      creds,
+      "GET",
+      `/v2/treasury/payouts/${encodeURIComponent(payoutId)}`,
+    );
+  },
   // Live lifecycle status (unlike the list endpoints, which only ever
   // return the stored pending/complete). `signingUrl` is included only when
   // status is `payment-pending` AND a `redirectUrl` is supplied (Ponto needs
@@ -677,6 +735,8 @@ export const payouts = {
   ): Promise<{
     status: "pending" | "burnt" | "payment-pending" | "complete";
     signingUrl?: string | null;
+    feeTransferPending?: boolean;
+    feeTransferTxHash?: string | null;
   }> {
     return request(
       creds,
@@ -698,11 +758,52 @@ export const payouts = {
       timeoutMs: 30_000,
     });
   },
+  // CP no longer burns server-side: the dashboard burns the place's tokens
+  // (the payout `net`) with its own minter, then reports the resulting on-chain
+  // hash here. CP records it and flips the payout to `burnt`. When a
+  // `destination` is supplied, CP also *attempts* to sweep the platform's
+  // retained cut (`fees + manualDeduction`) to that address.
+  //
+  // ⚠️ This endpoint now returns 200 as soon as the BURN is recorded — even if
+  // the sweep fails. A non-2xx means the burn itself failed. On 200 you MUST
+  // read the body: `feeTransferPending: true` (+ `feeTransferError`) means the
+  // sweep didn't run and needs a retry via `feeTransfer` below.
   burn(
     creds: CitizenPayApiCredentials,
     payoutId: string,
-  ): Promise<{ success: boolean; txHash: string }> {
+    txHash: string,
+    destination?: string,
+  ): Promise<{
+    success: boolean;
+    txHash?: string;
+    feeAmount?: number | null; // cents
+    feeTransferTxHash?: string | null;
+    feeTransferPending?: boolean;
+    feeTransferError?: string | null;
+  }> {
     return request(creds, "POST", `/v2/treasury/payouts/${encodeURIComponent(payoutId)}/burn`, {
+      body: destination ? { txHash, destination } : { txHash },
+      timeoutMs: 30_000,
+    });
+  },
+  // Standalone, idempotent sweep of the retained cut to `destination`. Run it
+  // to retry a burn whose sweep failed, or to sweep later. Unlike `burn`, this
+  // DOES surface sweep failures as HTTP status (402 insufficient, 409 not-burnt
+  // / in-progress, 422 config, 503 bundler, 400 bad destination) — they throw
+  // CitizenPayApiError. Idempotent: once swept, returns the hash with
+  // `alreadyTransferred: true`.
+  feeTransfer(
+    creds: CitizenPayApiCredentials,
+    payoutId: string,
+    destination: string,
+  ): Promise<{
+    success: boolean;
+    feeAmount?: number | null; // cents
+    feeTransferTxHash: string;
+    alreadyTransferred?: boolean;
+  }> {
+    return request(creds, "POST", `/v2/treasury/payouts/${encodeURIComponent(payoutId)}/fee-transfer`, {
+      body: { destination },
       timeoutMs: 30_000,
     });
   },
@@ -764,6 +865,33 @@ export const payouts = {
       "POST",
       `/v2/treasury/payouts/${encodeURIComponent(payoutId)}/orders`,
       { body, timeoutMs: 30_000 },
+    );
+  },
+  // Set the manual deduction (cents) + comment on a payout, recomputing net.
+  // Only valid while the payout is still `pending` (CP rejects otherwise).
+  setManualDeduction(
+    creds: CitizenPayApiCredentials,
+    payoutId: string,
+    body: { manualDeduction: number; comment?: string | null },
+  ): Promise<ManualDeductionWire> {
+    return request(
+      creds,
+      "POST",
+      `/v2/treasury/payouts/${encodeURIComponent(payoutId)}/manual-deduction`,
+      { body, timeoutMs: 30_000 },
+    );
+  },
+  // Clear a payout's manual deduction + comment (resets to 0 / null), with net
+  // back to total − fees. Same `pending`-only gate as setting it.
+  clearManualDeduction(
+    creds: CitizenPayApiCredentials,
+    payoutId: string,
+  ): Promise<ManualDeductionWire> {
+    return request(
+      creds,
+      "DELETE",
+      `/v2/treasury/payouts/${encodeURIComponent(payoutId)}/manual-deduction`,
+      { timeoutMs: 30_000 },
     );
   },
   // Archive an order out of the payout (unlink + recompute totals).

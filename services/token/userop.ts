@@ -23,7 +23,6 @@ import {
   polygon,
 } from "viem/chains";
 
-import { alchemyNetwork } from "@/services/alchemy/client";
 import { decryptSecret } from "@/services/crypto/secret";
 
 // ERC-4337 UserOperation builder + submitter for CitizenPay's Safe-account
@@ -375,11 +374,15 @@ export function safeTransferCallData(
 // initCode (lazy SA deployment)
 // =============================================================================
 
-function initCodeFor(factory: Address, owner: Address): Hex {
+function initCodeFor(
+  factory: Address,
+  owner: Address,
+  saltNonce: bigint = SALT_NONCE,
+): Hex {
   const createCall = encodeFunctionData({
     abi: FACTORY_ABI,
     functionName: "createAccount",
-    args: [owner, SALT_NONCE],
+    args: [owner, saltNonce],
   });
   return concatHex([factory, createCall]);
 }
@@ -422,17 +425,16 @@ function publicClientFor(chainId: number): PublicClient {
       `No chain config for chainId ${chainId}`,
     );
   }
-  const network = alchemyNetwork(chainId);
-  const alchemyKey = process.env.ALCHEMY_API_KEY;
-  if (!network || !alchemyKey) {
-    throw new UserOpError(
-      "config",
-      "ALCHEMY_API_KEY is required for userop submission",
-    );
-  }
+  // The bundler URL is itself a full JSON-RPC node (it already answers
+  // eth_getTransactionReceipt / eth_call here). Use its chain-scoped read
+  // endpoint for the plain chain reads in the userop flow — getUserOpHash,
+  // the account-existence fallback, and post-failure role checks — so the
+  // whole mint/burn/transfer submission path depends only on the bundler.
+  // Alchemy stays reserved for the enhanced balance/transfer APIs that power
+  // the holders + history views (it doesn't touch this path).
   return createPublicClient({
     chain,
-    transport: http(`https://${network}.g.alchemy.com/v2/${alchemyKey}`),
+    transport: http(bundlerReadRpcUrl(chainId)),
   });
 }
 
@@ -505,6 +507,7 @@ async function prepareUserOp(args: {
   owner: Address;
   sender: Address;
   factory: Address;
+  saltNonce?: bigint;
   callData: Hex;
 }): Promise<UserOp> {
   const deployed = await senderAccountExists(
@@ -514,7 +517,7 @@ async function prepareUserOp(args: {
   );
   const initCode: Hex = deployed
     ? "0x"
-    : initCodeFor(args.factory, args.owner);
+    : initCodeFor(args.factory, args.owner, args.saltNonce ?? SALT_NONCE);
   return {
     sender: args.sender,
     nonce: BigInt(0),
@@ -654,6 +657,41 @@ type EthReceipt = { status?: string; blockNumber?: string } | null;
  * it hits the chain-scoped endpoint and needs no paymaster. Returns null
  * when the tx isn't mined / isn't known to the node, and never throws.
  */
+export type UserOpResolution = {
+  txHash: Hex | null;
+  status: "pending" | "submitted" | "success" | "reverted" | "timeout";
+};
+
+/**
+ * Resolve a userOp hash to its settlement tx hash + status via the bundler's
+ * REST endpoint `GET /v1/{chainId}/userop/{hash}/tx`. A single non-blocking
+ * poll — used by the annotation-resolve queue (services/transaction-annotation)
+ * to turn the userOp hashes CP returns into the real on-chain tx hashes that
+ * history is keyed by. A 404 (hash not yet known to the bundler) is reported as
+ * `pending` so the caller retries; other transport errors throw.
+ */
+export async function getUserOpTx(
+  chainId: number,
+  userOpHash: string,
+): Promise<UserOpResolution> {
+  const res = await fetch(
+    `${bundlerRoot()}/v1/${chainId}/userop/${userOpHash}/tx`,
+    { signal: AbortSignal.timeout(10_000) },
+  );
+  if (res.status === 404) return { txHash: null, status: "pending" };
+  if (!res.ok) {
+    throw new UserOpError(
+      "submit_failed",
+      `Bundler userop/tx HTTP ${res.status}`,
+    );
+  }
+  const body = (await res.json()) as {
+    tx_hash: string | null;
+    status: UserOpResolution["status"];
+  };
+  return { txHash: (body.tx_hash as Hex) ?? null, status: body.status };
+}
+
 export async function getBundlerTxReceipt(args: {
   chainId: number;
   txHash: string;
@@ -741,16 +779,23 @@ function loadFundContext(fund: FundMinterContext): FundContext {
 async function runUserOp(
   ctx: FundContext,
   callData: Hex,
-  userOpData?: unknown,
-  extraData?: unknown,
+  opts: {
+    // Override the UserOp sender / salt to act from a non-minter account
+    // (a named fund account). Defaults to the minter's own salt-0 Safe.
+    sender?: Address;
+    saltNonce?: bigint;
+    userOpData?: unknown;
+    extraData?: unknown;
+  } = {},
 ): Promise<{ txHash: Hex; userOpHash: Hex }> {
   const chainId = ctx.fund.tokenChainId;
   const prepared = await prepareUserOp({
     client: ctx.client,
     chainId,
     owner: ctx.owner,
-    sender: ctx.sender,
+    sender: opts.sender ?? ctx.sender,
     factory: ctx.factory,
+    saltNonce: opts.saltNonce ?? SALT_NONCE,
     callData,
   });
   const sponsored = await paymasterSignUserOp({
@@ -774,8 +819,8 @@ async function runUserOp(
     paymaster: ctx.paymaster,
     entrypoint: ctx.entrypoint,
     op: signed,
-    userOpData,
-    extraData,
+    userOpData: opts.userOpData,
+    extraData: opts.extraData,
   });
   const txHash = await awaitUserOpSuccess({
     chainId,
@@ -804,7 +849,10 @@ export async function call(args: {
     args.value ?? BigInt(0),
     args.data,
   );
-  return await runUserOp(ctx, callData, args.userOpData, args.extraData);
+  return await runUserOp(ctx, callData, {
+    userOpData: args.userOpData,
+    extraData: args.extraData,
+  });
 }
 
 export async function mintToken(args: {
@@ -817,7 +865,10 @@ export async function mintToken(args: {
   const ctx = loadFundContext(args.fund);
   const callData = safeMintCallData(ctx.token, args.to, args.amount);
   try {
-    return await runUserOp(ctx, callData, args.userOpData, args.extraData);
+    return await runUserOp(ctx, callData, {
+      userOpData: args.userOpData,
+      extraData: args.extraData,
+    });
   } catch (e) {
     if (e instanceof UserOpError && e.code === "submit_failed") {
       await assertMinterRole(ctx);
@@ -836,13 +887,43 @@ export async function burnFromToken(args: {
   const ctx = loadFundContext(args.fund);
   const callData = safeBurnFromCallData(ctx.token, args.from, args.amount);
   try {
-    return await runUserOp(ctx, callData, args.userOpData, args.extraData);
+    return await runUserOp(ctx, callData, {
+      userOpData: args.userOpData,
+      extraData: args.extraData,
+    });
   } catch (e) {
     if (e instanceof UserOpError && e.code === "submit_failed") {
       await assertBurnerRole(ctx);
     }
     throw e;
   }
+}
+
+/**
+ * Transfer the fund token FROM one of the fund's named accounts (a Safe
+ * derived from the minter EOA at `saltNonce`) to `to`. The minter EOA owns
+ * every such Safe, so the same key signs the userop; the account is lazily
+ * deployed via the salt-specific initCode on its first outbound op. This is a
+ * plain ERC20 `transfer` — no mint/burn role required. `sender` is the
+ * account's cached counterfactual address (FundTokenAccount.address).
+ */
+export async function transferFromAccount(args: {
+  fund: FundMinterContext;
+  saltNonce: bigint;
+  sender: Address;
+  to: Address;
+  amount: bigint;
+  userOpData?: unknown;
+  extraData?: unknown;
+}): Promise<{ txHash: Hex; userOpHash: Hex }> {
+  const ctx = loadFundContext(args.fund);
+  const callData = safeTransferCallData(ctx.token, args.to, args.amount);
+  return await runUserOp(ctx, callData, {
+    sender: args.sender,
+    saltNonce: args.saltNonce,
+    userOpData: args.userOpData,
+    extraData: args.extraData,
+  });
 }
 
 /**

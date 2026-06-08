@@ -2,7 +2,7 @@
 "use server";
 
 import { getTranslations } from "next-intl/server";
-import { revalidatePath } from "next/cache";
+import { refresh, revalidatePath } from "next/cache";
 
 import { getBalances } from "@/services/alchemy/balances";
 import { formatTokenAmount } from "@/services/alchemy/format";
@@ -12,6 +12,7 @@ import { CitizenPayApiError } from "@/services/citizenpay/api";
 import { getCitizenPayClient } from "@/services/citizenpay/client";
 import type {
   ArchivedPayout,
+  PayoutDeduction,
   PayoutOrder,
   PayoutStatus,
 } from "@/services/citizenpay/types";
@@ -22,10 +23,14 @@ import {
   manualMintDirectAction,
 } from "@/services/token-operations/admin-actions";
 
+import { ANNOTATION_KINDS } from "@/services/transaction-annotation/annotate";
+import { resolveOrEnqueueAnnotation } from "@/services/transaction-annotation/pending";
+
 import { resolveOrderReceipts, type TxReceiptStatus } from "./receipts";
 import {
   CreatePayoutOrderSchema,
   PayoutRangeSchema,
+  SetManualDeductionSchema,
   toRfc3339,
 } from "./schemas";
 
@@ -70,7 +75,29 @@ export type CreatePayoutPaymentResult =
   | { error: string }
   | { ok: true };
 
-export type BurnPayoutResult = { error: string } | { ok: true; txHash: string };
+export type BurnPayoutResult =
+  | { error: string }
+  | {
+      ok: true;
+      txHash: string;
+      // Sweep outcome. The burn itself succeeded; the sweep of the retained cut
+      // (fees + manualDeduction) is decoupled. `feeTransferTxHash` is set when
+      // it ran inline; `feeTransferPending` is true when it still needs running
+      // (retry via feeTransferAction), with the reason in `feeTransferError`.
+      feeAmount?: string | null;
+      feeTransferTxHash?: string | null;
+      feeTransferPending?: boolean;
+      feeTransferError?: string | null;
+    };
+
+export type FeeTransferActionResult =
+  | { error: string }
+  | {
+      ok: true;
+      feeTransferTxHash: string;
+      feeAmount: string | null;
+      alreadyTransferred: boolean;
+    };
 
 // CP's own error strings are admin-facing and usually actionable ("merchant
 // not connected", "payout already paid", …) so we surface them directly;
@@ -640,6 +667,12 @@ export async function createPayoutPaymentAction(input: {
   }
 }
 
+// Burn step. CP no longer burns server-side — the dashboard burns the place's
+// tokens (the payout `net`) with its own minter wallet, then reports the hash
+// to CP, which marks the payout `burnt`. Mirrors the order-reconciliation burn
+// (`fixOrderAction`), reusing `manualBurnDirectAction` so the op is recorded as
+// a TokenOperation. The burn is only valid while the payout is `pending`; we
+// re-check live status first so a re-click can't burn a second time.
 export async function burnPayoutAction(input: {
   payoutId: string;
 }): Promise<BurnPayoutResult> {
@@ -648,12 +681,218 @@ export async function burnPayoutAction(input: {
 
   try {
     const client = getCitizenPayClient(fund);
-    const { txHash } = await client.burnPayout(input.payoutId);
+
+    // Idempotency guard: the burn button only shows while `pending`, and CP
+    // flips the payout to `burnt` the instant it records our hash. Re-checking
+    // live status here means a stale/duplicate submit can't double-burn.
+    const { status } = await client.getPayoutStatus(input.payoutId);
+    if (status !== "pending") return { error: t("notBurnable") };
+
+    // Amount = the payout `net` (total − fees − manualDeduction): the tokens
+    // the place holds for this payout. Read straight from the detail endpoint.
+    let payout;
+    try {
+      payout = await client.getPayout(input.payoutId);
+    } catch {
+      return { error: t("payoutNotFound") };
+    }
+
+    // Source = the place's wallet (each order's net was minted there). It rides
+    // on the orders-page envelope — one row is enough to read it.
+    const ordersPage = await client.getPayoutOrders(input.payoutId, {
+      limit: 1,
+    });
+    const placeAccount = ordersPage.placeAccountAddress;
+    if (!placeAccount) return { error: t("noPlaceAccount") };
+
+    // Burn only the `net` on-chain with our minter (records a TokenOperation).
+    // The place account also holds the retained cut (fees + manualDeduction);
+    // CP sweeps that to our minter account when we pass `destination` below.
+    const burn = await manualBurnDirectAction({
+      from: placeAccount,
+      amount: payout.net,
+    });
+    if ("error" in burn) return { error: burn.error };
+
+    // Report the hash so CP marks the payout burnt, and hand CP the minter
+    // smart account as the sweep destination for the retained cut. A non-2xx
+    // here means the BURN record failed — the tokens are already gone, so
+    // surface the hash and do NOT retry (re-running would burn again). A 2xx
+    // means the burn is recorded; the sweep is reported in the body and may be
+    // pending (retry via feeTransferAction) without being a burn failure.
+    let report;
+    try {
+      report = await client.burnPayout(
+        input.payoutId,
+        burn.txHash,
+        fund.tokenMinterSmartAccountAddress ?? undefined,
+      );
+    } catch (e) {
+      console.error("[payout] reporting burn to CP failed", input.payoutId, e);
+      return { error: `${t("reportFailed")} (tx ${burn.txHash})` };
+    }
+
+    // Annotate via the userOp hash for both: a userOp's settlement tx hash
+    // isn't final until `success` (a retry can change it), so we resolve once
+    // now and queue if still pending — never annotate an eager hash. The burn
+    // is our userOp; the fee sweep is CP's.
+    await resolveOrEnqueueAnnotation({
+      fundId: fund.id,
+      chainId: fund.tokenChainId,
+      userOpHash: burn.userOpHash,
+      kind: ANNOTATION_KINDS.payoutBurn,
+    });
+    if (report.feeTransferTxHash) {
+      await resolveOrEnqueueAnnotation({
+        fundId: fund.id,
+        chainId: fund.tokenChainId,
+        userOpHash: report.feeTransferTxHash,
+        kind: ANNOTATION_KINDS.payoutFee,
+      });
+    }
+
     revalidatePath("/payments");
-    return { ok: true, txHash };
+    revalidatePath(`/payments/payouts/${input.payoutId}`);
+    return {
+      ok: true,
+      txHash: burn.txHash,
+      feeAmount: report.feeAmount,
+      feeTransferTxHash: report.feeTransferTxHash,
+      feeTransferPending: report.feeTransferPending,
+      feeTransferError: report.feeTransferError,
+    };
   } catch (e) {
     console.error("[payout] burnPayout failed", input.payoutId, e);
     return { error: toMessage(e, t("burnFailed")) };
+  }
+}
+
+// Run (or retry) just the fee sweep for an already-burned payout — the
+// standalone, idempotent counterpart to the burn's inline sweep. Used when a
+// burn's sweep came back pending (or to sweep later). Sweeps to the fund's
+// minter account, same destination as the inline path. Idempotent on CP's side,
+// so a retry after a lost response won't double-transfer.
+export async function feeTransferAction(input: {
+  payoutId: string;
+}): Promise<FeeTransferActionResult> {
+  const t = await getTranslations("fund.payments.settlement.errors");
+  const { fund } = await requireFundRole("ADMIN");
+
+  const destination = fund.tokenMinterSmartAccountAddress;
+  if (!destination) return { error: t("noFeeDestination") };
+
+  try {
+    const client = getCitizenPayClient(fund);
+    const res = await client.feeTransfer(input.payoutId, destination);
+    // CP returns a userOp hash — resolve to the real tx hash now if it's
+    // already settled, otherwise queue for the cron.
+    await resolveOrEnqueueAnnotation({
+      fundId: fund.id,
+      chainId: fund.tokenChainId,
+      userOpHash: res.feeTransferTxHash,
+      kind: ANNOTATION_KINDS.payoutFee,
+    });
+    revalidatePath("/payments");
+    revalidatePath(`/payments/payouts/${input.payoutId}`);
+    refresh();
+    return {
+      ok: true,
+      feeTransferTxHash: res.feeTransferTxHash,
+      feeAmount: res.feeAmount,
+      alreadyTransferred: res.alreadyTransferred,
+    };
+  } catch (e) {
+    // CP surfaces sweep failures as HTTP status with a descriptive message
+    // (402 insufficient, 409 not-burnt/in-progress, 422 config, 503 bundler).
+    // toMessage forwards that message so the operator sees the real reason.
+    console.error("[payout] feeTransfer failed", input.payoutId, e);
+    return { error: toMessage(e, t("feeTransferFailed")) };
+  }
+}
+
+export type SetManualDeductionResult =
+  | { error: string }
+  | { ok: true; payout: PayoutDeduction };
+
+// Set/clear a payout's manual deduction (+ comment). This is a pure ledger
+// adjustment on CP's side — it lowers the `net` the merchant is paid, with no
+// on-chain effect. Only mutable while the payout isn't complete; we pre-check
+// status (and that the deduction can't drive net negative) for a clear message,
+// but CP is the final authority.
+export async function setManualDeductionAction(input: {
+  payoutId: string;
+  amount: string;
+  comment: string | null;
+}): Promise<SetManualDeductionResult> {
+  const t = await getTranslations("fund.payments.settlement.errors");
+  const { fund } = await requireFundRole("ADMIN");
+
+  const parsed = SetManualDeductionSchema.safeParse(input);
+  if (!parsed.success) {
+    const key = parsed.error.issues[0]?.message ?? "deductionFailed";
+    return { error: t(key.split(".").pop() as never) };
+  }
+
+  const client = getCitizenPayClient(fund);
+
+  // Need the current totals both to validate the bound and (live status) to
+  // confirm the payout is still editable.
+  let payout;
+  try {
+    payout = await client.getPayout(parsed.data.payoutId);
+  } catch {
+    return { error: t("payoutNotFound") };
+  }
+
+  const { status } = await client.getPayoutStatus(parsed.data.payoutId);
+  if (status !== "pending") return { error: t("deductionNotPending") };
+
+  // A deduction larger than (total − fees) would drive net negative.
+  const maxDeduction = Number(payout.totalAmount) - Number(payout.totalFees);
+  if (Number(parsed.data.amount) > maxDeduction) {
+    return { error: t("deductionTooHigh") };
+  }
+
+  try {
+    const updated = await client.setManualDeduction(parsed.data.payoutId, {
+      amount: parsed.data.amount,
+      comment: parsed.data.comment?.trim() || null,
+    });
+    revalidatePath("/payments");
+    revalidatePath(`/payments/payouts/${parsed.data.payoutId}`);
+    // Refresh the client router so the detail header (net + deduction row)
+    // re-renders. Must run here in the Server Action — `refresh` throws if
+    // called from a Client Component.
+    refresh();
+    return { ok: true, payout: updated };
+  } catch (e) {
+    console.error("[payout] setManualDeduction failed", input, e);
+    return { error: toMessage(e, t("deductionFailed")) };
+  }
+}
+
+// Clear a payout's manual deduction (+ comment), net back to total − fees.
+// Same pending-only gate as setting it.
+export async function clearManualDeductionAction(input: {
+  payoutId: string;
+}): Promise<SetManualDeductionResult> {
+  const t = await getTranslations("fund.payments.settlement.errors");
+  const { fund } = await requireFundRole("ADMIN");
+
+  const client = getCitizenPayClient(fund);
+
+  const { status } = await client.getPayoutStatus(input.payoutId);
+  if (status !== "pending") return { error: t("deductionNotPending") };
+
+  try {
+    const updated = await client.clearManualDeduction(input.payoutId);
+    revalidatePath("/payments");
+    revalidatePath(`/payments/payouts/${input.payoutId}`);
+    refresh();
+    return { ok: true, payout: updated };
+  } catch (e) {
+    console.error("[payout] clearManualDeduction failed", input.payoutId, e);
+    return { error: toMessage(e, t("deductionFailed")) };
   }
 }
 

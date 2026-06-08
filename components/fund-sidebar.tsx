@@ -18,6 +18,7 @@ import {
   UserCog,
   Users,
   Wallet,
+  Wallet2,
 } from "lucide-react";
 
 import { LocaleSwitcher } from "@/components/locale-switcher";
@@ -47,6 +48,7 @@ export function FundSidebar({
     { href: "/cards", label: t("cards"), icon: CreditCard },
     { href: "/allocations", label: t("allocations"), icon: Wallet },
     { href: "/token", label: t("token"), icon: Coins },
+    { href: "/accounts", label: t("accounts"), icon: Wallet2 },
     { href: "/merchants", label: t("merchants"), icon: Store },
     { href: "/payments", label: t("payments"), icon: Receipt },
     { href: "/bank", label: t("bank"), icon: Landmark },

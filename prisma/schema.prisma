@@ -206,6 +206,16 @@ model Fund {
   // the sponsor only on the referee's activation.
   referralBonusAmount Decimal? @db.Decimal(10, 2)
 
+  // Platform fee taken on merchant payments, as a percent (e.g. "2.50" =
+  // 2.5%). Null = not configured (CP applies its own default). We are
+  // canonical: the settings UI persists this locally first, then pushes the
+  // value (as integer basis points) to CP via PATCH /v2/treasury.
+  // `payoutFeeSynced` is false while a local change hasn't yet been accepted
+  // by CP (DB may lead CP) — the UI surfaces a retry hint. Per-business
+  // overrides are future work.
+  payoutFeePercentage Decimal? @db.Decimal(5, 2)
+  payoutFeeSynced     Boolean  @default(true)
+
   // Defaults
   defaultLocale String @default("fr")
   timezone      String @default("Europe/Brussels")
@@ -270,6 +280,9 @@ model Fund {
 
   citizenPayConnectAttempts CitizenPayConnectAttempt[] // in-flight CP connect handoffs
   addressProfiles           AddressProfileCache[] // CP profile cache (token explorer / transfers)
+  tokenAccounts             FundTokenAccount[] // named smart accounts (minter EOA + salt)
+  txAnnotations             TransactionAnnotation[] // per-tx labels for on-chain history
+  pendingAnnotations        PendingAnnotation[] // userOp hashes awaiting tx-hash resolution
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -278,6 +291,77 @@ model Fund {
 enum AllocationMode {
   FIXED_PERIOD // attribute tokens at the end of each period (monthly etc.)
   PAY_AND_GO // mint immediately when CP reports a deposit
+}
+
+// Per-fund annotation of an on-chain transaction, keyed by tx hash. Lets us
+// label what a transaction was for (e.g. a payout fee sweep, an account
+// transfer) so transaction-history views can show meaning next to the raw
+// hash. `kind` is a machine category resolved to a localised label in the UI;
+// `note` is optional free text (custom annotations). Written best-effort by the
+// actions that produce the tx — never the source of truth for the tx itself.
+model TransactionAnnotation {
+  id     String @id @default(cuid())
+  fundId String
+  fund   Fund   @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  txHash String // on-chain tx hash, stored lowercased
+  kind   String // machine category (PAYOUT_FEE, ACCOUNT_MINT, …)
+  note   String? // optional free-text detail / custom annotation
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([fundId, txHash])
+  @@index([fundId])
+}
+
+// A userOp hash awaiting resolution to its settlement tx hash, so we can write
+// a TransactionAnnotation keyed by the REAL tx hash (the one on-chain history
+// shows) rather than the userOp hash. CP returns userOp hashes for the payout
+// fee sweep; we queue them here and a cron polls the bundler
+// (`GET /v1/{chainId}/userop/{hash}/tx`) until `success` (→ annotate + drop) or
+// `reverted` / `timeout` / attempts exhausted (→ drop). Non-blocking by design.
+model PendingAnnotation {
+  id     String @id @default(cuid())
+  fundId String
+  fund   Fund   @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  chainId    Int
+  userOpHash String // bundler userOp hash, stored lowercased
+  kind       String // annotation kind to apply once resolved
+  note       String? // optional note to carry onto the final annotation
+  attempts   Int     @default(0) // poll count — capped so we don't loop forever
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([fundId, userOpHash])
+  @@index([fundId])
+}
+
+// A named, fund-owned smart account. Counterfactually derived (CREATE2) from
+// the fund's minter EOA (`Fund.tokenMinterEoaAddress`) against CP's Safe
+// factory (`Fund.citizenPayAccountFactoryAddress`) with a per-fund-unique
+// `saltNonce`. Salt 0 is reserved for the minter's own account
+// (`Fund.tokenMinterSmartAccountAddress`), so these start at 1. `address` is
+// the cached derived address; balances + transfer history are read on-chain
+// via Alchemy. Archived rows stay for history but drop out of the list.
+model FundTokenAccount {
+  id     String @id @default(cuid())
+  fundId String
+  fund   Fund   @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  name      String // operator-facing label
+  saltNonce Int // unique per fund; salt 0 is the minter, so these are ≥ 1
+  address   String // counterfactual Safe address (deterministic across chains)
+
+  archivedAt DateTime? // soft delete — hidden from the list, kept for history
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([fundId, saltNonce])
+  @@unique([fundId, address])
+  @@index([fundId])
 }
 
 model FundMember {

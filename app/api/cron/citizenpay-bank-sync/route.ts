@@ -2,6 +2,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { syncFundBankTransactions } from "@/services/bank-sync/ingest";
+import { cronGate } from "@/services/cron/guard";
 import { prisma } from "@/services/db/prisma";
 
 // Vercel cron entry — see vercel.json. Polls CitizenPay for new bank
@@ -18,17 +19,8 @@ import { prisma } from "@/services/db/prisma";
 // manually from the Bank page (see services/bank/admin-actions.ts).
 
 export async function GET(request: NextRequest) {
-  if (process.env.VERCEL_ENV !== "production") {
-    return NextResponse.json({ skipped: "non-production" });
-  }
-
-  const expected = process.env.CRON_SECRET;
-  if (expected) {
-    const auth = request.headers.get("authorization");
-    if (auth !== `Bearer ${expected}`) {
-      return new NextResponse("Unauthorized", { status: 401 });
-    }
-  }
+  const gate = cronGate(request);
+  if (gate) return gate;
 
   const funds = await prisma.fund.findMany({
     where: { citizenPayFundId: { not: null } },

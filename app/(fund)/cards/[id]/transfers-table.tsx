@@ -13,10 +13,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { TxAnnotationCell } from "@/components/tx-annotation";
 import { cn } from "@/lib/utils";
 import { formatTokenAmount, isZeroAddress } from "@/services/alchemy/format";
 import { listTransfersForAccount } from "@/services/alchemy/transfers";
 import { prisma } from "@/services/db/prisma";
+import { getAnnotations } from "@/services/transaction-annotation/annotate";
 
 import {
   AddressLabel,
@@ -58,28 +60,38 @@ export async function CardTransfersTable({
   cursor: string | null;
 }) {
   const t = await getTranslations("fund.cards.detail.transfers");
+  const tAcc = await getTranslations("fund.accounts");
   const format = await getFormatter();
 
-  const [page, cards, placesResult, merchants] = await Promise.all([
-    safeListTransfers({
-      chainId,
-      contractAddress,
-      account,
-      pageSize: PAGE_SIZE,
-      cursor,
-    }),
-    prisma.card.findMany({
-      where: { account: { not: null }, fundId: fund.id },
-      include: {
-        member: { select: { firstName: true, lastName: true } },
-      },
-    }),
-    getPlacesForFund(fund.id, fund.citizenPayApiKeyId, fund.citizenPayApiKeyEnc),
-    prisma.merchant.findMany({
-      where: { fundId: fund.id, citizenPayPlaceId: { not: null } },
-      select: { citizenPayPlaceId: true, name: true },
-    }),
-  ]);
+  const [page, cards, placesResult, merchants, tokenAccounts] =
+    await Promise.all([
+      safeListTransfers({
+        chainId,
+        contractAddress,
+        account,
+        pageSize: PAGE_SIZE,
+        cursor,
+      }),
+      prisma.card.findMany({
+        where: { account: { not: null }, fundId: fund.id },
+        include: {
+          member: { select: { firstName: true, lastName: true } },
+        },
+      }),
+      getPlacesForFund(
+        fund.id,
+        fund.citizenPayApiKeyId,
+        fund.citizenPayApiKeyEnc,
+      ),
+      prisma.merchant.findMany({
+        where: { fundId: fund.id, citizenPayPlaceId: { not: null } },
+        select: { citizenPayPlaceId: true, name: true },
+      }),
+      prisma.fundTokenAccount.findMany({
+        where: { fundId: fund.id, archivedAt: null },
+        select: { name: true, address: true },
+      }),
+    ]);
 
   if (page.error) {
     return (
@@ -89,6 +101,11 @@ export async function CardTransfersTable({
       </div>
     );
   }
+
+  const annotations = await getAnnotations(
+    fund.id,
+    page.transfers.map((tx) => tx.hash),
+  );
 
   const merchantNameByPlaceId = new Map<string, string>();
   for (const m of merchants) {
@@ -145,6 +162,10 @@ export async function CardTransfersTable({
       account: p.account,
       name: merchantNameByPlaceId.get(p.id) ?? p.name,
     })),
+    accounts: tokenAccounts.map((a) => ({
+      account: a.address,
+      name: a.name || tAcc("defaultName"),
+    })),
     profiles: fetchedProfiles,
     minterEoa,
     minterSmartAccount,
@@ -172,11 +193,12 @@ export async function CardTransfersTable({
             <TableHead aria-label="" className="w-6" />
             <TableHead>{t("to")}</TableHead>
             <TableHead className="text-right">{t("amount")}</TableHead>
+            <TableHead>{t("note")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {page.transfers.length === 0 ? (
-            <TableEmpty colSpan={5}>{t("empty")}</TableEmpty>
+            <TableEmpty colSpan={6}>{t("empty")}</TableEmpty>
           ) : (
             page.transfers.map((tx) => (
               <TableRow key={tx.uniqueId}>
@@ -214,6 +236,13 @@ export async function CardTransfersTable({
                       {symbol}
                     </span>
                   )}
+                </TableCell>
+                <TableCell>
+                  <TxAnnotationCell
+                    txHash={tx.hash}
+                    kind={annotations.get(tx.hash.toLowerCase())?.kind ?? null}
+                    note={annotations.get(tx.hash.toLowerCase())?.note ?? null}
+                  />
                 </TableCell>
               </TableRow>
             ))

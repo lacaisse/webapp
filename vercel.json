@@ -20,6 +20,10 @@
     {
       "path": "/api/cron/citizenpay-mint-retry",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/annotation-resolve",
+      "schedule": "*/2 * * * *"
     }
   ]
 }

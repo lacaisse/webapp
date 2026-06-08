@@ -11,7 +11,8 @@
     "copy": {
       "label": "Naar klembord kopiëren",
       "copied": "Gekopieerd"
-    }
+    },
+    "save": "Opslaan"
   },
   "locale": {
     "label": "Taal",
@@ -127,7 +128,8 @@
       "emails": "E-mails",
       "team": "Team",
       "settings": "Instellingen",
-      "backToApex": "Terug naar mijn fondsen"
+      "backToApex": "Terug naar mijn fondsen",
+      "accounts": "Rekeningen"
     },
     "team": {
       "title": "Team",
@@ -266,7 +268,78 @@
         "joined": "Lid sinds"
       },
       "unverified": "E-mail niet geverifieerd",
-      "empty": "Geen leden om te tonen."
+      "empty": "Geen leden om te tonen.",
+      "detail": {
+        "back": "Alle leden",
+        "unverified": "E-mail niet geverifieerd",
+        "profile": {
+          "title": "Identiteit",
+          "description": "Contact en huishouden.",
+          "address": "Adres",
+          "household": "Huishouden",
+          "householdValue": "{adults} volwassenen · {children} kinderen",
+          "joined": "Lid sinds",
+          "left": "Vertrokken"
+        },
+        "banking": {
+          "title": "Lidmaatschap",
+          "description": "Niveau, bankgegevens en verwijzingskenmerken.",
+          "tier": "Niveau",
+          "iban": "IBAN",
+          "reference": "Betalingskenmerk",
+          "referralCode": "Verwijzingscode",
+          "primaryCard": "Hoofdkaart"
+        },
+        "applicationData": {
+          "title": "Aanvraaggegevens",
+          "description": "Aangepaste onboardingvelden ingediend door het lid."
+        },
+        "cards": {
+          "title": "Kaarten",
+          "serial": "Serienummer",
+          "holder": "Houder",
+          "status": "Status",
+          "issued": "Uitgegeven",
+          "balance": "Saldo",
+          "primary": "Hoofdkaart",
+          "lost": "Verloren",
+          "empty": "Nog geen kaarten."
+        },
+        "tokenOps": {
+          "title": "Tokenbewerkingen",
+          "date": "Datum",
+          "type": "Type",
+          "tier": "Niveau",
+          "period": "Periode",
+          "amount": "Bedrag",
+          "status": "Status",
+          "empty": "Nog geen tokenbewerkingen."
+        },
+        "bank": {
+          "title": "Banktransacties",
+          "date": "Datum",
+          "reference": "Kenmerk",
+          "period": "Periode",
+          "amount": "Bedrag",
+          "empty": "Geen overeenkomende banktransacties."
+        },
+        "referrals": {
+          "sponsorTitle": "Verwezen door",
+          "sponsorDescription": "Het lid dat deze aanmelding heeft verwezen.",
+          "sponsorEmpty": "Geen verwijzer.",
+          "sponsoredTitle": "Verwezen leden",
+          "sponsoredDescription": "{count} aanmeldingen met de code van dit lid.",
+          "sponsoredEmpty": "Nog geen verwijzingen."
+        },
+        "emails": {
+          "title": "E-mails",
+          "date": "Datum",
+          "type": "Type",
+          "to": "Aan",
+          "status": "Status",
+          "empty": "Geen e-mails verzonden."
+        }
+      }
     },
     "cards": {
       "title": "Kaarten",
@@ -321,13 +394,14 @@
           "amount": "Bedrag",
           "empty": "Nog geen transfers voor deze kaart.",
           "issued": "Uitgegeven",
-          "retired": "Ingetrokken",
+          "retired": "Vernietigd",
           "treasury": "Treasury",
           "unknown": "Externe wallet",
           "self": "Deze kaart",
           "newer": "Nieuwer",
           "older": "Ouder",
-          "error": "Kon on-chain transfers niet laden."
+          "error": "Kon on-chain transfers niet laden.",
+          "note": "Notitie"
         }
       }
     },
@@ -395,6 +469,43 @@
         "status": "Status",
         "closedAt": "Gesloten op",
         "empty": "Nog geen periodes."
+      },
+      "periodDetail": {
+        "back": "Alle periodes",
+        "range": "{starts} → {cutoff}",
+        "closedAt": "Gesloten op {date}",
+        "notes": "Notities",
+        "kpi": {
+          "deposits": "Geïnde stortingen",
+          "depositsHint": "{count} banktransacties",
+          "minted": "Uitgegeven tokens",
+          "mintedHint": "{count} bewerkingen (bevestigd)",
+          "members": "Bijdragende leden",
+          "membersHint": "Unieke leden met een overeenkomende storting",
+          "status": "Status",
+          "statusHints": {
+            "OPEN": "Accepteert momenteel stortingen.",
+            "IN_PROGRESS": "Deadline bereikt, uitgifte loopt.",
+            "CLOSED": "Uitgifte voltooid."
+          }
+        },
+        "deposits": {
+          "title": "Stortingen",
+          "date": "Datum",
+          "member": "Lid",
+          "reference": "Kenmerk",
+          "amount": "Bedrag",
+          "empty": "Nog geen stortingen in deze periode."
+        },
+        "mints": {
+          "title": "Uitgiftes",
+          "date": "Datum",
+          "member": "Lid",
+          "tier": "Niveau",
+          "amount": "Bedrag",
+          "status": "Status",
+          "empty": "Nog geen uitgiftes gebatcht."
+        }
       }
     },
     "token": {
@@ -444,12 +555,13 @@
         "amount": "Bedrag",
         "empty": "Nog geen overdrachten.",
         "issued": "Uitgegeven",
-        "retired": "Ingenomen",
+        "retired": "Vernietigd",
         "treasury": "Treasury",
         "unknown": "Externe portemonnee",
         "newer": "Nieuwer",
         "older": "Ouder",
-        "error": "Kan on-chain overdrachten niet laden."
+        "error": "Kan on-chain overdrachten niet laden.",
+        "note": "Notitie"
       },
       "holders": {
         "holder": "Portemonnee",
@@ -490,7 +602,88 @@
         "balance": "Saldo",
         "joined": "Aangesloten op"
       },
-      "empty": "Geen handelaars om te tonen."
+      "empty": "Geen handelaars om te tonen.",
+      "detail": {
+        "back": "Alle handelaren",
+        "verified": "E-mail geverifieerd",
+        "unverified": "E-mail niet geverifieerd",
+        "connected": "Citizen Pay verbonden",
+        "notConnected": "Citizen Pay niet verbonden",
+        "invite": {
+          "title": "Citizen Pay-uitnodiging",
+          "description": "Status van de uitnodiging die naar de handelaar is gestuurd.",
+          "sentTo": "Uitnodiging verzonden naar {email}",
+          "on": "op {date}",
+          "expires": "Verloopt op {date}."
+        },
+        "contact": {
+          "title": "Contact",
+          "description": "Openbare contactgegevens.",
+          "contactName": "Contactpersoon",
+          "email": "E-mail",
+          "phone": "Telefoon",
+          "website": "Website",
+          "address": "Adres",
+          "location": "Locatie",
+          "coordinates": "{lat}, {lng}",
+          "emailVerifiedAt": "E-mail geverifieerd op"
+        },
+        "business": {
+          "title": "Onderneming",
+          "description": "Interne status en Citizen Pay-koppeling.",
+          "joined": "Lid sinds",
+          "position": "Positie in directory",
+          "conditions": "Acceptatievoorwaarden",
+          "citizenPayPlace": "Citizen Pay-plaats-ID",
+          "citizenPayBusiness": "Citizen Pay-onderneming-ID",
+          "citizenPayWallet": "Walletadres",
+          "balance": "Saldo",
+          "balanceUnavailable": "Niet beschikbaar",
+          "citizenPayActivated": "Citizen Pay-activatie",
+          "citizenPayLastSynced": "Laatst gesynchroniseerd",
+          "createdAt": "Aangemaakt",
+          "updatedAt": "Bijgewerkt",
+          "reviewed": "Laatst beoordeeld",
+          "reviewNote": "Beoordelingsnotitie"
+        },
+        "applicationData": {
+          "title": "Aanvraaggegevens",
+          "description": "Aangepaste onboardingvelden ingediend door de handelaar."
+        },
+        "payouts": {
+          "title": "Uitbetalingen",
+          "total": "{total} over {count} overdrachten",
+          "date": "Datum",
+          "reference": "Kenmerk",
+          "amount": "Bedrag",
+          "empty": "Nog geen uitbetalingen."
+        },
+        "emails": {
+          "title": "E-mails",
+          "date": "Datum",
+          "type": "Type",
+          "to": "Aan",
+          "status": "Status",
+          "empty": "Geen e-mails verzonden."
+        },
+        "transfers": {
+          "title": "Overdrachtgeschiedenis",
+          "date": "Datum",
+          "direction": "Richting",
+          "in": "In",
+          "out": "Uit",
+          "counterparty": "Tegenpartij",
+          "amount": "Bedrag",
+          "empty": "Nog geen on-chain overdrachten.",
+          "unavailable": "Overdrachtgeschiedenis is momenteel niet beschikbaar.",
+          "issued": "Uitgegeven",
+          "retired": "Vernietigd",
+          "treasury": "Treasury",
+          "unknown": "Onbekend",
+          "newer": "Nieuwer",
+          "older": "Ouder"
+        }
+      }
     },
     "payments": {
       "title": "Betalingen",
@@ -612,7 +805,12 @@
           "descriptionLabel": "Omschrijving",
           "descriptionPlaceholder": "Waarvoor deze order is",
           "net": "Netto",
-          "confirm": "Order toevoegen"
+          "confirm": "Order toevoegen",
+          "searchPlaceholder": "Zoek op naam, kenmerk of bedrag…",
+          "loadMore": "Meer tonen",
+          "noMatches": "Geen overdrachten komen overeen met je zoekopdracht.",
+          "successMinted": "Bestelling toegevoegd en netto uitgegeven naar de plaats.",
+          "mintFailed": "Bestelling toegevoegd, maar automatische uitgifte mislukt. Verwerk het via het tabblad Problemen."
         },
         "pay": {
           "button": "Handelaar betalen",
@@ -625,7 +823,9 @@
           "description": "Dit verbrandt de on-chain tokens achter deze uitbetaling. Burn en bankbetaling staan los van elkaar — in willekeurige volgorde.",
           "warning": "Dit is onomkeerbaar. De tokens voor deze uitbetaling worden permanent verbrand.",
           "confirm": "Tokens verbranden",
-          "success": "Tokens verbrand. Transactiehash:"
+          "success": "Tokens verbrand. Transactiehash:",
+          "feeSwept": "Kosten overgemaakt naar de fondsrekening: {amount}",
+          "feeNotSwept": "Tokens verbrand, maar de kosten zijn nog niet overgemaakt."
         },
         "orders": {
           "title": "Bestellingen",
@@ -705,7 +905,34 @@
           "amountPositive": "Het bedrag moet groter dan nul zijn.",
           "feeTooHigh": "De kosten mogen niet hoger zijn dan het bedrag.",
           "descriptionTooLong": "De omschrijving is te lang.",
-          "completeFailed": "Kon de uitbetaling niet als voltooid markeren. Probeer het zo opnieuw."
+          "completeFailed": "Kon de uitbetaling niet als voltooid markeren. Probeer het zo opnieuw.",
+          "notBurnable": "Deze uitbetaling is niet meer in de verbrandstap (al verbrand of afgewikkeld).",
+          "payoutNotFound": "Uitbetaling niet gevonden.",
+          "deductionFailed": "Kon de inhouding niet opslaan. Probeer het zo opnieuw.",
+          "deductionTooHigh": "De inhouding mag niet hoger zijn dan totaal min kosten.",
+          "deductionNotPending": "De handmatige inhouding kan alleen worden gewijzigd zolang de uitbetaling in behandeling is.",
+          "reportFailed": "Tokens on-chain verbrand, maar kon dit niet melden aan Citizen Pay. Niet opnieuw proberen — bewaar de transactiehash voor reconciliatie.",
+          "noFeeDestination": "Geen bestemmingsrekening voor kosten. Verbind het fonds eerst met Citizen Pay.",
+          "feeTransferFailed": "De kostenoverdracht is mislukt. Probeer het zo opnieuw."
+        },
+        "manualDeduction": "Handmatige inhouding",
+        "deduction": {
+          "trigger": "Inhouding toevoegen",
+          "edit": "Inhouding bewerken",
+          "title": "Handmatige inhouding",
+          "description": "Een boekhoudkundige aanpassing die het netto bedrag aan de handelaar verlaagt. Geen on-chain effect.",
+          "amount": "Inhoudingsbedrag",
+          "amountHint": "Maximaal {max}. Voer 0 in om de inhouding te wissen.",
+          "comment": "Opmerking",
+          "commentPlaceholder": "Reden voor de aanpassing",
+          "net": "Netto na inhouding",
+          "confirm": "Opslaan",
+          "remove": "Verwijderen"
+        },
+        "feeTransfer": {
+          "pending": "De kosten van deze uitbetaling zijn nog niet overgemaakt.",
+          "button": "Kosten overmaken",
+          "done": "Kosten overgemaakt. Transactiehash:"
         }
       },
       "admin": {
@@ -794,7 +1021,8 @@
         "token": "Token",
         "onboarding": "Onboarding",
         "terms": "Voorwaarden",
-        "citizenpay": "Citizen Pay"
+        "citizenpay": "Citizen Pay",
+        "fees": "Kosten"
       },
       "general": {
         "title": "Algemeen",
@@ -850,6 +1078,63 @@
         "verifyMerchant": {
           "label": "E-mailverificatie verplichten voor handelaars",
           "description": "Handelaars moeten op een bevestigingslink klikken voordat hun aanvraag in de beoordelingswachtrij belandt."
+        },
+        "redirects": {
+          "title": "Doorverwijzingen na aanmelding",
+          "description": "Stuur aanvragers naar je eigen site zodra hun aanmelding voltooid is. Laat leeg om de ingebouwde bevestigingspagina te gebruiken.",
+          "member": "Doorverwijs-URL voor leden",
+          "memberHint": "Waar leden terechtkomen na hun laatste aanmeldstap (na e-mailverificatie, indien ingeschakeld).",
+          "merchant": "Doorverwijs-URL voor handelaren",
+          "merchantHint": "Waar handelaren terechtkomen na hun laatste aanmeldstap (na e-mailverificatie, indien ingeschakeld)."
+        },
+        "fieldsTitle": "Aanvraagvelden",
+        "fieldsDescription": "Voeg aangepaste vragen toe aan de aanmeldformulieren voor leden en handelaren. Ingebouwde velden (naam, e-mail) zijn altijd aanwezig.",
+        "fields": {
+          "memberTitle": "Ledenvelden",
+          "memberDescription": "Vragen op het /join-formulier voor leden.",
+          "merchantTitle": "Handelaarsvelden",
+          "merchantDescription": "Vragen op het /join-merchant-formulier voor handelaren.",
+          "add": "Veld toevoegen",
+          "edit": "Bewerken",
+          "required": "Verplicht",
+          "archived": "Gearchiveerd",
+          "empty": "Nog geen velden.",
+          "columns": {
+            "position": "#",
+            "label": "Label",
+            "key": "Sleutel",
+            "type": "Type",
+            "required": "Verplicht"
+          },
+          "dialog": {
+            "createTitle": "Een veld toevoegen",
+            "editTitle": "Veld bewerken",
+            "description": "Velden worden aan aanvragers getoond in de volgorde van hun positie. Sleutels worden bij elke aanvraag opgeslagen en kunnen niet meer wijzigen zodra ze zijn ingesteld.",
+            "key": "Sleutel",
+            "keyHint": "Identificator in kleine letters (letters, cijfers, underscore). Wordt intern gebruikt om het antwoord op te slaan.",
+            "type": "Type",
+            "label": "Label",
+            "helpText": "Helptekst",
+            "position": "Positie",
+            "required": "Verplicht",
+            "options": "Opties",
+            "optionsHint": "Eén optie per regel. Gebruik \"waarde:label\" om een andere opgeslagen waarde in te stellen, of alleen het label.",
+            "save": "Opslaan",
+            "saving": "Opslaan…",
+            "cancel": "Annuleren"
+          },
+          "archive": {
+            "button": "Archiveren",
+            "restore": "Herstellen",
+            "title": "Dit veld archiveren?",
+            "description": "Gearchiveerde velden verschijnen niet meer op nieuwe aanvragen. Bestaande aanvraaggegevens die naar dit veld verwijzen, blijven behouden.",
+            "restoreTitle": "Dit veld herstellen?",
+            "restoreDescription": "Herstelde velden verschijnen weer op nieuwe aanvragen op hun vorige positie.",
+            "confirm": "Archiveren",
+            "restoreConfirm": "Herstellen",
+            "saving": "Opslaan…",
+            "cancel": "Annuleren"
+          }
         }
       },
       "terms": {
@@ -887,6 +1172,117 @@
             "failed": "Verbinding met Citizen Pay is mislukt. Probeer het opnieuw."
           }
         }
+      },
+      "fees": {
+        "title": "Kosten",
+        "description": "Commissie op betalingen aan handelaren. Hier ingesteld en vervolgens naar Citizen Pay gestuurd.",
+        "rate": "Kostentarief (%)",
+        "rateHint": "Percentage dat op elke betaling wordt ingehouden (bijv. 2,5 voor 2,5%). Laat leeg om het standaardtarief van Citizen Pay te gebruiken.",
+        "syncPending": "Lokaal opgeslagen, maar nog niet bevestigd door Citizen Pay. Sla opnieuw op om de synchronisatie te herhalen.",
+        "syncFailed": "Tarief opgeslagen, maar de synchronisatie met Citizen Pay is mislukt. Sla opnieuw op om opnieuw te proberen."
+      }
+    },
+    "annotations": {
+      "PAYOUT_BURN": "Uitbetaling vernietigd",
+      "PAYOUT_FEE": "Uitbetalingskosten",
+      "ACCOUNT_MINT": "Uitgifte",
+      "ACCOUNT_BURN": "Vernietiging",
+      "ACCOUNT_TRANSFER": "Overdracht",
+      "edit": "Annoteren",
+      "title": "Transactie annoteren",
+      "noteLabel": "Notitie",
+      "notePlaceholder": "Waarvoor was dit?",
+      "errors": {
+        "invalidHash": "Ongeldige transactiehash.",
+        "noteTooLong": "Notitie is te lang (max. 280 tekens).",
+        "saveFailed": "Kon de annotatie niet opslaan. Probeer het zo opnieuw."
+      }
+    },
+    "accounts": {
+      "title": "Rekeningen",
+      "description": "Benoemde rekeningen afgeleid van de sleutel van het fonds. Bekijk per rekening het saldo en de transactiegeschiedenis.",
+      "notConnected": "Verbind dit fonds eerst met Citizen Pay om rekeningen aan te maken.",
+      "balancesError": "Kon de on-chain saldi niet laden. Probeer het zo opnieuw.",
+      "empty": "Nog geen rekeningen. Maak er een aan om te beginnen.",
+      "defaultName": "Hoofdrekening",
+      "defaultBadge": "Standaard",
+      "table": {
+        "name": "Naam",
+        "address": "Adres",
+        "balance": "Saldo"
+      },
+      "detail": {
+        "back": "Alle rekeningen",
+        "balance": "Saldo"
+      },
+      "create": {
+        "trigger": "Nieuwe rekening",
+        "title": "Rekening aanmaken",
+        "description": "Een nieuwe on-chain rekening afgeleid van de sleutel van het fonds.",
+        "name": "Naam",
+        "namePlaceholder": "bijv. Reserve, Kosten, Evenementen",
+        "confirm": "Rekening aanmaken"
+      },
+      "rename": {
+        "trigger": "Hernoemen",
+        "title": "Rekening hernoemen",
+        "name": "Naam"
+      },
+      "archive": {
+        "trigger": "Verwijderen",
+        "title": "Deze rekening verwijderen?",
+        "description": "De rekening wordt uit de lijst verwijderd. Het on-chain adres en de tokens blijven bestaan — je kunt de rekening later opnieuw aanmaken.",
+        "confirm": "Verwijderen"
+      },
+      "move": {
+        "inTrigger": "Tokens toevoegen",
+        "outTrigger": "Tokens verwijderen",
+        "inTitle": "Tokens toevoegen",
+        "outTitle": "Tokens verwijderen",
+        "inDescription": "Geef tokens uit naar deze rekening.",
+        "outDescription": "Verbrand tokens van deze rekening.",
+        "amount": "Bedrag",
+        "confirm": "Bevestigen",
+        "success": "Transactie ingediend."
+      },
+      "transfer": {
+        "trigger": "Overdragen",
+        "title": "Tokens overdragen",
+        "description": "Stuur tokens van deze rekening naar een andere rekening of een adres.",
+        "destination": "Bestemming",
+        "pickAccount": "Kies een rekening…",
+        "amount": "Bedrag",
+        "confirm": "Overdragen",
+        "success": "Transactie ingediend."
+      },
+      "transfers": {
+        "title": "Transactiegeschiedenis",
+        "empty": "Nog geen transacties.",
+        "direction": "Richting",
+        "counterparty": "Tegenpartij",
+        "date": "Datum",
+        "amount": "Bedrag",
+        "loadMore": "Meer tonen",
+        "loadError": "Kon de on-chain geschiedenis niet laden.",
+        "directions": {
+          "in": "Ontvangen",
+          "out": "Verzonden",
+          "self": "Intern"
+        }
+      },
+      "errors": {
+        "nameRequired": "Naam is verplicht.",
+        "nameTooLong": "Naam is te lang (max. 80 tekens).",
+        "notFound": "Rekening niet gevonden.",
+        "cannotRemoveDefault": "De hoofdrekening kan niet worden verwijderd.",
+        "notConnected": "Verbind dit fonds eerst met Citizen Pay.",
+        "deriveFailed": "Kon het rekeningadres niet afleiden. Probeer het zo opnieuw.",
+        "createFailed": "Kon de rekening niet aanmaken. Probeer het zo opnieuw.",
+        "amountInvalid": "Bedrag moet een geldig getal zijn.",
+        "amountPositive": "Bedrag moet groter dan nul zijn.",
+        "addressInvalid": "Voer een geldig 0x-adres in (40 hex-tekens).",
+        "transferFailed": "On-chain overdracht mislukt. Probeer het zo opnieuw.",
+        "transfersFailed": "Kon de transacties niet laden. Probeer het zo opnieuw."
       }
     }
   },
@@ -917,7 +1313,10 @@
       "localeUnsupported": "Niet-ondersteunde taal.",
       "timezoneRequired": "Tijdzone is verplicht.",
       "colorInvalid": "Gebruik een hexkleur met 6 tekens (bv. #1a73e8).",
-      "amountInvalid": "Bedrag moet een getal zijn met maximaal 2 decimalen."
+      "amountInvalid": "Bedrag moet een getal zijn met maximaal 2 decimalen.",
+      "urlInvalid": "Voer een geldige URL in (moet beginnen met http:// of https://).",
+      "feeInvalid": "Kostentarief moet een getal met maximaal 2 decimalen zijn.",
+      "feeTooHigh": "Kostentarief mag niet hoger zijn dan 100%."
     }
   },
   "team": {
@@ -1005,16 +1404,7 @@
       "description": "Vul uw gegevens in om lid te worden. Een beheerder beoordeelt uw aanvraag en neemt contact op.",
       "firstName": "Voornaam",
       "lastName": "Achternaam",
-      "email": {
-        "verify": {
-          "subject": "Bevestig uw e-mail — {fundName}",
-          "textBody": "Hallo {firstName},\n\nBevestig uw e-mailadres om uw aanvraag bij {fundName} af te ronden. Klik op de onderstaande link — deze is 24 uur geldig:\n\n  {verifyUrl}\n\nAls u dit niet hebt aangevraagd, kunt u deze e-mail negeren.\n\nHet {fundName}-team"
-        },
-        "welcome": {
-          "subject": "Welkom bij {fundName}",
-          "textBody": "Hallo {firstName},\n\nWelkom bij {fundName}. Uw aanvraag wordt beoordeeld — een beheerder neemt binnenkort contact op.\n\nWanneer u klaar bent om bij te dragen, vermeld dan deze referentie op uw bankoverschrijving:\n  {paymentReference}\n\nBedankt,\nHet {fundName}-team"
-        }
-      },
+      "email": "E-mail",
       "submit": "Aanvragen",
       "submitting": "Verzenden…",
       "errors": {
@@ -1035,6 +1425,17 @@
           "title": "Aanvraag ontvangen",
           "description": "Bedankt voor uw aanvraag bij {fundName}.",
           "nextSteps": "Een beheerder beoordeelt uw aanvraag en neemt contact op per e-mail."
+        }
+      },
+      "emailTemplates": {
+        "verify": {
+          "subject": "Bevestig uw e-mail — {fundName}",
+          "textBody": "Hallo {firstName},\n\nBevestig uw e-mailadres om uw aanvraag bij {fundName} af te ronden. Klik op de onderstaande link — deze is 24 uur geldig:\n\n  {verifyUrl}\n\nAls u dit niet hebt aangevraagd, kunt u deze e-mail negeren.\n\nHet {fundName}-team",
+          "ctaLabel": "E-mail verifiëren"
+        },
+        "welcome": {
+          "subject": "Welkom bij {fundName}",
+          "textBody": "Hallo {firstName},\n\nWelkom bij {fundName}. Uw aanvraag wordt beoordeeld — een beheerder neemt binnenkort contact op.\n\nWanneer u klaar bent om bij te dragen, vermeld dan deze referentie op uw bankoverschrijving:\n  {paymentReference}\n\nBedankt,\nHet {fundName}-team"
         }
       }
     },
@@ -1127,6 +1528,19 @@
         "cancel": "Annuleren",
         "confirm": "Bijwerken",
         "saving": "Opslaan…"
+      },
+      "mint": {
+        "button": "Tokens uitgeven",
+        "title": "Tokens uitgeven",
+        "description": "Geef handmatig tokens uit naar de hoofdkaart van {memberName}. Gebruik dit voor correcties of eenmalige toevoegingen buiten de normale toewijzing.",
+        "amountLabel": "Bedrag",
+        "amountHint": "Aantal uit te geven tokens, met maximaal 2 decimalen.",
+        "amountRequired": "Bedrag is verplicht.",
+        "noteLabel": "Notitie (optioneel, intern)",
+        "notePlaceholder": "Waarom deze uitgifte? Vastgelegd voor controle.",
+        "cancel": "Annuleren",
+        "confirm": "Uitgeven",
+        "minting": "Bezig met uitgeven…"
       }
     }
   },
@@ -1266,7 +1680,8 @@
       "email": {
         "verify": {
           "subject": "Bevestig uw e-mail — {fundName}",
-          "textBody": "Hallo {merchantName},\n\nBevestig uw e-mailadres om uw aanvraag om als handelaar bij {fundName} aan te sluiten af te ronden. Klik op de onderstaande link — deze is 24 uur geldig:\n\n  {verifyUrl}\n\nAls u dit niet hebt aangevraagd, kunt u deze e-mail negeren.\n\nHet {fundName}-team"
+          "textBody": "Hallo {merchantName},\n\nBevestig uw e-mailadres om uw aanvraag om als handelaar bij {fundName} aan te sluiten af te ronden. Klik op de onderstaande link — deze is 24 uur geldig:\n\n  {verifyUrl}\n\nAls u dit niet hebt aangevraagd, kunt u deze e-mail negeren.\n\nHet {fundName}-team",
+          "ctaLabel": "E-mail verifiëren"
         },
         "welcome": {
           "subject": "Aanvraag ontvangen — {fundName}",
@@ -1312,7 +1727,8 @@
         "approved": {
           "subject": "Aanvraag goedgekeurd — {fundName}",
           "textBodyWithLink": "Hallo {merchantName},\n\nUw aanvraag om bij {fundName} aan te sluiten is goedgekeurd.\n\nVolgende stap: verbind uw bedrijf met Citizen Pay zodat uw terminal tokens kan accepteren. Ga naar:\n\n  {citizenPayUrl}\n\nZodra u de Citizen Pay-onboarding hebt afgerond, bent u actief in het {fundName}-netwerk. Bij vragen kunt u contact opnemen met de beheerder.\n\nHet {fundName}-team",
-          "textBodyWithoutLink": "Hallo {merchantName},\n\nUw aanvraag om bij {fundName} aan te sluiten is goedgekeurd.\n\nDe beheerder neemt contact op met de details voor verbinding met Citizen Pay, zodat u tokens kunt gaan accepteren.\n\nHet {fundName}-team"
+          "textBodyWithoutLink": "Hallo {merchantName},\n\nUw aanvraag om bij {fundName} aan te sluiten is goedgekeurd.\n\nDe beheerder neemt contact op met de details voor verbinding met Citizen Pay, zodat u tokens kunt gaan accepteren.\n\nHet {fundName}-team",
+          "ctaLabel": "Citizen Pay openen"
         },
         "rejected": {
           "subject": "Update over uw aanvraag — {fundName}",
@@ -2022,5 +2438,16 @@
     "thirdParty": "Componenten van derden",
     "thirdPartyLink": "Zie /licenses",
     "viewOnGithub": "Bekijk op GitHub"
+  },
+  "onboardingFields": {
+    "errors": {
+      "keyRequired": "Sleutel is verplicht.",
+      "keyInvalid": "Sleutel moet uit kleine letters, cijfers of underscores bestaan en met een letter beginnen.",
+      "keyTaken": "Een ander veld gebruikt deze sleutel al.",
+      "labelRequired": "Label is verplicht.",
+      "optionEmpty": "Elke optie moet een waarde en een label hebben.",
+      "optionsRequired": "Voeg ten minste één optie toe.",
+      "notFound": "Veld niet gevonden."
+    }
   }
 }
