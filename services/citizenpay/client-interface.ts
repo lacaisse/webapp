@@ -9,7 +9,6 @@ import type {
   BankingStatus,
   BankTransactionPayloadPage,
   BankTransactionsPage,
-  BurnPayoutResult,
   CardOperationInput,
   CardOperationResult,
   CitizenPayCardDetail,
@@ -19,6 +18,7 @@ import type {
   CreatedPayoutOrder,
   CreatePayoutOrderInput,
   CreatePayoutPaymentResult,
+  FeeTransferResult,
   ListBankTransactionsInput,
   ListBankTransactionsResult,
   ListCardsInput,
@@ -26,12 +26,15 @@ import type {
   ListPlacesResult,
   OperationStatusResult,
   Payout,
+  PayoutBurnReport,
+  PayoutDeduction,
   PayoutDraft,
   PayoutDraftPreview,
   PayoutOrdersPage,
   PayoutStatusDetail,
   RegisteredCard,
   RegisterCardInput,
+  SetManualDeductionInput,
   SubmitMintInput,
   SubmittedOperation,
 } from "./types";
@@ -267,6 +270,26 @@ export interface CitizenPayClient {
   archiveOrder(payoutId: string, orderId: number): Promise<ArchivedPayout>;
 
   /**
+   * Set a payout's manual deduction (+ comment), recomputing `net`
+   * (total − fees − deduction). EUR decimal `amount`; "0" clears it. Only
+   * valid while the payout isn't complete (CP rejects otherwise). Returns the
+   * recomputed totals so the UI can update the header in place. Backed by
+   * POST /v2/treasury/payouts/{id}/manual-deduction.
+   */
+  setManualDeduction(
+    payoutId: string,
+    input: SetManualDeductionInput,
+  ): Promise<PayoutDeduction>;
+
+  /**
+   * Clear a payout's manual deduction + comment (resets to 0 / null), with
+   * `net` back to total − fees. Same `pending`-only gate as setManualDeduction.
+   * Returns the recomputed totals. Backed by DELETE
+   * /v2/treasury/payouts/{id}/manual-deduction.
+   */
+  clearManualDeduction(payoutId: string): Promise<PayoutDeduction>;
+
+  /**
    * The treasury's bank-connection status (Ponto). Read-only — activation
    * runs through the merchant dashboard's OAuth flow, not a treasury API key.
    * Degrades to a "not connected" status rather than throwing.
@@ -303,6 +326,14 @@ export interface CitizenPayClient {
   listCompletedPayouts(): Promise<Payout[]>;
 
   /**
+   * Full detail for one payout — total / fees / manual deduction (+ comment) /
+   * net. Backed by GET /v2/treasury/payouts/{id}. Carries the stored status
+   * only (use getPayoutStatus for the live lifecycle). Throws (404) when the
+   * id isn't found — callers degrade.
+   */
+  getPayout(payoutId: string): Promise<Payout>;
+
+  /**
    * Live status of a single payout, plus the Ponto `signingUrl` while it's
    * `payment-pending`. The signing link is only returned when `redirectUrl`
    * is supplied (an https URL Ponto sends the operator to after signing).
@@ -324,11 +355,28 @@ export interface CitizenPayClient {
   ): Promise<CreatePayoutPaymentResult>;
 
   /**
-   * Step 2 of settlement: burn the on-chain tokens backing this payout once
-   * the fiat leg is paid. Returns the burn tx hash. Irreversible — always
-   * confirm with the admin before calling.
+   * Report the on-chain burn for this payout to CP. The dashboard burns the
+   * place's tokens (the payout `net`) with its own minter wallet, then hands
+   * CP the resulting tx hash; CP marks the payout `burnt`. CP no longer burns
+   * server-side. When `destination` is supplied, CP also sweeps the retained
+   * cut (fees + manualDeduction) from the place account to it and returns the
+   * transfer hash + amount. Irreversible — confirm with the admin before the
+   * burn.
    */
-  burnPayout(payoutId: string): Promise<BurnPayoutResult>;
+  burnPayout(
+    payoutId: string,
+    txHash: string,
+    destination?: string,
+  ): Promise<PayoutBurnReport>;
+
+  /**
+   * Run (or retry) just the fee sweep to `destination` — the standalone,
+   * idempotent counterpart to the burn's inline sweep. Use it when a burn's
+   * sweep came back pending. Throws CitizenPayApiError on sweep failure (402
+   * insufficient, 409 not-burnt/in-progress, 422 config, 503 bundler, 400 bad
+   * destination). Backed by POST /v2/treasury/payouts/{id}/fee-transfer.
+   */
+  feeTransfer(payoutId: string, destination: string): Promise<FeeTransferResult>;
 
   /**
    * Admin override: mark a payout `complete` without burning tokens or
@@ -338,4 +386,13 @@ export interface CitizenPayClient {
    * the admin first — it bypasses settlement and can't be undone.
    */
   completePayout(payoutId: string): Promise<void>;
+
+  /**
+   * Push the platform fee percentage to CitizenPay (treasury-level). `percent`
+   * is a decimal-percent string (e.g. "2.5" = 2.5%); the live client converts
+   * it to integer basis points on the wire. We are canonical for this value —
+   * it's persisted locally first, then synced here. ⚠️ ASSUMED CP endpoint
+   * (PATCH /v2/treasury) until CP ships it.
+   */
+  setPayoutFeePercentage(percent: string): Promise<void>;
 }

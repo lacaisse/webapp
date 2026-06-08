@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { ArrowDownToLine, ArrowUpFromLine, Store, User } from "lucide-react";
+import {
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  Store,
+  User,
+  Wallet2,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { isZeroAddress, shortAddress } from "@/services/alchemy/format";
@@ -13,6 +19,7 @@ export type AddressDirectory = {
   // lowercased address -> labels
   cards: Map<string, { name: string }>;
   places: Map<string, { name: string }>;
+  accounts: Map<string, { name: string }>;
   profiles: Map<string, { name: string; imageSmall: string | null }>;
   minterAddresses: Set<string>;
 };
@@ -25,6 +32,10 @@ export function buildAddressDirectory(opts: {
     serialNumber: string;
   }>;
   places: Array<{ account: string | null; name: string }>;
+  // Named fund token accounts (services/token-account) — Safe wallets the
+  // fund controls. Resolves their addresses to the operator-given name.
+  // Optional: views that don't load them simply skip account resolution.
+  accounts?: Array<{ account: string | null; name: string }>;
   profiles: Array<{ account: string; name: string; imageSmall: string | null }>;
   minterEoa: string | null;
   minterSmartAccount: string | null;
@@ -41,6 +52,11 @@ export function buildAddressDirectory(opts: {
     if (!p.account) continue;
     places.set(p.account.toLowerCase(), { name: p.name });
   }
+  const accounts = new Map<string, { name: string }>();
+  for (const a of opts.accounts ?? []) {
+    if (!a.account) continue;
+    accounts.set(a.account.toLowerCase(), { name: a.name });
+  }
   const profiles = new Map<string, { name: string; imageSmall: string | null }>();
   for (const p of opts.profiles) {
     if (!p.account) continue;
@@ -53,7 +69,7 @@ export function buildAddressDirectory(opts: {
   if (opts.minterEoa) minterAddresses.add(opts.minterEoa.toLowerCase());
   if (opts.minterSmartAccount)
     minterAddresses.add(opts.minterSmartAccount.toLowerCase());
-  return { cards, places, profiles, minterAddresses };
+  return { cards, places, accounts, profiles, minterAddresses };
 }
 
 export function AddressLabel({
@@ -83,6 +99,20 @@ export function AddressLabel({
       <span className="inline-flex items-center gap-1.5 text-sm">
         <Icon className="size-3.5 text-muted-foreground" />
         <span className="font-medium">{label}</span>
+      </span>
+    );
+  }
+
+  // Named fund accounts win over the generic "Treasury" label — the minter's
+  // own Safe (salt 0) is the "Main account", so it shows that name rather than
+  // "Treasury". The bare minter EOA (not an account) still falls through to the
+  // treasury label below.
+  const account = directory.accounts.get(lower);
+  if (account) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-sm">
+        <Wallet2 className="size-3.5 text-muted-foreground" />
+        <span>{account.name}</span>
       </span>
     );
   }

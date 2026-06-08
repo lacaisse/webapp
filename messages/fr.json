@@ -3,6 +3,7 @@
     "or": "ou",
     "cancel": "Annuler",
     "close": "Fermer",
+    "save": "Enregistrer",
     "delete": "Supprimer",
     "back": "Retour",
     "backToHome": "Retour à l'accueil",
@@ -120,6 +121,7 @@
       "cards": "Cartes",
       "allocations": "Allocations",
       "token": "Jeton",
+      "accounts": "Comptes",
       "merchants": "Commerces",
       "payments": "Paiements",
       "bank": "Banque",
@@ -128,6 +130,98 @@
       "team": "Équipe",
       "settings": "Paramètres",
       "backToApex": "Retour à mes caisses"
+    },
+    "annotations": {
+      "PAYOUT_BURN": "Brûlage de virement",
+      "PAYOUT_FEE": "Commission de virement",
+      "ACCOUNT_MINT": "Émission",
+      "ACCOUNT_BURN": "Brûlage",
+      "ACCOUNT_TRANSFER": "Transfert",
+      "edit": "Annoter",
+      "title": "Annoter la transaction",
+      "noteLabel": "Note",
+      "notePlaceholder": "À quoi correspond cette transaction ?",
+      "errors": {
+        "invalidHash": "Hash de transaction invalide.",
+        "noteTooLong": "La note est trop longue (280 caractères max).",
+        "saveFailed": "Impossible d'enregistrer l'annotation. Réessayez bientôt."
+      }
+    },
+    "accounts": {
+      "title": "Comptes",
+      "description": "Comptes nommés dérivés de la clé de la caisse. Consultez le solde et l'historique des transactions de chacun.",
+      "notConnected": "Connectez d'abord cette caisse à Citizen Pay pour créer des comptes.",
+      "balancesError": "Impossible de charger les soldes on-chain. Réessayez bientôt.",
+      "empty": "Aucun compte pour le moment. Créez-en un pour commencer.",
+      "defaultName": "Compte principal",
+      "defaultBadge": "Par défaut",
+      "table": { "name": "Nom", "address": "Adresse", "balance": "Solde" },
+      "detail": { "back": "Tous les comptes", "balance": "Solde" },
+      "create": {
+        "trigger": "Nouveau compte",
+        "title": "Créer un compte",
+        "description": "Un nouveau compte on-chain dérivé de la clé de la caisse.",
+        "name": "Nom",
+        "namePlaceholder": "ex. Réserve, Frais, Événements",
+        "confirm": "Créer le compte"
+      },
+      "rename": {
+        "trigger": "Renommer",
+        "title": "Renommer le compte",
+        "name": "Nom"
+      },
+      "archive": {
+        "trigger": "Supprimer",
+        "title": "Supprimer ce compte ?",
+        "description": "Le compte est retiré de la liste. L'adresse on-chain et ses jetons subsistent — vous pouvez le recréer plus tard.",
+        "confirm": "Supprimer"
+      },
+      "move": {
+        "inTrigger": "Ajouter des jetons",
+        "outTrigger": "Retirer des jetons",
+        "inTitle": "Ajouter des jetons",
+        "outTitle": "Retirer des jetons",
+        "inDescription": "Émettre des jetons vers ce compte.",
+        "outDescription": "Brûler des jetons depuis ce compte.",
+        "amount": "Montant",
+        "confirm": "Confirmer",
+        "success": "Transaction envoyée."
+      },
+      "transfer": {
+        "trigger": "Transférer",
+        "title": "Transférer des jetons",
+        "description": "Envoyez des jetons depuis ce compte vers un autre compte ou une adresse.",
+        "destination": "Destination",
+        "pickAccount": "Choisir un compte…",
+        "amount": "Montant",
+        "confirm": "Transférer",
+        "success": "Transaction envoyée."
+      },
+      "transfers": {
+        "title": "Historique des transactions",
+        "empty": "Aucune transaction pour le moment.",
+        "direction": "Sens",
+        "counterparty": "Contrepartie",
+        "date": "Date",
+        "amount": "Montant",
+        "loadMore": "Afficher plus",
+        "loadError": "Impossible de charger l'historique on-chain.",
+        "directions": { "in": "Reçu", "out": "Envoyé", "self": "Interne" }
+      },
+      "errors": {
+        "nameRequired": "Le nom est requis.",
+        "nameTooLong": "Le nom est trop long (80 caractères max).",
+        "notFound": "Compte introuvable.",
+        "cannotRemoveDefault": "Le compte principal ne peut pas être supprimé.",
+        "notConnected": "Connectez d'abord cette caisse à Citizen Pay.",
+        "deriveFailed": "Impossible de dériver l'adresse du compte. Réessayez bientôt.",
+        "createFailed": "Impossible de créer le compte. Réessayez bientôt.",
+        "amountInvalid": "Le montant doit être un nombre valide.",
+        "amountPositive": "Le montant doit être supérieur à zéro.",
+        "addressInvalid": "Saisissez une adresse 0x valide (40 caractères hexadécimaux).",
+        "transferFailed": "Échec du transfert on-chain. Réessayez bientôt.",
+        "transfersFailed": "Impossible de charger les transactions. Réessayez bientôt."
+      }
     },
     "team": {
       "title": "Équipe",
@@ -390,9 +484,10 @@
           "from": "De",
           "to": "Vers",
           "amount": "Montant",
+          "note": "Note",
           "empty": "Aucun transfert pour cette carte.",
           "issued": "Émis",
-          "retired": "Retiré",
+          "retired": "Détruit",
           "treasury": "Trésorerie",
           "unknown": "Portefeuille externe",
           "self": "Cette carte",
@@ -550,9 +645,10 @@
         "from": "De",
         "to": "Vers",
         "amount": "Montant",
+        "note": "Note",
         "empty": "Aucun transfert pour le moment.",
         "issued": "Émis",
-        "retired": "Retiré",
+        "retired": "Détruit",
         "treasury": "Trésor",
         "unknown": "Portefeuille externe",
         "newer": "Plus récents",
@@ -673,7 +769,7 @@
           "empty": "Aucun transfert sur la chaîne pour le moment.",
           "unavailable": "L'historique des transferts est indisponible pour le moment.",
           "issued": "Émis",
-          "retired": "Retiré",
+          "retired": "Détruit",
           "treasury": "Trésorerie",
           "unknown": "Inconnu",
           "newer": "Plus récents",
@@ -708,6 +804,7 @@
         "total": "Total",
         "fees": "Frais",
         "net": "Net",
+        "manualDeduction": "Déduction manuelle",
         "placeBalance": "Solde du commerce",
         "placeBalanceEnough": "Suffisant pour brûler",
         "placeBalanceLow": "Inférieur au montant net",
@@ -808,6 +905,19 @@
           "successMinted": "Commande ajoutée et net émis vers le commerce.",
           "mintFailed": "Commande ajoutée, mais l’émission automatique a échoué. Réconciliez-la depuis l’onglet Problèmes."
         },
+        "deduction": {
+          "trigger": "Ajouter une déduction",
+          "edit": "Modifier la déduction",
+          "title": "Déduction manuelle",
+          "description": "Ajustement comptable qui diminue le net versé au commerce. Sans effet on-chain.",
+          "amount": "Montant de la déduction",
+          "amountHint": "Maximum {max}. Saisissez 0 pour supprimer la déduction.",
+          "comment": "Commentaire",
+          "commentPlaceholder": "Motif de l’ajustement",
+          "net": "Net après déduction",
+          "confirm": "Enregistrer",
+          "remove": "Supprimer"
+        },
         "pay": {
           "button": "Payer le commerce",
           "openSigning": "Ouvrir la page de signature",
@@ -819,7 +929,14 @@
           "description": "Cette action brûle les jetons on-chain correspondant à ce virement. Le burn et le paiement bancaire sont indépendants — dans n’importe quel ordre.",
           "warning": "Cette action est irréversible. Les jetons de ce virement seront définitivement brûlés.",
           "confirm": "Brûler les jetons",
-          "success": "Jetons brûlés. Hash de transaction :"
+          "success": "Jetons brûlés. Hash de transaction :",
+          "feeSwept": "Commission transférée vers le compte de la caisse : {amount}",
+          "feeNotSwept": "Jetons brûlés, mais la commission n'a pas encore été transférée."
+        },
+        "feeTransfer": {
+          "pending": "La commission de ce virement n'a pas encore été transférée.",
+          "button": "Transférer la commission",
+          "done": "Commission transférée. Hash de transaction :"
         },
         "orders": {
           "title": "Commandes",
@@ -883,6 +1000,14 @@
         "errors": {
           "payFailed": "Impossible de créer le paiement. Réessayez bientôt.",
           "burnFailed": "Impossible de brûler les jetons. Réessayez bientôt.",
+          "notBurnable": "Ce virement n’est plus à l’étape de brûlage (déjà brûlé ou réglé).",
+          "payoutNotFound": "Virement introuvable.",
+          "deductionFailed": "Impossible d’enregistrer la déduction. Réessayez bientôt.",
+          "deductionTooHigh": "La déduction ne peut pas dépasser le total moins les frais.",
+          "deductionNotPending": "La déduction manuelle ne peut être modifiée que tant que le virement est en attente.",
+          "reportFailed": "Jetons brûlés on-chain, mais impossible de le signaler à Citizen Pay. Ne réessayez pas — conservez le hash de transaction pour réconciliation.",
+          "noFeeDestination": "Aucun compte de destination pour la commission. Connectez d'abord la caisse à Citizen Pay.",
+          "feeTransferFailed": "Le transfert de la commission a échoué. Réessayez bientôt.",
           "previewFailed": "Impossible de prévisualiser la période. Réessayez bientôt.",
           "createFailed": "Impossible de créer le virement. Réessayez bientôt.",
           "statusFailed": "Impossible de récupérer le statut. Réessayez bientôt.",
@@ -988,7 +1113,8 @@
         "token": "Jeton",
         "onboarding": "Onboarding",
         "terms": "Conditions",
-        "citizenpay": "Citizen Pay"
+        "citizenpay": "Citizen Pay",
+        "fees": "Frais"
       },
       "general": {
         "title": "Général",
@@ -1138,6 +1264,14 @@
             "failed": "La connexion à Citizen Pay a échoué. Veuillez réessayer."
           }
         }
+      },
+      "fees": {
+        "title": "Frais",
+        "description": "Commission prélevée sur les paiements aux commerces. Configurée ici, puis transmise à Citizen Pay.",
+        "rate": "Taux de commission (%)",
+        "rateHint": "Pourcentage prélevé sur chaque paiement (ex. 2,5 pour 2,5 %). Laissez vide pour utiliser le taux par défaut de Citizen Pay.",
+        "syncPending": "Enregistré localement, mais pas encore confirmé par Citizen Pay. Enregistrez à nouveau pour réessayer la synchronisation.",
+        "syncFailed": "Taux enregistré, mais la synchronisation avec Citizen Pay a échoué. Enregistrez à nouveau pour réessayer."
       }
     }
   },
@@ -1180,7 +1314,9 @@
       "timezoneRequired": "Le fuseau horaire est requis.",
       "colorInvalid": "Utilisez une couleur hex à 6 chiffres (ex. #1a73e8).",
       "amountInvalid": "Le montant doit être un nombre avec jusqu'à 2 décimales.",
-      "urlInvalid": "Saisissez une URL valide (doit commencer par http:// ou https://)."
+      "urlInvalid": "Saisissez une URL valide (doit commencer par http:// ou https://).",
+      "feeInvalid": "Le taux doit être un nombre avec jusqu'à 2 décimales.",
+      "feeTooHigh": "Le taux ne peut pas dépasser 100 %."
     }
   },
   "team": {

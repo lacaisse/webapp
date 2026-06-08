@@ -21,6 +21,7 @@ import { TokenInfo } from "./token-info";
 import {
   BrandingForm,
   CitizenPayForm,
+  FeeForm,
   GeneralForm,
   LegalForm,
   SignupRedirectsForm,
@@ -33,6 +34,7 @@ const TABS = [
   { value: "onboarding" },
   { value: "terms" },
   { value: "citizenpay" },
+  { value: "fees" },
 ] as const;
 
 export default async function SettingsPage({
@@ -57,6 +59,8 @@ export default async function SettingsPage({
     privacyUrl: fund.privacyUrl,
     citizenPayFundId: fund.citizenPayFundId,
     referralBonusAmount: fund.referralBonusAmount?.toString() ?? null,
+    payoutFeePercentage: fund.payoutFeePercentage?.toString() ?? null,
+    payoutFeeSynced: fund.payoutFeeSynced,
     memberSignupSuccessUrl: fund.memberSignupSuccessUrl,
     merchantSignupSuccessUrl: fund.merchantSignupSuccessUrl,
   };
@@ -168,6 +172,18 @@ export default async function SettingsPage({
                 flash: sp.connect ?? null,
               }}
             />
+          </CardContent>
+        </Card>
+      )}
+
+      {active === "fees" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("fees.title")}</CardTitle>
+            <CardDescription>{t("fees.description")}</CardDescription>
+          </CardHeader>
+          <CardContent className="pb-4">
+            <FeeForm fund={fundForForms} />
           </CardContent>
         </Card>
       )}

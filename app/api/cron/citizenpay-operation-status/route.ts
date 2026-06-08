@@ -2,6 +2,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { getCitizenPayClient } from "@/services/citizenpay/client";
+import { cronGate } from "@/services/cron/guard";
 import { prisma } from "@/services/db/prisma";
 import {
   sendAllocationConfirmation,
@@ -20,13 +21,8 @@ import {
 const BATCH_SIZE = 50;
 
 export async function GET(request: NextRequest) {
-  const expected = process.env.CRON_SECRET;
-  if (expected) {
-    const auth = request.headers.get("authorization");
-    if (auth !== `Bearer ${expected}`) {
-      return new NextResponse("Unauthorized", { status: 401 });
-    }
-  }
+  const gate = cronGate(request);
+  if (gate) return gate;
 
   const ops = await prisma.tokenOperation.findMany({
     where: { status: "PENDING", txHash: { not: null } },

@@ -21,6 +21,7 @@ import { requireCurrentFund } from "@/services/fund/server";
 import { cn } from "@/lib/utils";
 
 import { CreateOrderDialog } from "./create-order-dialog";
+import { ManualDeductionDialog } from "./manual-deduction-dialog";
 import { OrdersExplorer } from "./orders-explorer";
 
 import { getBankingStatus } from "../../../bank/data";
@@ -147,6 +148,37 @@ export default async function PayoutDetailPage({
             />
           </Suspense>
         </dl>
+
+        {/* Manual deduction — a ledger adjustment lowering the net paid out.
+            Editable only while pending (CP's gate); shown read-only once
+            settlement has started, and hidden when there's nothing to show. */}
+        {(liveStatus === "pending" || Number(payout.manualDeduction) > 0) && (
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-lg border border-border px-3 py-2">
+            <div className="text-sm">
+              <span className="text-muted-foreground">
+                {t("manualDeduction")}:{" "}
+              </span>
+              <span className="font-medium tabular-nums">
+                {euro(format, payout.manualDeduction)}
+              </span>
+              {payout.manualDeductionComment && (
+                <span className="text-muted-foreground">
+                  {" "}
+                  — {payout.manualDeductionComment}
+                </span>
+              )}
+            </div>
+            {liveStatus === "pending" && (
+              <ManualDeductionDialog
+                payoutId={payout.id}
+                amount={payout.manualDeduction}
+                comment={payout.manualDeductionComment}
+                total={payout.totalAmount}
+                fees={payout.totalFees}
+              />
+            )}
+          </div>
+        )}
       </header>
 
       <PayoutProcess
@@ -155,6 +187,7 @@ export default async function PayoutDetailPage({
         canInitiatePayment={banking.paymentInitiationEnabled}
         signingUrl={signingUrl}
         signingQr={signingQr}
+        feeTransferPending={live?.feeTransferPending ?? payout.feeTransferPending}
       />
 
       <section className="space-y-3">

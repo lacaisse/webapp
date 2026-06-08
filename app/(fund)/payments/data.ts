@@ -93,10 +93,9 @@ export const getCompletedPayouts = cache(
   },
 );
 
-// Single-payout summary for the detail header. There's no GET /payouts/{id}
-// on the treasury API, so we find it across the pending + completed lists
-// (both cached, so the list views share these calls in the same render).
-// Returns null when the id isn't in either list.
+// Single-payout summary for the detail header — total / fees / net / manual
+// deduction. Backed by GET /v2/treasury/payouts/{id}. Returns null on a miss
+// (404) or CP error so the page falls through to notFound().
 export const getPayoutSummary = cache(
   async (
     fundId: string,
@@ -104,15 +103,16 @@ export const getPayoutSummary = cache(
     citizenPayApiKeyEnc: string | null,
     payoutId: string,
   ): Promise<Payout | null> => {
-    const [pending, completed] = await Promise.all([
-      getPendingPayouts(fundId, citizenPayApiKeyId, citizenPayApiKeyEnc),
-      getCompletedPayouts(fundId, citizenPayApiKeyId, citizenPayApiKeyEnc),
-    ]);
-    return (
-      [...pending.payouts, ...completed.payouts].find(
-        (p) => p.id === payoutId,
-      ) ?? null
-    );
+    try {
+      return await client(
+        fundId,
+        citizenPayApiKeyId,
+        citizenPayApiKeyEnc,
+      ).getPayout(payoutId);
+    } catch (e) {
+      console.warn("[payments] getPayout failed", e);
+      return null;
+    }
   },
 );
 

@@ -195,6 +195,28 @@ export type ListCardsResult = {
   pagination: { page: number; limit: number; total: number; totalPages: number };
 };
 
+// Result of reporting a payout burn to CP. The burn itself succeeded (a failure
+// throws). The sweep of the retained cut (fees + manualDeduction) is decoupled:
+// `feeTransferTxHash` is set when it ran in the same call; `feeTransferPending`
+// is true when it still needs running (via `feeTransfer`), with the reason in
+// `feeTransferError`. All sweep fields are null/false when no destination was
+// supplied or there was nothing to sweep.
+export type PayoutBurnReport = {
+  feeAmount: string | null; // EUR decimal
+  feeTransferTxHash: string | null;
+  feeTransferPending: boolean;
+  feeTransferError: string | null;
+};
+
+// Result of the standalone fee-transfer (sweep) endpoint. A failure throws
+// (CitizenPayApiError with the HTTP status); on success the hash is returned,
+// with `alreadyTransferred` true when an earlier sweep had already recorded it.
+export type FeeTransferResult = {
+  feeAmount: string | null; // EUR decimal
+  feeTransferTxHash: string;
+  alreadyTransferred: boolean;
+};
+
 // =============================================================================
 // Merchant payouts (settlement)
 // =============================================================================
@@ -213,6 +235,10 @@ export type PayoutStatus = "pending" | "payment-pending" | "burnt" | "complete";
 export type PayoutStatusDetail = {
   status: PayoutStatus;
   signingUrl: string | null;
+  // True on a burned payout whose retained cut hasn't been swept yet. Drives
+  // the "fees not yet transferred" affordance; `feeTransferTxHash` is the proof.
+  feeTransferPending: boolean;
+  feeTransferTxHash: string | null;
 };
 
 // Normalised view of CP's `PayoutWire`. Cents-on-the-wire amounts are
@@ -237,6 +263,10 @@ export type Payout = {
   // On-chain burn tx hashes once the burn step runs (CP returns one per
   // token batch). Empty until burnt.
   burnTxHashes: string[];
+  // Outstanding-sweep flags (see PayoutStatusDetail). `feeTransferPending` is
+  // true on a burned payout whose retained cut hasn't been swept yet.
+  feeTransferPending: boolean;
+  feeTransferTxHash: string | null;
   pontoPaymentId: string | null;
   pontoPaymentStatus: string | null;
   emailRecipient: string | null;
@@ -334,6 +364,25 @@ export type CreatedPayoutOrder = {
   payout: ArchivedPayout;
 };
 
+// Input for setting a payout's manual deduction. `amount` is a EUR Decimal
+// string (the adapter converts to cents); "0" clears the deduction. `comment`
+// is a short free-text note explaining the adjustment.
+export type SetManualDeductionInput = {
+  amount: string; // EUR decimal
+  comment: string | null;
+};
+
+// Recomputed payout money after a manual-deduction change: the ArchivedPayout
+// trio plus the deduction and its comment (net = total − fees − deduction).
+export type PayoutDeduction = {
+  payoutId: string;
+  total: string; // EUR decimal
+  fees: string; // EUR decimal
+  manualDeduction: string; // EUR decimal
+  manualDeductionComment: string | null;
+  net: string; // EUR decimal
+};
+
 // =============================================================================
 // Banking (Ponto connection status)
 // =============================================================================
@@ -391,6 +440,3 @@ export type CreatePayoutPaymentResult =
   | { alreadyCreated: true }
   | { alreadyCreated: false; paymentId: string; signingUrl: string };
 
-export type BurnPayoutResult = {
-  txHash: string;
-};

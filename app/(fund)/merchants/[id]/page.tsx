@@ -53,6 +53,7 @@ export default async function MerchantDetailPage({
   searchParams: Promise<{ cursor?: string }>;
 }) {
   const t = await getTranslations("fund.merchants.detail");
+  const tAcc = await getTranslations("fund.accounts");
   const format = await getFormatter();
   const fund = await requireCurrentFund();
   const { id } = await params;
@@ -133,28 +134,35 @@ export default async function MerchantDetailPage({
   if (showTransfers && transferAccount) {
     try {
       const account = transferAccount.toLowerCase();
-      const [page, cards, placesResult, merchants] = await Promise.all([
-        listTransfersForAccount({
-          chainId: fund.tokenChainId!,
-          contractAddress: fund.tokenAddress!,
-          account: transferAccount,
-          pageSize: TRANSFERS_PAGE_SIZE,
-          cursor: cursor ?? null,
-        }),
-        prisma.card.findMany({
-          where: { account: { not: null }, fundId: fund.id },
-          include: { member: { select: { firstName: true, lastName: true } } },
-        }),
-        getPlacesForFund(
-          fund.id,
-          fund.citizenPayApiKeyId,
-          fund.citizenPayApiKeyEnc,
-        ),
-        prisma.merchant.findMany({
-          where: { fundId: fund.id, citizenPayPlaceId: { not: null } },
-          select: { citizenPayPlaceId: true, name: true },
-        }),
-      ]);
+      const [page, cards, placesResult, merchants, tokenAccounts] =
+        await Promise.all([
+          listTransfersForAccount({
+            chainId: fund.tokenChainId!,
+            contractAddress: fund.tokenAddress!,
+            account: transferAccount,
+            pageSize: TRANSFERS_PAGE_SIZE,
+            cursor: cursor ?? null,
+          }),
+          prisma.card.findMany({
+            where: { account: { not: null }, fundId: fund.id },
+            include: {
+              member: { select: { firstName: true, lastName: true } },
+            },
+          }),
+          getPlacesForFund(
+            fund.id,
+            fund.citizenPayApiKeyId,
+            fund.citizenPayApiKeyEnc,
+          ),
+          prisma.merchant.findMany({
+            where: { fundId: fund.id, citizenPayPlaceId: { not: null } },
+            select: { citizenPayPlaceId: true, name: true },
+          }),
+          prisma.fundTokenAccount.findMany({
+            where: { fundId: fund.id, archivedAt: null },
+            select: { name: true, address: true },
+          }),
+        ]);
 
       const merchantNameByPlaceId = new Map<string, string>();
       for (const m of merchants) {
@@ -216,6 +224,10 @@ export default async function MerchantDetailPage({
         places: placesResult.map((p) => ({
           account: p.account,
           name: merchantNameByPlaceId.get(p.id) ?? p.name,
+        })),
+        accounts: tokenAccounts.map((a) => ({
+          account: a.address,
+          name: a.name || tAcc("defaultName"),
         })),
         profiles: fetchedProfiles,
         minterEoa: fund.tokenMinterEoaAddress,

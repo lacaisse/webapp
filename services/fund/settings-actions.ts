@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireFundRole } from "@/services/auth/dal";
+import { getCitizenPayClient } from "@/services/citizenpay/client";
 import { prisma } from "@/services/db/prisma";
 import { isSupportedLocale } from "@/services/i18n/config";
 
@@ -159,6 +160,71 @@ export async function updateReferralSettingsAction(
   });
   revalidatePath("/settings");
   revalidatePath("/referrals");
+  return { ok: true };
+}
+
+// --- Payout fee ----------------------------------------------------------
+// Per-fund platform fee on merchant payments. We are canonical: persist the
+// value locally first (the DB may lead CP), then push it to CitizenPay as
+// integer basis points. A failed push leaves `payoutFeeSynced = false` and
+// returns a warning so the admin can retry by saving again. Clearing the
+// field stores null and skips the push — the assumed CP endpoint takes a
+// concrete bps value, not a "reset to default" signal.
+
+export type FeeSettingsResult =
+  | { ok: true; warning?: string }
+  | { error: string };
+
+const PayoutFeeSchema = z.object({
+  payoutFeePercentage: z
+    .string()
+    .regex(/^\d+(\.\d{1,2})?$/, { error: "settings.errors.feeInvalid" })
+    .refine((v) => Number(v) <= 100, { error: "settings.errors.feeTooHigh" })
+    .or(z.literal(""))
+    .nullable()
+    .optional(),
+});
+
+export async function updatePayoutFeeAction(
+  input: z.infer<typeof PayoutFeeSchema>,
+): Promise<FeeSettingsResult> {
+  const t = await getTranslations();
+  const { fund } = await requireFundRole("ADMIN");
+  const parsed = PayoutFeeSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: t(parsed.error.issues[0].message as never) };
+  }
+
+  const raw = parsed.data.payoutFeePercentage;
+  const value = raw && raw !== "" ? raw : null;
+
+  // DB-first: the local value is authoritative even if the CP push fails.
+  // Mark unsynced up front; flip to synced only once CP accepts it.
+  await prisma.fund.update({
+    where: { id: fund.id },
+    data: { payoutFeePercentage: value, payoutFeeSynced: value === null },
+  });
+
+  // Nothing to push when cleared.
+  if (value === null) {
+    revalidatePath("/settings");
+    return { ok: true };
+  }
+
+  try {
+    const client = getCitizenPayClient(fund);
+    await client.setPayoutFeePercentage(value);
+    await prisma.fund.update({
+      where: { id: fund.id },
+      data: { payoutFeeSynced: true },
+    });
+  } catch (e) {
+    console.error("[settings] payout fee CP sync failed", fund.id, e);
+    revalidatePath("/settings");
+    return { ok: true, warning: t("fund.settings.fees.syncFailed") };
+  }
+
+  revalidatePath("/settings");
   return { ok: true };
 }
 

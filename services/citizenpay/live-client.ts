@@ -12,12 +12,15 @@ import {
   payouts as apiPayouts,
   places as apiPlaces,
   profiles as apiProfiles,
+  treasury as apiTreasury,
   PROFILES_BATCH_MAX,
   type CitizenPayApiCredentials,
   CitizenPayApiError,
   type InviteWire,
   type PaginatedCards,
+  type ManualDeductionWire,
   type PayoutDraftWire,
+  type PayoutDetailWire,
   type PayoutListPageWire,
   type PayoutListWire,
   type PayoutOrderWire,
@@ -31,7 +34,6 @@ import type {
   BankTransactionPayload,
   BankTransactionPayloadPage,
   BankTransactionsPage,
-  BurnPayoutResult,
   CardOperationInput,
   CardOperationResult,
   CardStatus,
@@ -43,6 +45,7 @@ import type {
   CreatedPayoutOrder,
   CreatePayoutOrderInput,
   CreatePayoutPaymentResult,
+  FeeTransferResult,
   ListBankTransactionsInput,
   ListBankTransactionsResult,
   ListCardsInput,
@@ -50,6 +53,8 @@ import type {
   ListPlacesResult,
   OperationStatusResult,
   Payout,
+  PayoutBurnReport,
+  PayoutDeduction,
   PayoutDraft,
   PayoutDraftPreview,
   PayoutOrder,
@@ -57,6 +62,7 @@ import type {
   PayoutStatusDetail,
   RegisteredCard,
   RegisterCardInput,
+  SetManualDeductionInput,
   SubmitMintInput,
   SubmittedOperation,
 } from "./types";
@@ -138,12 +144,35 @@ function payoutFromListWire(w: PayoutListWire): Payout {
     // Burn hashes / ponto id / emails aren't in the list shape — they live
     // on the order/status endpoints. Surface what the list gives us.
     burnTxHashes: [],
+    feeTransferPending: w.feeTransferPending ?? false,
+    feeTransferTxHash: w.feeTransferTxHash ?? null,
     pontoPaymentId: null,
     pontoPaymentStatus: w.pontoPaymentStatus ?? null,
     emailRecipient: null,
     emailSentAt: null,
     createdAt: w.createdAt,
     updatedAt: w.updatedAt,
+  };
+}
+
+// Detail wire = list-row shape + the manual-deduction comment. Reuse the list
+// normaliser and layer the extra field on top.
+function payoutFromDetailWire(w: PayoutDetailWire): Payout {
+  return {
+    ...payoutFromListWire(w),
+    manualDeductionComment: w.manualDeductionComment ?? null,
+  };
+}
+
+// Recomputed totals returned by set/clear manual-deduction — cents → decimal.
+function deductionFromWire(p: ManualDeductionWire["payout"]): PayoutDeduction {
+  return {
+    payoutId: p.payoutId,
+    total: centsToDecimal(p.total),
+    fees: centsToDecimal(p.fees),
+    manualDeduction: centsToDecimal(p.manualDeduction),
+    manualDeductionComment: p.manualDeductionComment ?? null,
+    net: centsToDecimal(p.net),
   };
 }
 
@@ -669,6 +698,22 @@ export class LiveCitizenPayClient implements CitizenPayClient {
     };
   }
 
+  async setManualDeduction(
+    payoutId: string,
+    input: SetManualDeductionInput,
+  ): Promise<PayoutDeduction> {
+    const { payout } = await apiPayouts.setManualDeduction(this.creds, payoutId, {
+      manualDeduction: toCents(input.amount),
+      comment: input.comment,
+    });
+    return deductionFromWire(payout);
+  }
+
+  async clearManualDeduction(payoutId: string): Promise<PayoutDeduction> {
+    const { payout } = await apiPayouts.clearManualDeduction(this.creds, payoutId);
+    return deductionFromWire(payout);
+  }
+
   async getBankingStatus(): Promise<BankingStatus> {
     const w = await apiBanking.status(this.creds);
     return {
@@ -731,6 +776,10 @@ export class LiveCitizenPayClient implements CitizenPayClient {
     );
   }
 
+  async getPayout(payoutId: string): Promise<Payout> {
+    return payoutFromDetailWire(await apiPayouts.get(this.creds, payoutId));
+  }
+
   // The list endpoints are paginated (`{ payouts, total, limit, offset }`).
   // Page through to the full set so the views don't silently truncate;
   // advance by the actual rows returned (the server may cap the page size
@@ -759,7 +808,12 @@ export class LiveCitizenPayClient implements CitizenPayClient {
     const res = await apiPayouts.status(this.creds, payoutId, {
       redirectUrl: opts.redirectUrl,
     });
-    return { status: res.status, signingUrl: res.signingUrl ?? null };
+    return {
+      status: res.status,
+      signingUrl: res.signingUrl ?? null,
+      feeTransferPending: res.feeTransferPending ?? false,
+      feeTransferTxHash: res.feeTransferTxHash ?? null,
+    };
   }
 
   async createPayoutPayment(
@@ -777,13 +831,42 @@ export class LiveCitizenPayClient implements CitizenPayClient {
     };
   }
 
-  async burnPayout(payoutId: string): Promise<BurnPayoutResult> {
-    const { txHash } = await apiPayouts.burn(this.creds, payoutId);
-    return { txHash };
+  async burnPayout(
+    payoutId: string,
+    txHash: string,
+    destination?: string,
+  ): Promise<PayoutBurnReport> {
+    const res = await apiPayouts.burn(this.creds, payoutId, txHash, destination);
+    return {
+      feeAmount: res.feeAmount != null ? centsToDecimal(res.feeAmount) : null,
+      feeTransferTxHash: res.feeTransferTxHash ?? null,
+      feeTransferPending: res.feeTransferPending ?? false,
+      feeTransferError: res.feeTransferError ?? null,
+    };
+  }
+
+  async feeTransfer(
+    payoutId: string,
+    destination: string,
+  ): Promise<FeeTransferResult> {
+    const res = await apiPayouts.feeTransfer(this.creds, payoutId, destination);
+    return {
+      feeAmount: res.feeAmount != null ? centsToDecimal(res.feeAmount) : null,
+      feeTransferTxHash: res.feeTransferTxHash,
+      alreadyTransferred: res.alreadyTransferred ?? false,
+    };
   }
 
   async completePayout(payoutId: string): Promise<void> {
     await apiPayouts.complete(this.creds, payoutId);
+  }
+
+  async setPayoutFeePercentage(percent: string): Promise<void> {
+    // Decimal percent → integer basis points (2.5% → 250). The local column
+    // caps at 2 decimals, so the result is always integral; round anyway to
+    // shed any float dust from the multiply.
+    const bps = Math.round(Number(percent) * 100);
+    await apiTreasury.updateFee(this.creds, bps);
   }
 }
 

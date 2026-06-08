@@ -9,13 +9,14 @@ import {
   AlertTriangle,
   Check,
   ChevronRight,
+  Coins,
   ExternalLink,
   Flame,
   Info,
   Loader2,
   RefreshCw,
 } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -33,6 +34,7 @@ import {
   burnPayoutAction,
   completePayoutAction,
   createPayoutPaymentAction,
+  feeTransferAction,
   getPayoutStatusAction,
   pollPayoutStatusAction,
 } from "@/services/payout/admin-actions";
@@ -60,6 +62,7 @@ export function PayoutProcess({
   canInitiatePayment,
   signingUrl,
   signingQr,
+  feeTransferPending,
 }: {
   payoutId: string;
   status: PayoutStatus;
@@ -70,8 +73,12 @@ export function PayoutProcess({
   // payment-pending. Null otherwise.
   signingUrl: string | null;
   signingQr: string | null;
+  // True when the payout is burned but the retained cut hasn't been swept yet
+  // — drives a persistent "Transfer fees" retry affordance.
+  feeTransferPending: boolean;
 }) {
   const t = useTranslations("fund.payments.settlement.process");
+  const tFee = useTranslations("fund.payments.settlement.feeTransfer");
 
   return (
     <section className="space-y-4 rounded-lg border border-border p-4">
@@ -126,6 +133,18 @@ export function PayoutProcess({
         )}
       </div>
 
+      {/* Outstanding fee sweep — the burn succeeded but CP's transfer of the
+          retained cut didn't run. Shown at any stage until it's swept. */}
+      {feeTransferPending && (
+        <div className="space-y-2 border-t border-border pt-3">
+          <Alert variant="warning">
+            <AlertTriangle className="size-4" />
+            <AlertDescription>{tFee("pending")}</AlertDescription>
+          </Alert>
+          <FeeTransferButton payoutId={payoutId} />
+        </div>
+      )}
+
       {/* Escape hatch: settled out-of-band → close the payout without the
           burn + SEPA flow. Hidden once already complete. */}
       {status !== "complete" && (
@@ -137,6 +156,64 @@ export function PayoutProcess({
         </div>
       )}
     </section>
+  );
+}
+
+// Retry the standalone fee sweep for a burned payout whose cut wasn't swept.
+// The action is idempotent on CP's side and calls refresh() on success, so a
+// successful sweep makes the surrounding affordance disappear on re-render.
+function FeeTransferButton({ payoutId }: { payoutId: string }) {
+  const t = useTranslations("fund.payments.settlement.feeTransfer");
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<string | null>(null);
+
+  const onClick = () => {
+    setError(null);
+    startTransition(async () => {
+      const res = await feeTransferAction({ payoutId });
+      if ("error" in res) {
+        setError(res.error);
+        return;
+      }
+      setDone(res.feeTransferTxHash);
+    });
+  };
+
+  if (done) {
+    return (
+      <Alert>
+        <Check className="size-4" />
+        <AlertDescription>
+          <div>{t("done")}</div>
+          <div className="mt-1 font-mono text-xs break-all">{done}</div>
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        onClick={onClick}
+        disabled={pending}
+      >
+        {pending ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <Coins className="size-4" />
+        )}
+        {t("button")}
+      </Button>
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+    </div>
   );
 }
 
@@ -420,16 +497,24 @@ function SignPayment({
 function BurnDialog({ payoutId }: { payoutId: string }) {
   const t = useTranslations("fund.payments.settlement.burn");
   const tRoot = useTranslations();
+  const format = useFormatter();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
+  const [fee, setFee] = useState<{
+    txHash: string | null;
+    amount: string | null;
+    pending: boolean;
+    error: string | null;
+  } | null>(null);
 
   function onOpenChange(next: boolean) {
     setOpen(next);
     if (!next) {
       setError(null);
       setTxHash(null);
+      setFee(null);
     }
   }
 
@@ -442,6 +527,12 @@ function BurnDialog({ payoutId }: { payoutId: string }) {
         return;
       }
       setTxHash(result.txHash);
+      setFee({
+        txHash: result.feeTransferTxHash ?? null,
+        amount: result.feeAmount ?? null,
+        pending: result.feeTransferPending ?? false,
+        error: result.feeTransferError ?? null,
+      });
     });
   };
 
@@ -467,8 +558,39 @@ function BurnDialog({ payoutId }: { payoutId: string }) {
               <AlertDescription>
                 <div>{t("success")}</div>
                 <div className="mt-1 font-mono text-xs break-all">{txHash}</div>
+                {fee?.txHash && (
+                  <div className="mt-2 border-t border-border pt-2">
+                    <div>
+                      {t("feeSwept", {
+                        amount: fee.amount
+                          ? format.number(Number(fee.amount), {
+                              style: "currency",
+                              currency: "EUR",
+                            })
+                          : "",
+                      })}
+                    </div>
+                    <div className="mt-1 font-mono text-xs break-all">
+                      {fee.txHash}
+                    </div>
+                  </div>
+                )}
               </AlertDescription>
             </Alert>
+            {fee?.pending && (
+              <>
+                <Alert variant="warning">
+                  <AlertTriangle className="size-4" />
+                  <AlertDescription>
+                    <div>{t("feeNotSwept")}</div>
+                    {fee.error && (
+                      <div className="mt-1 text-xs opacity-90">{fee.error}</div>
+                    )}
+                  </AlertDescription>
+                </Alert>
+                <FeeTransferButton payoutId={payoutId} />
+              </>
+            )}
             <DialogFooter>
               <Button
                 type="button"

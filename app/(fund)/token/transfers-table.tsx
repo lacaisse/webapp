@@ -11,9 +11,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { TxAnnotationCell } from "@/components/tx-annotation";
 import { prisma } from "@/services/db/prisma";
 import { formatTokenAmount, isZeroAddress } from "@/services/alchemy/format";
 import { listTransfers } from "@/services/alchemy/transfers";
+import { getAnnotations } from "@/services/transaction-annotation/annotate";
 
 import { AddressLabel, buildAddressDirectory } from "./address-label";
 import { getPlacesForFund, getProfile } from "./data";
@@ -45,30 +47,40 @@ export async function TransfersTable({
   cursor: string | null;
 }) {
   const t = await getTranslations("fund.token.transfers");
+  const tAcc = await getTranslations("fund.accounts");
   const format = await getFormatter();
 
   // Fetch in parallel: on-chain transfers, local card directory (members),
-  // CitizenPay places (merchants), and local merchants (so we can prefer a
-  // polished local name over CP's raw place name).
-  const [page, cards, placesResult, merchants] = await Promise.all([
-    safeListTransfers({
-      chainId,
-      contractAddress,
-      pageSize: PAGE_SIZE,
-      pageKey: cursor,
-    }),
-    prisma.card.findMany({
-      where: { account: { not: null }, fundId: fund.id },
-      include: {
-        member: { select: { firstName: true, lastName: true } },
-      },
-    }),
-    getPlacesForFund(fund.id, fund.citizenPayApiKeyId, fund.citizenPayApiKeyEnc),
-    prisma.merchant.findMany({
-      where: { fundId: fund.id, citizenPayPlaceId: { not: null } },
-      select: { citizenPayPlaceId: true, name: true },
-    }),
-  ]);
+  // CitizenPay places (merchants), local merchants (so we can prefer a polished
+  // local name over CP's raw place name), and the fund's named token accounts.
+  const [page, cards, placesResult, merchants, tokenAccounts] =
+    await Promise.all([
+      safeListTransfers({
+        chainId,
+        contractAddress,
+        pageSize: PAGE_SIZE,
+        pageKey: cursor,
+      }),
+      prisma.card.findMany({
+        where: { account: { not: null }, fundId: fund.id },
+        include: {
+          member: { select: { firstName: true, lastName: true } },
+        },
+      }),
+      getPlacesForFund(
+        fund.id,
+        fund.citizenPayApiKeyId,
+        fund.citizenPayApiKeyEnc,
+      ),
+      prisma.merchant.findMany({
+        where: { fundId: fund.id, citizenPayPlaceId: { not: null } },
+        select: { citizenPayPlaceId: true, name: true },
+      }),
+      prisma.fundTokenAccount.findMany({
+        where: { fundId: fund.id, archivedAt: null },
+        select: { name: true, address: true },
+      }),
+    ]);
 
   if (page.error) {
     return (
@@ -78,6 +90,12 @@ export async function TransfersTable({
       </div>
     );
   }
+
+  // Fund's per-tx annotations for the hashes on this page.
+  const annotations = await getAnnotations(
+    fund.id,
+    page.transfers.map((tx) => tx.hash),
+  );
 
   const merchantNameByPlaceId = new Map<string, string>();
   for (const m of merchants) {
@@ -136,6 +154,10 @@ export async function TransfersTable({
       account: p.account,
       name: merchantNameByPlaceId.get(p.id) ?? p.name,
     })),
+    accounts: tokenAccounts.map((a) => ({
+      account: a.address,
+      name: a.name || tAcc("defaultName"),
+    })),
     profiles: fetchedProfiles,
     minterEoa,
     minterSmartAccount,
@@ -158,11 +180,12 @@ export async function TransfersTable({
             <TableHead aria-label="" className="w-6" />
             <TableHead>{t("to")}</TableHead>
             <TableHead className="text-right">{t("amount")}</TableHead>
+            <TableHead>{t("note")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {page.transfers.length === 0 ? (
-            <TableEmpty colSpan={5}>{t("empty")}</TableEmpty>
+            <TableEmpty colSpan={6}>{t("empty")}</TableEmpty>
           ) : (
             page.transfers.map((tx) => (
               <TableRow key={tx.uniqueId}>
@@ -200,6 +223,13 @@ export async function TransfersTable({
                       {symbol}
                     </span>
                   )}
+                </TableCell>
+                <TableCell>
+                  <TxAnnotationCell
+                    txHash={tx.hash}
+                    kind={annotations.get(tx.hash.toLowerCase())?.kind ?? null}
+                    note={annotations.get(tx.hash.toLowerCase())?.note ?? null}
+                  />
                 </TableCell>
               </TableRow>
             ))

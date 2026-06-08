@@ -13,7 +13,6 @@ import type {
   BankingStatus,
   BankTransactionPayloadPage,
   BankTransactionsPage,
-  BurnPayoutResult,
   CardOperationInput,
   CardOperationResult,
   CitizenPayCardDetail,
@@ -23,6 +22,7 @@ import type {
   CreatedPayoutOrder,
   CreatePayoutOrderInput,
   CreatePayoutPaymentResult,
+  FeeTransferResult,
   ListBankTransactionsInput,
   ListBankTransactionsResult,
   ListCardsInput,
@@ -30,6 +30,8 @@ import type {
   ListPlacesResult,
   OperationStatusResult,
   Payout,
+  PayoutBurnReport,
+  PayoutDeduction,
   PayoutDraft,
   PayoutDraftPreview,
   PayoutOrder,
@@ -38,6 +40,7 @@ import type {
   PayoutStatusDetail,
   RegisteredCard,
   RegisterCardInput,
+  SetManualDeductionInput,
   SubmitMintInput,
   SubmittedOperation,
 } from "./types";
@@ -493,14 +496,65 @@ class MockCitizenPayClient implements CitizenPayClient {
     ];
   }
 
+  async getPayout(payoutId: string): Promise<Payout> {
+    this.log("getPayout", { payoutId });
+    if (completedMockPayouts.has(payoutId)) {
+      return mockPayout(payoutId, "complete", "150.00");
+    }
+    const fixture = MOCK_PENDING_PAYOUTS.find((p) => p.id === payoutId);
+    if (fixture) return mockPayout(fixture.id, fixture.status, fixture.amount);
+    if (payoutId === "mock-payout-0") {
+      return {
+        ...mockPayout("mock-payout-0", "complete", "320.00"),
+        burnTxHashes: [`0x${randomBytes(32).toString("hex")}`],
+      };
+    }
+    // Unknown id — synthesize a plausible pending payout so the detail page
+    // still renders in dev.
+    return mockPayout(payoutId, "pending", "150.00");
+  }
+
+  async setManualDeduction(
+    payoutId: string,
+    input: SetManualDeductionInput,
+  ): Promise<PayoutDeduction> {
+    this.log("setManualDeduction", { payoutId, ...input });
+    const base = await this.getPayout(payoutId);
+    const deduction = Number(input.amount);
+    const net = Number(base.totalAmount) - Number(base.totalFees) - deduction;
+    return {
+      payoutId,
+      total: base.totalAmount,
+      fees: base.totalFees,
+      manualDeduction: deduction.toFixed(2),
+      manualDeductionComment: input.comment,
+      net: net.toFixed(2),
+    };
+  }
+
+  async clearManualDeduction(payoutId: string): Promise<PayoutDeduction> {
+    this.log("clearManualDeduction", { payoutId });
+    const base = await this.getPayout(payoutId);
+    const net = Number(base.totalAmount) - Number(base.totalFees);
+    return {
+      payoutId,
+      total: base.totalAmount,
+      fees: base.totalFees,
+      manualDeduction: "0.00",
+      manualDeductionComment: null,
+      net: net.toFixed(2),
+    };
+  }
+
   async getPayoutStatus(
     payoutId: string,
     opts: { redirectUrl?: string } = {},
   ): Promise<PayoutStatusDetail> {
     this.log("getPayoutStatus", { payoutId, ...opts });
+    const base = { feeTransferPending: false, feeTransferTxHash: null };
     // A manual "mark complete" wins over the fixture's lifecycle stage.
     if (completedMockPayouts.has(payoutId)) {
-      return { status: "complete", signingUrl: null };
+      return { status: "complete", signingUrl: null, ...base };
     }
     // Map the mock payouts so dev sees each lifecycle stage (and the signing
     // QR for the payment-pending one).
@@ -508,12 +562,13 @@ class MockCitizenPayClient implements CitizenPayClient {
       return {
         status: "payment-pending",
         signingUrl: "https://myponto.com/sign/mock-payout-2",
+        ...base,
       };
     }
     if (payoutId === "mock-payout-0") {
-      return { status: "complete", signingUrl: null };
+      return { status: "complete", signingUrl: null, ...base };
     }
-    return { status: "pending", signingUrl: null };
+    return { status: "pending", signingUrl: null, ...base };
   }
 
   async createPayoutPayment(
@@ -529,14 +584,42 @@ class MockCitizenPayClient implements CitizenPayClient {
     };
   }
 
-  async burnPayout(payoutId: string): Promise<BurnPayoutResult> {
-    this.log("burnPayout", { payoutId });
-    return { txHash: `0x${randomBytes(32).toString("hex")}` };
+  async burnPayout(
+    payoutId: string,
+    txHash: string,
+    destination?: string,
+  ): Promise<PayoutBurnReport> {
+    this.log("burnPayout", { payoutId, txHash, destination });
+    // Mock: the sweep "succeeds" inline when a destination is supplied.
+    return {
+      feeAmount: null,
+      feeTransferTxHash: destination
+        ? `0x${randomBytes(32).toString("hex")}`
+        : null,
+      feeTransferPending: false,
+      feeTransferError: null,
+    };
+  }
+
+  async feeTransfer(
+    payoutId: string,
+    destination: string,
+  ): Promise<FeeTransferResult> {
+    this.log("feeTransfer", { payoutId, destination });
+    return {
+      feeAmount: null,
+      feeTransferTxHash: `0x${randomBytes(32).toString("hex")}`,
+      alreadyTransferred: false,
+    };
   }
 
   async completePayout(payoutId: string): Promise<void> {
     this.log("completePayout", { payoutId });
     completedMockPayouts.add(payoutId);
+  }
+
+  async setPayoutFeePercentage(percent: string): Promise<void> {
+    this.log("setPayoutFeePercentage", { percent });
   }
 }
 
@@ -576,6 +659,8 @@ function mockPayout(id: string, status: PayoutStatus, amount: string): Payout {
     net: amount,
     status,
     burnTxHashes: [],
+    feeTransferPending: false,
+    feeTransferTxHash: null,
     pontoPaymentId: null,
     pontoPaymentStatus: null,
     emailRecipient: null,

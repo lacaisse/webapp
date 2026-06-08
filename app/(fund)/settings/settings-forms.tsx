@@ -13,6 +13,7 @@ import {
   updateCitizenPaySettingsAction,
   updateGeneralSettingsAction,
   updateLegalSettingsAction,
+  updatePayoutFeeAction,
   updateReferralSettingsAction,
   updateSignupRedirectsAction,
 } from "@/services/fund/settings-actions";
@@ -38,12 +39,15 @@ function SettingsForm<T extends Record<string, string>>({
 }: {
   fields: FieldSpec<T>[];
   initial: T;
-  action: (data: T) => Promise<{ ok: true } | { error: string }>;
+  action: (
+    data: T,
+  ) => Promise<{ ok: true; warning?: string } | { error: string }>;
   saveLabel: string;
   savingLabel: string;
 }) {
   const [values, setValues] = useState<T>(initial);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [pending, startTransition] = useTransition();
   const tSaved = useTranslations("fund.settings");
@@ -51,6 +55,7 @@ function SettingsForm<T extends Record<string, string>>({
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setWarning(null);
     setSaved(false);
     startTransition(async () => {
       const result = await action(values);
@@ -59,6 +64,7 @@ function SettingsForm<T extends Record<string, string>>({
         return;
       }
       setSaved(true);
+      setWarning("warning" in result ? (result.warning ?? null) : null);
     });
   };
 
@@ -71,6 +77,7 @@ function SettingsForm<T extends Record<string, string>>({
           value={values[f.key]}
           onChange={(v) => {
             setSaved(false);
+            setWarning(null);
             setValues((prev) => ({ ...prev, [f.key]: v }) as T);
           }}
         />
@@ -78,6 +85,11 @@ function SettingsForm<T extends Record<string, string>>({
       {error && (
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+      {warning && (
+        <Alert variant="warning">
+          <AlertDescription>{warning}</AlertDescription>
         </Alert>
       )}
       <div className="flex items-center justify-between">
@@ -166,6 +178,8 @@ type Fund = {
   privacyUrl: string | null;
   citizenPayFundId: string | null;
   referralBonusAmount: string | null;
+  payoutFeePercentage: string | null;
+  payoutFeeSynced: boolean;
   memberSignupSuccessUrl: string | null;
   merchantSignupSuccessUrl: string | null;
 };
@@ -338,6 +352,41 @@ export function SignupRedirectsForm({ fund }: { fund: Fund }) {
         },
       ]}
     />
+  );
+}
+
+export function FeeForm({ fund }: { fund: Fund }) {
+  const t = useTranslations("fund.settings.fees");
+  const tRoot = useTranslations("fund.settings");
+  // DB may lead CP: if a value is set but hasn't been accepted by CP yet,
+  // tell the admin it isn't live — saving again retries the push.
+  const showSyncPending = Boolean(fund.payoutFeePercentage) && !fund.payoutFeeSynced;
+  return (
+    <div className="space-y-4">
+      {showSyncPending && (
+        <Alert variant="warning">
+          <AlertDescription>{t("syncPending")}</AlertDescription>
+        </Alert>
+      )}
+      <SettingsForm
+        saveLabel={tRoot("save")}
+        savingLabel={tRoot("saving")}
+        initial={{ payoutFeePercentage: fund.payoutFeePercentage ?? "" }}
+        action={async (v) =>
+          updatePayoutFeeAction({
+            payoutFeePercentage: v.payoutFeePercentage,
+          })
+        }
+        fields={[
+          {
+            key: "payoutFeePercentage",
+            label: t("rate"),
+            hint: t("rateHint"),
+            type: "decimal",
+          },
+        ]}
+      />
+    </div>
   );
 }
 
