@@ -4,7 +4,7 @@
 // export async functions; exporting constants from it produces a runtime
 // server-reference proxy, not the array).
 
-export const SUPPORTED_LOCALES = ["en", "fr", "nl"] as const;
+export const SUPPORTED_LOCALES = ["en", "fr", "nl", "es"] as const;
 export type SupportedLocale = (typeof SUPPORTED_LOCALES)[number];
 
 // English is the fallback when the user's browser locale doesn't match any
