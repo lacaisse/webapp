@@ -18,6 +18,7 @@ import { prisma } from "@/services/db/prisma";
 import { requireCurrentFund } from "@/services/fund/server";
 import { AddCardDialog } from "./add-card-dialog";
 import { InviteMemberDialog } from "./invite-member-dialog";
+import { MemberImportDialog } from "./member-import-dialog";
 import { MemberRowActions } from "./member-row-actions";
 import { StatusChangeDialog } from "./status-change-dialog";
 import { MemberTierPicker } from "./tier-picker";
@@ -82,7 +83,13 @@ export default async function MembersPage({
           <h1 className="font-heading text-2xl font-medium">{t("title")}</h1>
           <p className="text-sm text-muted-foreground">{t("description")}</p>
         </div>
-        <InviteMemberDialog triggerLabel={t("invite")} />
+        <div className="flex items-center gap-2">
+          <MemberImportDialog
+            triggerLabel={t("import.button")}
+            tiers={tiers.map((tier) => tier.name)}
+          />
+          <InviteMemberDialog triggerLabel={t("invite")} />
+        </div>
       </header>
 
       <Tabs

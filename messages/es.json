@@ -463,6 +463,9 @@
           "status": "Estado",
           "empty": "No se ha enviado ningún correo electrónico."
         }
+      },
+      "import": {
+        "button": "Importar CSV"
       }
     },
     "cards": {
@@ -480,7 +483,8 @@
         "member": "Miembro",
         "status": "Estado",
         "balance": "Saldo",
-        "issued": "Emitida"
+        "issued": "Emitida",
+        "number": "N.º tarjeta"
       },
       "primary": "Tarjeta principal",
       "badges": {
@@ -507,7 +511,8 @@
           "issued": "Emitida",
           "blocked": "Bloqueada",
           "reportedLost": "Reportada como perdida",
-          "lastTransaction": "Última transacción"
+          "lastTransaction": "Última transacción",
+          "number": "Número de tarjeta"
         },
         "transfers": {
           "title": "Transferencias",
@@ -528,6 +533,27 @@
           "older": "Más antiguas",
           "error": "No se pudieron cargar las transferencias en cadena."
         }
+      },
+      "number": {
+        "edit": "Editar",
+        "save": "Guardar",
+        "saving": "Guardando…",
+        "cancel": "Cancelar"
+      },
+      "numberImport": {
+        "button": "Importar números",
+        "title": "Importar números de tarjeta",
+        "description": "Sube o pega un CSV con encabezados y elige las columnas de serial y número. Los serials desconocidos se registran en CitizenPay y se crean aquí.",
+        "fileLabel": "Archivo CSV",
+        "pasteLabel": "O pega las filas",
+        "import": "Importar",
+        "importing": "Importando…",
+        "cancel": "Cancelar",
+        "close": "Cerrar",
+        "result": "{applied} número(s) aplicado(s); {provisioned} tarjeta(s) nueva(s) creada(s); {displaced} desplazado(s).",
+        "skipped": "{count} serial(es) no creado(s)",
+        "serialColumn": "Columna de serial",
+        "numberColumn": "Columna de número"
       }
     },
     "allocations": {
@@ -593,7 +619,11 @@
         "cutoffDate": "Fecha límite",
         "status": "Estado",
         "closedAt": "Cerrado el",
-        "empty": "Aún no hay periodos."
+        "empty": "Aún no hay periodos.",
+        "newPeriod": "Nuevo período",
+        "edit": "Editar",
+        "actions": "Acciones",
+        "disabledDescription": "La asignación está desactivada para este fondo. Los ingresos se registran y se asignan a los miembros, pero no se emiten tokens."
       },
       "periodDetail": {
         "back": "Todos los periodos",
@@ -630,6 +660,18 @@
           "amount": "Importe",
           "status": "Estado",
           "empty": "Aún no hay emisiones agrupadas."
+        }
+      },
+      "periods": {
+        "dialog": {
+          "createTitle": "Nuevo período",
+          "editTitle": "Editar fecha de corte",
+          "description": "Un período abarca un mes natural. Elige la fecha de corte: cuándo se ejecuta la asignación por lotes.",
+          "cutoffDate": "Fecha de corte",
+          "cutoffHint": "El mes se toma de esta fecha; las asignaciones se distribuyen al final de este día.",
+          "cancel": "Cancelar",
+          "save": "Guardar",
+          "saving": "Guardando…"
         }
       }
     },
@@ -1085,6 +1127,18 @@
           "notIncoming": "Solo las transacciones entrantes se pueden vincular a un miembro.",
           "memberNotFound": "No hay ningún miembro con esa referencia o correo electrónico en este fondo.",
           "identifierRequired": "Introduce una referencia o un correo electrónico."
+        },
+        "attribute": {
+          "button": "Atribuir",
+          "title": "Atribuir el ingreso",
+          "description": "Elige el miembro del que proviene esta transferencia. Al confirmar se vincula, se recuerda la cuenta para la próxima vez y se ejecuta la asignación.",
+          "searchPlaceholder": "Buscar miembros por nombre…",
+          "loading": "Cargando…",
+          "noResults": "Ningún miembro coincide.",
+          "noSuggestions": "Sin coincidencia probable: busca por nombre.",
+          "noTier": "Sin nivel",
+          "noCard": "Sin tarjeta",
+          "cancel": "Cancelar"
         }
       }
     },
@@ -1166,7 +1220,10 @@
         "allocationMode": "Modo de asignación",
         "allocationModeHint": "El período fijo agrupa las acuñaciones en cada corte; el modo pago inmediato acuña en cuanto se detecta un depósito.",
         "modeFixedPeriod": "Período fijo",
-        "modePayAndGo": "Pago inmediato"
+        "modePayAndGo": "Pago inmediato",
+        "allocationCutoffDay": "Día de corte de asignaciones",
+        "allocationCutoffDayHint": "Día del mes en que se distribuyen las asignaciones de período fijo. 31 = último día del mes.",
+        "modeDisabled": "Desactivado"
       },
       "branding": {
         "title": "Marca",
@@ -1356,7 +1413,8 @@
       "amountInvalid": "El importe debe ser un número con hasta 2 decimales.",
       "urlInvalid": "Introduzca una URL válida (debe empezar por http:// o https://).",
       "feeInvalid": "La tasa de comisión debe ser un número con hasta 2 decimales.",
-      "feeTooHigh": "La tasa de comisión no puede superar el 100%."
+      "feeTooHigh": "La tasa de comisión no puede superar el 100%.",
+      "cutoffDayInvalid": "El día de corte debe ser un número entero entre 1 y 31."
     }
   },
   "team": {
@@ -1581,6 +1639,48 @@
         "cancel": "Cancelar",
         "confirm": "Actualizar",
         "saving": "Guardando…"
+      },
+      "import": {
+        "title": "Importar miembros",
+        "description": "Sube o pega un CSV con encabezados y asigna cada columna a un campo de miembro.",
+        "fileLabel": "Archivo CSV",
+        "pasteLabel": "O pega las filas",
+        "mapHeading": "Asignar columnas",
+        "none": "— ninguna —",
+        "import": "Importar",
+        "importing": "Importando…",
+        "cancel": "Cancelar",
+        "close": "Cerrar",
+        "result": "{created} creados, {updated} actualizados, {cardsLinked} tarjeta(s) vinculada(s).",
+        "serialsNotFound": "{count} serial(es) no se pudieron vincular ni crear",
+        "skippedTitle": "{count} fila(s) omitida(s)",
+        "rowLabel": "Fila {row}",
+        "fields": {
+          "firstName": "Nombre",
+          "lastName": "Apellido",
+          "email": "Correo",
+          "phone": "Teléfono",
+          "iban": "IBAN",
+          "address": "Dirección",
+          "postalCode": "Código postal",
+          "city": "Ciudad",
+          "householdAdults": "Adultos en el hogar",
+          "householdChildren": "Niños en el hogar",
+          "tier": "Nivel (por nombre)",
+          "notes": "Notas",
+          "serial": "Serial de tarjeta"
+        },
+        "errors": {
+          "missingRequiredMapping": "Asigna los campos obligatorios (nombre, apellido, correo).",
+          "columnMissing": "Falta en el CSV una columna asignada.",
+          "empty": "No se encontraron filas de datos en el CSV."
+        },
+        "skip": {
+          "missingName": "Falta el nombre o el apellido.",
+          "invalidEmail": "Correo no válido.",
+          "error": "No se pudo importar esta fila."
+        },
+        "fixedValuePlaceholder": "Aplicar a todas las filas"
       }
     }
   },
@@ -1655,6 +1755,21 @@
         "errorsInStep": "{count, plural, one {# elemento falló} other {# elementos fallaron}}",
         "errors": {
           "previewFailed": "No se pudo conectar con Citizen Pay. Comprueba tu conexión con la tesorería e inténtalo de nuevo."
+        }
+      },
+      "number": {
+        "errors": {
+          "notFound": "Tarjeta no encontrada.",
+          "invalid": "El número de tarjeta debe ser un entero positivo.",
+          "taken": "Otra tarjeta ya usa ese número."
+        }
+      },
+      "numberImport": {
+        "errors": {
+          "duplicate": "El CSV tiene un serial o número duplicado.",
+          "empty": "No se encontraron filas válidas en el CSV.",
+          "noMatches": "Ningún serial coincide con una tarjeta de este fondo.",
+          "columnMissing": "Elige una columna de serial y una de número."
         }
       }
     }
@@ -2478,5 +2593,15 @@
     "thirdParty": "Componentes de terceros",
     "thirdPartyLink": "Consulta /licenses",
     "viewOnGithub": "Ver en GitHub"
+  },
+  "periods": {
+    "errors": {
+      "dateInvalid": "Introduce una fecha válida.",
+      "exists": "Ya existe un período para ese mes.",
+      "notFound": "Período no encontrado.",
+      "closed": "Este período ya está cerrado y no se puede editar.",
+      "monthMismatch": "La fecha de corte debe estar dentro del mes del período.",
+      "notFixedPeriod": "Los períodos solo se aplican cuando la asignación está en modo de período fijo."
+    }
   }
 }

@@ -22,6 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { prisma } from "@/services/db/prisma";
 import { requireCurrentFund } from "@/services/fund/server";
+import { PeriodDialog } from "./period-dialog";
 import { ArchiveTierButton, TierDialog } from "./tier-dialog";
 
 const TABS = [
@@ -222,17 +223,23 @@ async function ScheduleTab({
   allocationMode,
 }: {
   fundId: string;
-  allocationMode: "FIXED_PERIOD" | "PAY_AND_GO";
+  allocationMode: "FIXED_PERIOD" | "PAY_AND_GO" | "DISABLED";
 }) {
   const t = await getTranslations("fund.allocations.schedule");
   const format = await getFormatter();
 
-  if (allocationMode === "PAY_AND_GO") {
+  // Only FIXED_PERIOD funds have periods. Pay-and-go and disabled funds show
+  // an explanatory card instead of the period schedule.
+  if (allocationMode !== "FIXED_PERIOD") {
     return (
       <Card>
         <CardHeader>
           <CardTitle>{t("title")}</CardTitle>
-          <CardDescription>{t("payAndGoDescription")}</CardDescription>
+          <CardDescription>
+            {allocationMode === "PAY_AND_GO"
+              ? t("payAndGoDescription")
+              : t("disabledDescription")}
+          </CardDescription>
         </CardHeader>
       </Card>
     );
@@ -245,49 +252,78 @@ async function ScheduleTab({
   });
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>{t("label")}</TableHead>
-          <TableHead>{t("startsAt")}</TableHead>
-          <TableHead>{t("cutoffDate")}</TableHead>
-          <TableHead>{t("status")}</TableHead>
-          <TableHead>{t("closedAt")}</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {periods.length === 0 ? (
-          <TableEmpty colSpan={5}>{t("empty")}</TableEmpty>
-        ) : (
-          periods.map((p) => (
-            <TableRow key={p.id}>
-              <TableCell className="font-medium">
-                <Link
-                  href={`/allocations/periods/${p.id}`}
-                  className="hover:underline"
-                >
-                  {p.label}
-                </Link>
-              </TableCell>
-              <TableCell className="text-sm text-muted-foreground">
-                {format.dateTime(p.startsAt, { dateStyle: "medium" })}
-              </TableCell>
-              <TableCell className="text-sm text-muted-foreground">
-                {format.dateTime(p.cutoffDate, { dateStyle: "medium" })}
-              </TableCell>
-              <TableCell>
-                <PeriodStatusBadge status={p.status} />
-              </TableCell>
-              <TableCell className="text-sm text-muted-foreground">
-                {p.closedAt
-                  ? format.dateTime(p.closedAt, { dateStyle: "medium" })
-                  : "—"}
-              </TableCell>
-            </TableRow>
-          ))
-        )}
-      </TableBody>
-    </Table>
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <PeriodDialog
+          mode={{ kind: "create" }}
+          trigger={<Button size="sm">{t("newPeriod")}</Button>}
+        />
+      </div>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>{t("label")}</TableHead>
+            <TableHead>{t("startsAt")}</TableHead>
+            <TableHead>{t("cutoffDate")}</TableHead>
+            <TableHead>{t("status")}</TableHead>
+            <TableHead>{t("closedAt")}</TableHead>
+            <TableHead className="text-right">{t("actions")}</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {periods.length === 0 ? (
+            <TableEmpty colSpan={6}>{t("empty")}</TableEmpty>
+          ) : (
+            periods.map((p) => (
+              <TableRow key={p.id}>
+                <TableCell className="font-medium">
+                  <Link
+                    href={`/allocations/periods/${p.id}`}
+                    className="hover:underline"
+                  >
+                    {p.label}
+                  </Link>
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {format.dateTime(p.startsAt, { dateStyle: "medium" })}
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {format.dateTime(p.cutoffDate, { dateStyle: "medium" })}
+                </TableCell>
+                <TableCell>
+                  <PeriodStatusBadge status={p.status} />
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {p.closedAt
+                    ? format.dateTime(p.closedAt, { dateStyle: "medium" })
+                    : "—"}
+                </TableCell>
+                <TableCell className="text-right">
+                  {p.status === "CLOSED" ? (
+                    "—"
+                  ) : (
+                    <PeriodDialog
+                      mode={{
+                        kind: "edit",
+                        periodId: p.id,
+                        initialCutoff: p.cutoffDate
+                          .toISOString()
+                          .slice(0, 10),
+                      }}
+                      trigger={
+                        <Button variant="ghost" size="sm">
+                          {t("edit")}
+                        </Button>
+                      }
+                    />
+                  )}
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
 

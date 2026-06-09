@@ -10,11 +10,13 @@ import {
   ANNOTATION_TRIGGERS,
 } from "@/services/transaction-annotation/annotate";
 
+import { ensureOpenPeriod } from "./ensure";
+
 // Period close: FIXED_PERIOD funds accumulate deposits within an
 // AllocationPeriod, then mint tokens for each contributing member at the
 // period's cutoff. This module finds OPEN periods that have passed cutoff,
-// runs the batch mint, marks the period CLOSED, and creates the next OPEN
-// period (length = previous period's duration).
+// runs the batch mint, marks the period CLOSED, and opens the next calendar
+// month's period (via ensureOpenPeriod, using the fund's cutoff day).
 //
 // Minting amount per member = their tier's `allocationAmount` IF the sum
 // of their matched deposits within the period is inside [minContribution,
@@ -33,7 +35,13 @@ export type ClosePeriodStats = {
 export async function closeExpiredPeriods(): Promise<ClosePeriodStats[]> {
   const now = new Date();
   const candidates = await prisma.allocationPeriod.findMany({
-    where: { status: "OPEN", cutoffDate: { lte: now } },
+    // Only FIXED_PERIOD funds batch-mint. If a fund switched to PAY_AND_GO or
+    // DISABLED, any leftover OPEN period must NOT mint at cutoff.
+    where: {
+      status: "OPEN",
+      cutoffDate: { lte: now },
+      fund: { allocationMode: "FIXED_PERIOD" },
+    },
     orderBy: { cutoffDate: "asc" },
     select: {
       id: true,
@@ -47,6 +55,7 @@ export async function closeExpiredPeriods(): Promise<ClosePeriodStats[]> {
           citizenPayFundId: true,
           citizenPayApiKeyId: true,
           citizenPayApiKeyEnc: true,
+          allocationCutoffDay: true,
         },
       },
     },
@@ -75,6 +84,7 @@ type PeriodToClose = {
     citizenPayFundId: string | null;
     citizenPayApiKeyId: string | null;
     citizenPayApiKeyEnc: string | null;
+    allocationCutoffDay: number;
   };
 };
 
@@ -211,9 +221,12 @@ async function closePeriod(period: PeriodToClose): Promise<ClosePeriodStats> {
     }
   }
 
-  // Auto-create the next OPEN period — same duration as the one we just
-  // closed. Uses the cutoffDate as the new start.
-  const nextPeriodId = await createNextPeriod(period);
+  // Auto-create the next OPEN period. Once a period is closed, "now" is past
+  // its cutoff, so ensureOpenPeriod resolves to the next calendar month.
+  const nextPeriodId = await ensureOpenPeriod(
+    period.fundId,
+    period.fund.allocationCutoffDay,
+  );
 
   return {
     fundId: period.fundId,
@@ -226,49 +239,3 @@ async function closePeriod(period: PeriodToClose): Promise<ClosePeriodStats> {
   };
 }
 
-async function createNextPeriod(prev: PeriodToClose): Promise<string | null> {
-  const durationMs = prev.cutoffDate.getTime() - prev.startsAt.getTime();
-  if (durationMs <= 0) {
-    console.warn(
-      "[period-close] previous period has non-positive duration, skipping next-period creation",
-      prev.id,
-    );
-    return null;
-  }
-  const newStartsAt = new Date(prev.cutoffDate);
-  const newCutoffDate = new Date(prev.cutoffDate.getTime() + durationMs);
-  const newLabel = monthLabel(newStartsAt);
-
-  try {
-    const next = await prisma.allocationPeriod.create({
-      data: {
-        fundId: prev.fundId,
-        label: newLabel,
-        startsAt: newStartsAt,
-        cutoffDate: newCutoffDate,
-        status: "OPEN",
-      },
-      select: { id: true },
-    });
-    return next.id;
-  } catch (e) {
-    // P2002 on (fundId, label) = admin already created this period
-    // manually. Don't fail the whole close just because the label clashes.
-    const code = (e as { code?: string }).code;
-    if (code === "P2002") {
-      console.warn(
-        "[period-close] next period label already exists",
-        prev.fundId,
-        newLabel,
-      );
-      return null;
-    }
-    throw e;
-  }
-}
-
-function monthLabel(d: Date): string {
-  const year = d.getUTCFullYear();
-  const month = (d.getUTCMonth() + 1).toString().padStart(2, "0");
-  return `${year}-${month}`;
-}

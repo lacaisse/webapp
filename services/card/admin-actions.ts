@@ -8,8 +8,12 @@ import { z } from "zod";
 
 import { requireFundRole } from "@/services/auth/dal";
 import { getCitizenPayClient } from "@/services/citizenpay/client";
+import { Prisma } from "@/services/db/generated/client";
 import type { CardStatus } from "@/services/db/generated/enums";
 import { prisma } from "@/services/db/prisma";
+import { nextCardNumber } from "@/services/card/numbering";
+import { normalizeSerial } from "@/services/card/serial";
+import { parseCsv } from "@/services/csv/parse";
 import { ANNOTATION_TRIGGERS } from "@/services/transaction-annotation/annotate";
 import { resolveOrEnqueueAnnotation } from "@/services/transaction-annotation/pending";
 import {
@@ -381,8 +385,8 @@ export async function importOneCardAction(input: {
 
   // Already-exists is fine — concurrent sync runs, or a manual addCard
   // that landed between preview and execute. Treat as success.
-  const existing = await prisma.card.findUnique({
-    where: { serialNumber: input.serialNumber },
+  const existing = await prisma.card.findFirst({
+    where: { serialNumber: { equals: input.serialNumber, mode: "insensitive" } },
     select: { id: true },
   });
   if (existing) return { ok: true };
@@ -405,6 +409,7 @@ export async function importOneCardAction(input: {
         memberId: null,
         serialNumber: detail.serialNumber,
         account: detail.account,
+        number: await nextCardNumber(fund.id),
         holderName: null,
         status: detail.status,
         issuedAt: new Date(detail.createdAt),
@@ -539,4 +544,218 @@ export async function searchUnattachedCardsAction(
     take: UNATTACHED_LIMIT,
   });
   return cards;
+}
+
+// =============================================================================
+// Card numbering — the per-fund 1…N number members encode in their Belgian
+// structured communication. Auto-assigned at creation; admins can edit a
+// single card or bulk-import a serial→number CSV here.
+// =============================================================================
+
+export type SetCardNumberResult = { ok: true } | { error: string };
+
+export async function setCardNumberAction(input: {
+  cardId: string;
+  number: number | null;
+}): Promise<SetCardNumberResult> {
+  const t = await getTranslations();
+  const { fund } = await requireFundRole("ADMIN");
+
+  const card = await prisma.card.findFirst({
+    where: { id: input.cardId, fundId: fund.id },
+    select: { id: true },
+  });
+  if (!card) return { error: t("cards.admin.number.errors.notFound" as never) };
+
+  const number = input.number;
+  if (number !== null && (!Number.isInteger(number) || number < 1)) {
+    return { error: t("cards.admin.number.errors.invalid" as never) };
+  }
+
+  // Reject a number already held by another card — the admin resolves the
+  // clash explicitly (single edits don't silently steal; CSV import does the
+  // bulk swap with displacement reporting).
+  if (number !== null) {
+    const clash = await prisma.card.findFirst({
+      where: { fundId: fund.id, number, id: { not: card.id } },
+      select: { id: true },
+    });
+    if (clash) return { error: t("cards.admin.number.errors.taken" as never) };
+  }
+
+  await prisma.card.update({ where: { id: card.id }, data: { number } });
+  revalidatePath("/cards");
+  return { ok: true };
+}
+
+export type ImportCardNumbersResult =
+  | { error: string }
+  | {
+      ok: true;
+      applied: number;
+      provisioned: number;
+      displaced: number;
+      skipped: string[];
+    };
+
+// Bulk serial→number mapping from a CSV with headers. The admin picks which
+// header is the serial and which is the number; we map each row's serial to
+// its number. Numbers and serials must be unique within the CSV.
+//
+// Serials with no local card are provisioned: registered with CitizenPay in
+// one bulk call, then created locally (account hydrated per-serial). Applying
+// frees any number currently held elsewhere (those cards become unnumbered —
+// reported as `displaced`). Serials that can't be provisioned (fund not
+// connected to CP, or CP rejected them) are reported as `skipped`.
+export async function importCardNumbersAction(input: {
+  csv: string;
+  serialColumn: string;
+  numberColumn: string;
+}): Promise<ImportCardNumbersResult> {
+  const t = await getTranslations();
+  const { fund } = await requireFundRole("ADMIN");
+
+  const { headers, rows: csvRows } = parseCsv(input.csv);
+  const si = headers.indexOf(input.serialColumn);
+  const ni = headers.indexOf(input.numberColumn);
+  if (si === -1 || ni === -1) {
+    return {
+      error: t("cards.admin.numberImport.errors.columnMissing" as never),
+    };
+  }
+
+  const rows: { serial: string; number: number }[] = [];
+  const seenSerials = new Set<string>();
+  const seenNumbers = new Set<number>();
+  for (const r of csvRows) {
+    const serial = normalizeSerial(r[si] ?? "");
+    const num = Number((r[ni] ?? "").trim());
+    if (!serial || !Number.isInteger(num) || num < 1) continue; // blank/junk
+    if (seenSerials.has(serial) || seenNumbers.has(num)) {
+      return { error: t("cards.admin.numberImport.errors.duplicate" as never) };
+    }
+    seenSerials.add(serial);
+    seenNumbers.add(num);
+    rows.push({ serial, number: num });
+  }
+  if (rows.length === 0) {
+    return { error: t("cards.admin.numberImport.errors.empty" as never) };
+  }
+
+  // Map existing fund cards by NORMALISED serial so a re-import finds a card
+  // regardless of the case it was stored in — never creating a case-variant
+  // duplicate. (rows[].serial is already normalised.)
+  const fundCards = await prisma.card.findMany({
+    where: { fundId: fund.id },
+    select: { id: true, serialNumber: true },
+  });
+  const idByNormSerial = new Map(
+    fundCards.map((c) => [normalizeSerial(c.serialNumber), c.id]),
+  );
+  const idBySerial = new Map<string, string>();
+  for (const r of rows) {
+    const id = idByNormSerial.get(r.serial);
+    if (id) idBySerial.set(r.serial, id);
+  }
+
+  // Serials with no local card: provision them at CitizenPay (one bulk call),
+  // hydrate each account, and create the local row. Numbers are assigned below
+  // in the displacement loop along with the existing cards.
+  const missing = rows
+    .filter((r) => !idBySerial.has(r.serial))
+    .map((r) => r.serial);
+  let provisioned = 0;
+  const skipped: string[] = [];
+  if (missing.length > 0) {
+    if (!fund.citizenPayFundId) {
+      skipped.push(...missing); // not connected to CP — can't provision
+    } else {
+      try {
+        const cp = getCitizenPayClient(fund);
+        await cp.bulkCreateCards(missing);
+        for (const serial of missing) {
+          const detail = await cp.getCitizenPayCard(serial).catch(() => null);
+          try {
+            const created = await prisma.card.create({
+              data: {
+                fundId: fund.id,
+                memberId: null,
+                serialNumber: serial,
+                account: detail?.account ?? null,
+                status: detail?.status ?? "INACTIVE",
+                issuedAt: new Date(),
+              },
+              select: { id: true },
+            });
+            idBySerial.set(serial, created.id);
+            provisioned++;
+          } catch (e) {
+            // Raced with another create — re-find within THIS fund only. A
+            // serial owned by another fund (global @unique) is left untouched.
+            const existing = await prisma.card.findFirst({
+              where: { fundId: fund.id, serialNumber: serial },
+              select: { id: true },
+            });
+            if (existing) {
+              idBySerial.set(serial, existing.id);
+              provisioned++;
+            } else {
+              console.error("[card.numberImport] provision failed", serial, e);
+              skipped.push(serial);
+            }
+          }
+        }
+      } catch (e) {
+        console.error("[card.numberImport] bulkCreate failed", e);
+        skipped.push(...missing);
+      }
+    }
+  }
+
+  const toApply = rows.filter((r) => idBySerial.has(r.serial));
+  if (toApply.length === 0) {
+    return { error: t("cards.admin.numberImport.errors.noMatches" as never) };
+  }
+
+  const targetNumbers = toApply.map((r) => r.number);
+  const targetCardIds = toApply.map((r) => idBySerial.get(r.serial)!);
+
+  // Cards (other than our targets) that will lose their number to a target —
+  // reported as `displaced`.
+  const displaced = await prisma.card.count({
+    where: {
+      fundId: fund.id,
+      number: { in: targetNumbers },
+      id: { notIn: targetCardIds },
+    },
+  });
+
+  // Two statements in one batch transaction (a per-row update loop timed out at
+  // ~200 cards on the 5s interactive limit): first free every number we're
+  // about to assign — held by a target or any other card — then set them all in
+  // a single UPDATE ... FROM (VALUES ...). The free-first step avoids transient
+  // @@unique([fundId, number]) collisions mid-swap.
+  const assignments = Prisma.join(
+    toApply.map(
+      (r) => Prisma.sql`(${idBySerial.get(r.serial)!}::text, ${r.number}::int)`,
+    ),
+  );
+  await prisma.$transaction([
+    prisma.card.updateMany({
+      where: {
+        fundId: fund.id,
+        OR: [{ number: { in: targetNumbers } }, { id: { in: targetCardIds } }],
+      },
+      data: { number: null },
+    }),
+    prisma.$executeRaw`
+      UPDATE "Card" AS c
+      SET "number" = v.num
+      FROM (VALUES ${assignments}) AS v(id, num)
+      WHERE c.id = v.id AND c."fundId" = ${fund.id}
+    `,
+  ]);
+
+  revalidatePath("/cards");
+  return { ok: true, applied: toApply.length, provisioned, displaced, skipped };
 }

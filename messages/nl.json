@@ -340,6 +340,9 @@
           "status": "Status",
           "empty": "Geen e-mails verzonden."
         }
+      },
+      "import": {
+        "button": "CSV importeren"
       }
     },
     "cards": {
@@ -357,7 +360,8 @@
         "member": "Lid",
         "status": "Status",
         "balance": "Saldo",
-        "issued": "Uitgegeven"
+        "issued": "Uitgegeven",
+        "number": "Kaartnr."
       },
       "primary": "Primaire kaart",
       "badges": {
@@ -384,7 +388,8 @@
           "issued": "Uitgegeven",
           "blocked": "Geblokkeerd",
           "reportedLost": "Verloren gemeld",
-          "lastTransaction": "Laatste transactie"
+          "lastTransaction": "Laatste transactie",
+          "number": "Kaartnummer"
         },
         "transfers": {
           "title": "Transfers",
@@ -405,6 +410,27 @@
           "trigger": "Trigger",
           "note": "Notitie"
         }
+      },
+      "number": {
+        "edit": "Bewerken",
+        "save": "Opslaan",
+        "saving": "Opslaan…",
+        "cancel": "Annuleren"
+      },
+      "numberImport": {
+        "button": "Nummers importeren",
+        "title": "Kaartnummers importeren",
+        "description": "Upload of plak een CSV met kopregels en kies de serienummer- en nummerkolom. Onbekende serienummers worden bij CitizenPay geregistreerd en hier aangemaakt.",
+        "fileLabel": "CSV-bestand",
+        "pasteLabel": "Of plak rijen",
+        "import": "Importeren",
+        "importing": "Importeren…",
+        "cancel": "Annuleren",
+        "close": "Sluiten",
+        "result": "{applied} nummer(s) toegepast; {provisioned} nieuwe kaart(en) aangemaakt; {displaced} verplaatst.",
+        "skipped": "{count} serienummer(s) niet aangemaakt",
+        "serialColumn": "Serienummerkolom",
+        "numberColumn": "Nummerkolom"
       }
     },
     "allocations": {
@@ -470,7 +496,11 @@
         "cutoffDate": "Sluitingsdatum",
         "status": "Status",
         "closedAt": "Gesloten op",
-        "empty": "Nog geen periodes."
+        "empty": "Nog geen periodes.",
+        "newPeriod": "Nieuwe periode",
+        "edit": "Bewerken",
+        "actions": "Acties",
+        "disabledDescription": "Allocatie is uitgeschakeld voor dit fonds. Stortingen worden nog vastgelegd en aan leden gekoppeld, maar er worden geen tokens aangemaakt."
       },
       "periodDetail": {
         "back": "Alle periodes",
@@ -507,6 +537,18 @@
           "amount": "Bedrag",
           "status": "Status",
           "empty": "Nog geen uitgiftes gebatcht."
+        }
+      },
+      "periods": {
+        "dialog": {
+          "createTitle": "Nieuwe periode",
+          "editTitle": "Afkapdatum bewerken",
+          "description": "Een periode beslaat één kalendermaand. Kies de afkapdatum — wanneer de batchallocatie wordt uitgevoerd.",
+          "cutoffDate": "Afkapdatum",
+          "cutoffHint": "De maand wordt afgeleid uit deze datum; allocaties worden aan het einde van deze dag uitgekeerd.",
+          "cancel": "Annuleren",
+          "save": "Opslaan",
+          "saving": "Opslaan…"
         }
       }
     },
@@ -962,6 +1004,18 @@
           "notIncoming": "Alleen inkomende transacties kunnen aan een lid worden gekoppeld.",
           "memberNotFound": "Geen lid gevonden met die referentie of dat e-mailadres in dit fonds.",
           "identifierRequired": "Voer een referentie of e-mail in."
+        },
+        "attribute": {
+          "button": "Toewijzen",
+          "title": "Storting toewijzen",
+          "description": "Kies het lid van wie deze overschrijving afkomstig is. Bevestigen koppelt ze, onthoudt de rekening voor de volgende keer en voert de allocatie uit.",
+          "searchPlaceholder": "Zoek leden op naam…",
+          "loading": "Laden…",
+          "noResults": "Geen leden gevonden.",
+          "noSuggestions": "Geen waarschijnlijke match — zoek op naam.",
+          "noTier": "Geen schijf",
+          "noCard": "Geen kaart",
+          "cancel": "Annuleren"
         }
       }
     },
@@ -1043,7 +1097,10 @@
         "allocationMode": "Allocatiemodus",
         "allocationModeHint": "Vaste periode: batch bij elke sluiting. Pay-and-go: onmiddellijk munten bij detectie van een storting.",
         "modeFixedPeriod": "Vaste periode",
-        "modePayAndGo": "Pay-and-go"
+        "modePayAndGo": "Pay-and-go",
+        "allocationCutoffDay": "Afkapdag allocaties",
+        "allocationCutoffDayHint": "Dag van de maand waarop allocaties met vaste periode worden uitgekeerd. 31 = laatste dag van de maand.",
+        "modeDisabled": "Uitgeschakeld"
       },
       "branding": {
         "title": "Huisstijl",
@@ -1345,7 +1402,8 @@
       "amountInvalid": "Bedrag moet een getal zijn met maximaal 2 decimalen.",
       "urlInvalid": "Voer een geldige URL in (moet beginnen met http:// of https://).",
       "feeInvalid": "Kostentarief moet een getal met maximaal 2 decimalen zijn.",
-      "feeTooHigh": "Kostentarief mag niet hoger zijn dan 100%."
+      "feeTooHigh": "Kostentarief mag niet hoger zijn dan 100%.",
+      "cutoffDayInvalid": "Afkapdag moet een geheel getal tussen 1 en 31 zijn."
     }
   },
   "team": {
@@ -1570,6 +1628,48 @@
         "cancel": "Annuleren",
         "confirm": "Uitgeven",
         "minting": "Bezig met uitgeven…"
+      },
+      "import": {
+        "title": "Leden importeren",
+        "description": "Upload of plak een CSV met kopregels en koppel elke kolom aan een ledenveld.",
+        "fileLabel": "CSV-bestand",
+        "pasteLabel": "Of plak rijen",
+        "mapHeading": "Kolommen koppelen",
+        "none": "— geen —",
+        "import": "Importeren",
+        "importing": "Importeren…",
+        "cancel": "Annuleren",
+        "close": "Sluiten",
+        "result": "{created} aangemaakt, {updated} bijgewerkt, {cardsLinked} kaart(en) gekoppeld.",
+        "serialsNotFound": "{count} serienummer(s) konden niet worden gekoppeld of aangemaakt",
+        "skippedTitle": "{count} rij(en) overgeslagen",
+        "rowLabel": "Rij {row}",
+        "fields": {
+          "firstName": "Voornaam",
+          "lastName": "Achternaam",
+          "email": "E-mail",
+          "phone": "Telefoon",
+          "iban": "IBAN",
+          "address": "Adres",
+          "postalCode": "Postcode",
+          "city": "Stad",
+          "householdAdults": "Volwassenen in huishouden",
+          "householdChildren": "Kinderen in huishouden",
+          "tier": "Schijf (op naam)",
+          "notes": "Notities",
+          "serial": "Kaartserienummer"
+        },
+        "errors": {
+          "missingRequiredMapping": "Koppel de verplichte velden (voornaam, achternaam, e-mail).",
+          "columnMissing": "Een gekoppelde kolom ontbreekt in de CSV.",
+          "empty": "Geen gegevensrijen in de CSV."
+        },
+        "skip": {
+          "missingName": "Voornaam of achternaam ontbreekt.",
+          "invalidEmail": "Ongeldig e-mailadres.",
+          "error": "Kon deze rij niet importeren."
+        },
+        "fixedValuePlaceholder": "Voor alle rijen instellen"
       }
     }
   },
@@ -1644,6 +1744,21 @@
         "errorsInStep": "{count, plural, one {# item mislukt} other {# items mislukt}}",
         "errors": {
           "previewFailed": "Kan Citizen Pay niet bereiken. Controleer de treasury-verbinding en probeer opnieuw."
+        }
+      },
+      "number": {
+        "errors": {
+          "notFound": "Kaart niet gevonden.",
+          "invalid": "Kaartnummer moet een positief geheel getal zijn.",
+          "taken": "Een andere kaart gebruikt dit nummer al."
+        }
+      },
+      "numberImport": {
+        "errors": {
+          "duplicate": "De CSV bevat een dubbel serienummer of nummer.",
+          "empty": "Geen geldige rijen in de CSV.",
+          "noMatches": "Geen enkel serienummer komt overeen met een kaart in dit fonds.",
+          "columnMissing": "Kies zowel een serienummer- als een nummerkolom."
         }
       }
     }
@@ -2477,6 +2592,16 @@
       "optionEmpty": "Elke optie moet een waarde en een label hebben.",
       "optionsRequired": "Voeg ten minste één optie toe.",
       "notFound": "Veld niet gevonden."
+    }
+  },
+  "periods": {
+    "errors": {
+      "dateInvalid": "Voer een geldige datum in.",
+      "exists": "Er bestaat al een periode voor die maand.",
+      "notFound": "Periode niet gevonden.",
+      "closed": "Deze periode is al afgesloten en kan niet worden bewerkt.",
+      "monthMismatch": "De afkapdatum moet binnen de maand van de periode vallen.",
+      "notFixedPeriod": "Periodes gelden alleen wanneer allocatie op vaste periode staat."
     }
   }
 }

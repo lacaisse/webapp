@@ -175,8 +175,15 @@
       "empty": "No accounts yet. Create one to get started.",
       "defaultName": "Main account",
       "defaultBadge": "Default",
-      "table": { "name": "Name", "address": "Address", "balance": "Balance" },
-      "detail": { "back": "All accounts", "balance": "Balance" },
+      "table": {
+        "name": "Name",
+        "address": "Address",
+        "balance": "Balance"
+      },
+      "detail": {
+        "back": "All accounts",
+        "balance": "Balance"
+      },
       "create": {
         "trigger": "New account",
         "title": "Create account",
@@ -227,7 +234,11 @@
         "amount": "Amount",
         "loadMore": "Show more",
         "loadError": "Couldn't load on-chain history.",
-        "directions": { "in": "Received", "out": "Sent", "self": "Internal" }
+        "directions": {
+          "in": "Received",
+          "out": "Sent",
+          "self": "Internal"
+        }
       },
       "errors": {
         "nameRequired": "Name is required.",
@@ -452,6 +463,9 @@
           "status": "Status",
           "empty": "No emails sent."
         }
+      },
+      "import": {
+        "button": "Import CSV"
       }
     },
     "cards": {
@@ -469,7 +483,8 @@
         "member": "Member",
         "status": "Status",
         "balance": "Balance",
-        "issued": "Issued"
+        "issued": "Issued",
+        "number": "Card #"
       },
       "primary": "Primary card",
       "badges": {
@@ -496,7 +511,8 @@
           "issued": "Issued",
           "blocked": "Blocked",
           "reportedLost": "Reported lost",
-          "lastTransaction": "Last transaction"
+          "lastTransaction": "Last transaction",
+          "number": "Card number"
         },
         "transfers": {
           "title": "Transfers",
@@ -517,6 +533,27 @@
           "older": "Older",
           "error": "Couldn't load on-chain transfers."
         }
+      },
+      "number": {
+        "edit": "Edit",
+        "save": "Save",
+        "saving": "Saving…",
+        "cancel": "Cancel"
+      },
+      "numberImport": {
+        "button": "Import numbers",
+        "title": "Import card numbers",
+        "description": "Upload or paste a CSV with headers, then choose the serial and number columns. Serials not yet on file are registered with CitizenPay and created here.",
+        "fileLabel": "CSV file",
+        "pasteLabel": "Or paste rows",
+        "import": "Import",
+        "importing": "Importing…",
+        "cancel": "Cancel",
+        "close": "Close",
+        "result": "Applied {applied} number(s); provisioned {provisioned} new card(s); {displaced} displaced.",
+        "skipped": "{count} serial(s) couldn't be provisioned",
+        "serialColumn": "Serial column",
+        "numberColumn": "Number column"
       }
     },
     "allocations": {
@@ -582,7 +619,11 @@
         "cutoffDate": "Cutoff date",
         "status": "Status",
         "closedAt": "Closed at",
-        "empty": "No periods yet."
+        "empty": "No periods yet.",
+        "newPeriod": "New period",
+        "edit": "Edit",
+        "actions": "Actions",
+        "disabledDescription": "Allocation is disabled for this fund. Deposits are still recorded and matched to members, but no tokens are minted."
       },
       "periodDetail": {
         "back": "All periods",
@@ -619,6 +660,18 @@
           "amount": "Amount",
           "status": "Status",
           "empty": "No mints batched yet."
+        }
+      },
+      "periods": {
+        "dialog": {
+          "createTitle": "New period",
+          "editTitle": "Edit period cutoff",
+          "description": "A period covers one calendar month. Pick the cutoff date — when the batch allocation runs.",
+          "cutoffDate": "Cutoff date",
+          "cutoffHint": "The month is taken from this date; allocations are distributed at the end of this day.",
+          "cancel": "Cancel",
+          "save": "Save",
+          "saving": "Saving…"
         }
       }
     },
@@ -1074,6 +1127,18 @@
           "notIncoming": "Only incoming transactions can be linked to a member.",
           "memberNotFound": "No member with that reference or email in this fund.",
           "identifierRequired": "Enter a reference or email."
+        },
+        "attribute": {
+          "button": "Attribute",
+          "title": "Attribute deposit",
+          "description": "Choose the member this transfer is from. Confirming links it, remembers the account for next time, and runs the allocation.",
+          "searchPlaceholder": "Search members by name…",
+          "loading": "Loading…",
+          "noResults": "No members match.",
+          "noSuggestions": "No likely match — search by name above.",
+          "noTier": "No tier",
+          "noCard": "No card",
+          "cancel": "Cancel"
         }
       }
     },
@@ -1155,7 +1220,10 @@
         "allocationMode": "Allocation mode",
         "allocationModeHint": "Fixed period batches mints at each cutoff; pay-and-go mints immediately when a deposit is detected.",
         "modeFixedPeriod": "Fixed period",
-        "modePayAndGo": "Pay-and-go"
+        "modePayAndGo": "Pay-and-go",
+        "allocationCutoffDay": "Allocation cutoff day",
+        "allocationCutoffDayHint": "Day of the month fixed-period allocations are distributed. 31 = last day of the month.",
+        "modeDisabled": "Disabled"
       },
       "branding": {
         "title": "Branding",
@@ -1345,7 +1413,8 @@
       "amountInvalid": "Amount must be a number with up to 2 decimal places.",
       "urlInvalid": "Enter a valid URL (must start with http:// or https://).",
       "feeInvalid": "Fee rate must be a number with up to 2 decimal places.",
-      "feeTooHigh": "Fee rate can't exceed 100%."
+      "feeTooHigh": "Fee rate can't exceed 100%.",
+      "cutoffDayInvalid": "Cutoff day must be a whole number between 1 and 31."
     }
   },
   "team": {
@@ -1570,6 +1639,48 @@
         "cancel": "Cancel",
         "confirm": "Update",
         "saving": "Saving…"
+      },
+      "import": {
+        "title": "Import members",
+        "description": "Upload or paste a CSV with headers, then map each column to a member field.",
+        "fileLabel": "CSV file",
+        "pasteLabel": "Or paste rows",
+        "mapHeading": "Map columns",
+        "none": "— none —",
+        "import": "Import",
+        "importing": "Importing…",
+        "cancel": "Cancel",
+        "close": "Close",
+        "result": "Created {created}, updated {updated}, linked {cardsLinked} card(s).",
+        "serialsNotFound": "{count} serial(s) couldn't be linked or provisioned",
+        "skippedTitle": "{count} row(s) skipped",
+        "rowLabel": "Row {row}",
+        "fields": {
+          "firstName": "First name",
+          "lastName": "Last name",
+          "email": "Email",
+          "phone": "Phone",
+          "iban": "IBAN",
+          "address": "Address",
+          "postalCode": "Postal code",
+          "city": "City",
+          "householdAdults": "Adults in household",
+          "householdChildren": "Children in household",
+          "tier": "Tier (by name)",
+          "notes": "Notes",
+          "serial": "Card serial"
+        },
+        "errors": {
+          "missingRequiredMapping": "Map the required fields (first name, last name, email).",
+          "columnMissing": "A mapped column is missing from the CSV.",
+          "empty": "No data rows found in the CSV."
+        },
+        "skip": {
+          "missingName": "Missing first or last name.",
+          "invalidEmail": "Invalid email.",
+          "error": "Could not import this row."
+        },
+        "fixedValuePlaceholder": "Set for all rows"
       }
     }
   },
@@ -1644,6 +1755,21 @@
         "errorsInStep": "{count, plural, one {# item failed} other {# items failed}}",
         "errors": {
           "previewFailed": "Couldn't reach Citizen Pay. Check your treasury connection and try again."
+        }
+      },
+      "number": {
+        "errors": {
+          "notFound": "Card not found.",
+          "invalid": "Card number must be a positive whole number.",
+          "taken": "Another card already uses that number."
+        }
+      },
+      "numberImport": {
+        "errors": {
+          "duplicate": "The CSV has a duplicate serial or number.",
+          "empty": "No valid rows found in the CSV.",
+          "noMatches": "None of the serials matched a card in this fund.",
+          "columnMissing": "Pick both a serial and a number column."
         }
       }
     }
@@ -2467,5 +2593,15 @@
     "thirdParty": "Third-party components",
     "thirdPartyLink": "See /licenses",
     "viewOnGithub": "View on GitHub"
+  },
+  "periods": {
+    "errors": {
+      "dateInvalid": "Enter a valid calendar date.",
+      "exists": "A period for that month already exists.",
+      "notFound": "Period not found.",
+      "closed": "This period is already closed and can't be edited.",
+      "monthMismatch": "The cutoff date must fall within the period's own month.",
+      "notFixedPeriod": "Periods only apply when allocation is set to fixed period."
+    }
   }
 }

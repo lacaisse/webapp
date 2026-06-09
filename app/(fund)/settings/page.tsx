@@ -53,6 +53,7 @@ export default async function SettingsPage({
     defaultLocale: fund.defaultLocale,
     timezone: fund.timezone,
     allocationMode: fund.allocationMode,
+    allocationCutoffDay: fund.allocationCutoffDay,
     logoUrl: fund.logoUrl,
     primaryColor: fund.primaryColor,
     termsUrl: fund.termsUrl,

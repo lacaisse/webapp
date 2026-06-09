@@ -271,6 +271,12 @@ export class LiveCitizenPayClient implements CitizenPayClient {
     };
   }
 
+  async bulkCreateCards(
+    serials: string[],
+  ): Promise<{ created: number; conflicts: number }> {
+    return apiCards.bulkCreate(this.creds, serials);
+  }
+
   async blockCard(serialNumber: string): Promise<void> {
     try {
       await apiCards.updateStatus(this.creds, serialNumber, "blocked");

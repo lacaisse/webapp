@@ -175,8 +175,15 @@
       "empty": "Aucun compte pour le moment. Créez-en un pour commencer.",
       "defaultName": "Compte principal",
       "defaultBadge": "Par défaut",
-      "table": { "name": "Nom", "address": "Adresse", "balance": "Solde" },
-      "detail": { "back": "Tous les comptes", "balance": "Solde" },
+      "table": {
+        "name": "Nom",
+        "address": "Adresse",
+        "balance": "Solde"
+      },
+      "detail": {
+        "back": "Tous les comptes",
+        "balance": "Solde"
+      },
       "create": {
         "trigger": "Nouveau compte",
         "title": "Créer un compte",
@@ -227,7 +234,11 @@
         "amount": "Montant",
         "loadMore": "Afficher plus",
         "loadError": "Impossible de charger l'historique on-chain.",
-        "directions": { "in": "Reçu", "out": "Envoyé", "self": "Interne" }
+        "directions": {
+          "in": "Reçu",
+          "out": "Envoyé",
+          "self": "Interne"
+        }
       },
       "errors": {
         "nameRequired": "Le nom est requis.",
@@ -452,6 +463,9 @@
           "status": "Statut",
           "empty": "Aucun email envoyé."
         }
+      },
+      "import": {
+        "button": "Importer un CSV"
       }
     },
     "cards": {
@@ -469,7 +483,8 @@
         "member": "Membre",
         "status": "Statut",
         "balance": "Solde",
-        "issued": "Émise le"
+        "issued": "Émise le",
+        "number": "N° carte"
       },
       "primary": "Carte principale",
       "badges": {
@@ -496,7 +511,8 @@
           "issued": "Émise le",
           "blocked": "Bloquée le",
           "reportedLost": "Signalée perdue le",
-          "lastTransaction": "Dernière transaction"
+          "lastTransaction": "Dernière transaction",
+          "number": "Numéro de carte"
         },
         "transfers": {
           "title": "Transferts",
@@ -517,6 +533,27 @@
           "older": "Plus anciens",
           "error": "Impossible de charger les transferts on-chain."
         }
+      },
+      "number": {
+        "edit": "Modifier",
+        "save": "Enregistrer",
+        "saving": "Enregistrement…",
+        "cancel": "Annuler"
+      },
+      "numberImport": {
+        "button": "Importer les numéros",
+        "title": "Importer les numéros de carte",
+        "description": "Importez ou collez un CSV avec en-têtes, puis choisissez les colonnes serial et numéro. Les serials inconnus sont enregistrés auprès de CitizenPay et créés ici.",
+        "fileLabel": "Fichier CSV",
+        "pasteLabel": "Ou collez les lignes",
+        "import": "Importer",
+        "importing": "Importation…",
+        "cancel": "Annuler",
+        "close": "Fermer",
+        "result": "{applied} numéro(s) appliqué(s) ; {provisioned} nouvelle(s) carte(s) créée(s) ; {displaced} déplacé(s).",
+        "skipped": "{count} serial(s) non créé(s)",
+        "serialColumn": "Colonne serial",
+        "numberColumn": "Colonne numéro"
       }
     },
     "allocations": {
@@ -619,7 +656,23 @@
         "cutoffDate": "Date de clôture",
         "status": "Statut",
         "closedAt": "Clôturée le",
-        "empty": "Aucune période pour le moment."
+        "empty": "Aucune période pour le moment.",
+        "newPeriod": "Nouvelle période",
+        "edit": "Modifier",
+        "actions": "Actions",
+        "disabledDescription": "L'allocation est désactivée pour cette caisse. Les versements sont enregistrés et associés aux membres, mais aucun jeton n'est émis."
+      },
+      "periods": {
+        "dialog": {
+          "createTitle": "Nouvelle période",
+          "editTitle": "Modifier la date limite",
+          "description": "Une période couvre un mois civil. Choisissez la date limite — moment où l'allocation groupée est exécutée.",
+          "cutoffDate": "Date limite",
+          "cutoffHint": "Le mois est déduit de cette date ; les allocations sont distribuées à la fin de ce jour.",
+          "cancel": "Annuler",
+          "save": "Enregistrer",
+          "saving": "Enregistrement…"
+        }
       }
     },
     "token": {
@@ -1074,6 +1127,18 @@
           "notIncoming": "Seules les transactions entrantes peuvent être liées à un membre.",
           "memberNotFound": "Aucun membre trouvé avec cette référence ou cet email dans cette caisse.",
           "identifierRequired": "Saisissez une référence ou un email."
+        },
+        "attribute": {
+          "button": "Attribuer",
+          "title": "Attribuer le versement",
+          "description": "Choisissez le membre à l'origine de ce virement. La confirmation l'associe, mémorise le compte pour la prochaine fois et exécute l'allocation.",
+          "searchPlaceholder": "Rechercher un membre par nom…",
+          "loading": "Chargement…",
+          "noResults": "Aucun membre correspondant.",
+          "noSuggestions": "Aucune correspondance probable — recherchez par nom.",
+          "noTier": "Sans palier",
+          "noCard": "Sans carte",
+          "cancel": "Annuler"
         }
       }
     },
@@ -1155,7 +1220,10 @@
         "allocationMode": "Mode d'allocation",
         "allocationModeHint": "Période fixe : batch à chaque clôture. Pay-and-go : mint immédiat à la détection d'un dépôt.",
         "modeFixedPeriod": "Période fixe",
-        "modePayAndGo": "Pay-and-go"
+        "modePayAndGo": "Pay-and-go",
+        "allocationCutoffDay": "Jour de clôture des allocations",
+        "allocationCutoffDayHint": "Jour du mois où les allocations à période fixe sont distribuées. 31 = dernier jour du mois.",
+        "modeDisabled": "Désactivé"
       },
       "branding": {
         "title": "Identité visuelle",
@@ -1345,7 +1413,8 @@
       "amountInvalid": "Le montant doit être un nombre avec jusqu'à 2 décimales.",
       "urlInvalid": "Saisissez une URL valide (doit commencer par http:// ou https://).",
       "feeInvalid": "Le taux doit être un nombre avec jusqu'à 2 décimales.",
-      "feeTooHigh": "Le taux ne peut pas dépasser 100 %."
+      "feeTooHigh": "Le taux ne peut pas dépasser 100 %.",
+      "cutoffDayInvalid": "Le jour de clôture doit être un entier entre 1 et 31."
     }
   },
   "team": {
@@ -1570,6 +1639,48 @@
         "cancel": "Annuler",
         "confirm": "Mettre à jour",
         "saving": "Enregistrement…"
+      },
+      "import": {
+        "title": "Importer des membres",
+        "description": "Importez ou collez un CSV avec en-têtes, puis associez chaque colonne à un champ membre.",
+        "fileLabel": "Fichier CSV",
+        "pasteLabel": "Ou collez les lignes",
+        "mapHeading": "Associer les colonnes",
+        "none": "— aucune —",
+        "import": "Importer",
+        "importing": "Importation…",
+        "cancel": "Annuler",
+        "close": "Fermer",
+        "result": "{created} créé(s), {updated} mis à jour, {cardsLinked} carte(s) liée(s).",
+        "serialsNotFound": "{count} serial(s) n'ont pas pu être liés ni créés",
+        "skippedTitle": "{count} ligne(s) ignorée(s)",
+        "rowLabel": "Ligne {row}",
+        "fields": {
+          "firstName": "Prénom",
+          "lastName": "Nom",
+          "email": "E-mail",
+          "phone": "Téléphone",
+          "iban": "IBAN",
+          "address": "Adresse",
+          "postalCode": "Code postal",
+          "city": "Ville",
+          "householdAdults": "Adultes du foyer",
+          "householdChildren": "Enfants du foyer",
+          "tier": "Palier (par nom)",
+          "notes": "Notes",
+          "serial": "Serial de carte"
+        },
+        "errors": {
+          "missingRequiredMapping": "Associez les champs requis (prénom, nom, e-mail).",
+          "columnMissing": "Une colonne associée est absente du CSV.",
+          "empty": "Aucune ligne de données dans le CSV."
+        },
+        "skip": {
+          "missingName": "Prénom ou nom manquant.",
+          "invalidEmail": "E-mail invalide.",
+          "error": "Impossible d'importer cette ligne."
+        },
+        "fixedValuePlaceholder": "Définir pour toutes les lignes"
       }
     }
   },
@@ -1644,6 +1755,21 @@
         "errorsInStep": "{count, plural, one {# élément en échec} other {# éléments en échec}}",
         "errors": {
           "previewFailed": "Impossible de contacter Citizen Pay. Vérifiez la connexion de la trésorerie et réessayez."
+        }
+      },
+      "number": {
+        "errors": {
+          "notFound": "Carte introuvable.",
+          "invalid": "Le numéro de carte doit être un entier positif.",
+          "taken": "Une autre carte utilise déjà ce numéro."
+        }
+      },
+      "numberImport": {
+        "errors": {
+          "duplicate": "Le CSV contient un numéro ou un serial en double.",
+          "empty": "Aucune ligne valide dans le CSV.",
+          "noMatches": "Aucun serial ne correspond à une carte de cette caisse.",
+          "columnMissing": "Choisissez une colonne serial et une colonne numéro."
         }
       }
     }
@@ -2467,5 +2593,15 @@
     "thirdParty": "Composants tiers",
     "thirdPartyLink": "Voir /licenses",
     "viewOnGithub": "Voir sur GitHub"
+  },
+  "periods": {
+    "errors": {
+      "dateInvalid": "Saisissez une date valide.",
+      "exists": "Une période existe déjà pour ce mois.",
+      "notFound": "Période introuvable.",
+      "closed": "Cette période est déjà clôturée et ne peut pas être modifiée.",
+      "monthMismatch": "La date limite doit se situer dans le mois de la période.",
+      "notFixedPeriod": "Les périodes ne s'appliquent que lorsque l'allocation est en mode période fixe."
+    }
   }
 }

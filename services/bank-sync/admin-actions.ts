@@ -4,8 +4,13 @@
 import { getTranslations } from "next-intl/server";
 import { revalidatePath } from "next/cache";
 
+import { ensureOpenPeriod } from "@/services/allocation-periods/ensure";
 import { requireFundRole } from "@/services/auth/dal";
 import { prisma } from "@/services/db/prisma";
+import { ANNOTATION_TRIGGERS } from "@/services/transaction-annotation/annotate";
+
+import { mintTierAllocation } from "./allocate";
+import { scoreNameMatch } from "./matching/name";
 
 // Manual admin action: link an unmatched BankTransaction to a member when
 // bank-sync couldn't auto-match (typo in payment reference, transfer from
@@ -84,8 +89,184 @@ export async function unlinkBankTransactionAction(input: {
 
   await prisma.bankTransaction.update({
     where: { id: tx.id },
-    data: { memberId: null, matchedAt: null },
+    data: { memberId: null, matchedAt: null, matchMethod: null, cardId: null },
   });
+
+  revalidatePath("/payments");
+  return { ok: true };
+}
+
+// Ranked member suggestions for the manual attribution picker. With a query,
+// filters by name/email; without one, ranks all members by name similarity to
+// the deposit's counterpart name. Suggestions only — never an auto-match.
+export type MemberSuggestion = {
+  id: string;
+  name: string;
+  hasCardAccount: boolean;
+  tierAssigned: boolean;
+};
+
+const memberPick = {
+  id: true,
+  firstName: true,
+  lastName: true,
+  tierId: true,
+  primaryCard: { select: { account: true } },
+} as const;
+
+function toSuggestion(m: {
+  id: string;
+  firstName: string;
+  lastName: string;
+  tierId: string | null;
+  primaryCard: { account: string | null } | null;
+}): MemberSuggestion {
+  return {
+    id: m.id,
+    name: `${m.firstName} ${m.lastName}`.trim(),
+    hasCardAccount: Boolean(m.primaryCard?.account),
+    tierAssigned: m.tierId !== null,
+  };
+}
+
+export async function suggestMembersForAttributionAction(input: {
+  bankTransactionId: string;
+  query?: string;
+}): Promise<MemberSuggestion[]> {
+  const { fund } = await requireFundRole("ADMIN");
+  const query = input.query?.trim() ?? "";
+
+  if (query.length >= 2) {
+    const members = await prisma.member.findMany({
+      where: {
+        fundId: fund.id,
+        OR: [
+          { firstName: { contains: query, mode: "insensitive" } },
+          { lastName: { contains: query, mode: "insensitive" } },
+          { email: { contains: query, mode: "insensitive" } },
+        ],
+      },
+      select: memberPick,
+      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+      take: 10,
+    });
+    return members.map(toSuggestion);
+  }
+
+  // No query → rank by name similarity to the deposit's counterpart name.
+  const tx = await prisma.bankTransaction.findFirst({
+    where: { id: input.bankTransactionId, fundId: fund.id },
+    select: { counterpartName: true },
+  });
+  const members = await prisma.member.findMany({
+    where: { fundId: fund.id },
+    select: memberPick,
+    take: 2000,
+  });
+  return members
+    .map((m) => ({
+      m,
+      score: scoreNameMatch(tx?.counterpartName, m.firstName, m.lastName),
+    }))
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 8)
+    .map((x) => toSuggestion(x.m));
+}
+
+// Attribute an unmatched INCOMING deposit to a member: link it (MANUAL), learn
+// the IBAN for future auto-matching, and trigger the allocation — mint now for
+// PAY_AND_GO (to the member's primary card), or tag the open period for
+// FIXED_PERIOD so the close cron includes it. Shows up in allocation history.
+export async function attributeBankTransactionAction(input: {
+  bankTransactionId: string;
+  memberId: string;
+}): Promise<LinkBankTransactionResult> {
+  const t = await getTranslations();
+  const { user, fund } = await requireFundRole("ADMIN");
+
+  const tx = await prisma.bankTransaction.findFirst({
+    where: { id: input.bankTransactionId, fundId: fund.id },
+    select: {
+      id: true,
+      direction: true,
+      counterpartIban: true,
+      amount: true,
+      allocationPeriodId: true,
+    },
+  });
+  if (!tx) {
+    return { error: t("fund.payments.admin.errors.notFound" as never) };
+  }
+  if (tx.direction !== "INCOMING") {
+    return { error: t("fund.payments.admin.errors.notIncoming" as never) };
+  }
+
+  const member = await prisma.member.findFirst({
+    where: { id: input.memberId, fundId: fund.id },
+    select: {
+      id: true,
+      tierId: true,
+      primaryCard: { select: { account: true } },
+    },
+  });
+  if (!member) {
+    return { error: t("fund.payments.admin.errors.memberNotFound" as never) };
+  }
+
+  // FIXED_PERIOD: ensure the deposit is tagged to the current open period.
+  let allocationPeriodId = tx.allocationPeriodId;
+  if (fund.allocationMode === "FIXED_PERIOD" && !allocationPeriodId) {
+    allocationPeriodId = await ensureOpenPeriod(
+      fund.id,
+      fund.allocationCutoffDay,
+    );
+  }
+
+  await prisma.$transaction(async (db) => {
+    await db.bankTransaction.update({
+      where: { id: tx.id },
+      data: {
+        memberId: member.id,
+        matchedAt: new Date(),
+        matchMethod: "MANUAL",
+        ...(allocationPeriodId ? { allocationPeriodId } : {}),
+      },
+    });
+    // Learn the IBAN → member mapping so this account auto-matches next time.
+    if (tx.counterpartIban) {
+      await db.linkedBankAccount.upsert({
+        where: { fundId_iban: { fundId: fund.id, iban: tx.counterpartIban } },
+        create: {
+          fundId: fund.id,
+          iban: tx.counterpartIban,
+          memberId: member.id,
+          source: "MANUAL",
+        },
+        update: { memberId: member.id },
+      });
+    }
+  });
+
+  // PAY_AND_GO mints immediately (to the member's primary card — manual
+  // attribution has no referenced card). FIXED_PERIOD mints at period close.
+  if (fund.allocationMode === "PAY_AND_GO" && fund.citizenPayFundId) {
+    await mintTierAllocation({
+      fund: {
+        id: fund.id,
+        citizenPayFundId: fund.citizenPayFundId,
+        citizenPayApiKeyId: fund.citizenPayApiKeyId,
+        citizenPayApiKeyEnc: fund.citizenPayApiKeyEnc,
+      },
+      bankTransactionId: tx.id,
+      memberId: member.id,
+      tierId: member.tierId,
+      account: member.primaryCard?.account ?? null,
+      depositAmount: tx.amount.toString(),
+      trigger: ANNOTATION_TRIGGERS.manualAttribution,
+      triggeredByUserId: user.id,
+    });
+  }
 
   revalidatePath("/payments");
   return { ok: true };

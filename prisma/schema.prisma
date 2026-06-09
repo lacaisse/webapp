@@ -206,6 +206,13 @@ model Fund {
   // detection and payouts but the fund owns token issuance.
   allocationMode AllocationMode @default(FIXED_PERIOD)
 
+  // FIXED_PERIOD only: the day-of-month at which each monthly period hits its
+  // cutoff and the batch mint fires. Auto-created periods derive their
+  // `cutoffDate` from this; a manually-created period can override the exact
+  // date. Clamped to the month length at use (so 31 = last day of every
+  // month). Ignored for PAY_AND_GO.
+  allocationCutoffDay Int @default(31)
+
   // Referral programme (5.3.4). Null = not configured. Tokens minted to
   // the sponsor only on the referee's activation.
   referralBonusAmount Decimal? @db.Decimal(10, 2)
@@ -269,18 +276,19 @@ model Fund {
   memberSignupSuccessUrl   String?
   merchantSignupSuccessUrl String?
 
-  staff             FundMember[] // staff with admin access (OWNER/ADMIN/VIEWER)
-  invites           FundInvite[] // pending staff invitations
-  members           Member[] // demand-side recipients of allocations
-  cards             Card[] // cards in the fund (may be member-bound or imported)
-  tiers             AllocationTier[] // contribution/allocation tiers
-  merchants         Merchant[] // shops in the fund's network
-  onboardingFields  OnboardingField[] // per-fund extras on the signup forms
-  bankTransactions  BankTransaction[] // bank-sync mirror (incoming + outgoing)
-  tokenOperations   TokenOperation[] // mint/burn/transfer audit log
-  allocationPeriods AllocationPeriod[] // FIXED_PERIOD scheduling windows
-  referrals         Referral[] // referral programme records (5.3.4)
-  emails            Email[] // transactional email outbox/log
+  staff              FundMember[] // staff with admin access (OWNER/ADMIN/VIEWER)
+  invites            FundInvite[] // pending staff invitations
+  members            Member[] // demand-side recipients of allocations
+  cards              Card[] // cards in the fund (may be member-bound or imported)
+  tiers              AllocationTier[] // contribution/allocation tiers
+  merchants          Merchant[] // shops in the fund's network
+  onboardingFields   OnboardingField[] // per-fund extras on the signup forms
+  bankTransactions   BankTransaction[] // bank-sync mirror (incoming + outgoing)
+  tokenOperations    TokenOperation[] // mint/burn/transfer audit log
+  allocationPeriods  AllocationPeriod[] // FIXED_PERIOD scheduling windows
+  linkedBankAccounts LinkedBankAccount[] // learned IBAN → member mappings
+  referrals          Referral[] // referral programme records (5.3.4)
+  emails             Email[] // transactional email outbox/log
 
   citizenPayConnectAttempts CitizenPayConnectAttempt[] // in-flight CP connect handoffs
   addressProfiles           AddressProfileCache[] // CP profile cache (token explorer / transfers)
@@ -295,6 +303,7 @@ model Fund {
 enum AllocationMode {
   FIXED_PERIOD // attribute tokens at the end of each period (monthly etc.)
   PAY_AND_GO // mint immediately when CP reports a deposit
+  DISABLED // no automatic allocation: deposits are still mirrored/matched, but no minting and no periods
 }
 
 // Per-fund annotation of an on-chain transaction, keyed by tx hash. Lets us
@@ -414,7 +423,7 @@ model FundInvite {
 
   email String // normalized lowercase
   role  FundRole // OWNER | ADMIN granted on accept (VIEWER unused here)
-  token String @unique // random, carried in the accept URL
+  token String   @unique // random, carried in the accept URL
 
   invitedById String @db.Uuid
   invitedBy   User   @relation("FundInvitesSent", fields: [invitedById], references: [id], onDelete: Cascade)
@@ -504,6 +513,9 @@ model Member {
   bankTransactions BankTransaction[]
   tokenOperations  TokenOperation[]
 
+  // Learned bank accounts that auto-match deposits to this member.
+  linkedBankAccounts LinkedBankAccount[]
+
   // Permanent referral code shared by this member with prospective new
   // members. App-side generator produces URL-safe chars (alphanumeric, no
   // ambiguous 0/O/1/l). Per-fund unique. NULL until the member is created.
@@ -570,6 +582,13 @@ model Card {
   serialNumber String  @unique
   account      String? @unique
 
+  // Per-fund sequential card number (1…N). Encoded in the Belgian structured
+  // communication members put on their bank transfers (base of the OGM =
+  // this number), so bank-sync can match a deposit to the card. Auto-assigned
+  // (max+1 per fund) at creation, admin-editable, importable via CSV. Nullable
+  // for cards created before numbering / not yet assigned.
+  number Int?
+
   // Typically the dependant's name on a secondary card; on the primary it
   // mirrors the member.
   holderName String?
@@ -594,9 +613,14 @@ model Card {
   // Inverse of Member.primaryCard (one-to-one).
   primaryOf Member? @relation("MemberPrimaryCard")
 
+  // Bank deposits whose reference resolved to this card (serial / structured
+  // communication match). The mint for such a deposit targets this card.
+  bankTransactions BankTransaction[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([fundId, number])
   @@index([memberId])
   @@index([fundId])
   @@index([status])
@@ -1011,6 +1035,17 @@ model BankTransaction {
   merchant   Merchant? @relation(fields: [merchantId], references: [id], onDelete: SetNull)
   matchedAt  DateTime?
 
+  // How the INCOMING deposit was matched to its member. NULL while unmatched
+  // (awaiting manual attribution). SERIAL / STRUCTURED_COMMUNICATION resolve a
+  // specific card (see `card`); IBAN / MANUAL resolve only the member.
+  matchMethod BankMatchMethod?
+
+  // The specific card a serial / structured-communication reference resolved
+  // to — the mint target for that deposit. NULL for IBAN/MANUAL matches (which
+  // mint to the member's primary card) and for unmatched rows.
+  cardId String?
+  card   Card?   @relation(fields: [cardId], references: [id], onDelete: SetNull)
+
   // For FIXED_PERIOD funds: the period this deposit accumulates into.
   // NULL for PAY_AND_GO and for unmatched OUTGOING transactions.
   allocationPeriodId String?
@@ -1037,11 +1072,52 @@ model BankTransaction {
   @@index([fundId, occurredAt])
   @@index([memberId])
   @@index([merchantId])
+  @@index([cardId])
 }
 
 enum TransactionDirection {
   INCOMING // member deposit / contribution
   OUTGOING // payout to a merchant
+}
+
+// How bank-sync matched an INCOMING deposit to a member. Precedence order:
+// SERIAL → STRUCTURED_COMMUNICATION → IBAN → (else unmatched → MANUAL). NAME
+// matching is not stored: it only ranks suggestions in the attribution UI.
+enum BankMatchMethod {
+  SERIAL // card NFC serial in the reference (definite)
+  STRUCTURED_COMMUNICATION // Belgian OGM, base = card number (definite)
+  IBAN // counterpart IBAN known for a member (auto)
+  MANUAL // admin attributed it in the review queue
+}
+
+// Learned IBAN → member mapping, per fund. Seeded from Member.iban and grown
+// by manual attribution: once a deposit from an unknown account is attributed
+// to a member, that account auto-matches next time (BankMatchMethod.IBAN).
+// One IBAN maps to at most one member within a fund.
+model LinkedBankAccount {
+  id     String @id @default(cuid())
+  fundId String
+  fund   Fund   @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  iban String
+
+  // How this mapping was established: onboarding (Member.iban seed) or a
+  // manual attribution in the bank review queue.
+  source LinkedBankAccountSource @default(MANUAL)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([fundId, iban])
+  @@index([memberId])
+}
+
+enum LinkedBankAccountSource {
+  ONBOARDING // seeded from Member.iban
+  MANUAL // learned from a manual attribution
 }
 
 model TokenOperation {
@@ -1118,8 +1194,9 @@ enum TokenOperationStatus {
 // Allocation periods (FIXED_PERIOD mode)
 // =============================================================================
 // Deposits accumulate within a period; tokens are batch-minted at the cutoff.
-// A cron creates the next period at the start of each cadence (and flips the
-// previous one to IN_PROGRESS). PAY_AND_GO funds don't use periods at all —
+// A period is one calendar month (label "YYYY-MM"). The close cron mints at
+// cutoff, marks the period CLOSED, and ensures the next month's period exists
+// (services/allocation-periods). PAY_AND_GO funds don't use periods at all —
 // their BankTransaction / TokenOperation rows carry NULL allocationPeriodId.
 
 model AllocationPeriod {
@@ -1131,7 +1208,8 @@ model AllocationPeriod {
   label String
 
   // Window. `cutoffDate` is the deadline for deposits to count towards this
-  // period — after it, the period flips to IN_PROGRESS and minting starts.
+  // period — after it, the close cron marks the period CLOSED and the batch
+  // mint runs. Derived from Fund.allocationCutoffDay for auto-created periods.
   startsAt   DateTime
   cutoffDate DateTime
 

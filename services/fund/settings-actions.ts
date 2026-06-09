@@ -50,7 +50,13 @@ const GeneralSchema = z.object({
       error: "settings.errors.localeUnsupported",
     }),
   timezone: z.string().min(1, { error: "settings.errors.timezoneRequired" }),
-  allocationMode: z.enum(["FIXED_PERIOD", "PAY_AND_GO"]),
+  allocationMode: z.enum(["FIXED_PERIOD", "PAY_AND_GO", "DISABLED"]),
+  // Day-of-month for FIXED_PERIOD cutoffs. 31 = last day of every month.
+  allocationCutoffDay: z.coerce
+    .number({ error: "settings.errors.cutoffDayInvalid" })
+    .int({ error: "settings.errors.cutoffDayInvalid" })
+    .min(1, { error: "settings.errors.cutoffDayInvalid" })
+    .max(31, { error: "settings.errors.cutoffDayInvalid" }),
 });
 
 export async function updateGeneralSettingsAction(
