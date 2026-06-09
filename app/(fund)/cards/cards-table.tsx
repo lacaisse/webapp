@@ -80,7 +80,8 @@ export async function CardsTable({
     prisma.card.count({ where }),
     prisma.card.findMany({
       where,
-      orderBy: { createdAt: "desc" },
+      // By card number ascending; unnumbered cards last, newest-first among them.
+      orderBy: [{ number: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }],
       // Clamp the page to a non-negative offset; the renderer will clamp
       // visually too.
       skip: Math.max(0, (page - 1) * PAGE_SIZE),
@@ -131,6 +132,7 @@ export async function CardsTable({
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead>{t("columns.number")}</TableHead>
             <TableHead>{t("columns.serial")}</TableHead>
             <TableHead>{t("columns.holder")}</TableHead>
             <TableHead>{t("columns.member")}</TableHead>
@@ -144,7 +146,7 @@ export async function CardsTable({
         </TableHeader>
         <TableBody>
           {pageCards.length === 0 ? (
-            <TableEmpty colSpan={7}>{t("empty")}</TableEmpty>
+            <TableEmpty colSpan={8}>{t("empty")}</TableEmpty>
           ) : (
             pageCards.map((c) => {
               // Unattached cards (imported from CitizenPay before any member
@@ -165,6 +167,9 @@ export async function CardsTable({
                   : null;
               return (
                 <TableRow key={c.id}>
+                  <TableCell className="tabular-nums text-sm text-muted-foreground">
+                    {c.number ?? "—"}
+                  </TableCell>
                   <TableCell className="font-mono text-xs">
                     <Link href={`/cards/${c.id}`} className="hover:underline">
                       {c.serialNumber}

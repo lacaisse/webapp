@@ -49,6 +49,16 @@ export interface CitizenPayClient {
   registerCard(input: RegisterCardInput): Promise<RegisteredCard>;
 
   /**
+   * Register many physical cards with CitizenPay in one call (bulk import).
+   * Returns counts only — CP doesn't echo the created cards' addresses, so
+   * the caller hydrates accounts afterwards via `getCitizenPayCard`.
+   * `conflicts` = serials CP already knew about (treated as success).
+   */
+  bulkCreateCards(
+    serials: string[],
+  ): Promise<{ created: number; conflicts: number }>;
+
+  /**
    * Tell CP to stop accepting charges from this card (member reported lost,
    * suspicious activity, etc.). Idempotent — calling it on an already-
    * blocked card is a no-op.

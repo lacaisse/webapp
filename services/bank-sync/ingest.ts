@@ -3,14 +3,15 @@ import "server-only";
 
 import { Prisma } from "@/services/db/generated/client";
 
+import { ensureOpenPeriod } from "@/services/allocation-periods/ensure";
 import { getCitizenPayClient } from "@/services/citizenpay/client";
 import type { BankTransactionPayload } from "@/services/citizenpay/types";
+
+import { mintTierAllocation } from "./allocate";
+import { matchMember, type Match } from "./matching/match";
 import { prisma } from "@/services/db/prisma";
 import { sendPaymentConfirmation } from "@/services/email/transactional";
-import {
-  annotateTransaction,
-  ANNOTATION_TRIGGERS,
-} from "@/services/transaction-annotation/annotate";
+import { ANNOTATION_TRIGGERS } from "@/services/transaction-annotation/annotate";
 
 // Bank-sync ingestion. Mirrors CitizenPay-reported bank movements into the
 // local BankTransaction table, attempts to match each INCOMING row to a
@@ -39,6 +40,7 @@ type IngestionFund = {
   citizenPayApiKeyEnc: string | null;
   citizenPayLastSyncedAt: Date | null;
   allocationMode: "FIXED_PERIOD" | "PAY_AND_GO";
+  allocationCutoffDay: number;
   name: string;
   primaryColor: string | null;
   logoUrl: string | null;
@@ -140,9 +142,12 @@ async function ingestOne(
 
   // INCOMING: ingest + try to match.
   const match = await matchMember(fund.id, payload);
+  // FIXED_PERIOD: tag the deposit with the fund's current open period,
+  // creating it on demand if it doesn't exist yet (first deposit of the
+  // month / fund's first ever period). PAY_AND_GO funds don't use periods.
   const allocationPeriodId =
     fund.allocationMode === "FIXED_PERIOD"
-      ? await currentOpenPeriodId(fund.id)
+      ? await ensureOpenPeriod(fund.id, fund.allocationCutoffDay)
       : null;
 
   if (!existing) {
@@ -153,6 +158,8 @@ async function ingestOne(
       data: {
         memberId: match.memberId,
         matchedAt: new Date(),
+        matchMethod: match.method,
+        cardId: match.cardId,
         ...(allocationPeriodId ? { allocationPeriodId } : {}),
       },
     });
@@ -213,6 +220,8 @@ async function createBankTransaction(
         : undefined,
       memberId: match?.memberId ?? null,
       matchedAt: match ? new Date() : null,
+      matchMethod: match?.method ?? null,
+      cardId: match?.cardId ?? null,
       allocationPeriodId: allocationPeriodId ?? null,
     },
   });
@@ -227,74 +236,6 @@ async function getBankTransactionId(
     select: { id: true },
   });
   return row?.id ?? null;
-}
-
-type Match = {
-  memberId: string;
-  tierId: string | null;
-  account: string | null;
-};
-
-async function matchMember(
-  fundId: string,
-  payload: BankTransactionPayload,
-): Promise<Match | null> {
-  const candidates: string[] = [];
-  if (payload.counterpartReference) {
-    candidates.push(payload.counterpartReference.trim().toUpperCase());
-  }
-  if (payload.remittanceInfo) {
-    for (const token of payload.remittanceInfo.toUpperCase().split(/[^A-Z0-9]+/)) {
-      if (token.length >= 6 && token.length <= 16) candidates.push(token);
-    }
-  }
-
-  if (candidates.length > 0) {
-    const m = await prisma.member.findFirst({
-      where: { fundId, paymentReference: { in: candidates } },
-      select: {
-        id: true,
-        tierId: true,
-        primaryCard: { select: { account: true } },
-      },
-    });
-    if (m) {
-      return {
-        memberId: m.id,
-        tierId: m.tierId,
-        account: m.primaryCard?.account ?? null,
-      };
-    }
-  }
-
-  if (payload.counterpartIban) {
-    const m = await prisma.member.findFirst({
-      where: { fundId, iban: payload.counterpartIban },
-      select: {
-        id: true,
-        tierId: true,
-        primaryCard: { select: { account: true } },
-      },
-    });
-    if (m) {
-      return {
-        memberId: m.id,
-        tierId: m.tierId,
-        account: m.primaryCard?.account ?? null,
-      };
-    }
-  }
-
-  return null;
-}
-
-async function currentOpenPeriodId(fundId: string): Promise<string | null> {
-  const period = await prisma.allocationPeriod.findFirst({
-    where: { fundId, status: "OPEN" },
-    orderBy: { startsAt: "desc" },
-    select: { id: true },
-  });
-  return period?.id ?? null;
 }
 
 async function dispatchPaymentConfirmation(args: {
@@ -344,7 +285,7 @@ async function dispatchPaymentConfirmation(args: {
   }
 }
 
-async function tryMintForPayAndGo(args: {
+function tryMintForPayAndGo(args: {
   fund: IngestionFund;
   bankTransactionId: string;
   memberId: string;
@@ -352,72 +293,16 @@ async function tryMintForPayAndGo(args: {
   account: string | null;
   depositAmount: string;
 }): Promise<boolean> {
-  if (!args.tierId) return false; // no tier assigned → no auto-mint
-  if (!args.account) return false; // member has no primary card account
-
-  const tier = await prisma.allocationTier.findUnique({
-    where: { id: args.tierId },
-    select: {
-      minContribution: true,
-      maxContribution: true,
-      allocationAmount: true,
-    },
+  // System-triggered mint (cron) — no acting admin. The shared allocator does
+  // the tier range-check, op + source-link, CP submit, and annotation.
+  return mintTierAllocation({
+    fund: args.fund,
+    bankTransactionId: args.bankTransactionId,
+    memberId: args.memberId,
+    tierId: args.tierId,
+    account: args.account,
+    depositAmount: args.depositAmount,
+    trigger: ANNOTATION_TRIGGERS.bankSync,
+    triggeredByUserId: null,
   });
-  if (!tier) return false;
-
-  const deposit = new Prisma.Decimal(args.depositAmount);
-  if (deposit.lt(tier.minContribution) || deposit.gt(tier.maxContribution)) {
-    return false; // out of range — admin can review manually
-  }
-
-  // Create op + source link in a transaction. Submission to CP happens
-  // outside (HTTP latency shouldn't hold locks).
-  const op = await prisma.$transaction(async (tx) => {
-    const op = await tx.tokenOperation.create({
-      data: {
-        fundId: args.fund.id,
-        type: "MINT",
-        memberId: args.memberId,
-        account: args.account!,
-        amount: tier.allocationAmount,
-        tierId: args.tierId,
-        status: "PENDING",
-      },
-    });
-    await tx.tokenOperationSource.create({
-      data: {
-        bankTransactionId: args.bankTransactionId,
-        tokenOperationId: op.id,
-      },
-    });
-    return op;
-  });
-
-  try {
-    const cp = getCitizenPayClient(args.fund);
-    const submitted = await cp.submitMint({
-      fundCitizenPayId: args.fund.citizenPayFundId,
-      toAccount: args.account,
-      amount: tier.allocationAmount.toString(),
-      reference: op.id,
-    });
-    await prisma.tokenOperation.update({
-      where: { id: op.id },
-      data: { txHash: submitted.txHash },
-    });
-    // System-triggered mint (cron) — no acting admin.
-    await annotateTransaction({
-      fundId: args.fund.id,
-      txHash: submitted.txHash,
-      kind: ANNOTATION_TRIGGERS.bankSync,
-      trigger: ANNOTATION_TRIGGERS.bankSync,
-      triggeredByUserId: null,
-    });
-  } catch (e) {
-    console.error("[bank-sync] submitMint failed", op.id, e);
-    // Op stays PENDING with no txHash; not picked up by the status-polling
-    // cron until a re-submit job exists.
-  }
-
-  return true;
 }

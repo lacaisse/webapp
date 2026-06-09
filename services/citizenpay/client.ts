@@ -79,6 +79,13 @@ class MockCitizenPayClient implements CitizenPayClient {
     };
   }
 
+  async bulkCreateCards(
+    serials: string[],
+  ): Promise<{ created: number; conflicts: number }> {
+    this.log("bulkCreateCards", { count: serials.length });
+    return { created: serials.length, conflicts: 0 };
+  }
+
   async blockCard(serialNumber: string): Promise<void> {
     this.log("blockCard", { serialNumber });
   }

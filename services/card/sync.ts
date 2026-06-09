@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import "server-only";
 
+import { normalizeSerial } from "@/services/card/serial";
 import { getCitizenPayClient } from "@/services/citizenpay/client";
 import type {
   CardStatus as CpCardStatus,
@@ -70,15 +71,20 @@ export async function computeCardSyncPlan(
     }),
   ]);
 
+  // Key by NORMALISED serial so a case/whitespace difference between CP and
+  // the local row doesn't read as "two different cards" (which would push one
+  // and import the other, duplicating it locally).
   const remoteBySerial = new Map(
-    remote.cards.map((r) => [r.serialNumber, r]),
+    remote.cards.map((r) => [normalizeSerial(r.serialNumber), r]),
   );
-  const localBySerial = new Map(local.map((l) => [l.serialNumber, l]));
+  const localBySerial = new Map(
+    local.map((l) => [normalizeSerial(l.serialNumber), l]),
+  );
 
   const plan: CardSyncPlan = { push: [], import: [], statusUpdate: [] };
 
   for (const l of local) {
-    const r = remoteBySerial.get(l.serialNumber);
+    const r = remoteBySerial.get(normalizeSerial(l.serialNumber));
     if (!r) {
       plan.push.push({
         cardId: l.id,
@@ -100,7 +106,7 @@ export async function computeCardSyncPlan(
   }
 
   for (const r of remote.cards) {
-    if (!localBySerial.has(r.serialNumber)) {
+    if (!localBySerial.has(normalizeSerial(r.serialNumber))) {
       // `account` isn't on the list endpoint — the run path fetches it
       // per-card via `getCitizenPayCard`. Preview just shows the count.
       plan.import.push({

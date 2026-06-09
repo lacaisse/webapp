@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
       citizenPayApiKeyEnc: true,
       citizenPayLastSyncedAt: true,
       allocationMode: true,
+      allocationCutoffDay: true,
       primaryColor: true,
       logoUrl: true,
     },
@@ -49,6 +50,7 @@ export async function GET(request: NextRequest) {
         citizenPayApiKeyEnc: f.citizenPayApiKeyEnc,
         citizenPayLastSyncedAt: f.citizenPayLastSyncedAt,
         allocationMode: f.allocationMode,
+        allocationCutoffDay: f.allocationCutoffDay,
         primaryColor: f.primaryColor,
         logoUrl: f.logoUrl,
       });

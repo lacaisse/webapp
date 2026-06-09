@@ -57,6 +57,7 @@ export default async function ReferralsPage() {
               defaultLocale: fund.defaultLocale,
               timezone: fund.timezone,
               allocationMode: fund.allocationMode,
+              allocationCutoffDay: fund.allocationCutoffDay,
               logoUrl: fund.logoUrl,
               primaryColor: fund.primaryColor,
               termsUrl: fund.termsUrl,

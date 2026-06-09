@@ -8,6 +8,7 @@ import { requireCurrentFund } from "@/services/fund/server";
 import { CardsSearch } from "./cards-search";
 import { CardsTable } from "./cards-table";
 import { CardSyncDialog } from "./sync-dialog";
+import { NumberImportDialog } from "./number-import-dialog";
 import { TableSkeleton } from "../token/skeleton";
 
 const TABS = [
@@ -36,7 +37,10 @@ export default async function CardsPage({
           <h1 className="font-heading text-2xl font-medium">{t("title")}</h1>
           <p className="text-sm text-muted-foreground">{t("description")}</p>
         </div>
-        <CardSyncDialog />
+        <div className="flex items-center gap-2">
+          <NumberImportDialog />
+          <CardSyncDialog />
+        </div>
       </header>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -58,6 +62,7 @@ export default async function CardsPage({
         fallback={
           <TableSkeleton
             columns={[
+              { label: t("columns.number") },
               { label: t("columns.serial") },
               { label: t("columns.holder") },
               { label: t("columns.member") },

@@ -22,13 +22,15 @@ import type { SupportedLocale } from "@/services/i18n/config";
 // Reusable form scaffold. Each tab passes its own fields + submit action;
 // this handles the submit / error / pending plumbing identically.
 
-type FieldType = "text" | "url" | "color" | "select" | "decimal";
+type FieldType = "text" | "url" | "color" | "select" | "decimal" | "number";
 type FieldSpec<T> = {
   key: keyof T;
   label: string;
   hint?: string;
   type?: FieldType;
   options?: { value: string; label: string }[];
+  min?: number;
+  max?: number;
 };
 
 function SettingsForm<T extends Record<string, string>>({
@@ -146,6 +148,17 @@ function FieldRow<T extends Record<string, string>>({
             placeholder="#1a73e8"
           />
         </div>
+      ) : spec.type === "number" ? (
+        <Input
+          id={id}
+          type="number"
+          inputMode="numeric"
+          min={spec.min}
+          max={spec.max}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          autoComplete="off"
+        />
       ) : (
         <Input
           id={id}
@@ -173,6 +186,7 @@ type Fund = {
   defaultLocale: string;
   timezone: string;
   allocationMode: "FIXED_PERIOD" | "PAY_AND_GO";
+  allocationCutoffDay: number;
   logoUrl: string | null;
   primaryColor: string | null;
   termsUrl: string | null;
@@ -197,16 +211,19 @@ export function GeneralForm({ fund }: { fund: Fund }) {
         defaultLocale: fund.defaultLocale,
         timezone: fund.timezone,
         allocationMode: fund.allocationMode,
+        allocationCutoffDay: String(fund.allocationCutoffDay),
       }}
       action={async (v) =>
         updateGeneralSettingsAction({
           name: v.name,
           // The SettingsForm state holds plain `string`, but the action's
           // schema narrows these (locale via a type-guard refine, allocation
-          // mode via a Zod enum), so cast back at the call boundary.
+          // mode via a Zod enum, cutoff day via z.coerce.number), so cast /
+          // coerce back at the call boundary.
           defaultLocale: v.defaultLocale as SupportedLocale,
           timezone: v.timezone,
           allocationMode: v.allocationMode as "FIXED_PERIOD" | "PAY_AND_GO",
+          allocationCutoffDay: Number(v.allocationCutoffDay),
         })
       }
       fields={[
@@ -233,6 +250,14 @@ export function GeneralForm({ fund }: { fund: Fund }) {
             { value: "FIXED_PERIOD", label: t("modeFixedPeriod") },
             { value: "PAY_AND_GO", label: t("modePayAndGo") },
           ],
+        },
+        {
+          key: "allocationCutoffDay",
+          label: t("allocationCutoffDay"),
+          hint: t("allocationCutoffDayHint"),
+          type: "number",
+          min: 1,
+          max: 31,
         },
       ]}
     />

@@ -7,6 +7,8 @@ import { revalidatePath } from "next/cache";
 import { requireFundRole } from "@/services/auth/dal";
 import { getCitizenPayClient } from "@/services/citizenpay/client";
 import { prisma } from "@/services/db/prisma";
+import { nextCardNumber } from "@/services/card/numbering";
+import { normalizeSerial } from "@/services/card/serial";
 import {
   sendMemberActivated,
   sendMemberInvited,
@@ -230,7 +232,7 @@ export async function addCardAction(input: {
   const t = await getTranslations();
   const { fund } = await requireFundRole("ADMIN");
 
-  const cardSerial = input.cardSerial.trim();
+  const cardSerial = normalizeSerial(input.cardSerial);
   if (!cardSerial) {
     return { error: t("members.admin.errors.serialRequired" as never) };
   }
@@ -253,8 +255,8 @@ export async function addCardAction(input: {
     return { error: t("members.admin.errors.noPrimaryCard" as never) };
   }
 
-  const existing = await prisma.card.findUnique({
-    where: { serialNumber: cardSerial },
+  const existing = await prisma.card.findFirst({
+    where: { serialNumber: { equals: cardSerial, mode: "insensitive" } },
     select: { id: true },
   });
   if (existing) {
@@ -288,6 +290,7 @@ export async function addCardAction(input: {
       memberId: member.id,
       serialNumber: cardSerial,
       account: cpAccount,
+      number: await nextCardNumber(fund.id),
       holderName,
       status: "INACTIVE", // CP confirms terminal-active separately
       issuedAt: new Date(),

@@ -24,6 +24,7 @@ import { requireCurrentFund } from "@/services/fund/server";
 
 import { CardRowActions } from "../card-row-actions";
 import { TableSkeleton } from "../../token/skeleton";
+import { CardNumberEdit } from "./card-number-edit";
 import { CardTransfersTable } from "./transfers-table";
 
 export default async function CardDetailPage({
@@ -138,6 +139,9 @@ export default async function CardDetailPage({
             <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
               <DtDd label={t("info.serial")} mono>
                 {card.serialNumber}
+              </DtDd>
+              <DtDd label={t("info.number")}>
+                <CardNumberEdit cardId={card.id} initial={card.number} />
               </DtDd>
               <DtDd label={t("info.holder")}>{card.holderName ?? "—"}</DtDd>
               <DtDd label={t("info.member")}>
