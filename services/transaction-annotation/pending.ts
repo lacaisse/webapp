@@ -23,6 +23,8 @@ export async function enqueuePendingAnnotation(input: {
   userOpHash: string;
   kind: string;
   note?: string | null;
+  trigger?: string | null;
+  triggeredByUserId?: string | null;
 }): Promise<void> {
   const userOpHash = input.userOpHash.toLowerCase();
   try {
@@ -34,6 +36,8 @@ export async function enqueuePendingAnnotation(input: {
         userOpHash,
         kind: input.kind,
         note: input.note ?? null,
+        trigger: input.trigger ?? null,
+        triggeredByUserId: input.triggeredByUserId ?? null,
       },
       update: {},
     });
@@ -53,6 +57,8 @@ export async function resolveOrEnqueueAnnotation(input: {
   userOpHash: string;
   kind: string;
   note?: string | null;
+  trigger?: string | null;
+  triggeredByUserId?: string | null;
 }): Promise<void> {
   let res;
   try {
@@ -70,6 +76,8 @@ export async function resolveOrEnqueueAnnotation(input: {
       txHash: res.txHash,
       kind: input.kind,
       note: input.note,
+      trigger: input.trigger,
+      triggeredByUserId: input.triggeredByUserId,
     });
   } else if (res.status === "reverted" || res.status === "timeout") {
     // The tx won't land — nothing to annotate.
@@ -118,6 +126,8 @@ export async function processPendingAnnotations(
         txHash: res.txHash,
         kind: row.kind,
         note: row.note,
+        trigger: row.trigger,
+        triggeredByUserId: row.triggeredByUserId,
       });
       await prisma.pendingAnnotation.delete({ where: { id: row.id } });
       resolved++;

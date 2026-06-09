@@ -22,7 +22,8 @@ import { annotateTransactionAction } from "@/services/transaction-annotation/act
 // A transaction's annotation: the resolved label (custom note, else localised
 // system kind) plus an inline editor to set/clear the note. Holds the note in
 // local state so the label updates immediately in client-paginated tables, not
-// only on a server re-render.
+// only on a server re-render. The mint/burn audit (who/what triggered the op)
+// is surfaced separately by `TxTriggerCell`.
 export function TxAnnotationCell({
   txHash,
   kind,
@@ -37,7 +38,7 @@ export function TxAnnotationCell({
 
   const label = note?.trim()
     ? note.trim()
-    : kind && t.has(kind)
+    : kind && t.has(kind as never)
       ? t(kind as never)
       : null;
 
@@ -49,6 +50,36 @@ export function TxAnnotationCell({
         <span className="text-xs text-muted-foreground/40">—</span>
       )}
       <AnnotateDialog txHash={txHash} note={note} onSaved={setNote} />
+    </div>
+  );
+}
+
+// The mint/burn audit cell: what triggered the on-chain op (a localised
+// ANNOTATION_TRIGGERS label) and who fired it — the acting admin's name, or
+// "System" for cron-driven ops. Read-only; empty ("—") for transfers with no
+// recorded trigger (e.g. inbound transfers or pre-audit history).
+export function TxTriggerCell({
+  trigger,
+  triggeredBy,
+}: {
+  trigger: string | null;
+  triggeredBy: string | null;
+}) {
+  const t = useTranslations("fund.annotations");
+
+  if (!trigger) {
+    return <span className="text-xs text-muted-foreground/40">—</span>;
+  }
+
+  const triggerLabel = t.has(`triggers.${trigger}` as never)
+    ? t(`triggers.${trigger}` as never)
+    : trigger;
+  const actor = triggeredBy ? t("by", { name: triggeredBy }) : t("system");
+
+  return (
+    <div className="flex flex-col">
+      <span className="text-xs text-foreground/70">{triggerLabel}</span>
+      <span className="text-[10px] text-muted-foreground/60">{actor}</span>
     </div>
   );
 }

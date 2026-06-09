@@ -402,6 +402,7 @@
           "newer": "Nieuwer",
           "older": "Ouder",
           "error": "Kon on-chain transfers niet laden.",
+          "trigger": "Trigger",
           "note": "Notitie"
         }
       }
@@ -522,6 +523,8 @@
           "description": "Verstuur vers gemunte tokens naar een kaart, plaats of wallet-adres.",
           "toLabel": "Ontvanger",
           "amountLabel": "Bedrag",
+          "noteLabel": "Annotatie",
+          "notePlaceholder": "Waarom geef je uit? (verplicht)",
           "submit": "Uitgeven"
         },
         "burn": {
@@ -531,6 +534,8 @@
           "warning": "Verbranden is onomkeerbaar. De wallet moet minstens het op te branden bedrag bevatten.",
           "fromLabel": "Bron",
           "amountLabel": "Bedrag",
+          "noteLabel": "Annotatie",
+          "notePlaceholder": "Waarom verbrand je? (verplicht)",
           "submit": "Verbranden"
         },
         "picker": {
@@ -562,6 +567,7 @@
         "newer": "Nieuwer",
         "older": "Ouder",
         "error": "Kan on-chain overdrachten niet laden.",
+        "trigger": "Trigger",
         "note": "Notitie"
       },
       "holders": {
@@ -1189,6 +1195,25 @@
       "ACCOUNT_MINT": "Uitgifte",
       "ACCOUNT_BURN": "Vernietiging",
       "ACCOUNT_TRANSFER": "Overdracht",
+      "system": "Systeem",
+      "by": "door {name}",
+      "triggers": {
+        "ADMIN_MANUAL_MINT": "Handmatige uitgifte",
+        "ADMIN_DIRECT_MINT": "Directe uitgifte",
+        "ADMIN_DIRECT_BURN": "Directe vernietiging",
+        "CARD_TOPUP": "Kaart opwaarderen",
+        "CARD_WITHDRAWAL": "Kaartopname",
+        "ACCOUNT_MINT": "Uitgifte op rekening",
+        "ACCOUNT_BURN": "Vernietiging op rekening",
+        "ACCOUNT_TRANSFER": "Rekeningoverdracht",
+        "ORDER_SETTLEMENT_MINT": "Orderafwikkeling (uitgifte)",
+        "ORDER_SETTLEMENT_BURN": "Orderafwikkeling (vernietiging)",
+        "PAYOUT_BURN": "Uitbetaling vernietigd",
+        "PAYOUT_FEE": "Uitbetalingskosten",
+        "REFERRAL_REWARD": "Verwijzingsbeloning",
+        "BANK_SYNC": "Bankstorting (auto)",
+        "PERIOD_CLOSE": "Periodeafsluiting"
+      },
       "edit": "Annoteren",
       "title": "Transactie annoteren",
       "noteLabel": "Notitie",
@@ -1261,6 +1286,7 @@
         "empty": "Nog geen transacties.",
         "direction": "Richting",
         "counterparty": "Tegenpartij",
+        "trigger": "Trigger",
         "date": "Datum",
         "amount": "Bedrag",
         "loadMore": "Meer tonen",
@@ -1301,6 +1327,8 @@
       "amountInvalid": "Bedrag moet een positief getal zijn.",
       "amountPositive": "Bedrag moet groter zijn dan nul.",
       "addressInvalid": "Adres moet een hex-string van 40 tekens zijn met 0x-prefix.",
+      "noteRequired": "Voeg een annotatie toe die deze bewerking beschrijft.",
+      "noteTooLong": "Annotatie is te lang (max. 280 tekens).",
       "tokenNotConfigured": "Dit fonds heeft nog geen token geconfigureerd — verbind eerst met Citizen Pay.",
       "submitFailed": "On-chain-indiening mislukt. Bekijk het operatielog voor details.",
       "memberNotFound": "Lid niet gevonden in dit fonds.",

@@ -5,6 +5,10 @@ import { Prisma } from "@/services/db/generated/client";
 
 import { getCitizenPayClient } from "@/services/citizenpay/client";
 import { prisma } from "@/services/db/prisma";
+import {
+  annotateTransaction,
+  ANNOTATION_TRIGGERS,
+} from "@/services/transaction-annotation/annotate";
 
 // Period close: FIXED_PERIOD funds accumulate deposits within an
 // AllocationPeriod, then mint tokens for each contributing member at the
@@ -192,6 +196,14 @@ async function closePeriod(period: PeriodToClose): Promise<ClosePeriodStats> {
       await prisma.tokenOperation.update({
         where: { id: op.opId },
         data: { txHash: result.txHash },
+      });
+      // System-triggered batch mint (cron) — no acting admin.
+      await annotateTransaction({
+        fundId: period.fundId,
+        txHash: result.txHash,
+        kind: ANNOTATION_TRIGGERS.periodClose,
+        trigger: ANNOTATION_TRIGGERS.periodClose,
+        triggeredByUserId: null,
       });
       submitted++;
     } catch (e) {

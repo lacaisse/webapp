@@ -9,6 +9,11 @@ import { requireFundRole } from "@/services/auth/dal";
 import { getCitizenPayClient } from "@/services/citizenpay/client";
 import { prisma } from "@/services/db/prisma";
 import {
+  annotateTransaction,
+  ANNOTATION_TRIGGERS,
+} from "@/services/transaction-annotation/annotate";
+import { resolveOrEnqueueAnnotation } from "@/services/transaction-annotation/pending";
+import {
   burnFromToken,
   mintToken,
   UserOpError,
@@ -49,7 +54,7 @@ export async function manualMintAction(input: {
   note?: string;
 }): Promise<ManualMintResult> {
   const t = await getTranslations();
-  const { fund } = await requireFundRole("ADMIN");
+  const { fund, user } = await requireFundRole("ADMIN");
 
   const parsed = ManualMintSchema.safeParse(input);
   if (!parsed.success) {
@@ -101,6 +106,14 @@ export async function manualMintAction(input: {
       where: { id: op.id },
       data: { txHash: submitted.txHash },
     });
+    // CP-REST mint returns the final settlement hash — annotate directly.
+    await annotateTransaction({
+      fundId: fund.id,
+      txHash: submitted.txHash,
+      kind: ANNOTATION_TRIGGERS.adminManualMint,
+      trigger: ANNOTATION_TRIGGERS.adminManualMint,
+      triggeredByUserId: user.id,
+    });
   } catch (e) {
     console.error("[citizenpay] submitMint failed for manual mint", e);
   }
@@ -123,14 +136,25 @@ export async function manualMintAction(input: {
 
 export type ManualMintDirectResult =
   | { ok: true; txHash: string; userOpHash: string }
-  | { error: string; field?: "to" | "amount" };
+  | { error: string; field?: "to" | "amount" | "note" };
 
-export async function manualMintDirectAction(input: {
-  to: string;
-  amount: string;
-}): Promise<ManualMintDirectResult> {
+// Audit context for the centralised annotation written on success. `trigger`
+// is one of ANNOTATION_TRIGGERS; the acting admin is taken from the session.
+// Callers that wrap this action (account moves, order settlement, payouts) pass
+// their own trigger; a raw /token call defaults to ADMIN_DIRECT_*. When `audit`
+// is absent the call is an operator's manual mint/burn, which MUST carry a note.
+type DirectAudit = { trigger: string };
+
+export async function manualMintDirectAction(
+  input: {
+    to: string;
+    amount: string;
+    note?: string;
+  },
+  audit?: DirectAudit,
+): Promise<ManualMintDirectResult> {
   const t = await getTranslations();
-  const { fund } = await requireFundRole("ADMIN");
+  const { fund, user } = await requireFundRole("ADMIN");
 
   const parsed = ManualMintDirectSchema.safeParse(input);
   if (!parsed.success) {
@@ -139,6 +163,13 @@ export async function manualMintDirectAction(input: {
       error: t(issue.message as never),
       field: issue.path[0] as "to" | "amount" | undefined,
     };
+  }
+
+  // Operator (manual) mints require an annotation note; internal callers carry
+  // their own audit trigger instead.
+  const note = input.note?.trim();
+  if (!audit && !note) {
+    return { error: t("tokenOps.errors.noteRequired" as never), field: "note" };
   }
 
   if (!fund.tokenAddress || fund.tokenDecimals == null) {
@@ -175,6 +206,16 @@ export async function manualMintDirectAction(input: {
       where: { id: op.id },
       data: { status: "CONFIRMED", txHash, confirmedAt: new Date() },
     });
+    const trigger = audit?.trigger ?? ANNOTATION_TRIGGERS.adminDirectMint;
+    await resolveOrEnqueueAnnotation({
+      fundId: fund.id,
+      chainId: fund.tokenChainId,
+      userOpHash,
+      kind: trigger,
+      note: note ?? null,
+      trigger,
+      triggeredByUserId: user.id,
+    });
     revalidatePath("/token");
     return { ok: true, txHash, userOpHash };
   } catch (e) {
@@ -191,14 +232,18 @@ export async function manualMintDirectAction(input: {
 
 export type ManualBurnDirectResult =
   | { ok: true; txHash: string; userOpHash: string }
-  | { error: string; field?: "from" | "amount" };
+  | { error: string; field?: "from" | "amount" | "note" };
 
-export async function manualBurnDirectAction(input: {
-  from: string;
-  amount: string;
-}): Promise<ManualBurnDirectResult> {
+export async function manualBurnDirectAction(
+  input: {
+    from: string;
+    amount: string;
+    note?: string;
+  },
+  audit?: DirectAudit,
+): Promise<ManualBurnDirectResult> {
   const t = await getTranslations();
-  const { fund } = await requireFundRole("ADMIN");
+  const { fund, user } = await requireFundRole("ADMIN");
 
   const parsed = ManualBurnDirectSchema.safeParse(input);
   if (!parsed.success) {
@@ -207,6 +252,13 @@ export async function manualBurnDirectAction(input: {
       error: t(issue.message as never),
       field: issue.path[0] as "from" | "amount" | undefined,
     };
+  }
+
+  // Operator (manual) burns require an annotation note; internal callers carry
+  // their own audit trigger instead.
+  const note = input.note?.trim();
+  if (!audit && !note) {
+    return { error: t("tokenOps.errors.noteRequired" as never), field: "note" };
   }
 
   if (!fund.tokenAddress || fund.tokenDecimals == null) {
@@ -242,6 +294,16 @@ export async function manualBurnDirectAction(input: {
     await prisma.tokenOperation.update({
       where: { id: op.id },
       data: { status: "CONFIRMED", txHash, confirmedAt: new Date() },
+    });
+    const trigger = audit?.trigger ?? ANNOTATION_TRIGGERS.adminDirectBurn;
+    await resolveOrEnqueueAnnotation({
+      fundId: fund.id,
+      chainId: fund.tokenChainId,
+      userOpHash,
+      kind: trigger,
+      note: note ?? null,
+      trigger,
+      triggeredByUserId: user.id,
     });
     revalidatePath("/token");
     return { ok: true, txHash, userOpHash };

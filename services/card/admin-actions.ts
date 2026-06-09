@@ -10,6 +10,8 @@ import { requireFundRole } from "@/services/auth/dal";
 import { getCitizenPayClient } from "@/services/citizenpay/client";
 import type { CardStatus } from "@/services/db/generated/enums";
 import { prisma } from "@/services/db/prisma";
+import { ANNOTATION_TRIGGERS } from "@/services/transaction-annotation/annotate";
+import { resolveOrEnqueueAnnotation } from "@/services/transaction-annotation/pending";
 import {
   burnFromToken,
   mintToken,
@@ -103,7 +105,7 @@ export async function topUpCardAction(input: {
   amount: string;
 }): Promise<CardOpResult> {
   const t = await getTranslations();
-  const { fund } = await requireFundRole("ADMIN");
+  const { fund, user } = await requireFundRole("ADMIN");
 
   const parsed = CardOpSchema.safeParse(input);
   if (!parsed.success) {
@@ -154,7 +156,7 @@ export async function topUpCardAction(input: {
   });
 
   try {
-    const { txHash } = await mintToken({
+    const { txHash, userOpHash } = await mintToken({
       fund: fund as FundMinterContext,
       to: card.account as `0x${string}`,
       amount: amountUnits,
@@ -162,6 +164,14 @@ export async function topUpCardAction(input: {
     await prisma.tokenOperation.update({
       where: { id: op.id },
       data: { status: "CONFIRMED", txHash, confirmedAt: new Date() },
+    });
+    await resolveOrEnqueueAnnotation({
+      fundId: fund.id,
+      chainId: fund.tokenChainId,
+      userOpHash,
+      kind: ANNOTATION_TRIGGERS.cardTopUp,
+      trigger: ANNOTATION_TRIGGERS.cardTopUp,
+      triggeredByUserId: user.id,
     });
     revalidatePath("/cards");
     revalidatePath(`/cards/${card.id}`);
@@ -185,7 +195,7 @@ export async function withdrawFromCardAction(input: {
   amount: string;
 }): Promise<CardOpResult> {
   const t = await getTranslations();
-  const { fund } = await requireFundRole("ADMIN");
+  const { fund, user } = await requireFundRole("ADMIN");
 
   const parsed = CardOpSchema.safeParse(input);
   if (!parsed.success) {
@@ -236,7 +246,7 @@ export async function withdrawFromCardAction(input: {
   });
 
   try {
-    const { txHash } = await burnFromToken({
+    const { txHash, userOpHash } = await burnFromToken({
       fund: fund as FundMinterContext,
       from: card.account as `0x${string}`,
       amount: amountUnits,
@@ -244,6 +254,14 @@ export async function withdrawFromCardAction(input: {
     await prisma.tokenOperation.update({
       where: { id: op.id },
       data: { status: "CONFIRMED", txHash, confirmedAt: new Date() },
+    });
+    await resolveOrEnqueueAnnotation({
+      fundId: fund.id,
+      chainId: fund.tokenChainId,
+      userOpHash,
+      kind: ANNOTATION_TRIGGERS.cardWithdrawal,
+      trigger: ANNOTATION_TRIGGERS.cardWithdrawal,
+      triggeredByUserId: user.id,
     });
     revalidatePath("/cards");
     revalidatePath(`/cards/${card.id}`);

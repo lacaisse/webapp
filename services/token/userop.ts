@@ -685,11 +685,22 @@ export async function getUserOpTx(
       `Bundler userop/tx HTTP ${res.status}`,
     );
   }
+  // The bundler wraps the payload in an envelope:
+  //   { response_type: "object", object: { status, tx_hash, user_op_hash } }
+  // Read from `object`, tolerating a flat shape in case a deployment returns it
+  // un-wrapped. Reading the top level directly leaves status/txHash undefined,
+  // so a settled userOp is never recognised as `success` and its annotation
+  // churns until the attempt cap drops it (see processPendingAnnotations).
   const body = (await res.json()) as {
-    tx_hash: string | null;
-    status: UserOpResolution["status"];
+    object?: { tx_hash?: string | null; status?: UserOpResolution["status"] };
+    tx_hash?: string | null;
+    status?: UserOpResolution["status"];
   };
-  return { txHash: (body.tx_hash as Hex) ?? null, status: body.status };
+  const payload = body.object ?? body;
+  return {
+    txHash: (payload.tx_hash as Hex) ?? null,
+    status: payload.status ?? "pending",
+  };
 }
 
 export async function getBundlerTxReceipt(args: {

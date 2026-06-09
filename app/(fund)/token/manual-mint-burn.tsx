@@ -31,8 +31,8 @@ import {
   manualMintDirectAction,
 } from "@/services/token-operations/admin-actions";
 import {
-  ManualBurnDirectSchema,
-  ManualMintDirectSchema,
+  ManualBurnFormSchema,
+  ManualMintFormSchema,
   type ManualBurnDirectInput,
   type ManualMintDirectInput,
 } from "@/services/token-operations/schemas";
@@ -64,8 +64,8 @@ function MintDialog({ symbol }: { symbol: string | null }) {
   const [txHash, setTxHash] = useState<string | null>(null);
 
   const form = useForm<ManualMintDirectInput>({
-    resolver: zodResolver(ManualMintDirectSchema),
-    defaultValues: { to: "", amount: "" },
+    resolver: zodResolver(ManualMintFormSchema),
+    defaultValues: { to: "", amount: "", note: "" },
   });
   const errors = form.formState.errors;
 
@@ -136,6 +136,13 @@ function MintDialog({ symbol }: { symbol: string | null }) {
               register={form.register("amount")}
               error={translateError(tRoot, errors.amount?.message)}
             />
+            <NoteField
+              id="manual-mint-note"
+              label={t("noteLabel")}
+              placeholder={t("notePlaceholder")}
+              register={form.register("note")}
+              error={translateError(tRoot, errors.note?.message)}
+            />
             {errors.root && (
               <Alert variant="destructive">
                 <AlertDescription>{errors.root.message}</AlertDescription>
@@ -170,8 +177,8 @@ function BurnDialog({ symbol }: { symbol: string | null }) {
   const [txHash, setTxHash] = useState<string | null>(null);
 
   const form = useForm<ManualBurnDirectInput>({
-    resolver: zodResolver(ManualBurnDirectSchema),
-    defaultValues: { from: "", amount: "" },
+    resolver: zodResolver(ManualBurnFormSchema),
+    defaultValues: { from: "", amount: "", note: "" },
   });
   const errors = form.formState.errors;
 
@@ -245,6 +252,13 @@ function BurnDialog({ symbol }: { symbol: string | null }) {
               symbol={symbol}
               register={form.register("amount")}
               error={translateError(tRoot, errors.amount?.message)}
+            />
+            <NoteField
+              id="manual-burn-note"
+              label={t("noteLabel")}
+              placeholder={t("notePlaceholder")}
+              register={form.register("note")}
+              error={translateError(tRoot, errors.note?.message)}
             />
             {errors.root && (
               <Alert variant="destructive">
@@ -322,6 +336,36 @@ function AmountField({
           </span>
         )}
       </div>
+      {error && <p className="text-sm text-destructive">{error}</p>}
+    </div>
+  );
+}
+
+// Required operator annotation — the audit note explaining why this manual
+// mint/burn happened. Persisted as the transaction's annotation.
+function NoteField({
+  id,
+  label,
+  placeholder,
+  register,
+  error,
+}: {
+  id: string;
+  label: string;
+  placeholder: string;
+  register: ReturnType<ReturnType<typeof useForm>["register"]>;
+  error: string | null;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      <Input
+        id={id}
+        autoComplete="off"
+        placeholder={placeholder}
+        maxLength={280}
+        {...register}
+      />
       {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );

@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { TxAnnotationCell } from "@/components/tx-annotation";
+import { TxAnnotationCell, TxTriggerCell } from "@/components/tx-annotation";
 import { shortAddress } from "@/services/alchemy/format";
 import { getAccountTransfersAction } from "@/services/token-account/admin-actions";
 import type { AccountTransfer } from "@/services/token-account/transfers";
@@ -64,6 +64,7 @@ export function TransfersTable({
           <TableRow>
             <TableHead>{t("direction")}</TableHead>
             <TableHead>{t("counterparty")}</TableHead>
+            <TableHead>{t("trigger")}</TableHead>
             <TableHead>{t("date")}</TableHead>
             <TableHead className="text-right">{t("amount")}</TableHead>
           </TableRow>
@@ -89,6 +90,12 @@ export function TransfersTable({
                     txHash={tr.hash}
                     kind={tr.annotation?.kind ?? null}
                     note={tr.annotation?.note ?? null}
+                  />
+                </TableCell>
+                <TableCell>
+                  <TxTriggerCell
+                    trigger={tr.annotation?.trigger ?? null}
+                    triggeredBy={tr.annotation?.triggeredByName ?? null}
                   />
                 </TableCell>
                 <TableCell className="text-muted-foreground">
