@@ -40,5 +40,22 @@ export const ManualBurnDirectSchema = z.object({
     }),
 });
 
-export type ManualMintDirectInput = z.infer<typeof ManualMintDirectSchema>;
-export type ManualBurnDirectInput = z.infer<typeof ManualBurnDirectSchema>;
+// A required operator annotation, persisted as the transaction's note. Manual
+// mint/burn from the /token UI must carry one — it's the audit record of *why*
+// the op happened. (Internal callers — account moves, payout/order settlement —
+// reuse the actions with their own trigger and don't go through these schemas.)
+const requiredNote = z
+  .string()
+  .trim()
+  .min(1, { error: "tokenOps.errors.noteRequired" })
+  .max(280, { error: "tokenOps.errors.noteTooLong" });
+
+export const ManualMintFormSchema = ManualMintDirectSchema.extend({
+  note: requiredNote,
+});
+export const ManualBurnFormSchema = ManualBurnDirectSchema.extend({
+  note: requiredNote,
+});
+
+export type ManualMintDirectInput = z.infer<typeof ManualMintFormSchema>;
+export type ManualBurnDirectInput = z.infer<typeof ManualBurnFormSchema>;

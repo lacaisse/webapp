@@ -7,6 +7,10 @@ import { getCitizenPayClient } from "@/services/citizenpay/client";
 import type { BankTransactionPayload } from "@/services/citizenpay/types";
 import { prisma } from "@/services/db/prisma";
 import { sendPaymentConfirmation } from "@/services/email/transactional";
+import {
+  annotateTransaction,
+  ANNOTATION_TRIGGERS,
+} from "@/services/transaction-annotation/annotate";
 
 // Bank-sync ingestion. Mirrors CitizenPay-reported bank movements into the
 // local BankTransaction table, attempts to match each INCOMING row to a
@@ -400,6 +404,14 @@ async function tryMintForPayAndGo(args: {
     await prisma.tokenOperation.update({
       where: { id: op.id },
       data: { txHash: submitted.txHash },
+    });
+    // System-triggered mint (cron) — no acting admin.
+    await annotateTransaction({
+      fundId: args.fund.id,
+      txHash: submitted.txHash,
+      kind: ANNOTATION_TRIGGERS.bankSync,
+      trigger: ANNOTATION_TRIGGERS.bankSync,
+      triggeredByUserId: null,
     });
   } catch (e) {
     console.error("[bank-sync] submitMint failed", op.id, e);

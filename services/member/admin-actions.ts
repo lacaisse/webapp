@@ -11,6 +11,10 @@ import {
   sendMemberActivated,
   sendMemberInvited,
 } from "@/services/email/transactional";
+import {
+  annotateTransaction,
+  ANNOTATION_TRIGGERS,
+} from "@/services/transaction-annotation/annotate";
 import { BuiltinSignupSchema } from "./schema";
 import { generatePaymentReference } from "./payment-reference";
 
@@ -31,7 +35,7 @@ export async function activateMemberAction(input: {
   note?: string;
 }): Promise<ActivateMemberResult> {
   const t = await getTranslations();
-  const { fund } = await requireFundRole("ADMIN");
+  const { fund, user } = await requireFundRole("ADMIN");
 
   if (!input.cardId) {
     return { error: t("members.admin.errors.cardRequired" as never) };
@@ -179,6 +183,14 @@ export async function activateMemberAction(input: {
       await prisma.tokenOperation.update({
         where: { id: tx.referralOpId },
         data: { txHash: submitted.txHash },
+      });
+      // Reward mint fired by this admin's activation of the referee.
+      await annotateTransaction({
+        fundId: fund.id,
+        txHash: submitted.txHash,
+        kind: ANNOTATION_TRIGGERS.referralReward,
+        trigger: ANNOTATION_TRIGGERS.referralReward,
+        triggeredByUserId: user.id,
       });
     } catch (e) {
       console.error("[citizenpay] submitMint failed for referral reward", e);

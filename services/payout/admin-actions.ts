@@ -23,7 +23,7 @@ import {
   manualMintDirectAction,
 } from "@/services/token-operations/admin-actions";
 
-import { ANNOTATION_KINDS } from "@/services/transaction-annotation/annotate";
+import { ANNOTATION_TRIGGERS } from "@/services/transaction-annotation/annotate";
 import { resolveOrEnqueueAnnotation } from "@/services/transaction-annotation/pending";
 
 import { resolveOrderReceipts, type TxReceiptStatus } from "./receipts";
@@ -357,17 +357,23 @@ export async function fixOrderAction(input: {
   // A mint failure after a successful burn is surfaced with the hash so the
   // operator can recover.
   if (input.account) {
-    const burn = await manualBurnDirectAction({
-      from: input.account,
-      amount: input.total,
-    });
+    const burn = await manualBurnDirectAction(
+      {
+        from: input.account,
+        amount: input.total,
+      },
+      { trigger: ANNOTATION_TRIGGERS.orderSettlementBurn },
+    );
     if ("error" in burn) return { error: burn.error };
   }
 
-  const mint = await manualMintDirectAction({
-    to: input.placeAccount,
-    amount: input.net,
-  });
+  const mint = await manualMintDirectAction(
+    {
+      to: input.placeAccount,
+      amount: input.net,
+    },
+    { trigger: ANNOTATION_TRIGGERS.orderSettlementMint },
+  );
   if ("error" in mint) return { error: mint.error };
 
   // Record the mint hash on the order so the server confirms it. If this
@@ -478,10 +484,13 @@ export async function createPayoutOrderAction(input: {
     return { ok: true, order, payout, mintError: t("noPlaceAccount") };
   }
 
-  const mint = await manualMintDirectAction({
-    to: placeAccount,
-    amount: order.net,
-  });
+  const mint = await manualMintDirectAction(
+    {
+      to: placeAccount,
+      amount: order.net,
+    },
+    { trigger: ANNOTATION_TRIGGERS.orderSettlementMint },
+  );
   if ("error" in mint) {
     return { ok: true, order, payout, mintError: mint.error };
   }
@@ -677,7 +686,7 @@ export async function burnPayoutAction(input: {
   payoutId: string;
 }): Promise<BurnPayoutResult> {
   const t = await getTranslations("fund.payments.settlement.errors");
-  const { fund } = await requireFundRole("ADMIN");
+  const { fund, user } = await requireFundRole("ADMIN");
 
   try {
     const client = getCitizenPayClient(fund);
@@ -708,10 +717,13 @@ export async function burnPayoutAction(input: {
     // Burn only the `net` on-chain with our minter (records a TokenOperation).
     // The place account also holds the retained cut (fees + manualDeduction);
     // CP sweeps that to our minter account when we pass `destination` below.
-    const burn = await manualBurnDirectAction({
-      from: placeAccount,
-      amount: payout.net,
-    });
+    const burn = await manualBurnDirectAction(
+      {
+        from: placeAccount,
+        amount: payout.net,
+      },
+      { trigger: ANNOTATION_TRIGGERS.payoutBurn },
+    );
     if ("error" in burn) return { error: burn.error };
 
     // Report the hash so CP marks the payout burnt, and hand CP the minter
@@ -732,22 +744,18 @@ export async function burnPayoutAction(input: {
       return { error: `${t("reportFailed")} (tx ${burn.txHash})` };
     }
 
-    // Annotate via the userOp hash for both: a userOp's settlement tx hash
-    // isn't final until `success` (a retry can change it), so we resolve once
-    // now and queue if still pending — never annotate an eager hash. The burn
-    // is our userOp; the fee sweep is CP's.
-    await resolveOrEnqueueAnnotation({
-      fundId: fund.id,
-      chainId: fund.tokenChainId,
-      userOpHash: burn.userOpHash,
-      kind: ANNOTATION_KINDS.payoutBurn,
-    });
+    // The burn itself is annotated inside manualBurnDirectAction (trigger
+    // PAYOUT_BURN, acting admin). The fee sweep is CP's own userOp — annotate it
+    // here: a userOp's settlement tx hash isn't final until `success` (a retry
+    // can change it), so we resolve once now and queue if still pending.
     if (report.feeTransferTxHash) {
       await resolveOrEnqueueAnnotation({
         fundId: fund.id,
         chainId: fund.tokenChainId,
         userOpHash: report.feeTransferTxHash,
-        kind: ANNOTATION_KINDS.payoutFee,
+        kind: ANNOTATION_TRIGGERS.payoutFee,
+        trigger: ANNOTATION_TRIGGERS.payoutFee,
+        triggeredByUserId: user.id,
       });
     }
 
@@ -776,7 +784,7 @@ export async function feeTransferAction(input: {
   payoutId: string;
 }): Promise<FeeTransferActionResult> {
   const t = await getTranslations("fund.payments.settlement.errors");
-  const { fund } = await requireFundRole("ADMIN");
+  const { fund, user } = await requireFundRole("ADMIN");
 
   const destination = fund.tokenMinterSmartAccountAddress;
   if (!destination) return { error: t("noFeeDestination") };
@@ -790,7 +798,9 @@ export async function feeTransferAction(input: {
       fundId: fund.id,
       chainId: fund.tokenChainId,
       userOpHash: res.feeTransferTxHash,
-      kind: ANNOTATION_KINDS.payoutFee,
+      kind: ANNOTATION_TRIGGERS.payoutFee,
+      trigger: ANNOTATION_TRIGGERS.payoutFee,
+      triggeredByUserId: user.id,
     });
     revalidatePath("/payments");
     revalidatePath(`/payments/payouts/${input.payoutId}`);

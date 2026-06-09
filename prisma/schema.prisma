@@ -65,6 +65,10 @@ model User {
   memberRecords     Member[] // demand-side member rows linked to this auth user (rare)
   reviewedMerchants Merchant[] // merchants this admin reviewed (approved or rejected)
 
+  // Mint/burn audit: annotations whose underlying op this user triggered.
+  triggeredAnnotations        TransactionAnnotation[] @relation("AnnotationTriggeredBy")
+  triggeredPendingAnnotations PendingAnnotation[]     @relation("PendingAnnotationTriggeredBy")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -308,11 +312,21 @@ model TransactionAnnotation {
   kind   String // machine category (PAYOUT_FEE, ACCOUNT_MINT, …)
   note   String? // optional free-text detail / custom annotation
 
+  // Mint/burn audit (immutable, set at creation — distinct from the
+  // operator-editable kind/note). `trigger` is the system origin of the op
+  // (ANNOTATION_TRIGGERS); `triggeredByUserId` is the acting admin, NULL for
+  // system/cron-driven ops (bank-sync, period-close). Both NULL on pre-audit
+  // historical rows.
+  trigger           String?
+  triggeredByUserId String? @db.Uuid
+  triggeredBy       User?   @relation("AnnotationTriggeredBy", fields: [triggeredByUserId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([fundId, txHash])
   @@index([fundId])
+  @@index([triggeredByUserId])
 }
 
 // A userOp hash awaiting resolution to its settlement tx hash, so we can write
@@ -332,11 +346,17 @@ model PendingAnnotation {
   note       String? // optional note to carry onto the final annotation
   attempts   Int     @default(0) // poll count — capped so we don't loop forever
 
+  // Carried onto the resolved TransactionAnnotation (see that model).
+  trigger           String?
+  triggeredByUserId String? @db.Uuid
+  triggeredBy       User?   @relation("PendingAnnotationTriggeredBy", fields: [triggeredByUserId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([fundId, userOpHash])
   @@index([fundId])
+  @@index([triggeredByUserId])
 }
 
 // A named, fund-owned smart account. Counterfactually derived (CREATE2) from

@@ -17,7 +17,7 @@ import {
   manualBurnDirectAction,
   manualMintDirectAction,
 } from "@/services/token-operations/admin-actions";
-import { ANNOTATION_KINDS } from "@/services/transaction-annotation/annotate";
+import { ANNOTATION_TRIGGERS } from "@/services/transaction-annotation/annotate";
 import { resolveOrEnqueueAnnotation } from "@/services/transaction-annotation/pending";
 
 import {
@@ -162,18 +162,15 @@ export async function accountMintInAction(input: {
   });
   if (!account) return { error: t("fund.accounts.errors.notFound" as never) };
 
-  const mint = await manualMintDirectAction({
-    to: account.address,
-    amount: parsed.data.amount,
-  });
+  const mint = await manualMintDirectAction(
+    {
+      to: account.address,
+      amount: parsed.data.amount,
+    },
+    { trigger: ANNOTATION_TRIGGERS.accountMint },
+  );
   if ("error" in mint) return { error: mint.error };
 
-  await resolveOrEnqueueAnnotation({
-    fundId: fund.id,
-    chainId: fund.tokenChainId,
-    userOpHash: mint.userOpHash,
-    kind: ANNOTATION_KINDS.accountMint,
-  });
   revalidatePath("/accounts");
   revalidatePath(`/accounts/${parsed.data.id}`);
   refresh();
@@ -200,18 +197,15 @@ export async function accountBurnOutAction(input: {
   });
   if (!account) return { error: t("fund.accounts.errors.notFound" as never) };
 
-  const burn = await manualBurnDirectAction({
-    from: account.address,
-    amount: parsed.data.amount,
-  });
+  const burn = await manualBurnDirectAction(
+    {
+      from: account.address,
+      amount: parsed.data.amount,
+    },
+    { trigger: ANNOTATION_TRIGGERS.accountBurn },
+  );
   if ("error" in burn) return { error: burn.error };
 
-  await resolveOrEnqueueAnnotation({
-    fundId: fund.id,
-    chainId: fund.tokenChainId,
-    userOpHash: burn.userOpHash,
-    kind: ANNOTATION_KINDS.accountBurn,
-  });
   revalidatePath("/accounts");
   revalidatePath(`/accounts/${parsed.data.id}`);
   refresh();
@@ -227,7 +221,7 @@ export async function accountTransferAction(input: {
   amount: string;
 }): Promise<MoveTokensResult> {
   const t = await getTranslations();
-  const { fund } = await requireFundRole("ADMIN");
+  const { fund, user } = await requireFundRole("ADMIN");
 
   const parsed = TransferTokensSchema.safeParse(input);
   if (!parsed.success) {
@@ -279,7 +273,9 @@ export async function accountTransferAction(input: {
       fundId: fund.id,
       chainId: fund.tokenChainId,
       userOpHash,
-      kind: ANNOTATION_KINDS.accountTransfer,
+      kind: ANNOTATION_TRIGGERS.accountTransfer,
+      trigger: ANNOTATION_TRIGGERS.accountTransfer,
+      triggeredByUserId: user.id,
     });
     revalidatePath("/accounts");
     revalidatePath(`/accounts/${parsed.data.id}`);

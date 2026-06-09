@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { TxAnnotationCell } from "@/components/tx-annotation";
+import { TxAnnotationCell, TxTriggerCell } from "@/components/tx-annotation";
 import { prisma } from "@/services/db/prisma";
 import { formatTokenAmount, isZeroAddress } from "@/services/alchemy/format";
 import { listTransfers } from "@/services/alchemy/transfers";
@@ -180,12 +180,13 @@ export async function TransfersTable({
             <TableHead aria-label="" className="w-6" />
             <TableHead>{t("to")}</TableHead>
             <TableHead className="text-right">{t("amount")}</TableHead>
+            <TableHead>{t("trigger")}</TableHead>
             <TableHead>{t("note")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {page.transfers.length === 0 ? (
-            <TableEmpty colSpan={6}>{t("empty")}</TableEmpty>
+            <TableEmpty colSpan={7}>{t("empty")}</TableEmpty>
           ) : (
             page.transfers.map((tx) => (
               <TableRow key={tx.uniqueId}>
@@ -223,6 +224,17 @@ export async function TransfersTable({
                       {symbol}
                     </span>
                   )}
+                </TableCell>
+                <TableCell>
+                  <TxTriggerCell
+                    trigger={
+                      annotations.get(tx.hash.toLowerCase())?.trigger ?? null
+                    }
+                    triggeredBy={
+                      annotations.get(tx.hash.toLowerCase())?.triggeredByName ??
+                      null
+                    }
+                  />
                 </TableCell>
                 <TableCell>
                   <TxAnnotationCell
