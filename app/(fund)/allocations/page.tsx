@@ -223,17 +223,23 @@ async function ScheduleTab({
   allocationMode,
 }: {
   fundId: string;
-  allocationMode: "FIXED_PERIOD" | "PAY_AND_GO";
+  allocationMode: "FIXED_PERIOD" | "PAY_AND_GO" | "DISABLED";
 }) {
   const t = await getTranslations("fund.allocations.schedule");
   const format = await getFormatter();
 
-  if (allocationMode === "PAY_AND_GO") {
+  // Only FIXED_PERIOD funds have periods. Pay-and-go and disabled funds show
+  // an explanatory card instead of the period schedule.
+  if (allocationMode !== "FIXED_PERIOD") {
     return (
       <Card>
         <CardHeader>
           <CardTitle>{t("title")}</CardTitle>
-          <CardDescription>{t("payAndGoDescription")}</CardDescription>
+          <CardDescription>
+            {allocationMode === "PAY_AND_GO"
+              ? t("payAndGoDescription")
+              : t("disabledDescription")}
+          </CardDescription>
         </CardHeader>
       </Card>
     );

@@ -499,7 +499,8 @@
         "empty": "Nog geen periodes.",
         "newPeriod": "Nieuwe periode",
         "edit": "Bewerken",
-        "actions": "Acties"
+        "actions": "Acties",
+        "disabledDescription": "Allocatie is uitgeschakeld voor dit fonds. Stortingen worden nog vastgelegd en aan leden gekoppeld, maar er worden geen tokens aangemaakt."
       },
       "periodDetail": {
         "back": "Alle periodes",
@@ -1098,7 +1099,8 @@
         "modeFixedPeriod": "Vaste periode",
         "modePayAndGo": "Pay-and-go",
         "allocationCutoffDay": "Afkapdag allocaties",
-        "allocationCutoffDayHint": "Dag van de maand waarop allocaties met vaste periode worden uitgekeerd. 31 = laatste dag van de maand."
+        "allocationCutoffDayHint": "Dag van de maand waarop allocaties met vaste periode worden uitgekeerd. 31 = laatste dag van de maand.",
+        "modeDisabled": "Uitgeschakeld"
       },
       "branding": {
         "title": "Huisstijl",
@@ -2598,7 +2600,8 @@
       "exists": "Er bestaat al een periode voor die maand.",
       "notFound": "Periode niet gevonden.",
       "closed": "Deze periode is al afgesloten en kan niet worden bewerkt.",
-      "monthMismatch": "De afkapdatum moet binnen de maand van de periode vallen."
+      "monthMismatch": "De afkapdatum moet binnen de maand van de periode vallen.",
+      "notFixedPeriod": "Periodes gelden alleen wanneer allocatie op vaste periode staat."
     }
   }
 }

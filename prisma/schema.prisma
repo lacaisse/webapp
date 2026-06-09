@@ -303,6 +303,7 @@ model Fund {
 enum AllocationMode {
   FIXED_PERIOD // attribute tokens at the end of each period (monthly etc.)
   PAY_AND_GO // mint immediately when CP reports a deposit
+  DISABLED // no automatic allocation: deposits are still mirrored/matched, but no minting and no periods
 }
 
 // Per-fund annotation of an on-chain transaction, keyed by tx hash. Lets us

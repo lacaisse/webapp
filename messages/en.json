@@ -622,7 +622,8 @@
         "empty": "No periods yet.",
         "newPeriod": "New period",
         "edit": "Edit",
-        "actions": "Actions"
+        "actions": "Actions",
+        "disabledDescription": "Allocation is disabled for this fund. Deposits are still recorded and matched to members, but no tokens are minted."
       },
       "periodDetail": {
         "back": "All periods",
@@ -1221,7 +1222,8 @@
         "modeFixedPeriod": "Fixed period",
         "modePayAndGo": "Pay-and-go",
         "allocationCutoffDay": "Allocation cutoff day",
-        "allocationCutoffDayHint": "Day of the month fixed-period allocations are distributed. 31 = last day of the month."
+        "allocationCutoffDayHint": "Day of the month fixed-period allocations are distributed. 31 = last day of the month.",
+        "modeDisabled": "Disabled"
       },
       "branding": {
         "title": "Branding",
@@ -2598,7 +2600,8 @@
       "exists": "A period for that month already exists.",
       "notFound": "Period not found.",
       "closed": "This period is already closed and can't be edited.",
-      "monthMismatch": "The cutoff date must fall within the period's own month."
+      "monthMismatch": "The cutoff date must fall within the period's own month.",
+      "notFixedPeriod": "Periods only apply when allocation is set to fixed period."
     }
   }
 }

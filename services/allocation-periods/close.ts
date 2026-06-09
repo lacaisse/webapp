@@ -35,7 +35,13 @@ export type ClosePeriodStats = {
 export async function closeExpiredPeriods(): Promise<ClosePeriodStats[]> {
   const now = new Date();
   const candidates = await prisma.allocationPeriod.findMany({
-    where: { status: "OPEN", cutoffDate: { lte: now } },
+    // Only FIXED_PERIOD funds batch-mint. If a fund switched to PAY_AND_GO or
+    // DISABLED, any leftover OPEN period must NOT mint at cutoff.
+    where: {
+      status: "OPEN",
+      cutoffDate: { lte: now },
+      fund: { allocationMode: "FIXED_PERIOD" },
+    },
     orderBy: { cutoffDate: "asc" },
     select: {
       id: true,

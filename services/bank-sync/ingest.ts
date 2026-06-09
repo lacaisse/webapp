@@ -39,7 +39,7 @@ type IngestionFund = {
   citizenPayApiKeyId: string | null;
   citizenPayApiKeyEnc: string | null;
   citizenPayLastSyncedAt: Date | null;
-  allocationMode: "FIXED_PERIOD" | "PAY_AND_GO";
+  allocationMode: "FIXED_PERIOD" | "PAY_AND_GO" | "DISABLED";
   allocationCutoffDay: number;
   name: string;
   primaryColor: string | null;

@@ -185,7 +185,7 @@ type Fund = {
   name: string;
   defaultLocale: string;
   timezone: string;
-  allocationMode: "FIXED_PERIOD" | "PAY_AND_GO";
+  allocationMode: "FIXED_PERIOD" | "PAY_AND_GO" | "DISABLED";
   allocationCutoffDay: number;
   logoUrl: string | null;
   primaryColor: string | null;
@@ -222,7 +222,10 @@ export function GeneralForm({ fund }: { fund: Fund }) {
           // coerce back at the call boundary.
           defaultLocale: v.defaultLocale as SupportedLocale,
           timezone: v.timezone,
-          allocationMode: v.allocationMode as "FIXED_PERIOD" | "PAY_AND_GO",
+          allocationMode: v.allocationMode as
+            | "FIXED_PERIOD"
+            | "PAY_AND_GO"
+            | "DISABLED",
           allocationCutoffDay: Number(v.allocationCutoffDay),
         })
       }
@@ -249,6 +252,7 @@ export function GeneralForm({ fund }: { fund: Fund }) {
           options: [
             { value: "FIXED_PERIOD", label: t("modeFixedPeriod") },
             { value: "PAY_AND_GO", label: t("modePayAndGo") },
+            { value: "DISABLED", label: t("modeDisabled") },
           ],
         },
         {

@@ -622,7 +622,8 @@
         "empty": "Aún no hay periodos.",
         "newPeriod": "Nuevo período",
         "edit": "Editar",
-        "actions": "Acciones"
+        "actions": "Acciones",
+        "disabledDescription": "La asignación está desactivada para este fondo. Los ingresos se registran y se asignan a los miembros, pero no se emiten tokens."
       },
       "periodDetail": {
         "back": "Todos los periodos",
@@ -1221,7 +1222,8 @@
         "modeFixedPeriod": "Período fijo",
         "modePayAndGo": "Pago inmediato",
         "allocationCutoffDay": "Día de corte de asignaciones",
-        "allocationCutoffDayHint": "Día del mes en que se distribuyen las asignaciones de período fijo. 31 = último día del mes."
+        "allocationCutoffDayHint": "Día del mes en que se distribuyen las asignaciones de período fijo. 31 = último día del mes.",
+        "modeDisabled": "Desactivado"
       },
       "branding": {
         "title": "Marca",
@@ -2598,7 +2600,8 @@
       "exists": "Ya existe un período para ese mes.",
       "notFound": "Período no encontrado.",
       "closed": "Este período ya está cerrado y no se puede editar.",
-      "monthMismatch": "La fecha de corte debe estar dentro del mes del período."
+      "monthMismatch": "La fecha de corte debe estar dentro del mes del período.",
+      "notFixedPeriod": "Los períodos solo se aplican cuando la asignación está en modo de período fijo."
     }
   }
 }

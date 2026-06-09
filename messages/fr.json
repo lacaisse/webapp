@@ -659,7 +659,8 @@
         "empty": "Aucune période pour le moment.",
         "newPeriod": "Nouvelle période",
         "edit": "Modifier",
-        "actions": "Actions"
+        "actions": "Actions",
+        "disabledDescription": "L'allocation est désactivée pour cette caisse. Les versements sont enregistrés et associés aux membres, mais aucun jeton n'est émis."
       },
       "periods": {
         "dialog": {
@@ -1221,7 +1222,8 @@
         "modeFixedPeriod": "Période fixe",
         "modePayAndGo": "Pay-and-go",
         "allocationCutoffDay": "Jour de clôture des allocations",
-        "allocationCutoffDayHint": "Jour du mois où les allocations à période fixe sont distribuées. 31 = dernier jour du mois."
+        "allocationCutoffDayHint": "Jour du mois où les allocations à période fixe sont distribuées. 31 = dernier jour du mois.",
+        "modeDisabled": "Désactivé"
       },
       "branding": {
         "title": "Identité visuelle",
@@ -2598,7 +2600,8 @@
       "exists": "Une période existe déjà pour ce mois.",
       "notFound": "Période introuvable.",
       "closed": "Cette période est déjà clôturée et ne peut pas être modifiée.",
-      "monthMismatch": "La date limite doit se situer dans le mois de la période."
+      "monthMismatch": "La date limite doit se situer dans le mois de la période.",
+      "notFixedPeriod": "Les périodes ne s'appliquent que lorsque l'allocation est en mode période fixe."
     }
   }
 }

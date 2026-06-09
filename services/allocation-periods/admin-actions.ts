@@ -52,6 +52,9 @@ export async function createPeriodAction(
 ): Promise<PeriodMutationResult> {
   const t = await getTranslations();
   const { fund } = await requireFundRole("ADMIN");
+  if (fund.allocationMode !== "FIXED_PERIOD") {
+    return { error: t("periods.errors.notFixedPeriod" as never) };
+  }
 
   const parsed = PeriodSchema.safeParse(input);
   if (!parsed.success) {
@@ -88,6 +91,9 @@ export async function updatePeriodAction(input: {
 }): Promise<PeriodMutationResult> {
   const t = await getTranslations();
   const { fund } = await requireFundRole("ADMIN");
+  if (fund.allocationMode !== "FIXED_PERIOD") {
+    return { error: t("periods.errors.notFixedPeriod" as never) };
+  }
 
   const parsed = PeriodSchema.safeParse({ cutoffDate: input.cutoffDate });
   if (!parsed.success) {
