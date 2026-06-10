@@ -15,36 +15,48 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
-import { fetchStoredBankTransactions, TRANSACTIONS_PAGE_SIZE } from "./data";
+import {
+  fetchFundPeriods,
+  fetchStoredBankTransactions,
+  TRANSACTIONS_PAGE_SIZE,
+} from "./data";
+import { BankTxPeriodPicker } from "./period-picker";
 import { resolveRangeWindow, type RangePreset } from "./range";
 
 // Server-rendered, offset-paginated view of the locally-stored bank
 // transactions for a date range. Newest-first; `amount` is the unsigned
-// magnitude, so `direction` carries the sign for display.
+// magnitude, so `direction` carries the sign for display. For FIXED_PERIOD
+// funds (`showPeriod`), a Period column shows each deposit's allocation
+// period with an inline picker to manually (re)assign it.
 export async function BankTransactionsTable({
   fundId,
   range,
   from,
   to,
   page,
+  showPeriod,
 }: {
   fundId: string;
   range: RangePreset;
   from?: string;
   to?: string;
   page: number;
+  showPeriod: boolean;
 }) {
   const t = await getTranslations("fund.bank.transactions");
   const format = await getFormatter();
 
   const window = resolveRangeWindow(range, from, to);
-  const { transactions, total } = await fetchStoredBankTransactions({
-    fundId,
-    from: window.from,
-    to: window.to,
-    page,
-    pageSize: TRANSACTIONS_PAGE_SIZE,
-  });
+  const [{ transactions, total }, periods] = await Promise.all([
+    fetchStoredBankTransactions({
+      fundId,
+      from: window.from,
+      to: window.to,
+      page,
+      pageSize: TRANSACTIONS_PAGE_SIZE,
+    }),
+    showPeriod ? fetchFundPeriods(fundId) : Promise.resolve([]),
+  ]);
 
   const totalPages = Math.max(1, Math.ceil(total / TRANSACTIONS_PAGE_SIZE));
   const clampedPage = Math.min(Math.max(page, 1), totalPages);
@@ -58,12 +70,15 @@ export async function BankTransactionsTable({
             <TableHead>{t("counterpart")}</TableHead>
             <TableHead>{t("reference")}</TableHead>
             <TableHead>{t("member")}</TableHead>
+            {showPeriod && <TableHead>{t("period")}</TableHead>}
             <TableHead className="text-right">{t("amount")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {transactions.length === 0 ? (
-            <TableEmpty colSpan={5}>{t("emptyRange")}</TableEmpty>
+            <TableEmpty colSpan={showPeriod ? 6 : 5}>
+              {t("emptyRange")}
+            </TableEmpty>
           ) : (
             transactions.map((tx) => {
               const signed =
@@ -93,6 +108,28 @@ export async function BankTransactionsTable({
                       <span className="text-muted-foreground">—</span>
                     )}
                   </TableCell>
+                  {showPeriod && (
+                    <TableCell>
+                      {tx.direction !== "INCOMING" ? (
+                        <span className="text-muted-foreground">—</span>
+                      ) : tx.locked ? (
+                        // Already used as a mint source — assignment is
+                        // locked, show the period as plain text.
+                        <span
+                          className="text-sm"
+                          title={t("periodLocked")}
+                        >
+                          {tx.periodLabel ?? "—"}
+                        </span>
+                      ) : (
+                        <BankTxPeriodPicker
+                          bankTransactionId={tx.id}
+                          currentPeriodId={tx.allocationPeriodId}
+                          periods={periods}
+                        />
+                      )}
+                    </TableCell>
+                  )}
                   <TableCell
                     className={cn(
                       "text-right font-medium tabular-nums",

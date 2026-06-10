@@ -42,6 +42,9 @@ export type CardWire = {
   owner?: string | null;
   pin?: string | null;
   status: "active" | "inactive" | "blocked";
+  // Serial of the card this card pulls from when its own balance can't cover
+  // a charge ("source card"). Omitted when no source is set.
+  source_serial?: string | null;
   last_activity?: string | null;
   limits?: Record<string, unknown> | null;
   notes?: string | null;
@@ -511,13 +514,18 @@ export const cards = {
   delete(creds: CitizenPayApiCredentials, serial: string): Promise<void> {
     return request(creds, "DELETE", `/v2/treasury/cards/${encodeURIComponent(serial)}`);
   },
-  updateStatus(
+  // PATCH accepts `status` and/or `source_serial` (empty string clears the
+  // source) — either field alone or both in one call.
+  update(
     creds: CitizenPayApiCredentials,
     serial: string,
-    status: "active" | "inactive" | "blocked",
-  ): Promise<{ status: string }> {
+    body: {
+      status?: "active" | "inactive" | "blocked";
+      source_serial?: string;
+    },
+  ): Promise<{ status?: string; source_serial?: string }> {
     return request(creds, "PATCH", `/v2/treasury/cards/${encodeURIComponent(serial)}`, {
-      body: { status },
+      body,
     });
   },
   balance(

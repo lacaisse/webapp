@@ -412,6 +412,7 @@ export async function importOneCardAction(input: {
         number: await nextCardNumber(fund.id),
         holderName: null,
         status: detail.status,
+        sourceSerial: detail.sourceSerial,
         issuedAt: new Date(detail.createdAt),
       },
     });
@@ -585,6 +586,63 @@ export async function setCardNumberAction(input: {
 
   await prisma.card.update({ where: { id: card.id }, data: { number } });
   revalidatePath("/cards");
+  return { ok: true };
+}
+
+export type SetCardSourceResult = { ok: true } | { error: string };
+
+// Set (or clear) the card this card pulls from when its own balance can't
+// cover a charge ("source card"). The relationship lives on CitizenPay —
+// we don't mirror it locally; the detail page reads it back via
+// `getCardSource`. Both cards are fund-scoped here, and CP enforces the
+// same ownership rule on its side.
+export async function setCardSourceAction(input: {
+  cardId: string;
+  sourceCardId: string | null;
+}): Promise<SetCardSourceResult> {
+  const t = await getTranslations();
+  const { fund } = await requireFundRole("ADMIN");
+
+  const card = await prisma.card.findFirst({
+    where: { id: input.cardId, fundId: fund.id },
+    select: { id: true, serialNumber: true },
+  });
+  if (!card) return { error: t("cards.admin.source.errors.notFound" as never) };
+
+  let sourceSerial: string | null = null;
+  if (input.sourceCardId !== null) {
+    if (input.sourceCardId === card.id) {
+      return { error: t("cards.admin.source.errors.self" as never) };
+    }
+    const source = await prisma.card.findFirst({
+      where: { id: input.sourceCardId, fundId: fund.id },
+      select: { serialNumber: true },
+    });
+    if (!source) {
+      return { error: t("cards.admin.source.errors.sourceNotFound" as never) };
+    }
+    sourceSerial = source.serialNumber;
+  }
+
+  try {
+    await getCitizenPayClient(fund).setCardSource(
+      card.serialNumber,
+      sourceSerial,
+    );
+  } catch (e) {
+    console.error("[citizenpay] setCardSource failed", e);
+    return { error: t("cards.admin.source.errors.failed" as never) };
+  }
+
+  // Write through to the local display cache (the cards list renders from
+  // Prisma). CP stays authoritative; sync heals any drift.
+  await prisma.card.update({
+    where: { id: card.id },
+    data: { sourceSerial },
+  });
+
+  revalidatePath("/cards");
+  revalidatePath(`/cards/${card.id}`);
   return { ok: true };
 }
 

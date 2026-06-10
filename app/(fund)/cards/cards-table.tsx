@@ -127,6 +127,31 @@ export async function CardsTable({
     }
   }
 
+  // Resolve the page's source serials (mirror of CP's "pull-from" card) to
+  // local cards in one query, for a labelled link. A serial with no local row
+  // (source exists on CP only) renders as the raw serial.
+  const sourceSerials = [
+    ...new Set(
+      pageCards
+        .map((c) => c.sourceSerial)
+        .filter((s): s is string => Boolean(s)),
+    ),
+  ];
+  const sourceCards =
+    sourceSerials.length > 0
+      ? await prisma.card.findMany({
+          where: { fundId: fund.id, serialNumber: { in: sourceSerials } },
+          select: {
+            id: true,
+            serialNumber: true,
+            number: true,
+            holderName: true,
+            member: { select: { firstName: true, lastName: true } },
+          },
+        })
+      : [];
+  const sourceBySerial = new Map(sourceCards.map((s) => [s.serialNumber, s]));
+
   return (
     <div>
       <Table>
@@ -136,6 +161,7 @@ export async function CardsTable({
             <TableHead>{t("columns.serial")}</TableHead>
             <TableHead>{t("columns.holder")}</TableHead>
             <TableHead>{t("columns.member")}</TableHead>
+            <TableHead>{t("columns.source")}</TableHead>
             <TableHead>{t("columns.status")}</TableHead>
             <TableHead className="text-right">
               {t("columns.balance")}
@@ -146,7 +172,7 @@ export async function CardsTable({
         </TableHeader>
         <TableBody>
           {pageCards.length === 0 ? (
-            <TableEmpty colSpan={8}>{t("empty")}</TableEmpty>
+            <TableEmpty colSpan={9}>{t("empty")}</TableEmpty>
           ) : (
             pageCards.map((c) => {
               // Unattached cards (imported from CitizenPay before any member
@@ -190,6 +216,16 @@ export async function CardsTable({
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {memberName || "—"}
+                  </TableCell>
+                  <TableCell>
+                    <SourceCell
+                      sourceSerial={c.sourceSerial}
+                      source={
+                        c.sourceSerial
+                          ? (sourceBySerial.get(c.sourceSerial) ?? null)
+                          : null
+                      }
+                    />
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap items-center gap-1">
@@ -248,6 +284,43 @@ function StatusBadge({ status }: { status: CardStatusEnum }) {
   if (status === "ACTIVE") return <Badge variant="success">{status}</Badge>;
   if (status === "BLOCKED") return <Badge variant="destructive">{status}</Badge>;
   return <Badge>{status}</Badge>;
+}
+
+// The card this card pulls from when its own balance can't cover a charge.
+// Linked when the source resolves to a local card; raw serial otherwise.
+function SourceCell({
+  sourceSerial,
+  source,
+}: {
+  sourceSerial: string | null;
+  source: {
+    id: string;
+    serialNumber: string;
+    number: number | null;
+    holderName: string | null;
+    member: { firstName: string; lastName: string } | null;
+  } | null;
+}) {
+  if (!sourceSerial) {
+    return <span className="text-muted-foreground">—</span>;
+  }
+  if (!source) {
+    return <span className="font-mono text-xs">{sourceSerial}</span>;
+  }
+  const holder =
+    source.holderName ||
+    (source.member
+      ? `${source.member.firstName} ${source.member.lastName}`.trim()
+      : "");
+  const label =
+    [source.number !== null ? `#${source.number}` : null, holder]
+      .filter(Boolean)
+      .join(" · ") || source.serialNumber;
+  return (
+    <Link href={`/cards/${source.id}`} className="text-sm hover:underline">
+      {label}
+    </Link>
+  );
 }
 
 function PageNumberNav({

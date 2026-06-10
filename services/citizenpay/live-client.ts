@@ -219,6 +219,7 @@ function cardFromWire(w: {
   serial: string;
   status: "active" | "inactive" | "blocked";
   owner?: string | null;
+  source_serial?: string | null;
   created_at: string;
   last_activity?: string | null;
 }): CitizenPayCard {
@@ -226,6 +227,8 @@ function cardFromWire(w: {
     serialNumber: w.serial,
     status: statusFromWire(w.status),
     owner: w.owner ?? null,
+    // CP omits the field (or sends "") when no source is set.
+    sourceSerial: w.source_serial || null,
     createdAt: w.created_at,
     lastActivity: w.last_activity ?? null,
   };
@@ -279,7 +282,7 @@ export class LiveCitizenPayClient implements CitizenPayClient {
 
   async blockCard(serialNumber: string): Promise<void> {
     try {
-      await apiCards.updateStatus(this.creds, serialNumber, "blocked");
+      await apiCards.update(this.creds, serialNumber, { status: "blocked" });
     } catch (e) {
       // Idempotency: if CP rejects because it's already in the target state,
       // treat as success. The spec doesn't promise idempotent semantics,
@@ -291,7 +294,7 @@ export class LiveCitizenPayClient implements CitizenPayClient {
 
   async unblockCard(serialNumber: string): Promise<void> {
     try {
-      await apiCards.updateStatus(this.creds, serialNumber, "active");
+      await apiCards.update(this.creds, serialNumber, { status: "active" });
     } catch (e) {
       if (e instanceof CitizenPayApiError && e.status === 409) return;
       throw e;
@@ -346,7 +349,9 @@ export class LiveCitizenPayClient implements CitizenPayClient {
       if (!occurredAt) continue;
       transactions.push(payloadFromBankingWire(tx, occurredAt));
     }
-    return { transactions, nextCursor: w.nextCursor ?? null, fetched: raw.length };
+    // CP's handler returns a Go zero-value `""` (never null) at end of
+    // history — normalise to null so callers' done checks work.
+    return { transactions, nextCursor: w.nextCursor || null, fetched: raw.length };
   }
 
   async listBankTransactions(
@@ -530,9 +535,29 @@ export class LiveCitizenPayClient implements CitizenPayClient {
     const wire =
       status === "ACTIVE" ? "active" : status === "BLOCKED" ? "blocked" : "inactive";
     try {
-      await apiCards.updateStatus(this.creds, serialNumber, wire);
+      await apiCards.update(this.creds, serialNumber, { status: wire });
     } catch (e) {
       if (e instanceof CitizenPayApiError && e.status === 409) return;
+      throw e;
+    }
+  }
+
+  async setCardSource(
+    serialNumber: string,
+    sourceSerial: string | null,
+  ): Promise<void> {
+    // Empty string is CP's "clear the source" sentinel on the PATCH.
+    await apiCards.update(this.creds, serialNumber, {
+      source_serial: sourceSerial ?? "",
+    });
+  }
+
+  async getCardSource(serialNumber: string): Promise<string | null> {
+    try {
+      const res = await apiCards.get(this.creds, serialNumber);
+      return res.card.source_serial || null;
+    } catch (e) {
+      if (e instanceof CitizenPayApiError && e.status === 404) return null;
       throw e;
     }
   }

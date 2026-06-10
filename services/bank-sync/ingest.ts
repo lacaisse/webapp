@@ -3,7 +3,10 @@ import "server-only";
 
 import { Prisma } from "@/services/db/generated/client";
 
-import { ensureOpenPeriod } from "@/services/allocation-periods/ensure";
+import {
+  ensureOpenPeriod,
+  ensurePeriodForDate,
+} from "@/services/allocation-periods/ensure";
 import { getCitizenPayClient } from "@/services/citizenpay/client";
 import type { BankTransactionPayload } from "@/services/citizenpay/types";
 
@@ -25,6 +28,14 @@ import { ANNOTATION_TRIGGERS } from "@/services/transaction-annotation/annotate"
 // PAY_AND_GO vs FIXED_PERIOD: FIXED_PERIOD funds just record + tag the
 // transaction with the current open AllocationPeriod (if any). The period
 // close cron is responsible for batch minting.
+//
+// Two behaviors share this module:
+// - "automated" (cron): full side effects — match, confirmation email, and
+//   PAY_AND_GO mint. Deposits attach to the fund's current open period.
+// - "backfill" (manual full sync): mirror + match ONLY. No emails, no mints.
+//   FIXED_PERIOD deposits are back-allocated to the period their own
+//   occurredAt falls in; already-past months are created CLOSED so the
+//   period-close cron never batch-mints a backfilled period.
 
 export type IngestStats = {
   ingested: number;
@@ -41,10 +52,18 @@ type IngestionFund = {
   citizenPayLastSyncedAt: Date | null;
   allocationMode: "FIXED_PERIOD" | "PAY_AND_GO" | "DISABLED";
   allocationCutoffDay: number;
+  confirmationEmailsPausedAt: Date | null;
   name: string;
   primaryColor: string | null;
   logoUrl: string | null;
 };
+
+// Bank transactions can appear in the Ponto feed days after their
+// executionDate (our `occurredAt`), and the paging watermark compares against
+// occurredAt — without an overlap, a row that settles late reads as "already
+// synced" and is dropped forever. Re-scanning a window behind the last sync is
+// free: the (fundId, externalId) upsert skips rows we already have.
+const WATERMARK_OVERLAP_MS = 7 * 24 * 60 * 60 * 1000;
 
 // Cron path: incremental sync since the fund's last-sync watermark.
 export async function syncFundBankTransactions(
@@ -54,30 +73,40 @@ export async function syncFundBankTransactions(
 
   const result = await cp.listBankTransactions({
     fundCitizenPayId: fund.citizenPayFundId,
-    since: fund.citizenPayLastSyncedAt?.toISOString(),
+    since: fund.citizenPayLastSyncedAt
+      ? new Date(
+          fund.citizenPayLastSyncedAt.getTime() - WATERMARK_OVERLAP_MS,
+        ).toISOString()
+      : undefined,
   });
 
-  const stats = await ingestPayloads(fund, result.transactions);
+  const stats = await ingestPayloads(fund, result.transactions, "automated");
   await touchLastSyncedAt(fund.id);
   return stats;
 }
+
+type IngestBehavior = "automated" | "backfill";
 
 // Manual full-sync, one page at a time. The Bank page drives this in a loop
 // (passing back `nextCursor`) so each request stays short and progress is
 // visible. We ignore the watermark — this re-pulls the full history — and only
 // bump `citizenPayLastSyncedAt` on the final page so a mid-run abort leaves the
 // cron's watermark untouched. Idempotent on (fundId, externalId), so a resumed
-// or restarted run just skips rows it already ingested.
+// or restarted run just skips rows it already ingested. Runs with "backfill"
+// behavior: no emails, no mints — see the module header.
 export async function runFullBankSyncPage(
   fund: IngestionFund,
   cursor?: string,
 ): Promise<{ stats: IngestStats; nextCursor: string | null; done: boolean }> {
   const cp = getCitizenPayClient(fund);
-  const page = await cp.getBankTransactionPayloadPage({ limit: 100, cursor });
-  const stats = await ingestPayloads(fund, page.transactions);
+  // 25 (not 100) per chunk: rows are ingested sequentially (matching +
+  // period lookups), so a smaller page keeps each action short and the UI's
+  // page counter ticking.
+  const page = await cp.getBankTransactionPayloadPage({ limit: 25, cursor });
+  const stats = await ingestPayloads(fund, page.transactions, "backfill");
   // End of history when CP gives no next cursor, or returns an empty page even
   // with a (stale) cursor still present — there's nothing left to ingest.
-  const done = page.nextCursor === null || page.fetched === 0;
+  const done = !page.nextCursor || page.fetched === 0;
   if (done) await touchLastSyncedAt(fund.id);
   return { stats, nextCursor: done ? null : page.nextCursor, done };
 }
@@ -88,11 +117,12 @@ export async function runFullBankSyncPage(
 async function ingestPayloads(
   fund: IngestionFund,
   payloads: BankTransactionPayload[],
+  behavior: IngestBehavior,
 ): Promise<IngestStats> {
   const stats: IngestStats = { ingested: 0, matched: 0, minted: 0, skipped: 0 };
   for (const payload of payloads) {
     try {
-      const r = await ingestOne(fund, payload);
+      const r = await ingestOne(fund, payload, behavior);
       if (r === "skipped") stats.skipped++;
       else {
         stats.ingested++;
@@ -115,21 +145,58 @@ function touchLastSyncedAt(fundId: string): Promise<unknown> {
 
 type IngestOneResult = "skipped" | { matched: boolean; minted: boolean };
 
+// The allocation period an INCOMING deposit attaches to. Live ingest uses the
+// fund's current open period; backfill uses the period the deposit's own
+// occurredAt falls in (past months back-created CLOSED).
+function resolveAllocationPeriod(
+  fund: IngestionFund,
+  payload: BankTransactionPayload,
+  behavior: IngestBehavior,
+): Promise<string | null> {
+  if (fund.allocationMode !== "FIXED_PERIOD") return Promise.resolve(null);
+  return behavior === "backfill"
+    ? ensurePeriodForDate(
+        fund.id,
+        fund.allocationCutoffDay,
+        new Date(payload.occurredAt),
+      )
+    : ensureOpenPeriod(fund.id, fund.allocationCutoffDay);
+}
+
 async function ingestOne(
   fund: IngestionFund,
   payload: BankTransactionPayload,
+  behavior: IngestBehavior,
 ): Promise<IngestOneResult> {
   const existing = await prisma.bankTransaction.findUnique({
     where: {
       fundId_externalId: { fundId: fund.id, externalId: payload.externalId },
     },
-    select: { id: true, matchedAt: true },
+    select: { id: true, matchedAt: true, allocationPeriodId: true },
   });
   // Already ingested + already matched — nothing to do. Re-match logic for
   // previously-unmatched rows isn't run here because the cron only pulls
   // "new since cursor"; if a member registers later, admin can manually
   // link via the UI (TBD).
-  if (existing?.matchedAt) return "skipped";
+  if (existing?.matchedAt) {
+    // Backfill repair: a matched row can still lack its allocation period
+    // (ingested while the fund was in another mode, or before periods
+    // existed). Attaching it is data-only — no emails, no mints.
+    if (
+      behavior === "backfill" &&
+      payload.direction === "INCOMING" &&
+      !existing.allocationPeriodId
+    ) {
+      const periodId = await resolveAllocationPeriod(fund, payload, behavior);
+      if (periodId) {
+        await prisma.bankTransaction.update({
+          where: { id: existing.id },
+          data: { allocationPeriodId: periodId },
+        });
+      }
+    }
+    return "skipped";
+  }
 
   // For the OUTGOING direction (merchant payouts), we just mirror — no
   // member matching, no minting. Match-to-merchant comes when we wire
@@ -140,34 +207,54 @@ async function ingestOne(
     return { matched: false, minted: false };
   }
 
-  // INCOMING: ingest + try to match.
+  // INCOMING: ingest + try to match. FIXED_PERIOD rows get tagged with their
+  // allocation period (created on demand — see resolveAllocationPeriod).
+  // PAY_AND_GO funds don't use periods.
   const match = await matchMember(fund.id, payload);
-  // FIXED_PERIOD: tag the deposit with the fund's current open period,
-  // creating it on demand if it doesn't exist yet (first deposit of the
-  // month / fund's first ever period). PAY_AND_GO funds don't use periods.
-  const allocationPeriodId =
-    fund.allocationMode === "FIXED_PERIOD"
-      ? await ensureOpenPeriod(fund.id, fund.allocationCutoffDay)
-      : null;
+  const allocationPeriodId = await resolveAllocationPeriod(
+    fund,
+    payload,
+    behavior,
+  );
 
   if (!existing) {
     await createBankTransaction(fund.id, payload, match, allocationPeriodId);
-  } else if (match) {
+  } else {
+    // Existing unmatched row: apply a found match. Backfill additionally fills
+    // a missing period (never overwrites one — a row already attached may have
+    // been minted in that period).
+    const fillPeriod =
+      behavior === "backfill" &&
+      !existing.allocationPeriodId &&
+      allocationPeriodId !== null;
+    if (!match && !fillPeriod) return { matched: false, minted: false };
     await prisma.bankTransaction.update({
       where: { id: existing.id },
       data: {
-        memberId: match.memberId,
-        matchedAt: new Date(),
-        matchMethod: match.method,
-        cardId: match.cardId,
-        ...(allocationPeriodId ? { allocationPeriodId } : {}),
+        ...(match
+          ? {
+              memberId: match.memberId,
+              matchedAt: new Date(),
+              matchMethod: match.method,
+              cardId: match.cardId,
+            }
+          : {}),
+        ...(behavior === "backfill"
+          ? fillPeriod
+            ? { allocationPeriodId }
+            : {}
+          : allocationPeriodId
+            ? { allocationPeriodId }
+            : {}),
       },
     });
-  } else {
-    return { matched: false, minted: false };
   }
 
   if (!match) return { matched: false, minted: false };
+
+  // Manual full sync mirrors and back-allocates only — confirmation emails
+  // and PAY_AND_GO mints stay with the live cron.
+  if (behavior === "backfill") return { matched: true, minted: false };
 
   const bankTransactionId = existing?.id ?? (await getBankTransactionId(fund.id, payload.externalId));
   if (!bankTransactionId) return { matched: true, minted: false };
@@ -245,6 +332,10 @@ async function dispatchPaymentConfirmation(args: {
   amount: string;
   occurredAt: string;
 }): Promise<void> {
+  // Fund-level pause: skip entirely (no Email row) — resuming doesn't send
+  // skipped confirmations retroactively.
+  if (args.fund.confirmationEmailsPausedAt) return;
+
   // Look up member email + name. We could pass these from the matcher but
   // re-querying is simpler and the row is small.
   const member = await prisma.member.findUnique({

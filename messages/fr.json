@@ -305,20 +305,22 @@
         "emptyRange": "Aucune transaction sur cette période.",
         "prev": "Précédent",
         "next": "Suivant",
-        "total": "{count, plural, =1 {# transaction} other {# transactions}}"
+        "total": "{count, plural, =1 {# transaction} other {# transactions}}",
+        "period": "Période",
+        "periodLocked": "Déjà utilisé par une émission — la période ne peut plus être modifiée."
       },
       "fullSync": {
         "trigger": "Synchronisation complète",
         "confirmTitle": "Lancer une synchronisation bancaire complète ?",
-        "confirmDescription": "Cela récupère tout l'historique des transactions bancaires depuis CitizenPay et le copie localement. Les nouveaux virements entrants associés à un membre peuvent déclencher des émissions de jetons. L'opération peut être relancée sans risque — les transactions déjà synchronisées sont ignorées.",
+        "confirmDescription": "Cela récupère tout l'historique des transactions bancaires depuis CitizenPay et le copie localement. Aucun e-mail ni émission de jetons n'est déclenché — pour les caisses à période fixe, les dépôts sont rattachés à la période d'allocation où ils ont eu lieu (les périodes passées sont créées clôturées, pour révision). L'opération peut être relancée sans risque — les transactions déjà synchronisées sont ignorées.",
         "confirmCancel": "Annuler",
         "confirmRun": "Lancer la synchronisation",
         "running": "Synchronisation…",
-        "progress": "{ingested, plural, =1 {# transaction synchronisée} other {# transactions synchronisées}} · {matched} associées · {minted} émises",
+        "progress": "{ingested, plural, =1 {# transaction synchronisée} other {# transactions synchronisées}} · {matched} associées · {skipped} ignorées",
         "pages": "{pages, plural, =1 {# page} other {# pages}}",
         "stop": "Arrêter",
         "completeTitle": "Synchronisation complète terminée",
-        "completeSummary": "{ingested, plural, =1 {# transaction synchronisée} other {# transactions synchronisées}} · {matched} associées · {minted} émises",
+        "completeSummary": "{ingested, plural, =1 {# transaction synchronisée} other {# transactions synchronisées}} · {matched} associées · {skipped} ignorées",
         "errorTitle": "Synchronisation interrompue",
         "error": "Impossible de terminer la synchronisation bancaire. Veuillez réessayer.",
         "resume": "Reprendre",
@@ -335,6 +337,16 @@
         "custom": "Personnalisé",
         "from": "Du",
         "to": "Au"
+      },
+      "periodAssign": {
+        "none": "Aucune période",
+        "closedOption": "{label} (clôturée)",
+        "errors": {
+          "notFound": "Transaction introuvable.",
+          "notIncoming": "Seules les transactions entrantes peuvent être rattachées à une période.",
+          "periodNotFound": "Période introuvable.",
+          "locked": "Ce dépôt a déjà servi à une émission — sa période ne peut plus être modifiée."
+        }
       }
     },
     "dashboard": {
@@ -484,7 +496,8 @@
         "status": "Statut",
         "balance": "Solde",
         "issued": "Émise le",
-        "number": "N° carte"
+        "number": "N° carte",
+        "source": "Source"
       },
       "primary": "Carte principale",
       "badges": {
@@ -512,7 +525,8 @@
           "blocked": "Bloquée le",
           "reportedLost": "Signalée perdue le",
           "lastTransaction": "Dernière transaction",
-          "number": "Numéro de carte"
+          "number": "Numéro de carte",
+          "source": "Carte source"
         },
         "transfers": {
           "title": "Transferts",
@@ -532,6 +546,10 @@
           "newer": "Plus récents",
           "older": "Plus anciens",
           "error": "Impossible de charger les transferts on-chain."
+        },
+        "source": {
+          "none": "Aucune source",
+          "hint": "Si le solde de cette carte est insuffisant lors d'un paiement, le montant manquant est prélevé sur la carte source."
         }
       },
       "number": {
@@ -1367,6 +1385,14 @@
         "rateHint": "Pourcentage prélevé sur chaque paiement (ex. 2,5 pour 2,5 %). Laissez vide pour utiliser le taux par défaut de Citizen Pay.",
         "syncPending": "Enregistré localement, mais pas encore confirmé par Citizen Pay. Enregistrez à nouveau pour réessayer la synchronisation.",
         "syncFailed": "Taux enregistré, mais la synchronisation avec Citizen Pay a échoué. Enregistrez à nouveau pour réessayer."
+      },
+      "emails": {
+        "title": "E-mails aux membres",
+        "description": "E-mails automatiques envoyés aux membres concernant leurs dépôts et allocations.",
+        "pause": {
+          "label": "Suspendre les e-mails de confirmation d'allocation et de paiement",
+          "description": "Pendant la pause, les membres ne reçoivent pas d'e-mail lorsqu'un dépôt est enregistré ou que des jetons sont alloués. Les e-mails ignorés ne sont pas mis en attente — rien n'est envoyé rétroactivement à la reprise. Les invitations, vérifications et autres e-mails ne sont pas concernés."
+        }
       }
     }
   },
@@ -1770,6 +1796,14 @@
           "empty": "Aucune ligne valide dans le CSV.",
           "noMatches": "Aucun serial ne correspond à une carte de cette caisse.",
           "columnMissing": "Choisissez une colonne serial et une colonne numéro."
+        }
+      },
+      "source": {
+        "errors": {
+          "notFound": "Carte introuvable.",
+          "sourceNotFound": "Carte source introuvable.",
+          "self": "Une carte ne peut pas être sa propre source.",
+          "failed": "Impossible de mettre à jour la carte source. Réessayez dans un instant."
         }
       }
     }

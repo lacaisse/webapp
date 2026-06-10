@@ -88,6 +88,11 @@ export type StoredBankTransaction = {
   counterpartIban: string | null;
   remittanceInfo: string | null;
   memberName: string | null;
+  allocationPeriodId: string | null;
+  periodLabel: string | null;
+  // True once the deposit has been used as a mint source — its period
+  // assignment is then locked (see setBankTransactionPeriodAction).
+  locked: boolean;
 };
 
 export type StoredBankTransactionsPage = {
@@ -131,6 +136,9 @@ export async function fetchStoredBankTransactions(opts: {
         counterpartIban: true,
         remittanceInfo: true,
         member: { select: { firstName: true, lastName: true } },
+        allocationPeriodId: true,
+        allocationPeriod: { select: { label: true } },
+        _count: { select: { operationSources: true } },
       },
     }),
     prisma.bankTransaction.count({ where }),
@@ -149,7 +157,29 @@ export async function fetchStoredBankTransactions(opts: {
       memberName: b.member
         ? `${b.member.firstName} ${b.member.lastName}`.trim()
         : null,
+      allocationPeriodId: b.allocationPeriodId,
+      periodLabel: b.allocationPeriod?.label ?? null,
+      locked: b._count.operationSources > 0,
     })),
     total,
   };
+}
+
+export type AssignablePeriod = {
+  id: string;
+  label: string;
+  status: "OPEN" | "IN_PROGRESS" | "CLOSED";
+};
+
+// All of the fund's allocation periods, newest first — the manual period
+// picker offers every period (incl. closed backfilled months), so an admin
+// can correct where a historical deposit belongs.
+export async function fetchFundPeriods(
+  fundId: string,
+): Promise<AssignablePeriod[]> {
+  return prisma.allocationPeriod.findMany({
+    where: { fundId },
+    orderBy: { startsAt: "desc" },
+    select: { id: true, label: true, status: true },
+  });
 }

@@ -189,6 +189,20 @@ class MockCitizenPayClient implements CitizenPayClient {
     this.log("setCardStatus", { serialNumber, status });
   }
 
+  async setCardSource(
+    serialNumber: string,
+    sourceSerial: string | null,
+  ): Promise<void> {
+    this.log("setCardSource", { serialNumber, sourceSerial });
+    if (sourceSerial === null) mockCardSources.delete(serialNumber);
+    else mockCardSources.set(serialNumber, sourceSerial);
+  }
+
+  async getCardSource(serialNumber: string): Promise<string | null> {
+    this.log("getCardSource", { serialNumber });
+    return mockCardSources.get(serialNumber) ?? null;
+  }
+
   async deleteCard(serialNumber: string): Promise<void> {
     this.log("deleteCard", { serialNumber });
   }
@@ -643,6 +657,11 @@ const MOCK_PENDING_PAYOUTS: {
   { id: "mock-payout-2", status: "payment-pending", amount: "42.50" },
 ];
 const completedMockPayouts = new Set<string>();
+
+// Card → source-card assignments made this session, so the card detail page
+// round-trips set/fetch in dev. Module-level: the factory hands out a fresh
+// MockCitizenPayClient per call.
+const mockCardSources = new Map<string, string>();
 
 // Plausible dev payout. The place id is arbitrary — the mock `listPlaces`
 // returns no places, so the settlement view falls back to showing the raw

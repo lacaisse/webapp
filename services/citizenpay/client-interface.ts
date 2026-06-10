@@ -187,6 +187,23 @@ export interface CitizenPayClient {
   ): Promise<void>;
 
   /**
+   * Set (or clear, with null) the card another card pulls from when its own
+   * balance can't cover a charge. Both cards must belong to the treasury;
+   * CP rejects self-references and foreign cards with a 400.
+   */
+  setCardSource(
+    serialNumber: string,
+    sourceSerial: string | null,
+  ): Promise<void>;
+
+  /**
+   * Read a card's configured source serial (null when none / card unknown).
+   * Narrow read for the card detail page — unlike `getCitizenPayCard` it
+   * doesn't trigger the balance side-call.
+   */
+  getCardSource(serialNumber: string): Promise<string | null>;
+
+  /**
    * Delete a card on CitizenPay by serial — used to clean up CP orphans
    * (cards present on CP but missing from our local DB). The local Card
    * delete flow also calls this to keep the two sides in lockstep.

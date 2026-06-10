@@ -40,6 +40,30 @@ export async function updateOnboardingSettingsAction(
   return { ok: true };
 }
 
+// --- Email pause ----------------------------------------------------------
+
+// Pause/resume the member-facing confirmation emails (PAYMENT_CONFIRMATION
+// at bank-sync ingest + ALLOCATION_CONFIRMATION when a sourced mint
+// confirms). While paused those sends are skipped, not queued — resuming
+// never emails retroactively. Other email types are unaffected.
+export async function setConfirmationEmailsPausedAction(input: {
+  paused: boolean;
+}): Promise<SettingsResult> {
+  const { fund } = await requireFundRole("ADMIN");
+
+  await prisma.fund.update({
+    where: { id: fund.id },
+    data: {
+      confirmationEmailsPausedAt: input.paused
+        ? (fund.confirmationEmailsPausedAt ?? new Date())
+        : null,
+    },
+  });
+
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
 // --- General -------------------------------------------------------------
 
 const GeneralSchema = z.object({
