@@ -40,6 +40,9 @@ export default async function BankPage({
   const from = sp.from ?? "";
   const to = sp.to ?? "";
   const page = Math.max(1, Number.parseInt(sp.page ?? "1", 10) || 1);
+  // Allocation periods only exist for FIXED_PERIOD funds — the Period
+  // column/picker is hidden for the other modes.
+  const showPeriod = fund.allocationMode === "FIXED_PERIOD";
 
   return (
     <>
@@ -73,7 +76,7 @@ export default async function BankPage({
         <Suspense
           // Re-show the skeleton when the range or page changes.
           key={`${range}:${from}:${to}:${page}`}
-          fallback={<TransactionsSkeleton />}
+          fallback={<TransactionsSkeleton columns={showPeriod ? 6 : 5} />}
         >
           <BankTransactionsTable
             fundId={fund.id}
@@ -81,6 +84,7 @@ export default async function BankPage({
             from={from || undefined}
             to={to || undefined}
             page={page}
+            showPeriod={showPeriod}
           />
         </Suspense>
       </section>
@@ -129,13 +133,14 @@ async function BalanceCard({
   );
 }
 
-function TransactionsSkeleton() {
+function TransactionsSkeleton({ columns }: { columns: number }) {
+  const last = columns - 1;
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          {Array.from({ length: 5 }).map((_, i) => (
-            <TableHead key={i} className={i === 4 ? "text-right" : undefined}>
+          {Array.from({ length: columns }).map((_, i) => (
+            <TableHead key={i} className={i === last ? "text-right" : undefined}>
               <span className="inline-block h-3.5 w-16 animate-pulse rounded bg-muted" />
             </TableHead>
           ))}
@@ -144,12 +149,15 @@ function TransactionsSkeleton() {
       <TableBody>
         {Array.from({ length: 6 }).map((_, r) => (
           <TableRow key={r}>
-            {Array.from({ length: 5 }).map((_, i) => (
-              <TableCell key={i} className={i === 4 ? "text-right" : undefined}>
+            {Array.from({ length: columns }).map((_, i) => (
+              <TableCell
+                key={i}
+                className={i === last ? "text-right" : undefined}
+              >
                 <span
                   className={cn(
                     "inline-block h-3.5 animate-pulse rounded bg-muted",
-                    i === 4 ? "w-16" : "w-28",
+                    i === last ? "w-16" : "w-28",
                   )}
                 />
               </TableCell>

@@ -2,7 +2,6 @@
 "use client";
 
 import { Fragment, useEffect, useState, useTransition } from "react";
-import { refresh } from "next/cache";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -222,6 +221,7 @@ function FeeTransferButton({ payoutId }: { payoutId: string }) {
 function MarkCompleteDialog({ payoutId }: { payoutId: string }) {
   const t = useTranslations("fund.payments.settlement.process.markComplete");
   const tRoot = useTranslations();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -241,7 +241,8 @@ function MarkCompleteDialog({ payoutId }: { payoutId: string }) {
       }
       // The action revalidated the detail path; refresh the client router so
       // the stepper + status badge re-render as complete right away.
-      refresh();
+      // (`refresh` from next/cache is server-action-only — use the router.)
+      router.refresh();
       onOpenChange(false);
     });
   };

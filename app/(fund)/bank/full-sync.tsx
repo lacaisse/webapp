@@ -2,7 +2,7 @@
 "use client";
 
 import { CheckCircle2, Loader2, RefreshCw, TriangleAlert } from "lucide-react";
-import { refresh } from "next/cache";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useRef, useState } from "react";
 
@@ -20,8 +20,12 @@ import {
 } from "@/components/ui/dialog";
 import { runFullBankSyncChunkAction } from "@/services/bank/admin-actions";
 
-type Totals = { ingested: number; matched: number; minted: number };
-const ZERO: Totals = { ingested: 0, matched: 0, minted: 0 };
+type Totals = {
+  ingested: number;
+  matched: number;
+  skipped: number;
+};
+const ZERO: Totals = { ingested: 0, matched: 0, skipped: 0 };
 type Phase = "idle" | "running" | "paused" | "done" | "error";
 
 // Safety bound for a single run. End-of-history is `done` from the server
@@ -38,6 +42,9 @@ const MAX_PAGES_PER_RUN = 1000;
 // Stop + Resume (or an outright restart) is safe.
 export function BankFullSync({ connected }: { connected: boolean }) {
   const t = useTranslations("fund.bank.fullSync");
+  // `refresh` from next/cache is server-action-only — in a client component
+  // the router API is the way to re-render the page's server components.
+  const router = useRouter();
   const [phase, setPhase] = useState<Phase>("idle");
   const [totals, setTotals] = useState<Totals>(ZERO);
   const [pages, setPages] = useState(0);
@@ -74,7 +81,7 @@ export function BankFullSync({ connected }: { connected: boolean }) {
       }
       acc.ingested += res.stats.ingested;
       acc.matched += res.stats.matched;
-      acc.minted += res.stats.minted;
+      acc.skipped += res.stats.skipped;
       pageCount += 1;
       pagesThisRun += 1;
       setTotals({ ...acc });
@@ -82,7 +89,7 @@ export function BankFullSync({ connected }: { connected: boolean }) {
 
       if (res.done) {
         resumeCursor.current = undefined;
-        refresh(); // final consistency pass
+        router.refresh(); // final consistency pass
         setPhase("done");
         return;
       }
@@ -101,7 +108,7 @@ export function BankFullSync({ connected }: { connected: boolean }) {
       // later chunks only add older rows that aren't on the visible page.
       if (!refreshed) {
         refreshed = true;
-        refresh();
+        router.refresh();
       }
       cursor = res.nextCursor ?? undefined;
 
@@ -115,7 +122,7 @@ export function BankFullSync({ connected }: { connected: boolean }) {
 
       if (abort.current) {
         resumeCursor.current = cursor; // resume continues from the next page
-        refresh();
+        router.refresh();
         setPhase("paused");
         return;
       }
@@ -187,7 +194,7 @@ export function BankFullSync({ connected }: { connected: boolean }) {
             {t("progress", {
               ingested: totals.ingested,
               matched: totals.matched,
-              minted: totals.minted,
+              skipped: totals.skipped,
             })}
             {" · "}
             {t("pages", { pages })}
@@ -203,7 +210,7 @@ export function BankFullSync({ connected }: { connected: boolean }) {
             {t("completeSummary", {
               ingested: totals.ingested,
               matched: totals.matched,
-              minted: totals.minted,
+              skipped: totals.skipped,
             })}
           </AlertDescription>
         </Alert>

@@ -305,20 +305,22 @@
         "emptyRange": "No transactions in this range.",
         "prev": "Previous",
         "next": "Next",
-        "total": "{count, plural, =1 {# transaction} other {# transactions}}"
+        "total": "{count, plural, =1 {# transaction} other {# transactions}}",
+        "period": "Period",
+        "periodLocked": "Already used by a mint — the period can no longer be changed."
       },
       "fullSync": {
         "trigger": "Full sync",
         "confirmTitle": "Run a full bank sync?",
-        "confirmDescription": "This re-pulls the entire bank transaction history from CitizenPay and mirrors it locally. New incoming transfers matched to a member may trigger token mints. It's safe to run more than once — already-synced transactions are skipped.",
+        "confirmDescription": "This re-pulls the entire bank transaction history from CitizenPay and mirrors it locally. No emails or token mints are triggered — for fixed-period funds, deposits are assigned to the allocation period they occurred in (past periods are created closed, for review). It's safe to run more than once — already-synced transactions are skipped.",
         "confirmCancel": "Cancel",
         "confirmRun": "Run full sync",
         "running": "Syncing…",
-        "progress": "{ingested, plural, =1 {# transaction} other {# transactions}} synced · {matched} matched · {minted} minted",
+        "progress": "{ingested, plural, =1 {# transaction} other {# transactions}} synced · {matched} matched · {skipped} skipped",
         "pages": "{pages, plural, =1 {# page} other {# pages}}",
         "stop": "Stop",
         "completeTitle": "Full sync complete",
-        "completeSummary": "{ingested, plural, =1 {# transaction} other {# transactions}} synced · {matched} matched · {minted} minted",
+        "completeSummary": "{ingested, plural, =1 {# transaction} other {# transactions}} synced · {matched} matched · {skipped} skipped",
         "errorTitle": "Sync interrupted",
         "error": "Couldn't complete the bank sync. Please try again.",
         "resume": "Resume",
@@ -335,6 +337,16 @@
         "custom": "Custom",
         "from": "From",
         "to": "To"
+      },
+      "periodAssign": {
+        "none": "No period",
+        "closedOption": "{label} (closed)",
+        "errors": {
+          "notFound": "Transaction not found.",
+          "notIncoming": "Only incoming transactions can be allocated to a period.",
+          "periodNotFound": "Period not found.",
+          "locked": "This deposit was already used by a mint — its period can no longer be changed."
+        }
       }
     },
     "dashboard": {
@@ -484,7 +496,8 @@
         "status": "Status",
         "balance": "Balance",
         "issued": "Issued",
-        "number": "Card #"
+        "number": "Card #",
+        "source": "Source"
       },
       "primary": "Primary card",
       "badges": {
@@ -512,7 +525,8 @@
           "blocked": "Blocked",
           "reportedLost": "Reported lost",
           "lastTransaction": "Last transaction",
-          "number": "Card number"
+          "number": "Card number",
+          "source": "Source card"
         },
         "transfers": {
           "title": "Transfers",
@@ -532,6 +546,10 @@
           "newer": "Newer",
           "older": "Older",
           "error": "Couldn't load on-chain transfers."
+        },
+        "source": {
+          "none": "No source",
+          "hint": "When this card can't cover a charge, the missing amount is pulled from the source card."
         }
       },
       "number": {
@@ -1367,6 +1385,14 @@
         "rateHint": "Percentage taken on each payment (e.g. 2.5 for 2.5%). Leave empty to use Citizen Pay's default rate.",
         "syncPending": "Saved locally, but not yet confirmed by Citizen Pay. Save again to retry the sync.",
         "syncFailed": "Rate saved, but the sync to Citizen Pay failed. Save again to retry."
+      },
+      "emails": {
+        "title": "Member emails",
+        "description": "Automatic emails sent to members about their deposits and allocations.",
+        "pause": {
+          "label": "Pause allocation and payment confirmation emails",
+          "description": "While paused, members are not emailed when a deposit is recorded or when tokens are allocated. Skipped emails are not queued — nothing is sent retroactively when you resume. Invitations, verification and other emails are unaffected."
+        }
       }
     }
   },
@@ -1770,6 +1796,14 @@
           "empty": "No valid rows found in the CSV.",
           "noMatches": "None of the serials matched a card in this fund.",
           "columnMissing": "Pick both a serial and a number column."
+        }
+      },
+      "source": {
+        "errors": {
+          "notFound": "Card not found.",
+          "sourceNotFound": "Source card not found.",
+          "self": "A card can't be its own source.",
+          "failed": "Couldn't update the source card. Try again shortly."
         }
       }
     }

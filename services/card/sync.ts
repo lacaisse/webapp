@@ -66,6 +66,7 @@ export async function computeCardSyncPlan(
         status: true,
         account: true,
         holderName: true,
+        sourceSerial: true,
         member: { select: { firstName: true, lastName: true } },
       },
     }),
@@ -82,6 +83,23 @@ export async function computeCardSyncPlan(
   );
 
   const plan: CardSyncPlan = { push: [], import: [], statusUpdate: [] };
+
+  // Heal the local `sourceSerial` display cache while we have both sides in
+  // hand. Unlike `status` (local-authoritative, pushed via the plan), the
+  // source relationship is CP-authoritative — there's nothing for the admin
+  // to decide, so drift is repaired silently rather than surfaced as a plan
+  // item. Idempotent; runs on every sync preview.
+  const sourceHeals = local.filter((l) => {
+    const r = remoteBySerial.get(normalizeSerial(l.serialNumber));
+    return r !== undefined && (r.sourceSerial ?? null) !== l.sourceSerial;
+  });
+  for (const l of sourceHeals) {
+    const r = remoteBySerial.get(normalizeSerial(l.serialNumber))!;
+    await prisma.card.update({
+      where: { id: l.id },
+      data: { sourceSerial: r.sourceSerial ?? null },
+    });
+  }
 
   for (const l of local) {
     const r = remoteBySerial.get(normalizeSerial(l.serialNumber));

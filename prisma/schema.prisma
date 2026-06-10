@@ -268,6 +268,12 @@ model Fund {
   requireMemberEmailVerification   Boolean @default(true)
   requireMerchantEmailVerification Boolean @default(true)
 
+  // When set, member-facing confirmation emails (PAYMENT_CONFIRMATION at
+  // bank-sync ingest, ALLOCATION_CONFIRMATION when a sourced mint confirms)
+  // are skipped — not queued: resuming does not send them retroactively.
+  // Other emails (invites, verification, referral bonus) are unaffected.
+  confirmationEmailsPausedAt DateTime?
+
   // Post-signup redirect URLs. When set, the last step of a successful
   // signup flow (form submit if no verification, otherwise the email-verify
   // landing) sends the visitor to this URL instead of the in-app /thanks
@@ -595,6 +601,13 @@ model Card {
 
   // CitizenPay-reported status — drives whether the terminal accepts charges.
   status CardStatus @default(INACTIVE)
+
+  // Mirror of CP's `source_serial`: the card this card pulls from when its
+  // own balance can't cover a charge. CP is authoritative (set via the card
+  // detail page, healed during card sync); display cache only — charge-time
+  // behaviour never reads this. A serial string (not an FK) so a source that
+  // exists on CP but not locally is still representable.
+  sourceSerial String?
 
   // Internal flag, doesn't change terminal behaviour. Usually paired with a
   // status change to BLOCKED at CitizenPay when the holder reports a loss.

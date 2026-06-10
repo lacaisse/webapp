@@ -1,9 +1,47 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import "server-only";
 
+import type { AllocationPeriodStatus } from "@/services/db/generated/client";
 import { prisma } from "@/services/db/prisma";
 
-import { activePeriodFor } from "./calendar";
+import { activePeriodFor, type PeriodWindow } from "./calendar";
+
+// Get-or-create on (fundId, label). `status` only applies when creating —
+// an existing period is returned as-is.
+async function getOrCreatePeriod(
+  fundId: string,
+  w: PeriodWindow,
+  status: "OPEN" | "CLOSED",
+): Promise<{ id: string; status: AllocationPeriodStatus }> {
+  const existing = await prisma.allocationPeriod.findUnique({
+    where: { fundId_label: { fundId, label: w.label } },
+    select: { id: true, status: true },
+  });
+  if (existing) return existing;
+
+  try {
+    return await prisma.allocationPeriod.create({
+      data: {
+        fundId,
+        label: w.label,
+        startsAt: w.startsAt,
+        cutoffDate: w.cutoffDate,
+        status,
+      },
+      select: { id: true, status: true },
+    });
+  } catch (e) {
+    // P2002 on (fundId, label): a concurrent ingest/cron created it first. Re-read.
+    if ((e as { code?: string }).code === "P2002") {
+      const row = await prisma.allocationPeriod.findUnique({
+        where: { fundId_label: { fundId, label: w.label } },
+        select: { id: true, status: true },
+      });
+      if (row) return row;
+    }
+    throw e;
+  }
+}
 
 // Auto-create the allocation period a FIXED_PERIOD fund needs right now.
 //
@@ -23,48 +61,37 @@ export async function ensureOpenPeriod(
   now: Date = new Date(),
 ): Promise<string> {
   const w = activePeriodFor(now, cutoffDay);
-
-  const existing = await prisma.allocationPeriod.findUnique({
-    where: { fundId_label: { fundId, label: w.label } },
-    select: { id: true, status: true },
-  });
-  if (existing) {
-    if (existing.status === "CLOSED") {
-      // The active-period label maps to an already-closed period. Only reachable
-      // via a manual/early close (activePeriodFor never returns a past-cutoff
-      // month), so don't silently attach new deposits to it — surface it.
-      console.warn(
-        "[ensure-period] active period label is CLOSED; deposits will attach to a closed period",
-        fundId,
-        w.label,
-      );
-    }
-    return existing.id;
+  const period = await getOrCreatePeriod(fundId, w, "OPEN");
+  if (period.status === "CLOSED") {
+    // The active-period label maps to an already-closed period. Only reachable
+    // via a manual/early close (activePeriodFor never returns a past-cutoff
+    // month), so don't silently attach new deposits to it — surface it.
+    console.warn(
+      "[ensure-period] active period label is CLOSED; deposits will attach to a closed period",
+      fundId,
+      w.label,
+    );
   }
+  return period.id;
+}
 
-  try {
-    const created = await prisma.allocationPeriod.create({
-      data: {
-        fundId,
-        label: w.label,
-        startsAt: w.startsAt,
-        cutoffDate: w.cutoffDate,
-        status: "OPEN",
-      },
-      select: { id: true },
-    });
-    return created.id;
-  } catch (e) {
-    // P2002 on (fundId, label): a concurrent ingest/cron created it first. Re-read.
-    if ((e as { code?: string }).code === "P2002") {
-      const row = await prisma.allocationPeriod.findUnique({
-        where: { fundId_label: { fundId, label: w.label } },
-        select: { id: true },
-      });
-      if (row) return row.id;
-    }
-    throw e;
-  }
+// The period a *historical* deposit belongs to — used by the manual full
+// bank-sync to back-allocate FIXED_PERIOD deposits. Same cutoff roll-over
+// rule as live ingest, but evaluated at the deposit's own occurredAt instead
+// of "now". A back-created period whose cutoff is already past is created
+// CLOSED so the period-close cron never batch-mints a backfilled month —
+// those stay for admin review. `closedAt` stays NULL ("finished minting"
+// never happened).
+export async function ensurePeriodForDate(
+  fundId: string,
+  cutoffDay: number,
+  occurredAt: Date,
+  now: Date = new Date(),
+): Promise<string> {
+  const w = activePeriodFor(occurredAt, cutoffDay);
+  const status = w.cutoffDate.getTime() <= now.getTime() ? "CLOSED" : "OPEN";
+  const period = await getOrCreatePeriod(fundId, w, status);
+  return period.id;
 }
 
 // Bootstrap: make sure every connected FIXED_PERIOD fund has a current open

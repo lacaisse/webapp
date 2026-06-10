@@ -96,6 +96,57 @@ export async function unlinkBankTransactionAction(input: {
   return { ok: true };
 }
 
+// Manually (re)assign an INCOMING deposit to an allocation period from the
+// Bank screen. Data-only — no mint, no email; the period-close cron (or a
+// manual close) is what turns period membership into mints. Blocked once the
+// deposit has been used as a mint source: the mint already counted it in a
+// period, so moving it would misreport history and risk double counting.
+export async function setBankTransactionPeriodAction(input: {
+  bankTransactionId: string;
+  periodId: string | null;
+}): Promise<LinkBankTransactionResult> {
+  const t = await getTranslations();
+  const { fund } = await requireFundRole("ADMIN");
+
+  const tx = await prisma.bankTransaction.findFirst({
+    where: { id: input.bankTransactionId, fundId: fund.id },
+    select: {
+      id: true,
+      direction: true,
+      _count: { select: { operationSources: true } },
+    },
+  });
+  if (!tx) {
+    return { error: t("fund.bank.periodAssign.errors.notFound" as never) };
+  }
+  if (tx.direction !== "INCOMING") {
+    return { error: t("fund.bank.periodAssign.errors.notIncoming" as never) };
+  }
+  if (tx._count.operationSources > 0) {
+    return { error: t("fund.bank.periodAssign.errors.locked" as never) };
+  }
+
+  if (input.periodId) {
+    const period = await prisma.allocationPeriod.findFirst({
+      where: { id: input.periodId, fundId: fund.id },
+      select: { id: true },
+    });
+    if (!period) {
+      return {
+        error: t("fund.bank.periodAssign.errors.periodNotFound" as never),
+      };
+    }
+  }
+
+  await prisma.bankTransaction.update({
+    where: { id: tx.id },
+    data: { allocationPeriodId: input.periodId },
+  });
+
+  revalidatePath("/bank");
+  return { ok: true };
+}
+
 // Ranked member suggestions for the manual attribution picker. With a query,
 // filters by name/email; without one, ranks all members by name similarity to
 // the deposit's counterpart name. Suggestions only — never an auto-match.

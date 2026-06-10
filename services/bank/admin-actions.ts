@@ -43,6 +43,7 @@ export async function runFullBankSyncChunkAction(input: {
         citizenPayLastSyncedAt: fund.citizenPayLastSyncedAt,
         allocationMode: fund.allocationMode,
         allocationCutoffDay: fund.allocationCutoffDay,
+        confirmationEmailsPausedAt: fund.confirmationEmailsPausedAt,
         primaryColor: fund.primaryColor,
         logoUrl: fund.logoUrl,
       },

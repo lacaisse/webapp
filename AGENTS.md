@@ -37,7 +37,7 @@ These are non-obvious facts about the Next 16 / Prisma 7 stack that bit us durin
 ### Next 16
 - **`middleware.ts` is now `proxy.ts`**, function `proxy()`. Same `NextRequest`/`NextResponse` API. Runs on Node.js runtime (good for Supabase compat). See `proxy.ts` at the project root.
 - **`cookies()` is async** — always `await cookies()`. Same for `headers()`.
-- Use **`refresh()` from `next/cache`** (not `router.refresh()`) for client-router refresh after a Server Action.
+- Use **`refresh()` from `next/cache`** for client-router refresh after a Server Action — but it is **server-action-only**: calling it from a Client Component throws `refresh is only available in a Server Component` at runtime. Put it inside the action, or use `useRouter().refresh()` when the refresh must happen client-side (e.g. only on certain results, or mid-loop).
 
 ### Prisma 7
 - **`PrismaClient` requires a Driver Adapter** (or Prisma Accelerate URL). The old "just pass DATABASE_URL" path is gone. We use `@prisma/adapter-pg` — see `services/db/prisma.ts`.

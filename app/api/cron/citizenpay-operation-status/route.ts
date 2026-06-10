@@ -42,6 +42,7 @@ export async function GET(request: NextRequest) {
           logoUrl: true,
           citizenPayApiKeyId: true,
           citizenPayApiKeyEnc: true,
+          confirmationEmailsPausedAt: true,
         },
       },
       member: { select: { email: true, firstName: true } },
@@ -107,7 +108,14 @@ export async function GET(request: NextRequest) {
           },
           amount: op.referral.fund.referralBonusAmount.toString(),
         });
-      } else if (op.sources.length > 0 && op.member?.email && op.memberId) {
+      } else if (
+        op.sources.length > 0 &&
+        op.member?.email &&
+        op.memberId &&
+        // Fund-level pause: the op still flips CONFIRMED, only the member
+        // notification is skipped (never sent retroactively on resume).
+        !op.fund.confirmationEmailsPausedAt
+      ) {
         await queueAndSendAllocationConfirmation({
           fundId: op.fundId,
           tokenOperationId: op.id,

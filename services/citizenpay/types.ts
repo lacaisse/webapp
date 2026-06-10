@@ -172,6 +172,9 @@ export type CitizenPayCard = {
   serialNumber: string;
   status: CardStatus;
   owner: string | null;
+  // Serial of the card this card pulls from when its own balance can't
+  // cover a charge ("source card"). Null when no source is configured.
+  sourceSerial: string | null;
   createdAt: string; // ISO 8601
   lastActivity: string | null;
 };

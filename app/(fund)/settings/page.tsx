@@ -16,6 +16,7 @@ import {
   type FieldRow,
 } from "./onboarding-fields";
 import { OnboardingSettings } from "./onboarding-settings";
+import { EmailSettings } from "./email-settings";
 import { CitizenPayConnect } from "./citizenpay-connect";
 import { TokenInfo } from "./token-info";
 import {
@@ -82,15 +83,28 @@ export default async function SettingsPage({
       />
 
       {active === "general" && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("general.title")}</CardTitle>
-            <CardDescription>{t("general.description")}</CardDescription>
-          </CardHeader>
-          <CardContent className="pb-4">
-            <GeneralForm fund={fundForForms} />
-          </CardContent>
-        </Card>
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("general.title")}</CardTitle>
+              <CardDescription>{t("general.description")}</CardDescription>
+            </CardHeader>
+            <CardContent className="pb-4">
+              <GeneralForm fund={fundForForms} />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("emails.title")}</CardTitle>
+              <CardDescription>{t("emails.description")}</CardDescription>
+            </CardHeader>
+            <CardContent className="pb-4">
+              <EmailSettings
+                initialPaused={fund.confirmationEmailsPausedAt !== null}
+              />
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {active === "branding" && (

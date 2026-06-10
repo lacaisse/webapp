@@ -16,6 +16,7 @@ import {
 import { CopyButton } from "@/components/copy-button";
 import { getBalances } from "@/services/alchemy/balances";
 import { formatTokenAmount, shortAddress } from "@/services/alchemy/format";
+import { getCitizenPayClient } from "@/services/citizenpay/client";
 import {
   type CardStatus as CardStatusEnum,
 } from "@/services/db/generated/enums";
@@ -25,6 +26,7 @@ import { requireCurrentFund } from "@/services/fund/server";
 import { CardRowActions } from "../card-row-actions";
 import { TableSkeleton } from "../../token/skeleton";
 import { CardNumberEdit } from "./card-number-edit";
+import { CardSourcePicker } from "./source-picker";
 import { CardTransfersTable } from "./transfers-table";
 
 export default async function CardDetailPage({
@@ -171,6 +173,25 @@ export default async function CardDetailPage({
                   "—"
                 )}
               </DtDd>
+              {fund.citizenPayFundId && (
+                <DtDd label={t("info.source")}>
+                  <Suspense
+                    fallback={
+                      <span className="inline-block h-7 w-40 animate-pulse rounded bg-muted" />
+                    }
+                  >
+                    <CardSourceRow
+                      fund={{
+                        id: fund.id,
+                        citizenPayApiKeyId: fund.citizenPayApiKeyId,
+                        citizenPayApiKeyEnc: fund.citizenPayApiKeyEnc,
+                      }}
+                      cardId={card.id}
+                      serialNumber={card.serialNumber}
+                    />
+                  </Suspense>
+                </DtDd>
+              )}
               <DtDd label={t("info.issued")}>
                 {card.issuedAt
                   ? format.dateTime(card.issuedAt, { dateStyle: "medium" })
@@ -287,6 +308,69 @@ async function BalanceDisplay({
         <span className="text-sm text-muted-foreground">{symbol}</span>
       )}
     </div>
+  );
+}
+
+// The card's configured source card (pull-from card at charge time). The
+// relationship lives on CitizenPay — read live here, set via the inline
+// picker. Candidate list comes from the local mirror (every fund card except
+// this one), labelled by number + holder.
+async function CardSourceRow({
+  fund,
+  cardId,
+  serialNumber,
+}: {
+  fund: {
+    id: string;
+    citizenPayApiKeyId: string | null;
+    citizenPayApiKeyEnc: string | null;
+  };
+  cardId: string;
+  serialNumber: string;
+}) {
+  let sourceSerial: string | null = null;
+  try {
+    sourceSerial = await getCitizenPayClient(fund).getCardSource(serialNumber);
+  } catch (e) {
+    console.warn("[cards.detail] getCardSource failed", e);
+    return <span className="text-muted-foreground">—</span>;
+  }
+
+  const candidates = await prisma.card.findMany({
+    where: { fundId: fund.id, id: { not: cardId } },
+    orderBy: [{ number: "asc" }, { serialNumber: "asc" }],
+    select: {
+      id: true,
+      serialNumber: true,
+      number: true,
+      holderName: true,
+      member: { select: { firstName: true, lastName: true } },
+    },
+  });
+
+  const options = candidates.map((c) => {
+    const holder =
+      c.holderName ||
+      (c.member ? `${c.member.firstName} ${c.member.lastName}`.trim() : "");
+    const num = c.number !== null ? `#${c.number}` : null;
+    return {
+      id: c.id,
+      label:
+        [num, holder].filter(Boolean).join(" · ") || c.serialNumber,
+    };
+  });
+
+  const current = sourceSerial
+    ? (candidates.find((c) => c.serialNumber === sourceSerial) ?? null)
+    : null;
+
+  return (
+    <CardSourcePicker
+      cardId={cardId}
+      currentSourceCardId={current?.id ?? null}
+      unresolvedSourceSerial={sourceSerial && !current ? sourceSerial : null}
+      options={options}
+    />
   );
 }
 
