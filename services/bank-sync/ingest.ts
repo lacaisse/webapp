@@ -12,6 +12,7 @@ import type { BankTransactionPayload } from "@/services/citizenpay/types";
 
 import { mintTierAllocation } from "./allocate";
 import { matchMember, type Match } from "./matching/match";
+import { isAllocationEligible } from "@/services/member/eligibility";
 import { prisma } from "@/services/db/prisma";
 import { sendPaymentConfirmation } from "@/services/email/transactional";
 import { ANNOTATION_TRIGGERS } from "@/services/transaction-annotation/annotate";
@@ -268,9 +269,12 @@ async function ingestOne(
     occurredAt: payload.occurredAt,
   });
 
-  // Minting: PAY_AND_GO only. FIXED_PERIOD accumulates until period close.
+  // Minting: PAY_AND_GO only, and only for ACTIVE members. Non-active members
+  // (new / inactive / paused / stopped / rejected) still get their deposit
+  // mirrored + matched above, but no allocation is minted (issue #17).
+  // FIXED_PERIOD accumulates until period close, which already filters ACTIVE.
   let minted = false;
-  if (fund.allocationMode === "PAY_AND_GO") {
+  if (fund.allocationMode === "PAY_AND_GO" && isAllocationEligible(match.status)) {
     minted = await tryMintForPayAndGo({
       fund,
       bankTransactionId,

@@ -15,7 +15,7 @@ import { annotateTransaction } from "@/services/transaction-annotation/annotate"
 // Returns true if a mint was created (op row exists, regardless of whether the
 // CP submission succeeded — a failed submit leaves the op PENDING with no
 // txHash for a re-submit job). Returns false when there's nothing to mint (no
-// tier, no target account, or the deposit is outside the tier's range).
+// tier, no target account, or the deposit is below the tier minimum).
 
 export type AllocationFund = {
   id: string;
@@ -42,15 +42,16 @@ export async function mintTierAllocation(args: {
     where: { id: args.tierId },
     select: {
       minContribution: true,
-      maxContribution: true,
       allocationAmount: true,
     },
   });
   if (!tier) return false;
 
   const deposit = new Prisma.Decimal(args.depositAmount);
-  if (deposit.lt(tier.minContribution) || deposit.gt(tier.maxContribution)) {
-    return false; // out of range — admin reviews
+  // Only a deposit below the tier minimum is excluded. Paying MORE than the
+  // tier maximum is a good thing — it still earns the allocation.
+  if (deposit.lt(tier.minContribution)) {
+    return false; // below minimum — admin reviews
   }
 
   // Op + source link in one transaction; CP submission outside (HTTP latency

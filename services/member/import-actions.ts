@@ -5,17 +5,20 @@ import { getTranslations } from "next-intl/server";
 import { revalidatePath } from "next/cache";
 
 import { requireFundRole } from "@/services/auth/dal";
-import { nextCardNumber } from "@/services/card/numbering";
 import { normalizeSerial } from "@/services/card/serial";
-import { getCitizenPayClient } from "@/services/citizenpay/client";
 import { parseCsv } from "@/services/csv/parse";
 import { prisma } from "@/services/db/prisma";
 
+import type { MemberStatus } from "@/services/db/generated/enums";
+
 import {
+  DEFAULT_IMPORT_STATUS,
   MEMBER_IMPORT_FIELDS,
+  recognizeStatus,
   type MemberImportField,
   type MemberImportMapping,
   type MemberImportResult,
+  type StatusValueMap,
 } from "./import-config";
 import { generatePaymentReference } from "./payment-reference";
 
@@ -24,10 +27,13 @@ const REFERENCE_RETRIES = 5;
 
 // Bulk member import from a CSV with headers. The admin maps each built-in
 // field to a column (firstName/lastName/email required). On a duplicate email
-// the existing member is updated with the mapped values; otherwise a new
-// INVITED member is created. A mapped IBAN is stored and learned for
-// auto-matching; a mapped serial links an existing unattached card (sets it
-// primary + marks the member active), reporting serials with no such card.
+// the existing member is updated with the mapped values; otherwise a new member
+// is created (status from the mapped status column, else NEW). A mapped IBAN is
+// stored and learned for auto-matching; a mapped serial or card number links an
+// EXISTING card (sets it primary; activates the member unless an explicit
+// status was imported). Member import NEVER creates cards — cards are synced
+// from CitizenPay or registered via the card flows; an unknown serial/number is
+// reported, not provisioned (provisioning from here once minted junk CP cards).
 export async function importMembersAction(input: {
   csv: string;
   mapping: MemberImportMapping;
@@ -35,10 +41,29 @@ export async function importMembersAction(input: {
   // (e.g. assign one tier to the whole import). Ignored for a field that is
   // also column-mapped (the column wins).
   defaults?: MemberImportMapping;
+  // Raw status value (lower-cased) → MemberStatus, from the dialog's
+  // interactive mapping step. Re-validated here; values still unresolved fall
+  // back to DEFAULT_IMPORT_STATUS and are reported in `statusesDefaulted`.
+  statusValueMap?: StatusValueMap;
 }): Promise<MemberImportResult> {
   const t = await getTranslations("members.admin.import");
   const { fund } = await requireFundRole("ADMIN");
   const defaults = input.defaults ?? {};
+
+  // Trust nothing from the client: rebuild the status map with lower-cased keys
+  // and only enum-valid values.
+  const VALID_STATUSES: ReadonlySet<string> = new Set([
+    "NEW",
+    "ACTIVE",
+    "INACTIVE",
+    "PAUSED",
+    "STOPPED",
+    "REJECTED",
+  ]);
+  const statusValueMap: StatusValueMap = {};
+  for (const [raw, status] of Object.entries(input.statusValueMap ?? {})) {
+    if (VALID_STATUSES.has(status)) statusValueMap[raw.trim().toLowerCase()] = status;
+  }
 
   const required = MEMBER_IMPORT_FIELDS.filter((f) => f.required).map(
     (f) => f.key,
@@ -72,16 +97,24 @@ export async function importMembersAction(input: {
   let updated = 0;
   let cardsLinked = 0;
   const skipped: { row: number; reason: string }[] = [];
+  // Serials / card numbers that didn't link: no existing card, or the card
+  // belongs to another member. Reported, never provisioned.
   const serialsNotFound: string[] = [];
-  // Serials with no local card yet — provisioned at CP in one bulk call after
-  // the row loop (deduped: first member to reference a serial wins it).
-  const toProvision: {
-    serial: string;
-    memberId: string;
-    firstName: string;
-    lastName: string;
-  }[] = [];
-  const provisionSeen = new Set<string>();
+  const cardNumbersNotFound: string[] = [];
+  // Distinct raw status values we couldn't resolve and defaulted.
+  const statusesDefaulted = new Set<string>();
+
+  // Resolve a CSV status cell to a MemberStatus: explicit mapping first, then
+  // auto-recognition, else the default (recorded for reporting). Returns
+  // undefined when no status was supplied for the row (leave existing as-is).
+  const resolveStatus = (raw: string): MemberStatus | undefined => {
+    if (!raw) return undefined;
+    const key = raw.toLowerCase();
+    const mapped = statusValueMap[key] ?? recognizeStatus(raw);
+    if (mapped) return mapped;
+    statusesDefaulted.add(raw);
+    return DEFAULT_IMPORT_STATUS;
+  };
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -125,6 +158,8 @@ export async function importMembersAction(input: {
     const tierName = valueFor("tier");
     const tierId = tierName ? tierByName.get(tierName.toLowerCase()) : undefined;
 
+    const status = resolveStatus(valueFor("status"));
+
     try {
       const existing = await prisma.member.findUnique({
         where: { fundId_email: { fundId: fund.id, email } },
@@ -141,6 +176,7 @@ export async function importMembersAction(input: {
             ...optional,
             ...household,
             ...(tierId ? { tierId } : {}),
+            ...(status ? { status } : {}),
           },
         });
         memberId = existing.id;
@@ -154,6 +190,7 @@ export async function importMembersAction(input: {
           optional,
           household,
           tierId,
+          status,
         });
         created++;
       }
@@ -172,10 +209,26 @@ export async function importMembersAction(input: {
         });
       }
 
-      // Serial → card. Link an existing unattached (or already-own) card now;
-      // a serial with no local card is queued for bulk provisioning; a serial
-      // owned by a different member is a conflict (reported, not stolen).
-      const serial = normalizeSerial(valueFor("serial"));
+      // Card linkage. Serial (free-form text) and/or per-fund card number,
+      // both only from a mapped column — a fixed default would link the same
+      // card to every row. Both paths only ever link an EXISTING card;
+      // member import never creates cards. A serial that matches no card
+      // falls back to a card-number lookup when it's digits-only (a number
+      // column mapped as serial), and is reported otherwise.
+      const rawSerial =
+        colIndex.serial !== undefined ? valueFor("serial") : "";
+      const rawCardNumber =
+        colIndex.cardNumber !== undefined ? valueFor("cardNumber") : "";
+
+      let cardNumber: number | null = null;
+      if (rawCardNumber) {
+        const n = Number(rawCardNumber);
+        if (Number.isInteger(n) && n >= 1) cardNumber = n;
+        else cardNumbersNotFound.push(rawCardNumber);
+      }
+
+      let rowCardHandled = false;
+      const serial = normalizeSerial(rawSerial);
       if (serial) {
         const card = await prisma.card.findFirst({
           where: {
@@ -185,13 +238,32 @@ export async function importMembersAction(input: {
           select: { id: true, memberId: true },
         });
         if (card && (card.memberId === null || card.memberId === memberId)) {
-          await linkCardToMember(card.id, memberId, { firstName, lastName });
+          await linkCardToMember(card.id, memberId, { firstName, lastName }, status);
           cardsLinked++;
+          rowCardHandled = true;
         } else if (card) {
           serialsNotFound.push(serial); // attached to another member
-        } else if (!provisionSeen.has(serial)) {
-          provisionSeen.add(serial);
-          toProvision.push({ serial, memberId, firstName, lastName });
+        } else if (
+          /^\d+$/.test(serial) &&
+          Number(serial) >= 1 &&
+          cardNumber === null
+        ) {
+          cardNumber = Number(serial); // a number column mapped as serial
+        } else {
+          serialsNotFound.push(serial); // no such card — not created
+        }
+      }
+      if (!rowCardHandled && cardNumber !== null) {
+        const card = await prisma.card.findFirst({
+          where: { fundId: fund.id, number: cardNumber },
+          select: { id: true, memberId: true },
+        });
+        if (card && (card.memberId === null || card.memberId === memberId)) {
+          await linkCardToMember(card.id, memberId, { firstName, lastName }, status);
+          cardsLinked++;
+        } else {
+          // No such card, or taken by another member — report, never create.
+          cardNumbersNotFound.push(String(cardNumber));
         }
       }
     } catch (e) {
@@ -200,46 +272,17 @@ export async function importMembersAction(input: {
     }
   }
 
-  // Provision queued serials at CitizenPay in one bulk call, then create the
-  // local card, auto-number it, and link it as the member's primary (active).
-  if (toProvision.length > 0) {
-    if (!fund.citizenPayFundId) {
-      serialsNotFound.push(...toProvision.map((p) => p.serial)); // not connected
-    } else {
-      try {
-        const cp = getCitizenPayClient(fund);
-        await cp.bulkCreateCards(toProvision.map((p) => p.serial));
-        for (const p of toProvision) {
-          try {
-            const detail = await cp.getCitizenPayCard(p.serial).catch(() => null);
-            const card = await prisma.card.create({
-              data: {
-                fundId: fund.id,
-                memberId: null,
-                serialNumber: p.serial,
-                account: detail?.account ?? null,
-                status: detail?.status ?? "INACTIVE",
-                number: await nextCardNumber(fund.id),
-                issuedAt: new Date(),
-              },
-              select: { id: true },
-            });
-            await linkCardToMember(card.id, p.memberId, p);
-            cardsLinked++;
-          } catch (e) {
-            console.error("[member-import] provision failed", p.serial, e);
-            serialsNotFound.push(p.serial);
-          }
-        }
-      } catch (e) {
-        console.error("[member-import] bulkCreate failed", e);
-        serialsNotFound.push(...toProvision.map((p) => p.serial));
-      }
-    }
-  }
-
   revalidatePath("/members");
-  return { ok: true, created, updated, skipped, cardsLinked, serialsNotFound };
+  return {
+    ok: true,
+    created,
+    updated,
+    skipped,
+    cardsLinked,
+    serialsNotFound,
+    cardNumbersNotFound,
+    statusesDefaulted: [...statusesDefaulted],
+  };
 }
 
 async function createMember(args: {
@@ -250,6 +293,7 @@ async function createMember(args: {
   optional: Record<string, string>;
   household: Record<string, number>;
   tierId: string | undefined;
+  status: MemberStatus | undefined;
 }): Promise<string> {
   // Retry on the (fundId, paymentReference) unique collision — same pattern as
   // the single-member invite.
@@ -261,7 +305,7 @@ async function createMember(args: {
           email: args.email,
           firstName: args.firstName,
           lastName: args.lastName,
-          status: "INVITED",
+          status: args.status ?? DEFAULT_IMPORT_STATUS,
           paymentReference: generatePaymentReference(),
           emailVerifiedAt: new Date(), // admin vouches for identity
           ...args.optional,
@@ -287,12 +331,14 @@ async function createMember(args: {
   throw new Error("could not allocate a unique payment reference");
 }
 
-// Attach a card to a member: set it as their primary card and mark them
-// active. Used for both existing-card links and freshly-provisioned cards.
+// Attach a card to a member: set it as their primary card. Linking a card
+// activates the member by default, but an explicit imported status wins (so a
+// member imported as e.g. PAUSED with a serial stays PAUSED).
 async function linkCardToMember(
   cardId: string,
   memberId: string,
   name: { firstName: string; lastName: string },
+  statusOverride: MemberStatus | undefined,
 ): Promise<void> {
   await prisma.$transaction(async (tx) => {
     await tx.card.update({
@@ -304,7 +350,7 @@ async function linkCardToMember(
     });
     await tx.member.update({
       where: { id: memberId },
-      data: { primaryCardId: cardId, status: "ACTIVE" },
+      data: { primaryCardId: cardId, status: statusOverride ?? "ACTIVE" },
     });
   });
 }

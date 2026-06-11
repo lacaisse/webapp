@@ -305,9 +305,9 @@ export type InviteMemberResult =
   | { ok: true }
   | { error: string; field?: "firstName" | "lastName" | "email" };
 
-// Admin-initiated invite: creates an INVITED member from a paper-form or
+// Admin-initiated invite: creates a NEW member from a paper-form or
 // admin-known recipient, emails them a heads-up, and shows up in the
-// "pending" tab so the admin can activate them when a card is in hand.
+// "new" tab so the admin can activate them when a card is in hand.
 export async function inviteMemberAction(input: {
   firstName: string;
   lastName: string;
@@ -341,7 +341,7 @@ export async function inviteMemberAction(input: {
             email: parsed.data.email,
             firstName: parsed.data.firstName,
             lastName: parsed.data.lastName,
-            status: "INVITED",
+            status: "NEW",
             paymentReference,
             // Admin vouches for identity — no verification round-trip.
             emailVerifiedAt: new Date(),

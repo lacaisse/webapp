@@ -16,17 +16,9 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import type { MemberStatus } from "@/services/db/generated/enums";
 import { changeMemberStatusAction } from "@/services/member/status-actions";
-
-type Status = "INVITED" | "ONBOARDING" | "ACTIVE" | "INACTIVE" | "LEFT";
-
-// Targets the admin can pick. INVITED + ONBOARDING are excluded — those
-// states belong to the signup/activation flows.
-const TARGET_OPTIONS: ("ACTIVE" | "INACTIVE" | "LEFT")[] = [
-  "ACTIVE",
-  "INACTIVE",
-  "LEFT",
-];
+import { MEMBER_STATUS_TRANSITIONS } from "@/services/member/status-config";
 
 export function StatusChangeDialog({
   memberId,
@@ -35,12 +27,14 @@ export function StatusChangeDialog({
 }: {
   memberId: string;
   memberName: string;
-  currentStatus: Status;
+  currentStatus: MemberStatus;
 }) {
   const t = useTranslations("members.admin.status");
   const [open, setOpen] = useState(false);
-  const [target, setTarget] = useState<"ACTIVE" | "INACTIVE" | "LEFT">(
-    currentStatus === "ACTIVE" ? "INACTIVE" : "ACTIVE",
+  // Only the transitions valid from the current status (issue #17).
+  const options = MEMBER_STATUS_TRANSITIONS[currentStatus];
+  const [target, setTarget] = useState<MemberStatus>(
+    options[0] ?? currentStatus,
   );
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -73,7 +67,10 @@ export function StatusChangeDialog({
         <DialogHeader>
           <DialogTitle>{t("title")}</DialogTitle>
           <DialogDescription>
-            {t("description", { memberName, currentStatus })}
+            {t("description", {
+              memberName,
+              currentStatus: t(`values.${currentStatus}`),
+            })}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-2">
@@ -81,19 +78,17 @@ export function StatusChangeDialog({
           <select
             id={`status-${memberId}`}
             value={target}
-            onChange={(e) =>
-              setTarget(e.target.value as "ACTIVE" | "INACTIVE" | "LEFT")
-            }
+            onChange={(e) => setTarget(e.target.value as MemberStatus)}
             className="h-8 w-full rounded-md bg-background px-2 text-sm ring-1 ring-foreground/15 outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            {TARGET_OPTIONS.map((opt) => (
-              <option key={opt} value={opt} disabled={opt === currentStatus}>
+            {options.map((opt) => (
+              <option key={opt} value={opt}>
                 {t(`values.${opt}`)}
               </option>
             ))}
           </select>
-          {target === "LEFT" && (
-            <p className="text-xs text-warning">{t("leftWarning")}</p>
+          {target === "STOPPED" && (
+            <p className="text-xs text-warning">{t("stoppedWarning")}</p>
           )}
         </div>
         {error && (

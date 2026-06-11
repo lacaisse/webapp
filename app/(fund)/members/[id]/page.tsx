@@ -35,6 +35,7 @@ export default async function MemberDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const t = await getTranslations("fund.members.detail");
+  const tStatus = await getTranslations("members.admin.status.values");
   const format = await getFormatter();
   const fund = await requireCurrentFund();
   const { id } = await params;
@@ -106,36 +107,31 @@ export default async function MemberDetailPage({
           {t("back")}
         </Link>
         <div className="inline-flex items-center gap-2">
-          {(member.status === "INVITED" || member.status === "ONBOARDING") &&
-            !member.primaryCardId && (
-              <MemberRowActions
-                memberId={member.id}
-                memberName={fullName}
-                emailVerified={emailVerified}
-              />
-            )}
+          {member.status === "NEW" && !member.primaryCardId && (
+            <MemberRowActions
+              memberId={member.id}
+              memberName={fullName}
+              emailVerified={emailVerified}
+            />
+          )}
           {member.status === "ACTIVE" && member.primaryCard?.account && (
             <MintDialog memberId={member.id} memberName={fullName} />
           )}
           {member.status === "ACTIVE" && member.primaryCardId && (
             <AddCardDialog memberId={member.id} memberName={fullName} />
           )}
-          {(member.status === "ACTIVE" ||
-            member.status === "INACTIVE" ||
-            member.status === "LEFT") && (
-            <StatusChangeDialog
-              memberId={member.id}
-              memberName={fullName}
-              currentStatus={member.status}
-            />
-          )}
+          <StatusChangeDialog
+            memberId={member.id}
+            memberName={fullName}
+            currentStatus={member.status}
+          />
         </div>
       </div>
 
       <header className="space-y-2">
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="font-heading text-2xl font-medium">{fullName}</h1>
-          <StatusBadge status={member.status} />
+          <StatusBadge status={member.status} label={tStatus(member.status)} />
         </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
           <span>{member.email}</span>
@@ -515,14 +511,16 @@ function formatAppValue(value: unknown): string {
   return String(value);
 }
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status, label }: { status: string; label: string }) {
   const variant: "default" | "success" | "warning" | "destructive" =
     status === "ACTIVE"
       ? "success"
-      : status === "INVITED" || status === "ONBOARDING"
+      : status === "NEW" || status === "PAUSED"
         ? "warning"
-        : "default";
-  return <Badge variant={variant}>{status}</Badge>;
+        : status === "REJECTED"
+          ? "destructive"
+          : "default"; // INACTIVE, STOPPED
+  return <Badge variant={variant}>{label}</Badge>;
 }
 
 function CardStatusBadge({

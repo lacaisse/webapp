@@ -20,8 +20,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { AttributeDialog } from "@/app/(fund)/payments/bank-transaction-actions";
+import { Prisma } from "@/services/db/generated/client";
 import { prisma } from "@/services/db/prisma";
 import { requireCurrentFund } from "@/services/fund/server";
+
+import { RemoveDepositButton } from "./remove-deposit-button";
 
 export default async function AllocationPeriodDetailPage({
   params,
@@ -40,6 +44,9 @@ export default async function AllocationPeriodDetailPage({
         orderBy: { occurredAt: "desc" },
         include: {
           member: { select: { id: true, firstName: true, lastName: true } },
+          // A deposit that already fed a mint is locked into the period —
+          // the remove button is hidden for those.
+          _count: { select: { operationSources: true } },
         },
       },
       tokenOperations: {
@@ -66,6 +73,65 @@ export default async function AllocationPeriodDetailPage({
       .map((b) => b.memberId)
       .filter((id): id is string => id !== null),
   ).size;
+
+  // Members the period was expected to allocate to: ACTIVE, with a tier and a
+  // primary card — the exact set the close process mints for (see
+  // services/allocation-periods/close.ts). Pull each one's matched INCOMING
+  // deposits in this period so we can split them into:
+  //   - missing:  no deposit at all (the "supposed to pay but didn't" list)
+  //   - belowMin: deposited, but total under the tier minimum → no mint
+  // (above-maximum totals still allocate — only below-minimum is a problem)
+  const expectedMembers = await prisma.member.findMany({
+    where: {
+      fundId: fund.id,
+      status: "ACTIVE",
+      tierId: { not: null },
+      primaryCardId: { not: null },
+    },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      tier: {
+        select: { name: true, minContribution: true },
+      },
+      bankTransactions: {
+        where: { allocationPeriodId: period.id, direction: "INCOMING" },
+        select: { amount: true },
+      },
+    },
+    orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+  });
+
+  type ExpectedRow = {
+    id: string;
+    name: string;
+    tierName: string;
+    min: string;
+    deposited: string;
+  };
+  const missing: ExpectedRow[] = [];
+  const belowMin: ExpectedRow[] = [];
+  for (const m of expectedMembers) {
+    if (!m.tier) continue; // tierId not null guarantees this, but narrow the type
+    const total = m.bankTransactions.reduce(
+      (sum, b) => sum.add(b.amount),
+      new Prisma.Decimal(0),
+    );
+    const row: ExpectedRow = {
+      id: m.id,
+      name: `${m.firstName} ${m.lastName}`.trim(),
+      tierName: m.tier.name,
+      min: m.tier.minContribution.toString(),
+      deposited: total.toString(),
+    };
+    if (m.bankTransactions.length === 0) {
+      missing.push(row);
+    } else if (total.lt(m.tier.minContribution)) {
+      belowMin.push(row);
+    }
+    // else: reached the minimum — allocated, not listed here.
+  }
 
   return (
     <>
@@ -155,11 +221,12 @@ export default async function AllocationPeriodDetailPage({
               <TableHead className="text-right">
                 {t("deposits.amount")}
               </TableHead>
+              <TableHead />
             </TableRow>
           </TableHeader>
           <TableBody>
             {period.bankTransactions.length === 0 ? (
-              <TableEmpty colSpan={4}>{t("deposits.empty")}</TableEmpty>
+              <TableEmpty colSpan={5}>{t("deposits.empty")}</TableEmpty>
             ) : (
               period.bankTransactions.map((b) => (
                 <TableRow key={b.id}>
@@ -175,9 +242,12 @@ export default async function AllocationPeriodDetailPage({
                         {`${b.member.firstName} ${b.member.lastName}`.trim()}
                       </Link>
                     ) : (
-                      <span className="text-sm text-muted-foreground">
-                        {b.counterpartName ?? "—"}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">
+                          {b.counterpartName ?? "—"}
+                        </span>
+                        <AttributeDialog bankTransactionId={b.id} />
+                      </div>
                     )}
                   </TableCell>
                   <TableCell className="font-mono text-xs">
@@ -185,6 +255,20 @@ export default async function AllocationPeriodDetailPage({
                   </TableCell>
                   <TableCell className="text-right font-medium">
                     {b.amount.toString()} {b.currency}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {b._count.operationSources === 0 && (
+                      <RemoveDepositButton
+                        bankTransactionId={b.id}
+                        label={
+                          b.member
+                            ? `${b.member.firstName} ${b.member.lastName}`.trim()
+                            : (b.counterpartName ??
+                              b.counterpartReference ??
+                              "—")
+                        }
+                      />
+                    )}
                   </TableCell>
                 </TableRow>
               ))
@@ -243,6 +327,94 @@ export default async function AllocationPeriodDetailPage({
           </TableBody>
         </Table>
       </section>
+
+      <section className="space-y-3">
+        <div className="space-y-1">
+          <h2 className="font-heading text-lg font-medium">
+            {t("missing.title", { count: missing.length })}
+          </h2>
+          <p className="text-sm text-muted-foreground">{t("missing.hint")}</p>
+        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t("missing.member")}</TableHead>
+              <TableHead>{t("missing.tier")}</TableHead>
+              <TableHead className="text-right">
+                {t("missing.minimum")}
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {missing.length === 0 ? (
+              <TableEmpty colSpan={3}>{t("missing.empty")}</TableEmpty>
+            ) : (
+              missing.map((m) => (
+                <TableRow key={m.id}>
+                  <TableCell>
+                    <Link href={`/members/${m.id}`} className="hover:underline">
+                      {m.name}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {m.tierName}
+                  </TableCell>
+                  <TableCell className="text-right text-sm text-muted-foreground">
+                    {m.min}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </section>
+
+      {belowMin.length > 0 && (
+        <section className="space-y-3">
+          <div className="space-y-1">
+            <h2 className="font-heading text-lg font-medium">
+              {t("belowMin.title", { count: belowMin.length })}
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              {t("belowMin.hint")}
+            </p>
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t("belowMin.member")}</TableHead>
+                <TableHead>{t("belowMin.tier")}</TableHead>
+                <TableHead className="text-right">
+                  {t("belowMin.deposited")}
+                </TableHead>
+                <TableHead className="text-right">
+                  {t("belowMin.minimum")}
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {belowMin.map((m) => (
+                <TableRow key={m.id}>
+                  <TableCell>
+                    <Link href={`/members/${m.id}`} className="hover:underline">
+                      {m.name}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {m.tierName}
+                  </TableCell>
+                  <TableCell className="text-right font-medium">
+                    {m.deposited}
+                  </TableCell>
+                  <TableCell className="text-right text-sm text-muted-foreground">
+                    {m.min}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </section>
+      )}
     </>
   );
 }

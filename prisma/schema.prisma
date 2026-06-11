@@ -502,7 +502,7 @@ model Member {
   applicationData Json?
 
   // Lifecycle
-  status   MemberStatus @default(INVITED)
+  status   MemberStatus @default(NEW)
   joinedAt DateTime     @default(now())
   leftAt   DateTime?
 
@@ -558,11 +558,12 @@ model Member {
 }
 
 enum MemberStatus {
-  INVITED // admin added them, no onboarding yet
-  ONBOARDING // partway through (some info, no card)
-  ACTIVE // card issued, contributions flowing
-  INACTIVE // paused, kept on file
-  LEFT // resigned
+  NEW // signed up / added, not active yet (was INVITED + ONBOARDING)
+  ACTIVE // participating — the only status that receives allocations + emails
+  INACTIVE // not participating, kept on file
+  PAUSED // temporarily paused
+  STOPPED // actively stopped / resigned (was LEFT)
+  REJECTED // signed up, won't be activated
 }
 
 model Card {
@@ -649,9 +650,10 @@ enum CardStatus {
 // Allocation tiers
 // =============================================================================
 // Each fund defines its own tiers (paliers). Members are assigned to one tier;
-// when bank-sync detects a deposit from that member within [minContribution,
-// maxContribution], it mints `allocationAmount` worth of tokens to the member's
-// primary card. Tiers are soft-deleted (archivedAt) so historical assignments
+// when bank-sync detects a deposit from that member of at least
+// minContribution, it mints `allocationAmount` worth of tokens to the member's
+// primary card (paying above maxContribution still allocates — generosity is
+// welcome). Tiers are soft-deleted (archivedAt) so historical assignments
 // remain valid for reporting.
 
 // =============================================================================
@@ -894,8 +896,9 @@ model AllocationTier {
 
   name String // e.g. "Standard", "Solidaire", "Familial"
 
-  // Bank-sync detection range. A deposit from an assigned member within
-  // [minContribution, maxContribution] is recognised as a contribution.
+  // Contribution band. A deposit of at least minContribution earns the
+  // allocation; maxContribution is the tier's indicative upper bound (a
+  // deposit above it STILL allocates — only below-minimum is excluded).
   minContribution Decimal @db.Decimal(10, 2)
   maxContribution Decimal @db.Decimal(10, 2)
 

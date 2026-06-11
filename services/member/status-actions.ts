@@ -5,30 +5,20 @@ import { getTranslations } from "next-intl/server";
 import { revalidatePath } from "next/cache";
 
 import { requireFundRole } from "@/services/auth/dal";
+import type { MemberStatus } from "@/services/db/generated/enums";
 import { prisma } from "@/services/db/prisma";
 
-// Admin status transitions. Allowed paths from the UI:
-//   ACTIVE ↔ INACTIVE          (pause / resume)
-//   ACTIVE | INACTIVE → LEFT   (resignation)
-//   LEFT → ACTIVE              (returning member)
-//
-// INVITED / ONBOARDING aren't reachable from the UI — those states are
-// owned by the signup + activation flows. Reverting back into them would
-// confuse audit semantics (an active member can't un-activate).
+import { MEMBER_STATUS_TRANSITIONS } from "./status-config";
 
-const MANUAL_TRANSITIONS = {
-  ACTIVE: new Set(["INACTIVE", "LEFT"] as const),
-  INACTIVE: new Set(["ACTIVE", "LEFT"] as const),
-  LEFT: new Set(["ACTIVE"] as const),
-  INVITED: new Set<"INACTIVE" | "ACTIVE" | "LEFT">(),
-  ONBOARDING: new Set<"INACTIVE" | "ACTIVE" | "LEFT">(),
-} as const;
+// Admin status transitions are defined in status-config.ts (shared with the
+// status-change dialog). Entering STOPPED stamps a leave date; leaving it
+// clears it.
 
 export type ChangeMemberStatusResult = { ok: true } | { error: string };
 
 export async function changeMemberStatusAction(input: {
   memberId: string;
-  status: "ACTIVE" | "INACTIVE" | "LEFT";
+  status: MemberStatus;
 }): Promise<ChangeMemberStatusResult> {
   const t = await getTranslations();
   const { fund } = await requireFundRole("ADMIN");
@@ -39,11 +29,8 @@ export async function changeMemberStatusAction(input: {
   });
   if (!member) return { error: t("members.admin.errors.notFound" as never) };
 
-  const allowed = MANUAL_TRANSITIONS[member.status];
-  if (
-    !(allowed as ReadonlySet<string>).has(input.status) &&
-    member.status !== input.status
-  ) {
+  const allowed = MEMBER_STATUS_TRANSITIONS[member.status];
+  if (!allowed.includes(input.status) && member.status !== input.status) {
     return {
       error: t("members.admin.errors.invalidStatusTransition" as never),
     };
@@ -54,11 +41,11 @@ export async function changeMemberStatusAction(input: {
     where: { id: member.id },
     data: {
       status: input.status,
-      // Stamp `leftAt` on the way into LEFT; clear it on the way out.
+      // Stamp `leftAt` on the way into STOPPED; clear it on the way out.
       leftAt:
-        input.status === "LEFT"
+        input.status === "STOPPED"
           ? new Date()
-          : member.status === "LEFT"
+          : member.status === "STOPPED"
             ? null
             : undefined,
     },

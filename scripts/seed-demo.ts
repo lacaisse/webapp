@@ -548,20 +548,22 @@ async function main() {
     householdChildren: number;
     tierId: string | null;
     tierName: "Solidaire" | "Standard" | "Soutien" | null;
-    status: "INVITED" | "ONBOARDING" | "ACTIVE" | "INACTIVE" | "LEFT";
+    status: "NEW" | "ACTIVE" | "INACTIVE" | "PAUSED" | "STOPPED" | "REJECTED";
     joinedAt: Date;
     leftAt: Date | null;
     addSecondaryCard: boolean;
   };
 
   const memberPlans: MemberPlan[] = [];
-  // Status distribution: 4 INVITED, 6 ONBOARDING, 44 ACTIVE, 4 INACTIVE, 2 LEFT = 60
+  // Status distribution (issue #17): 44 ACTIVE, 6 NEW, 4 INACTIVE, 2 PAUSED,
+  // 2 STOPPED, 2 REJECTED = 60.
   const statusPlan: MemberPlan["status"][] = [
     ...Array(44).fill("ACTIVE"),
-    ...Array(6).fill("ONBOARDING"),
-    ...Array(4).fill("INVITED"),
+    ...Array(6).fill("NEW"),
     ...Array(4).fill("INACTIVE"),
-    ...Array(2).fill("LEFT"),
+    ...Array(2).fill("PAUSED"),
+    ...Array(2).fill("STOPPED"),
+    ...Array(2).fill("REJECTED"),
   ];
 
   // Active members get a tier assignment. Mix: 14 Solidaire, 20 Standard, 10 Soutien.
@@ -570,41 +572,35 @@ async function main() {
     ...Array(20).fill("Standard"),
     ...Array(10).fill("Soutien"),
   ];
-  // Inactive members keep their last tier (so historical reports still work).
-  const inactiveTierPlan: MemberPlan["tierName"][] = [
-    "Standard", "Solidaire", "Standard", "Soutien",
-  ];
 
   for (let i = 0; i < 60; i++) {
     const first = pick(FIRST_NAMES, i * 13);
     const last = pick(LAST_NAMES, i * 7 + 3);
     const status = statusPlan[i];
+    // INACTIVE / PAUSED / STOPPED members were active before, so they keep a
+    // tier (historical reports still work). NEW / REJECTED have none yet.
+    const onceActive =
+      status === "INACTIVE" || status === "PAUSED" || status === "STOPPED";
     let tierName: MemberPlan["tierName"] = null;
     if (status === "ACTIVE") {
       tierName = activeTierPlan[memberPlans.filter((m) => m.status === "ACTIVE").length];
-    } else if (status === "INACTIVE") {
-      tierName = inactiveTierPlan[memberPlans.filter((m) => m.status === "INACTIVE").length];
-    } else if (status === "LEFT") {
-      tierName = i % 2 === 0 ? "Standard" : "Solidaire";
+    } else if (onceActive) {
+      tierName = i % 3 === 0 ? "Standard" : i % 3 === 1 ? "Solidaire" : "Soutien";
     }
 
     const joinedAt =
       status === "ACTIVE"
         ? addDays(TODAY, -randomInt(60, 220))
-        : status === "INACTIVE"
-        ? addDays(TODAY, -randomInt(120, 260))
-        : status === "LEFT"
-        ? addDays(TODAY, -randomInt(180, 320))
-        : status === "ONBOARDING"
-        ? addDays(TODAY, -randomInt(2, 18))
-        : addDays(TODAY, -randomInt(0, 6)); // INVITED
+        : onceActive
+        ? addDays(TODAY, -randomInt(120, 320))
+        : addDays(TODAY, -randomInt(0, 18)); // NEW / REJECTED
 
     memberPlans.push({
       firstName: first,
       lastName: last,
       email: emailFor(first, last, i),
       phone: i % 4 === 0 ? null : `+32 4${randomInt(70, 99)} ${randomInt(10, 99)} ${randomInt(10, 99)} ${randomInt(10, 99)}`,
-      iban: status === "INVITED" ? null : generateBelgianIban(),
+      iban: status === "NEW" ? null : generateBelgianIban(),
       address: makeAddress(i),
       householdAdults: i % 5 === 0 ? 1 : 2,
       householdChildren: i % 3 === 0 ? 2 : i % 4 === 0 ? 1 : 0,
@@ -612,7 +608,7 @@ async function main() {
       tierName,
       status,
       joinedAt,
-      leftAt: status === "LEFT" ? addDays(joinedAt, randomInt(60, 180)) : null,
+      leftAt: status === "STOPPED" ? addDays(joinedAt, randomInt(60, 180)) : null,
       // Roughly 25% of ACTIVE members have a secondary (dependant) card.
       addSecondaryCard: status === "ACTIVE" && i % 4 === 0,
     });
@@ -656,9 +652,9 @@ async function main() {
         joinedAt: plan.joinedAt,
         leftAt: plan.leftAt,
         emailVerifiedAt:
-          plan.status === "INVITED" || plan.status === "ONBOARDING"
-            ? plan.status === "ONBOARDING" && memberPlans.indexOf(plan) % 3 === 0
-              ? null // a few onboardings still unverified
+          plan.status === "NEW"
+            ? memberPlans.indexOf(plan) % 3 === 0
+              ? null // a few new members still unverified
               : addDays(plan.joinedAt, randomInt(0, 2))
             : addDays(plan.joinedAt, 1),
         applicationData: {
@@ -687,16 +683,17 @@ async function main() {
     let primaryCardId: string | null = null;
     let primaryCardAccount: string | null = null;
 
-    if (plan.status === "ACTIVE" || plan.status === "INACTIVE" || plan.status === "LEFT") {
-      // ACTIVE / INACTIVE / LEFT all once had a card. LEFT cards are BLOCKED.
+    if (
+      plan.status === "ACTIVE" ||
+      plan.status === "INACTIVE" ||
+      plan.status === "PAUSED" ||
+      plan.status === "STOPPED"
+    ) {
+      // These all once had a card. Only ACTIVE cards stay ACTIVE; the rest
+      // (inactive / paused / stopped) are BLOCKED.
       const account = generateAccountAddress();
       const issuedAt = addDays(plan.joinedAt, randomInt(2, 10));
-      const cardStatus =
-        plan.status === "LEFT"
-          ? "BLOCKED"
-          : plan.status === "INACTIVE"
-          ? "BLOCKED"
-          : "ACTIVE";
+      const cardStatus = plan.status === "ACTIVE" ? "ACTIVE" : "BLOCKED";
 
       const card = await prisma.card.create({
         data: {
@@ -760,10 +757,11 @@ async function main() {
   console.log(
     `[seed-demo] Members: ${createdMembers.length} ` +
       `(active=${createdMembers.filter((m) => m.plan.status === "ACTIVE").length}, ` +
-      `onboarding=${createdMembers.filter((m) => m.plan.status === "ONBOARDING").length}, ` +
-      `invited=${createdMembers.filter((m) => m.plan.status === "INVITED").length}, ` +
+      `new=${createdMembers.filter((m) => m.plan.status === "NEW").length}, ` +
       `inactive=${createdMembers.filter((m) => m.plan.status === "INACTIVE").length}, ` +
-      `left=${createdMembers.filter((m) => m.plan.status === "LEFT").length})`,
+      `paused=${createdMembers.filter((m) => m.plan.status === "PAUSED").length}, ` +
+      `stopped=${createdMembers.filter((m) => m.plan.status === "STOPPED").length}, ` +
+      `rejected=${createdMembers.filter((m) => m.plan.status === "REJECTED").length})`,
   );
 
   // ---------------------------------------------------------------------------
@@ -934,7 +932,7 @@ async function main() {
     .filter((m) => m.plan.joinedAt > addDays(TODAY, -90)) // recently joined
     .slice(0, 6);
   const refereesPendingPool = createdMembers
-    .filter((m) => m.plan.status === "ONBOARDING")
+    .filter((m) => m.plan.status === "NEW")
     .slice(0, 2);
 
   let refsActivated = 0;
@@ -1023,8 +1021,8 @@ async function main() {
       daysAgo: Math.floor((TODAY.getTime() - m.plan.joinedAt.getTime()) / 86_400_000) - 1,
     });
   }
-  // Verification for some ONBOARDING members.
-  for (const m of createdMembers.filter((m) => m.plan.status === "ONBOARDING").slice(0, 4)) {
+  // Verification for some NEW members.
+  for (const m of createdMembers.filter((m) => m.plan.status === "NEW").slice(0, 4)) {
     emailSamples.push({
       type: "MEMBER_EMAIL_VERIFICATION",
       targetMember: m,
