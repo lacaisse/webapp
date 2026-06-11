@@ -19,8 +19,9 @@ import { ensureOpenPeriod } from "./ensure";
 // month's period (via ensureOpenPeriod, using the fund's cutoff day).
 //
 // Minting amount per member = their tier's `allocationAmount` IF the sum
-// of their matched deposits within the period is inside [minContribution,
-// maxContribution]. Out-of-range totals get no auto-mint — admin reviews.
+// of their matched deposits within the period reaches the tier's
+// minContribution. Totals above maxContribution still mint (generosity is
+// welcome); only below-minimum totals get no auto-mint — admin reviews.
 
 export type ClosePeriodStats = {
   fundId: string;
@@ -104,7 +105,6 @@ async function closePeriod(period: PeriodToClose): Promise<ClosePeriodStats> {
       tier: {
         select: {
           minContribution: true,
-          maxContribution: true,
           allocationAmount: true,
         },
       },
@@ -139,12 +139,11 @@ async function closePeriod(period: PeriodToClose): Promise<ClosePeriodStats> {
       (sum, tx) => sum.add(tx.amount),
       new Prisma.Decimal(0),
     );
-    if (
-      total.lt(m.tier.minContribution) ||
-      total.gt(m.tier.maxContribution)
-    ) {
+    // Only below-minimum totals are excluded. Paying MORE than the tier
+    // maximum is a good thing — it still earns the allocation.
+    if (total.lt(m.tier.minContribution)) {
       skipped++;
-      continue; // out of range — admin handles manually
+      continue; // below minimum — admin handles manually
     }
     plans.push({
       memberId: m.id,

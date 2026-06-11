@@ -391,9 +391,12 @@
       "invite": "Inviter un membre",
       "tabs": {
         "all": "Tous",
-        "pending": "En attente",
+        "new": "Nouveaux",
         "active": "Actifs",
-        "inactive": "Inactifs"
+        "inactive": "Inactifs",
+        "paused": "En pause",
+        "stopped": "Arrêtés",
+        "rejected": "Refusés"
       },
       "columns": {
         "name": "Nom",
@@ -663,6 +666,30 @@
           "amount": "Montant",
           "status": "Statut",
           "empty": "Aucune émission groupée pour l'instant."
+        },
+        "missing": {
+          "title": "{count, plural, =0 {Dépôts manquants} one {Dépôt manquant (#)} other {Dépôts manquants (#)}}",
+          "hint": "Membres actifs avec un palier attendus pour cette période, sans aucun dépôt correspondant.",
+          "member": "Membre",
+          "tier": "Palier",
+          "empty": "Tous les membres attendus ont déposé.",
+          "minimum": "Minimum"
+        },
+        "belowMin": {
+          "title": "{count, plural, one {Dépôt sous le minimum (#)} other {Dépôts sous le minimum (#)}}",
+          "hint": "Ont déposé, mais le total est sous le minimum de leur palier — aucune allocation générée.",
+          "member": "Membre",
+          "tier": "Palier",
+          "deposited": "Déposé",
+          "minimum": "Minimum"
+        },
+        "removeDeposit": {
+          "button": "Retirer de la période",
+          "title": "Retirer ce dépôt de la période ?",
+          "description": "Le dépôt de {label} reste dans l'historique bancaire mais ne comptera plus dans cette période (totaux et contributions).",
+          "cancel": "Annuler",
+          "confirm": "Retirer",
+          "removing": "Retrait…"
         }
       },
       "schedule": {
@@ -1150,7 +1177,7 @@
           "button": "Attribuer",
           "title": "Attribuer le versement",
           "description": "Choisissez le membre à l'origine de ce virement. La confirmation l'associe, mémorise le compte pour la prochaine fois et exécute l'allocation.",
-          "searchPlaceholder": "Rechercher un membre par nom…",
+          "searchPlaceholder": "Rechercher par nom, e-mail ou serial de carte…",
           "loading": "Chargement…",
           "noResults": "Aucun membre correspondant.",
           "noSuggestions": "Aucune correspondance probable — recherchez par nom.",
@@ -1657,14 +1684,17 @@
         "description": "{memberName} est actuellement {currentStatus}.",
         "targetLabel": "Nouveau statut",
         "values": {
+          "NEW": "Nouveau",
           "ACTIVE": "Actif",
           "INACTIVE": "Inactif",
-          "LEFT": "Parti"
+          "PAUSED": "En pause",
+          "STOPPED": "Arrêté",
+          "REJECTED": "Refusé"
         },
-        "leftWarning": "Marquer comme Parti enregistre une date de départ. Utilisez Inactif pour une pause temporaire.",
         "cancel": "Annuler",
         "confirm": "Mettre à jour",
-        "saving": "Enregistrement…"
+        "saving": "Enregistrement…",
+        "stoppedWarning": "Marquer comme Arrêté enregistre une date de départ. Utilisez En pause pour une pause temporaire."
       },
       "import": {
         "title": "Importer des membres",
@@ -1678,7 +1708,7 @@
         "cancel": "Annuler",
         "close": "Fermer",
         "result": "{created} créé(s), {updated} mis à jour, {cardsLinked} carte(s) liée(s).",
-        "serialsNotFound": "{count} serial(s) n'ont pas pu être liés ni créés",
+        "serialsNotFound": "{count} serial(s) sans carte existante (non liés — les cartes sont synchronisées depuis CitizenPay)",
         "skippedTitle": "{count} ligne(s) ignorée(s)",
         "rowLabel": "Ligne {row}",
         "fields": {
@@ -1694,7 +1724,9 @@
           "householdChildren": "Enfants du foyer",
           "tier": "Palier (par nom)",
           "notes": "Notes",
-          "serial": "Serial de carte"
+          "serial": "Serial de carte",
+          "status": "Statut",
+          "cardNumber": "N° de carte (1…N)"
         },
         "errors": {
           "missingRequiredMapping": "Associez les champs requis (prénom, nom, e-mail).",
@@ -1706,7 +1738,11 @@
           "invalidEmail": "E-mail invalide.",
           "error": "Impossible d'importer cette ligne."
         },
-        "fixedValuePlaceholder": "Définir pour toutes les lignes"
+        "fixedValuePlaceholder": "Définir pour toutes les lignes",
+        "statusMapHeading": "Correspondance des statuts",
+        "statusUnrecognized": "non reconnu",
+        "statusesDefaulted": "{count, plural, one {# valeur de statut non reconnue, définie sur Nouveau} other {# valeurs de statut non reconnues, définies sur Nouveau}} :",
+        "cardNumbersNotFound": "{count, plural, one {# n° de carte sans carte existante (non lié)} other {# n° de carte sans carte existante (non liés)}} :"
       }
     }
   },

@@ -37,7 +37,14 @@ export function BankTransactionRowActions({
   return <AttributeDialog bankTransactionId={bankTransactionId} />;
 }
 
-function AttributeDialog({ bankTransactionId }: { bankTransactionId: string }) {
+// Search-and-pick member dialog for attributing an unmatched deposit. Also
+// used on the allocation-period detail page — keep it self-contained (only
+// needs the bank transaction id).
+export function AttributeDialog({
+  bankTransactionId,
+}: {
+  bankTransactionId: string;
+}) {
   const t = useTranslations("fund.payments.admin.attribute");
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -128,8 +135,15 @@ function AttributeDialog({ bankTransactionId }: { bankTransactionId: string }) {
                   onClick={() => attribute(s.id)}
                   className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted disabled:opacity-50"
                 >
-                  <span>{s.name}</span>
-                  <span className="flex items-center gap-1">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="truncate">{s.name}</span>
+                    {s.matchedSerial && (
+                      <span className="shrink-0 font-mono text-xs text-muted-foreground">
+                        {s.matchedSerial}
+                      </span>
+                    )}
+                  </span>
+                  <span className="flex shrink-0 items-center gap-1">
                     {!s.tierAssigned && (
                       <Badge variant="warning">{t("noTier")}</Badge>
                     )}

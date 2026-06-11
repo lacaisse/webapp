@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { ensureOpenPeriod } from "@/services/allocation-periods/ensure";
 import { requireFundRole } from "@/services/auth/dal";
 import { prisma } from "@/services/db/prisma";
+import { isAllocationEligible } from "@/services/member/eligibility";
 import { ANNOTATION_TRIGGERS } from "@/services/transaction-annotation/annotate";
 
 import { mintTierAllocation } from "./allocate";
@@ -113,6 +114,7 @@ export async function setBankTransactionPeriodAction(input: {
     select: {
       id: true,
       direction: true,
+      allocationPeriodId: true,
       _count: { select: { operationSources: true } },
     },
   });
@@ -144,17 +146,29 @@ export async function setBankTransactionPeriodAction(input: {
   });
 
   revalidatePath("/bank");
+  // Refresh the period detail page(s) affected — the removal button on the
+  // period page and any reassignment both change what a period displays.
+  if (tx.allocationPeriodId) {
+    revalidatePath(`/allocations/periods/${tx.allocationPeriodId}`);
+  }
+  if (input.periodId && input.periodId !== tx.allocationPeriodId) {
+    revalidatePath(`/allocations/periods/${input.periodId}`);
+  }
   return { ok: true };
 }
 
 // Ranked member suggestions for the manual attribution picker. With a query,
-// filters by name/email; without one, ranks all members by name similarity to
-// the deposit's counterpart name. Suggestions only — never an auto-match.
+// filters by name/email/card serial; without one, ranks all members by name
+// similarity to the deposit's counterpart name. Suggestions only — never an
+// auto-match.
 export type MemberSuggestion = {
   id: string;
   name: string;
   hasCardAccount: boolean;
   tierAssigned: boolean;
+  // Set when the query matched one of the member's card serials — shown in
+  // the picker so the admin sees WHY this member surfaced.
+  matchedSerial?: string;
 };
 
 const memberPick = {
@@ -195,13 +209,29 @@ export async function suggestMembersForAttributionAction(input: {
           { firstName: { contains: query, mode: "insensitive" } },
           { lastName: { contains: query, mode: "insensitive" } },
           { email: { contains: query, mode: "insensitive" } },
+          {
+            cards: {
+              some: { serialNumber: { contains: query, mode: "insensitive" } },
+            },
+          },
         ],
       },
-      select: memberPick,
+      select: {
+        ...memberPick,
+        // The serial(s) the query matched, to show in the picker.
+        cards: {
+          where: { serialNumber: { contains: query, mode: "insensitive" } },
+          select: { serialNumber: true },
+          take: 1,
+        },
+      },
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
       take: 10,
     });
-    return members.map(toSuggestion);
+    return members.map((m) => ({
+      ...toSuggestion(m),
+      matchedSerial: m.cards[0]?.serialNumber ?? undefined,
+    }));
   }
 
   // No query → rank by name similarity to the deposit's counterpart name.
@@ -257,6 +287,7 @@ export async function attributeBankTransactionAction(input: {
     where: { id: input.memberId, fundId: fund.id },
     select: {
       id: true,
+      status: true,
       tierId: true,
       primaryCard: { select: { account: true } },
     },
@@ -300,8 +331,15 @@ export async function attributeBankTransactionAction(input: {
   });
 
   // PAY_AND_GO mints immediately (to the member's primary card — manual
-  // attribution has no referenced card). FIXED_PERIOD mints at period close.
-  if (fund.allocationMode === "PAY_AND_GO" && fund.citizenPayFundId) {
+  // attribution has no referenced card), but only for ACTIVE members; the
+  // deposit + IBAN link above are recorded regardless of status (issue #17).
+  // To mint for a non-active member, use the manual mint on the token page.
+  // FIXED_PERIOD mints at period close.
+  if (
+    fund.allocationMode === "PAY_AND_GO" &&
+    fund.citizenPayFundId &&
+    isAllocationEligible(member.status)
+  ) {
     await mintTierAllocation({
       fund: {
         id: fund.id,
@@ -320,5 +358,9 @@ export async function attributeBankTransactionAction(input: {
   }
 
   revalidatePath("/payments");
+  // The attribute dialog is also embedded on the period detail page.
+  if (allocationPeriodId) {
+    revalidatePath(`/allocations/periods/${allocationPeriodId}`);
+  }
   return { ok: true };
 }

@@ -391,9 +391,12 @@
       "invite": "Invite member",
       "tabs": {
         "all": "All",
-        "pending": "Pending",
+        "new": "New",
         "active": "Active",
-        "inactive": "Inactive"
+        "inactive": "Inactive",
+        "paused": "Paused",
+        "stopped": "Stopped",
+        "rejected": "Rejected"
       },
       "columns": {
         "name": "Name",
@@ -678,6 +681,30 @@
           "amount": "Amount",
           "status": "Status",
           "empty": "No mints batched yet."
+        },
+        "missing": {
+          "title": "{count, plural, =0 {Missing deposits} one {Missing deposit (#)} other {Missing deposits (#)}}",
+          "hint": "Active members with a tier expected to contribute this period, with no matched deposit.",
+          "member": "Member",
+          "tier": "Tier",
+          "empty": "Every expected member has deposited.",
+          "minimum": "Minimum"
+        },
+        "belowMin": {
+          "title": "{count, plural, one {Below-minimum deposit (#)} other {Below-minimum deposits (#)}}",
+          "hint": "Deposited, but the total is under their tier minimum — no allocation was generated.",
+          "member": "Member",
+          "tier": "Tier",
+          "deposited": "Deposited",
+          "minimum": "Minimum"
+        },
+        "removeDeposit": {
+          "button": "Remove from period",
+          "title": "Remove this deposit from the period?",
+          "description": "The deposit from {label} stays in the bank history but will no longer count in this period (totals and contributions).",
+          "cancel": "Cancel",
+          "confirm": "Remove",
+          "removing": "Removing…"
         }
       },
       "periods": {
@@ -1150,7 +1177,7 @@
           "button": "Attribute",
           "title": "Attribute deposit",
           "description": "Choose the member this transfer is from. Confirming links it, remembers the account for next time, and runs the allocation.",
-          "searchPlaceholder": "Search members by name…",
+          "searchPlaceholder": "Search by name, email or card serial…",
           "loading": "Loading…",
           "noResults": "No members match.",
           "noSuggestions": "No likely match — search by name above.",
@@ -1657,14 +1684,17 @@
         "description": "{memberName} is currently {currentStatus}.",
         "targetLabel": "New status",
         "values": {
+          "NEW": "New",
           "ACTIVE": "Active",
           "INACTIVE": "Inactive",
-          "LEFT": "Left"
+          "PAUSED": "Paused",
+          "STOPPED": "Stopped",
+          "REJECTED": "Rejected"
         },
-        "leftWarning": "Marking as Left stamps a departure date. Use Inactive for temporary pauses.",
         "cancel": "Cancel",
         "confirm": "Update",
-        "saving": "Saving…"
+        "saving": "Saving…",
+        "stoppedWarning": "Marking as Stopped stamps a departure date. Use Paused for a temporary pause."
       },
       "import": {
         "title": "Import members",
@@ -1678,7 +1708,7 @@
         "cancel": "Cancel",
         "close": "Close",
         "result": "Created {created}, updated {updated}, linked {cardsLinked} card(s).",
-        "serialsNotFound": "{count} serial(s) couldn't be linked or provisioned",
+        "serialsNotFound": "{count} serial(s) with no existing card (not linked — cards are synced from CitizenPay)",
         "skippedTitle": "{count} row(s) skipped",
         "rowLabel": "Row {row}",
         "fields": {
@@ -1694,7 +1724,9 @@
           "householdChildren": "Children in household",
           "tier": "Tier (by name)",
           "notes": "Notes",
-          "serial": "Card serial"
+          "serial": "Card serial",
+          "status": "Status",
+          "cardNumber": "Card number (1…N)"
         },
         "errors": {
           "missingRequiredMapping": "Map the required fields (first name, last name, email).",
@@ -1706,7 +1738,11 @@
           "invalidEmail": "Invalid email.",
           "error": "Could not import this row."
         },
-        "fixedValuePlaceholder": "Set for all rows"
+        "fixedValuePlaceholder": "Set for all rows",
+        "statusMapHeading": "Status mapping",
+        "statusUnrecognized": "unrecognized",
+        "statusesDefaulted": "{count, plural, one {# status value was not recognized and defaulted to New} other {# status values were not recognized and defaulted to New}}:",
+        "cardNumbersNotFound": "{count, plural, one {# card number with no existing card (not linked)} other {# card numbers with no existing card (not linked)}}:"
       }
     }
   },

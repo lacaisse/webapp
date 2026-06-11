@@ -25,26 +25,34 @@ import { MemberTierPicker } from "./tier-picker";
 
 const TABS = [
   { value: "all" },
-  { value: "pending" },
+  { value: "new" },
   { value: "active" },
   { value: "inactive" },
+  { value: "paused" },
+  { value: "stopped" },
+  { value: "rejected" },
 ] as const;
 
 type TabValue = (typeof TABS)[number]["value"];
 
-// Tab → status filter. "pending" merges INVITED (admin added, no form yet)
-// and ONBOARDING (form submitted, no card yet) since both share the same
-// admin action: issue a card to activate.
+// Tab → status filter. One tab per status (issue #17); "new" covers members
+// who signed up / were added but aren't active yet.
 function statusFilterFor(tab: TabValue) {
   switch (tab) {
     case "all":
       return undefined;
-    case "pending":
-      return { in: [MemberStatus.INVITED, MemberStatus.ONBOARDING] };
+    case "new":
+      return MemberStatus.NEW;
     case "active":
       return MemberStatus.ACTIVE;
     case "inactive":
-      return { in: [MemberStatus.INACTIVE, MemberStatus.LEFT] };
+      return MemberStatus.INACTIVE;
+    case "paused":
+      return MemberStatus.PAUSED;
+    case "stopped":
+      return MemberStatus.STOPPED;
+    case "rejected":
+      return MemberStatus.REJECTED;
   }
 }
 
@@ -54,6 +62,7 @@ export default async function MembersPage({
   searchParams: Promise<{ tab?: string }>;
 }) {
   const t = await getTranslations("fund.members");
+  const tStatus = await getTranslations("members.admin.status.values");
   const format = await getFormatter();
   const fund = await requireCurrentFund();
   const sp = await searchParams;
@@ -137,7 +146,7 @@ export default async function MembersPage({
                     )}
                   </TableCell>
                   <TableCell>
-                    <StatusBadge status={m.status} />
+                    <StatusBadge status={m.status} label={tStatus(m.status)} />
                   </TableCell>
                   <TableCell>
                     <MemberTierPicker
@@ -154,30 +163,24 @@ export default async function MembersPage({
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="inline-flex items-center gap-1">
-                      {(m.status === "INVITED" ||
-                        m.status === "ONBOARDING") &&
-                        !m.primaryCardId && (
-                          <MemberRowActions
-                            memberId={m.id}
-                            memberName={fullName}
-                            emailVerified={m.emailVerifiedAt !== null}
-                          />
-                        )}
+                      {m.status === "NEW" && !m.primaryCardId && (
+                        <MemberRowActions
+                          memberId={m.id}
+                          memberName={fullName}
+                          emailVerified={m.emailVerifiedAt !== null}
+                        />
+                      )}
                       {m.status === "ACTIVE" && m.primaryCardId && (
                         <AddCardDialog
                           memberId={m.id}
                           memberName={fullName}
                         />
                       )}
-                      {(m.status === "ACTIVE" ||
-                        m.status === "INACTIVE" ||
-                        m.status === "LEFT") && (
-                        <StatusChangeDialog
-                          memberId={m.id}
-                          memberName={fullName}
-                          currentStatus={m.status}
-                        />
-                      )}
+                      <StatusChangeDialog
+                        memberId={m.id}
+                        memberName={fullName}
+                        currentStatus={m.status}
+                      />
                     </div>
                   </TableCell>
                 </TableRow>
@@ -190,12 +193,14 @@ export default async function MembersPage({
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status, label }: { status: string; label: string }) {
   const variant: "default" | "success" | "warning" | "destructive" =
     status === "ACTIVE"
       ? "success"
-      : status === "INVITED" || status === "ONBOARDING"
+      : status === "NEW" || status === "PAUSED"
         ? "warning"
-        : "default";
-  return <Badge variant={variant}>{status}</Badge>;
+        : status === "REJECTED"
+          ? "destructive"
+          : "default"; // INACTIVE, STOPPED
+  return <Badge variant={variant}>{label}</Badge>;
 }

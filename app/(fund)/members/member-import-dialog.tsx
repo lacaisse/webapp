@@ -2,7 +2,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -18,12 +18,16 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { parseCsv } from "@/services/csv/parse";
+import type { MemberStatus } from "@/services/db/generated/enums";
 import { importMembersAction } from "@/services/member/import-actions";
 import {
   MEMBER_IMPORT_FIELDS,
+  recognizeStatus,
   type MemberImportField,
   type MemberImportResult,
+  type StatusValueMap,
 } from "@/services/member/import-config";
+import { MEMBER_STATUSES } from "@/services/member/status-config";
 
 // Header synonyms (EN/FR/NL/ES) for auto-guessing the column mapping.
 const FIELD_PATTERNS: Record<MemberImportField, RegExp> = {
@@ -38,8 +42,13 @@ const FIELD_PATTERNS: Record<MemberImportField, RegExp> = {
   householdAdults: /adult|adulte|volwassen/i,
   householdChildren: /child|enfant|kind|ni[ñn]o/i,
   tier: /tier|palier|classe|class|niveau|schijf|nivel/i,
+  status: /status|statut|[ée]tat|toestand|estado/i,
   notes: /note|remarq|opmerking|nota/i,
-  serial: /serial|carte|card|uid|nfc/i,
+  // serial claims explicit serial-ish headers first (field order); any other
+  // card-ish header ("Carte", "N° carte", "card number") falls to cardNumber.
+  // Both only link existing cards — import never creates any.
+  serial: /serial|uid|nfc|puce/i,
+  cardNumber: /carte|card|kaart/i,
 };
 
 type Mapping = Record<MemberImportField, string>;
@@ -70,12 +79,15 @@ export function MemberImportDialog({
   tiers: string[];
 }) {
   const t = useTranslations("members.admin.import");
+  const tStatus = useTranslations("members.admin.status.values");
   const [open, setOpen] = useState(false);
   const [csv, setCsv] = useState("");
   const [headers, setHeaders] = useState<string[]>([]);
   const [mapping, setMapping] = useState<Mapping>(EMPTY_MAPPING);
   // Fixed values for fields left unmapped (applied to every row).
   const [defaults, setDefaults] = useState<Mapping>(EMPTY_MAPPING);
+  // Admin overrides for raw status values (the interactive mapping step).
+  const [statusMap, setStatusMap] = useState<StatusValueMap>({});
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<
     Extract<MemberImportResult, { ok: true }> | null
@@ -100,6 +112,30 @@ export function MemberImportDialog({
     (f) => mapping[f.key] !== "",
   );
 
+  // Distinct raw values in the mapped status column — drives the interactive
+  // mapping step below. Empty when no status column is mapped.
+  const statusColumnValues = useMemo(() => {
+    const col = mapping.status;
+    if (!col || !csv.trim()) return [] as string[];
+    const { headers: h, rows } = parseCsv(csv);
+    const idx = h.indexOf(col);
+    if (idx === -1) return [] as string[];
+    const seen = new Set<string>();
+    const values: string[] = [];
+    for (const row of rows) {
+      const v = (row[idx] ?? "").trim();
+      if (v && !seen.has(v.toLowerCase())) {
+        seen.add(v.toLowerCase());
+        values.push(v);
+      }
+    }
+    return values;
+  }, [csv, mapping.status]);
+
+  // Resolve a raw status value: admin override → auto-recognized → NEW.
+  const effectiveStatus = (raw: string): MemberStatus =>
+    statusMap[raw] ?? recognizeStatus(raw) ?? "NEW";
+
   const submit = () => {
     setError(null);
     setResult(null);
@@ -110,11 +146,15 @@ export function MemberImportDialog({
     const cleanedDefaults = Object.fromEntries(
       Object.entries(defaults).filter(([k, v]) => v !== "" && !cleaned[k]),
     );
+    // Resolved status for every distinct value in the mapped status column.
+    const statusValueMap: StatusValueMap = {};
+    for (const v of statusColumnValues) statusValueMap[v] = effectiveStatus(v);
     startTransition(async () => {
       const res = await importMembersAction({
         csv,
         mapping: cleaned,
         defaults: cleanedDefaults,
+        statusValueMap,
       });
       if ("error" in res) {
         setError(res.error);
@@ -133,6 +173,7 @@ export function MemberImportDialog({
           setCsv("");
           setHeaders([]);
           setDefaults(EMPTY_MAPPING);
+          setStatusMap({});
           setError(null);
           setResult(null);
         }
@@ -209,6 +250,10 @@ export function MemberImportDialog({
                         <FixedValueInput
                           field={f.key}
                           tiers={tiers}
+                          statuses={MEMBER_STATUSES.map((s) => ({
+                            value: s,
+                            label: tStatus(s),
+                          }))}
                           value={defaults[f.key]}
                           onChange={(v) =>
                             setDefaults((d) => ({ ...d, [f.key]: v }))
@@ -219,6 +264,51 @@ export function MemberImportDialog({
                       )}
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {statusColumnValues.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">
+                  {t("statusMapHeading")}
+                </p>
+                <div className="space-y-1.5">
+                  {statusColumnValues.map((raw) => {
+                    const unresolved = !recognizeStatus(raw) && !statusMap[raw];
+                    return (
+                      <div key={raw} className="flex items-center gap-2">
+                        <span
+                          className="min-w-0 flex-1 truncate font-mono text-xs"
+                          title={raw}
+                        >
+                          {raw}
+                        </span>
+                        {unresolved && (
+                          <span className="shrink-0 text-xs text-warning">
+                            {t("statusUnrecognized")}
+                          </span>
+                        )}
+                        <select
+                          aria-label={raw}
+                          value={effectiveStatus(raw)}
+                          onChange={(e) =>
+                            setStatusMap((m) => ({
+                              ...m,
+                              [raw]: e.target.value as MemberStatus,
+                            }))
+                          }
+                          className="h-7 w-32 shrink-0 rounded-md bg-background px-2 text-xs ring-1 ring-foreground/15 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          {MEMBER_STATUSES.map((s) => (
+                            <option key={s} value={s}>
+                              {tStatus(s)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -259,6 +349,7 @@ export function MemberImportDialog({
 function FixedValueInput({
   field,
   tiers,
+  statuses,
   value,
   onChange,
   placeholder,
@@ -266,6 +357,7 @@ function FixedValueInput({
 }: {
   field: MemberImportField;
   tiers: string[];
+  statuses: { value: string; label: string }[];
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
@@ -273,6 +365,10 @@ function FixedValueInput({
 }) {
   const cls =
     "h-7 w-full rounded-md bg-background px-2 text-xs ring-1 ring-foreground/15 outline-none focus-visible:ring-2 focus-visible:ring-ring";
+
+  // A fixed default makes no sense for card identifiers — it would link the
+  // same card to every imported row. The server ignores them too.
+  if (field === "serial" || field === "cardNumber") return null;
 
   if (field === "tier") {
     return (
@@ -285,6 +381,23 @@ function FixedValueInput({
         {tiers.map((name) => (
           <option key={name} value={name}>
             {name}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
+  if (field === "status") {
+    return (
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={cls}
+      >
+        <option value="">{tierNone}</option>
+        {statuses.map((s) => (
+          <option key={s.value} value={s.value}>
+            {s.label}
           </option>
         ))}
       </select>
@@ -333,6 +446,34 @@ function ResultView({
             </div>
             <div className="mt-1 font-mono text-xs">
               {result.serialsNotFound.join(", ")}
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+      {result.cardNumbersNotFound.length > 0 && (
+        <Alert variant="warning">
+          <AlertDescription>
+            <div>
+              {t("cardNumbersNotFound", {
+                count: result.cardNumbersNotFound.length,
+              })}
+            </div>
+            <div className="mt-1 font-mono text-xs">
+              {result.cardNumbersNotFound.join(", ")}
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+      {result.statusesDefaulted.length > 0 && (
+        <Alert variant="warning">
+          <AlertDescription>
+            <div>
+              {t("statusesDefaulted", {
+                count: result.statusesDefaulted.length,
+              })}
+            </div>
+            <div className="mt-1 font-mono text-xs">
+              {result.statusesDefaulted.join(", ")}
             </div>
           </AlertDescription>
         </Alert>

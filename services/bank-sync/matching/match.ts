@@ -2,6 +2,7 @@
 import "server-only";
 
 import type { BankTransactionPayload } from "@/services/citizenpay/types";
+import type { MemberStatus } from "@/services/db/generated/enums";
 import { prisma } from "@/services/db/prisma";
 
 import { parseCardSerial, parseStructuredCommunication } from "./parse";
@@ -26,6 +27,8 @@ export type BankMatchMethod =
 
 export type Match = {
   memberId: string;
+  // Member status gates allocation: only ACTIVE members get an auto-mint.
+  status: MemberStatus;
   tierId: string | null;
   // The card account to mint to: the referenced card for SERIAL/OGM (falling
   // back to the member's primary if that card has no on-chain account yet),
@@ -43,6 +46,7 @@ const cardSelect = {
   member: {
     select: {
       id: true,
+      status: true,
       tierId: true,
       primaryCard: { select: { account: true } },
     },
@@ -55,6 +59,7 @@ function matchFromCard(
     account: string | null;
     member: {
       id: string;
+      status: MemberStatus;
       tierId: string | null;
       primaryCard: { account: string | null } | null;
     } | null;
@@ -65,6 +70,7 @@ function matchFromCard(
   if (!card.member) return null;
   return {
     memberId: card.member.id,
+    status: card.member.status,
     tierId: card.member.tierId,
     account: card.account ?? card.member.primaryCard?.account ?? null,
     cardId: card.id,
@@ -108,6 +114,7 @@ export async function matchMember(
         member: {
           select: {
             id: true,
+            status: true,
             tierId: true,
             primaryCard: { select: { account: true } },
           },
@@ -117,6 +124,7 @@ export async function matchMember(
     if (link) {
       return {
         memberId: link.member.id,
+        status: link.member.status,
         tierId: link.member.tierId,
         account: link.member.primaryCard?.account ?? null,
         cardId: null,

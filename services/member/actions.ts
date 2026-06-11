@@ -79,7 +79,7 @@ export async function signupMemberAction(input: {
       found &&
       found.referralCode &&
       found.email !== parsed.data.email &&
-      found.status !== "LEFT"
+      found.status !== "STOPPED"
     ) {
       sponsor = { id: found.id, referralCode: found.referralCode };
     }
@@ -132,7 +132,7 @@ export async function signupMemberAction(input: {
             email: parsed.data.email,
             firstName: parsed.data.firstName,
             lastName: parsed.data.lastName,
-            status: "ONBOARDING",
+            status: "NEW",
             paymentReference,
             emailVerifiedAt: requireVerify ? null : new Date(),
             applicationData:
