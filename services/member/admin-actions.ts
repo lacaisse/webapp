@@ -13,10 +13,8 @@ import {
   sendMemberActivated,
   sendMemberInvited,
 } from "@/services/email/transactional";
-import {
-  annotateTransaction,
-  ANNOTATION_TRIGGERS,
-} from "@/services/transaction-annotation/annotate";
+import { ANNOTATION_TRIGGERS } from "@/services/transaction-annotation/annotate";
+import { resolveOrEnqueueAnnotation } from "@/services/transaction-annotation/pending";
 import { BuiltinSignupSchema } from "./schema";
 import { generatePaymentReference } from "./payment-reference";
 
@@ -126,17 +124,20 @@ export async function activateMemberAction(input: {
       },
     });
 
-    // 3. Queue + return the welcome (activation) email.
-    const emailRow = await tx.email.create({
-      data: {
-        fundId: fund.id,
-        type: "MEMBER_ACTIVATED",
-        toEmail: member.email,
-        memberId: member.id,
-        idempotencyKey: `MEMBER_ACTIVATED:member:${member.id}`,
-        subject: welcomeSubject,
-      },
-    });
+    // 3. Queue + return the welcome (activation) email — unless member
+    // emails are paused (fund settings): skipped, not queued.
+    const emailRow = fund.confirmationEmailsPausedAt
+      ? null
+      : await tx.email.create({
+          data: {
+            fundId: fund.id,
+            type: "MEMBER_ACTIVATED",
+            toEmail: member.email,
+            memberId: member.id,
+            idempotencyKey: `MEMBER_ACTIVATED:member:${member.id}`,
+            subject: welcomeSubject,
+          },
+        });
 
     // 4. Referral reward (if applicable). Create a PENDING TokenOperation
     // and flip the referral to ACTIVATED. Submission to CP happens after
@@ -165,7 +166,7 @@ export async function activateMemberAction(input: {
     }
 
     return {
-      emailId: emailRow.id,
+      emailId: emailRow?.id ?? null,
       cardSerial: card.serialNumber,
       referralOpId,
     };
@@ -186,10 +187,14 @@ export async function activateMemberAction(input: {
         where: { id: tx.referralOpId },
         data: { txHash: submitted.txHash },
       });
-      // Reward mint fired by this admin's activation of the referee.
-      await annotateTransaction({
+      // Reward mint fired by this admin's activation of the referee. CP's
+      // submitMint returns a userOp hash, not the settlement tx hash —
+      // resolve it (or queue for the annotation-resolve cron) so the
+      // annotation matches the transfer history.
+      await resolveOrEnqueueAnnotation({
         fundId: fund.id,
-        txHash: submitted.txHash,
+        chainId: fund.tokenChainId,
+        userOpHash: submitted.txHash,
         kind: ANNOTATION_TRIGGERS.referralReward,
         trigger: ANNOTATION_TRIGGERS.referralReward,
         triggeredByUserId: user.id,
@@ -199,20 +204,23 @@ export async function activateMemberAction(input: {
     }
   }
 
-  // Outside the transaction: dispatch the Resend send. Failure is swallowed
-  // by the sender so activation never fails because of an email problem.
-  await sendMemberActivated({
-    emailId: tx.emailId,
-    toEmail: member.email,
-    fund: {
-      name: fund.name,
-      primaryColor: fund.primaryColor,
-      logoUrl: fund.logoUrl,
-    },
-    firstName: member.firstName,
-    cardSerial: tx.cardSerial,
-    paymentReference: member.paymentReference ?? "",
-  });
+  // Outside the transaction: dispatch the Resend send (skipped while member
+  // emails are paused — no row was queued). Failure is swallowed by the
+  // sender so activation never fails because of an email problem.
+  if (tx.emailId) {
+    await sendMemberActivated({
+      emailId: tx.emailId,
+      toEmail: member.email,
+      fund: {
+        name: fund.name,
+        primaryColor: fund.primaryColor,
+        logoUrl: fund.logoUrl,
+      },
+      firstName: member.firstName,
+      cardSerial: tx.cardSerial,
+      paymentReference: member.paymentReference ?? "",
+    });
+  }
 
   revalidatePath("/members");
   return { ok: true };
@@ -327,7 +335,9 @@ export async function inviteMemberAction(input: {
     };
   }
 
-  const notify = input.notify ?? true;
+  // Member-email pause (fund settings) overrides the notify checkbox: while
+  // paused, NO member-facing email goes out — invitations included.
+  const notify = (input.notify ?? true) && !fund.confirmationEmailsPausedAt;
 
   const inviteSubject = t("members.admin.email.invited.subject" as never, {
     fundName: fund.name,

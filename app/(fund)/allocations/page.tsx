@@ -22,11 +22,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { prisma } from "@/services/db/prisma";
 import { requireCurrentFund } from "@/services/fund/server";
+import { DepositsTable } from "./deposits-table";
 import { PeriodDialog } from "./period-dialog";
 import { ArchiveTierButton, TierDialog } from "./tier-dialog";
 
 const TABS = [
   { value: "history" },
+  { value: "transactions" },
+  { value: "unmatched" },
   { value: "tiers" },
   { value: "schedule" },
 ] as const;
@@ -57,6 +60,12 @@ export default async function AllocationsPage({
       />
 
       {active === "history" && <HistoryTab fundId={fund.id} />}
+      {active === "transactions" && (
+        <DepositsTable fundId={fund.id} onlyUnmatched={false} />
+      )}
+      {active === "unmatched" && (
+        <DepositsTable fundId={fund.id} onlyUnmatched={true} />
+      )}
       {active === "tiers" && <TiersTab fundId={fund.id} />}
       {active === "schedule" && (
         <ScheduleTab

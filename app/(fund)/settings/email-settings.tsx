@@ -6,8 +6,10 @@ import { useState, useTransition } from "react";
 
 import { setConfirmationEmailsPausedAction } from "@/services/fund/settings-actions";
 
-// Pause switch for member-facing confirmation emails (deposit recorded /
-// tokens allocated). Optimistic toggle, same pattern as OnboardingSettings.
+// Pause switch for member-facing notification emails (deposit/allocation
+// confirmations, activation, invitation, referral bonus). Signup and
+// password emails keep working regardless. Optimistic toggle, same pattern
+// as OnboardingSettings.
 export function EmailSettings({
   initialPaused,
 }: {

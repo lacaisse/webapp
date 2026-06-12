@@ -8,10 +8,7 @@ import { z } from "zod";
 import { requireFundRole } from "@/services/auth/dal";
 import { getCitizenPayClient } from "@/services/citizenpay/client";
 import { prisma } from "@/services/db/prisma";
-import {
-  annotateTransaction,
-  ANNOTATION_TRIGGERS,
-} from "@/services/transaction-annotation/annotate";
+import { ANNOTATION_TRIGGERS } from "@/services/transaction-annotation/annotate";
 import { resolveOrEnqueueAnnotation } from "@/services/transaction-annotation/pending";
 import {
   burnFromToken,
@@ -106,10 +103,13 @@ export async function manualMintAction(input: {
       where: { id: op.id },
       data: { txHash: submitted.txHash },
     });
-    // CP-REST mint returns the final settlement hash — annotate directly.
-    await annotateTransaction({
+    // CP's top-up endpoint returns a userOp hash, not the settlement tx hash
+    // the transfer history is keyed by — resolve it (or queue for the
+    // annotation-resolve cron) so the annotation is visible.
+    await resolveOrEnqueueAnnotation({
       fundId: fund.id,
-      txHash: submitted.txHash,
+      chainId: fund.tokenChainId,
+      userOpHash: submitted.txHash,
       kind: ANNOTATION_TRIGGERS.adminManualMint,
       trigger: ANNOTATION_TRIGGERS.adminManualMint,
       triggeredByUserId: user.id,

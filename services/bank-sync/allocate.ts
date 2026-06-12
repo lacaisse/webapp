@@ -4,7 +4,7 @@ import "server-only";
 import { getCitizenPayClient } from "@/services/citizenpay/client";
 import { Prisma } from "@/services/db/generated/client";
 import { prisma } from "@/services/db/prisma";
-import { annotateTransaction } from "@/services/transaction-annotation/annotate";
+import { resolveOrEnqueueAnnotation } from "@/services/transaction-annotation/pending";
 
 // Single-deposit tier allocation: mint a member's tier `allocationAmount` for
 // one bank deposit. Shared by the PAY_AND_GO ingest path and manual
@@ -22,6 +22,8 @@ export type AllocationFund = {
   citizenPayFundId: string;
   citizenPayApiKeyId: string | null;
   citizenPayApiKeyEnc: string | null;
+  // For resolving the mint's userOp hash to its settlement tx (annotation).
+  tokenChainId: number;
 };
 
 export async function mintTierAllocation(args: {
@@ -89,9 +91,13 @@ export async function mintTierAllocation(args: {
       where: { id: op.id },
       data: { txHash: submitted.txHash },
     });
-    await annotateTransaction({
+    // CP's top-up endpoint returns a userOp hash, not the settlement tx hash
+    // the transfer history is keyed by — resolve via the bundler (or queue
+    // for the annotation-resolve cron) so the annotation is visible.
+    await resolveOrEnqueueAnnotation({
       fundId: args.fund.id,
-      txHash: submitted.txHash,
+      chainId: args.fund.tokenChainId,
+      userOpHash: submitted.txHash,
       kind: args.trigger,
       trigger: args.trigger,
       triggeredByUserId: args.triggeredByUserId ?? null,

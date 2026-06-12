@@ -70,7 +70,7 @@ export async function linkBankTransactionAction(input: {
     data: { memberId: member.id, matchedAt: new Date() },
   });
 
-  revalidatePath("/payments");
+  revalidatePath("/allocations");
   return { ok: true };
 }
 
@@ -93,7 +93,7 @@ export async function unlinkBankTransactionAction(input: {
     data: { memberId: null, matchedAt: null, matchMethod: null, cardId: null },
   });
 
-  revalidatePath("/payments");
+  revalidatePath("/allocations");
   return { ok: true };
 }
 
@@ -146,6 +146,8 @@ export async function setBankTransactionPeriodAction(input: {
   });
 
   revalidatePath("/bank");
+  // The deposit tables on the Allocations screen show the period read-only.
+  revalidatePath("/allocations");
   // Refresh the period detail page(s) affected — the removal button on the
   // period page and any reassignment both change what a period displays.
   if (tx.allocationPeriodId) {
@@ -346,6 +348,7 @@ export async function attributeBankTransactionAction(input: {
         citizenPayFundId: fund.citizenPayFundId,
         citizenPayApiKeyId: fund.citizenPayApiKeyId,
         citizenPayApiKeyEnc: fund.citizenPayApiKeyEnc,
+        tokenChainId: fund.tokenChainId,
       },
       bankTransactionId: tx.id,
       memberId: member.id,
@@ -357,7 +360,7 @@ export async function attributeBankTransactionAction(input: {
     });
   }
 
-  revalidatePath("/payments");
+  revalidatePath("/allocations");
   // The attribute dialog is also embedded on the period detail page.
   if (allocationPeriodId) {
     revalidatePath(`/allocations/periods/${allocationPeriodId}`);

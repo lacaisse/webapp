@@ -42,10 +42,14 @@ export async function updateOnboardingSettingsAction(
 
 // --- Email pause ----------------------------------------------------------
 
-// Pause/resume the member-facing confirmation emails (PAYMENT_CONFIRMATION
-// at bank-sync ingest + ALLOCATION_CONFIRMATION when a sourced mint
-// confirms). While paused those sends are skipped, not queued — resuming
-// never emails retroactively. Other email types are unaffected.
+// Pause/resume the member-facing NOTIFICATION emails: payment confirmation
+// (bank-sync ingest), allocation confirmation + referral bonus
+// (operation-status cron), member activated and member invited (admin
+// actions). While paused those sends are skipped, not queued — resuming
+// never emails retroactively. Signup-flow emails (verification, welcome)
+// stay functional regardless — the member is actively signing up and needs
+// them — and password emails are auth-level (Supabase → Resend SMTP),
+// outside this flag entirely. Merchant and team emails are unaffected.
 export async function setConfirmationEmailsPausedAction(input: {
   paused: boolean;
 }): Promise<SettingsResult> {

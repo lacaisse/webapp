@@ -107,6 +107,8 @@ async function dispatchMemberWelcome(
   fund: FundContext,
   memberId: string,
 ) {
+  // Signup-flow email: deliberately ignores the member-email pause — the
+  // member just verified and this welcome carries their payment reference.
   const member = await prisma.member.findUnique({
     where: { id: memberId },
     select: {
