@@ -388,7 +388,7 @@
     "members": {
       "title": "Membres",
       "description": "Gérez les comptes membres, l'onboarding et les paliers.",
-      "invite": "Inviter un membre",
+      "invite": "Ajouter un membre",
       "tabs": {
         "all": "Tous",
         "new": "Nouveaux",
@@ -1612,14 +1612,17 @@
         "activating": "Activation…"
       },
       "invite": {
-        "title": "Inviter un membre",
-        "description": "Créez un membre depuis un formulaire papier ou une demande connue. Il apparaîtra dans l'onglet « En attente » et sera averti par email.",
+        "title": "Ajouter un membre",
+        "description": "Créez un membre depuis un formulaire papier ou une demande connue. Il apparaîtra dans l'onglet « En attente ».",
         "firstNameLabel": "Prénom",
         "lastNameLabel": "Nom",
         "emailLabel": "Email",
+        "notifyLabel": "Avertir le membre par email",
         "cancel": "Annuler",
         "confirm": "Inviter le membre",
-        "inviting": "Envoi de l'invitation…"
+        "confirmSilent": "Ajouter le membre",
+        "inviting": "Envoi de l'invitation…",
+        "adding": "Ajout…"
       },
       "addCard": {
         "button": "Ajouter une carte",
