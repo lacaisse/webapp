@@ -1,22 +1,22 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import "server-only";
 
-import { Prisma } from "@/services/db/generated/client";
-
-import { getCitizenPayClient } from "@/services/citizenpay/client";
 import { prisma } from "@/services/db/prisma";
-import {
-  annotateTransaction,
-  ANNOTATION_TRIGGERS,
-} from "@/services/transaction-annotation/annotate";
+import { ANNOTATION_TRIGGERS } from "@/services/transaction-annotation/annotate";
 
 import { ensureOpenPeriod } from "./ensure";
+import { executeAllocationMint, findAllocationPlans } from "./run";
 
 // Period close: FIXED_PERIOD funds accumulate deposits within an
 // AllocationPeriod, then mint tokens for each contributing member at the
 // period's cutoff. This module finds OPEN periods that have passed cutoff,
 // runs the batch mint, marks the period CLOSED, and opens the next calendar
 // month's period (via ensureOpenPeriod, using the fund's cutoff day).
+//
+// Planning + minting are shared with the manual run actions (see ./run.ts):
+// a member who was already allocated for the period (e.g. by an early manual
+// run) is not a candidate anymore, so closing after a manual run only mints
+// for whoever is still waiting.
 //
 // Minting amount per member = their tier's `allocationAmount` IF the sum
 // of their matched deposits within the period reaches the tier's
@@ -56,6 +56,7 @@ export async function closeExpiredPeriods(): Promise<ClosePeriodStats[]> {
           citizenPayFundId: true,
           citizenPayApiKeyId: true,
           citizenPayApiKeyEnc: true,
+          tokenChainId: true,
           allocationCutoffDay: true,
         },
       },
@@ -85,139 +86,45 @@ type PeriodToClose = {
     citizenPayFundId: string | null;
     citizenPayApiKeyId: string | null;
     citizenPayApiKeyEnc: string | null;
+    tokenChainId: number;
     allocationCutoffDay: number;
   };
 };
 
 async function closePeriod(period: PeriodToClose): Promise<ClosePeriodStats> {
-  // Find every ACTIVE member of the fund with a tier + a primary card,
-  // and pull their matched INCOMING bank transactions in this period.
-  const members = await prisma.member.findMany({
-    where: {
-      fundId: period.fundId,
-      status: "ACTIVE",
-      tierId: { not: null },
-      primaryCardId: { not: null },
-    },
-    select: {
-      id: true,
-      tierId: true,
-      tier: {
-        select: {
-          minContribution: true,
-          allocationAmount: true,
-        },
-      },
-      primaryCard: { select: { account: true } },
-      bankTransactions: {
-        where: { allocationPeriodId: period.id, direction: "INCOMING" },
-        select: { id: true, amount: true },
-      },
-    },
+  // Plan first, then lock the period CLOSED BEFORE submitting to CP, so the
+  // period stops accepting deposits even if HTTP calls fail. Each mint is
+  // created PENDING and submitted by executeAllocationMint; a failed submit
+  // leaves the op PENDING for the mint-retry cron, and if the process dies
+  // mid-loop the remaining members stay candidates — visible on the period
+  // page as "ready to allocate", one bulk run away.
+  const { plans, skipped } = await findAllocationPlans({
+    fundId: period.fundId,
+    periodId: period.id,
   });
 
-  type Plan = {
-    memberId: string;
-    tierId: string;
-    account: string;
-    amount: Prisma.Decimal;
-    bankTransactionIds: string[];
-  };
-  const plans: Plan[] = [];
-  let skipped = 0;
-  for (const m of members) {
-    if (!m.tier || !m.tierId || !m.primaryCard?.account) {
-      skipped++;
-      continue;
-    }
-    if (m.bankTransactions.length === 0) {
-      // No deposit at all — nothing to mint. Not "skipped" in the sense of
-      // a problem; the member just didn't contribute this period.
-      continue;
-    }
-    const total = m.bankTransactions.reduce<Prisma.Decimal>(
-      (sum, tx) => sum.add(tx.amount),
-      new Prisma.Decimal(0),
-    );
-    // Only below-minimum totals are excluded. Paying MORE than the tier
-    // maximum is a good thing — it still earns the allocation.
-    if (total.lt(m.tier.minContribution)) {
-      skipped++;
-      continue; // below minimum — admin handles manually
-    }
-    plans.push({
-      memberId: m.id,
-      tierId: m.tierId,
-      account: m.primaryCard.account,
-      amount: m.tier.allocationAmount,
-      bankTransactionIds: m.bankTransactions.map((b) => b.id),
-    });
-  }
-
-  // Single transaction: flip period to CLOSED, create all ops + source links.
-  // We close the period BEFORE submitting to CP so the period is locked even
-  // if HTTP calls fail. PENDING ops without txHash can be retried by a
-  // separate submit job (TBD).
-  const created = await prisma.$transaction(async (tx) => {
-    await tx.allocationPeriod.update({
-      where: { id: period.id },
-      data: { status: "CLOSED", closedAt: new Date() },
-    });
-    const ops: Array<Plan & { opId: string }> = [];
-    for (const plan of plans) {
-      const op = await tx.tokenOperation.create({
-        data: {
-          fundId: period.fundId,
-          type: "MINT",
-          memberId: plan.memberId,
-          tierId: plan.tierId,
-          allocationPeriodId: period.id,
-          account: plan.account,
-          amount: plan.amount,
-          status: "PENDING",
-        },
-      });
-      if (plan.bankTransactionIds.length > 0) {
-        await tx.tokenOperationSource.createMany({
-          data: plan.bankTransactionIds.map((bid) => ({
-            bankTransactionId: bid,
-            tokenOperationId: op.id,
-          })),
-        });
-      }
-      ops.push({ ...plan, opId: op.id });
-    }
-    return ops;
+  await prisma.allocationPeriod.update({
+    where: { id: period.id },
+    data: { status: "CLOSED", closedAt: new Date() },
   });
 
-  // Outside the transaction: submit each mint to CP. Failures leave the op
-  // PENDING with no txHash; the period stays CLOSED regardless.
-  const cp = getCitizenPayClient(period.fund);
+  let created = 0;
   let submitted = 0;
-  for (const op of created) {
-    try {
-      const result = await cp.submitMint({
-        fundCitizenPayId: period.fund.citizenPayFundId,
-        toAccount: op.account,
-        amount: op.amount.toString(),
-        reference: op.opId,
-      });
-      await prisma.tokenOperation.update({
-        where: { id: op.opId },
-        data: { txHash: result.txHash },
-      });
-      // System-triggered batch mint (cron) — no acting admin.
-      await annotateTransaction({
-        fundId: period.fundId,
-        txHash: result.txHash,
-        kind: ANNOTATION_TRIGGERS.periodClose,
-        trigger: ANNOTATION_TRIGGERS.periodClose,
-        triggeredByUserId: null,
-      });
-      submitted++;
-    } catch (e) {
-      console.error("[period-close] submitMint failed", op.opId, e);
-    }
+  for (const plan of plans) {
+    const result = await executeAllocationMint({
+      fund: period.fund,
+      periodId: period.id,
+      plan,
+      // System-triggered batch mint (cron) — no acting admin. The period
+      // label in the note ties the on-chain tx back to this allocation.
+      trigger: ANNOTATION_TRIGGERS.periodClose,
+      triggeredByUserId: null,
+      note: period.label,
+      // Cron settlement: the status cron confirms and emails the member.
+      settlement: "cron",
+    });
+    if (result.created) created++;
+    if (result.submitted) submitted++;
   }
 
   // Auto-create the next OPEN period. Once a period is closed, "now" is past
@@ -231,10 +138,9 @@ async function closePeriod(period: PeriodToClose): Promise<ClosePeriodStats> {
     fundId: period.fundId,
     periodId: period.id,
     label: period.label,
-    mintsCreated: created.length,
+    mintsCreated: created,
     mintsSubmitted: submitted,
     skipped,
     nextPeriodId,
   };
 }
-

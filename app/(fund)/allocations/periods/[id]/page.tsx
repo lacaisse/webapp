@@ -20,12 +20,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { AttributeDialog } from "@/app/(fund)/payments/bank-transaction-actions";
+import { AttributeDialog } from "@/app/(fund)/allocations/bank-transaction-actions";
+import { findAllocationPlans } from "@/services/allocation-periods/run";
 import { Prisma } from "@/services/db/generated/client";
 import { prisma } from "@/services/db/prisma";
 import { requireCurrentFund } from "@/services/fund/server";
 
+import { AllocateMemberButton } from "./allocate-member-button";
 import { RemoveDepositButton } from "./remove-deposit-button";
+import { RunAllocation } from "./run-allocation";
 
 export default async function AllocationPeriodDetailPage({
   params,
@@ -44,9 +47,12 @@ export default async function AllocationPeriodDetailPage({
         orderBy: { occurredAt: "desc" },
         include: {
           member: { select: { id: true, firstName: true, lastName: true } },
-          // A deposit that already fed a mint is locked into the period —
-          // the remove button is hidden for those.
-          _count: { select: { operationSources: true } },
+          // Linked mint ops drive the per-deposit allocation badge. A deposit
+          // that already fed a mint is also locked into the period — the
+          // remove button is hidden for those.
+          operationSources: {
+            select: { tokenOperation: { select: { status: true } } },
+          },
         },
       },
       tokenOperations: {
@@ -133,6 +139,18 @@ export default async function AllocationPeriodDetailPage({
     // else: reached the minimum — allocated, not listed here.
   }
 
+  // Members ready to allocate right now: qualifying deposit total, no mint for
+  // this period yet. Same logic as the close cron and the run actions (see
+  // services/allocation-periods/run.ts), so this lists exactly what a run
+  // would mint — including late payers attributed after the period closed.
+  const { plans: ready } = await findAllocationPlans({
+    fundId: fund.id,
+    periodId: period.id,
+  });
+  const readyTotal = ready
+    .reduce((sum, p) => sum.add(p.amount), new Prisma.Decimal(0))
+    .toString();
+
   return (
     <>
       <Link
@@ -209,6 +227,71 @@ export default async function AllocationPeriodDetailPage({
       )}
 
       <section className="space-y-3">
+        <div className="space-y-1">
+          <h2 className="font-heading text-lg font-medium">
+            {t("ready.title", { count: ready.length })}
+          </h2>
+          <p className="text-sm text-muted-foreground">{t("ready.hint")}</p>
+        </div>
+        <RunAllocation
+          periodId={period.id}
+          readyCount={ready.length}
+          totalAmount={readyTotal}
+        />
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t("ready.member")}</TableHead>
+              <TableHead>{t("ready.tier")}</TableHead>
+              <TableHead className="text-right">
+                {t("ready.deposited")}
+              </TableHead>
+              <TableHead className="text-right">
+                {t("ready.allocation")}
+              </TableHead>
+              <TableHead />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {ready.length === 0 ? (
+              <TableEmpty colSpan={5}>{t("ready.empty")}</TableEmpty>
+            ) : (
+              ready.map((p) => (
+                <TableRow key={p.memberId}>
+                  <TableCell>
+                    <Link
+                      href={`/members/${p.memberId}`}
+                      className="hover:underline"
+                    >
+                      {p.memberName}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {p.tierName}
+                  </TableCell>
+                  <TableCell className="text-right text-sm text-muted-foreground">
+                    {p.deposited.toString()}
+                  </TableCell>
+                  <TableCell className="text-right font-medium">
+                    {p.amount.toString()}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <AllocateMemberButton
+                      periodId={period.id}
+                      memberId={p.memberId}
+                      memberName={p.memberName}
+                      amount={p.amount.toString()}
+                      periodLabel={period.label}
+                    />
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </section>
+
+      <section className="space-y-3">
         <h2 className="font-heading text-lg font-medium">
           {t("deposits.title")}
         </h2>
@@ -221,66 +304,75 @@ export default async function AllocationPeriodDetailPage({
               <TableHead className="text-right">
                 {t("deposits.amount")}
               </TableHead>
+              <TableHead>{t("deposits.allocation")}</TableHead>
               <TableHead />
             </TableRow>
           </TableHeader>
           <TableBody>
             {period.bankTransactions.length === 0 ? (
-              <TableEmpty colSpan={5}>{t("deposits.empty")}</TableEmpty>
+              <TableEmpty colSpan={6}>{t("deposits.empty")}</TableEmpty>
             ) : (
-              period.bankTransactions.map((b) => (
-                <TableRow key={b.id}>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {format.dateTime(b.occurredAt, { dateStyle: "medium" })}
-                  </TableCell>
-                  <TableCell>
-                    {b.member ? (
-                      <Link
-                        href={`/members/${b.member.id}`}
-                        className="hover:underline"
-                      >
-                        {`${b.member.firstName} ${b.member.lastName}`.trim()}
-                      </Link>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground">
-                          {b.counterpartName ?? "—"}
-                        </span>
-                        <AttributeDialog bankTransactionId={b.id} />
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">
-                    {b.counterpartReference ?? b.remittanceInfo ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-right font-medium">
-                    {b.amount.toString()} {b.currency}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {b._count.operationSources === 0 && (
-                      <RemoveDepositButton
-                        bankTransactionId={b.id}
-                        label={
-                          b.member
-                            ? `${b.member.firstName} ${b.member.lastName}`.trim()
-                            : (b.counterpartName ??
-                              b.counterpartReference ??
-                              "—")
-                        }
-                      />
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))
+              period.bankTransactions.map((b) => {
+                const allocation = depositAllocation(
+                  b.operationSources.map((s) => s.tokenOperation.status),
+                );
+                return (
+                  <TableRow key={b.id}>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {format.dateTime(b.occurredAt, { dateStyle: "medium" })}
+                    </TableCell>
+                    <TableCell>
+                      {b.member ? (
+                        <Link
+                          href={`/members/${b.member.id}`}
+                          className="hover:underline"
+                        >
+                          {`${b.member.firstName} ${b.member.lastName}`.trim()}
+                        </Link>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-muted-foreground">
+                            {b.counterpartName ?? "—"}
+                          </span>
+                          <AttributeDialog bankTransactionId={b.id} />
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {b.counterpartReference ?? b.remittanceInfo ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      {b.amount.toString()} {b.currency}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={allocation.variant}>
+                        {t(`deposits.${allocation.key}`)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {b.operationSources.length === 0 && (
+                        <RemoveDepositButton
+                          bankTransactionId={b.id}
+                          label={
+                            b.member
+                              ? `${b.member.firstName} ${b.member.lastName}`.trim()
+                              : (b.counterpartName ??
+                                b.counterpartReference ??
+                                "—")
+                          }
+                        />
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
       </section>
 
       <section className="space-y-3">
-        <h2 className="font-heading text-lg font-medium">
-          {t("mints.title")}
-        </h2>
+        <h2 className="font-heading text-lg font-medium">{t("mints.title")}</h2>
         <Table>
           <TableHeader>
             <TableRow>
@@ -417,6 +509,25 @@ export default async function AllocationPeriodDetailPage({
       )}
     </>
   );
+}
+
+// Per-deposit allocation state, derived from the mint ops the deposit fed
+// (M:N via TokenOperationSource). A deposit counts as allocated as soon as
+// one linked mint isn't FAILED; only-FAILED links surface as failed so the
+// admin knows a retry is needed.
+function depositAllocation(
+  statuses: Array<"PENDING" | "CONFIRMED" | "FAILED">,
+): {
+  variant: "success" | "warning" | "destructive" | "outline";
+  key: "allocated" | "allocationPending" | "allocationFailed" | "notAllocated";
+} {
+  if (statuses.includes("CONFIRMED"))
+    return { variant: "success", key: "allocated" };
+  if (statuses.includes("PENDING"))
+    return { variant: "warning", key: "allocationPending" };
+  if (statuses.length > 0)
+    return { variant: "destructive", key: "allocationFailed" };
+  return { variant: "outline", key: "notAllocated" };
 }
 
 function KpiCard({

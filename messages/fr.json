@@ -155,7 +155,8 @@
         "PAYOUT_FEE": "Commission de virement",
         "REFERRAL_REWARD": "Récompense de parrainage",
         "BANK_SYNC": "Dépôt bancaire (auto)",
-        "PERIOD_CLOSE": "Clôture de période"
+        "PERIOD_CLOSE": "Clôture de période",
+        "ALLOCATION_RUN": "Lancement d'allocation"
       },
       "edit": "Annoter",
       "title": "Annoter la transaction",
@@ -582,8 +583,20 @@
       "description": "Distribuez les jetons aux membres selon les paliers et la synchronisation bancaire.",
       "tabs": {
         "history": "Historique",
+        "transactions": "Transactions",
+        "unmatched": "Non attribuées",
         "tiers": "Paliers",
         "schedule": "Planification"
+      },
+      "transactions": {
+        "date": "Date",
+        "counterpart": "Contrepartie",
+        "reference": "Référence",
+        "member": "Membre",
+        "period": "Période",
+        "amount": "Montant",
+        "unmatched": "Non attribuée",
+        "empty": "Aucune transaction pour le moment."
       },
       "history": {
         "date": "Date",
@@ -656,7 +669,48 @@
           "member": "Membre",
           "reference": "Communication",
           "amount": "Montant",
+          "allocation": "Allocation",
+          "allocated": "Allouée",
+          "allocationPending": "En cours",
+          "allocationFailed": "Échouée",
+          "notAllocated": "Non allouée",
           "empty": "Aucun dépôt dans cette période."
+        },
+        "ready": {
+          "title": "{count, plural, =0 {Prêts à allouer} one {Prêt à allouer (#)} other {Prêts à allouer (#)}}",
+          "hint": "Membres dont les dépôts atteignent le minimum de leur palier et qui n'ont pas encore reçu l'allocation de cette période — y compris les paiements tardifs attribués après la clôture.",
+          "member": "Membre",
+          "tier": "Palier",
+          "deposited": "Déposé",
+          "allocation": "Allocation",
+          "empty": "Rien en attente — tous les dépôts éligibles ont été alloués."
+        },
+        "allocateMember": {
+          "button": "Allouer",
+          "title": "Lancer cette allocation ?",
+          "description": "Émettre {amount} jetons pour {name} au titre de la période {period}. L'émission est effectuée sur la blockchain et ne peut pas être annulée. Aucun e-mail n'est envoyé au membre.",
+          "cancel": "Annuler",
+          "confirm": "Émettre l'allocation",
+          "minting": "Émission…"
+        },
+        "run": {
+          "trigger": "Tout allouer ({count})",
+          "confirmTitle": "Lancer l'allocation de jetons ?",
+          "confirmDescription": "Cette action émet l'allocation de palier pour {count, plural, one {# membre} other {# membres}} ({total} jetons au total), par petits lots. Les membres sous le minimum de leur palier sont laissés en revue. Vous pouvez arrêter après chaque lot ; reprendre n'alloue jamais deux fois le même membre. Aucun e-mail n'est envoyé aux membres.",
+          "confirmCancel": "Annuler",
+          "confirmRun": "Lancer l'allocation",
+          "running": "Allocation en cours…",
+          "progress": "{minted} sur {total} émis · {submitted} soumis",
+          "stop": "Arrêter",
+          "resume": "Reprendre",
+          "completeTitle": "Allocation terminée",
+          "completeSummary": "{minted} allocations émises : {submitted} confirmées sur la blockchain, {failed} échouées, {skipped} membres ignorés (sous le minimum). Les membres en échec restent dans la liste « prêts à allouer » — relancez pour réessayer. Aucun e-mail n'est envoyé aux membres pour ces allocations.",
+          "errorTitle": "Allocation interrompue",
+          "errors": {
+            "notEligible": "Ce membre ne peut pas être alloué pour cette période — pas de dépôt suffisant, ou l'allocation a déjà eu lieu.",
+            "alreadyAllocated": "Ce membre a déjà reçu son allocation pour cette période.",
+            "submitFailed": "L'émission n'a pas pu être soumise à CitizenPay — l'opération est marquée en échec. Le membre reste dans la liste « prêts à allouer » ; réessayez."
+          }
         },
         "mints": {
           "title": "Émissions",
@@ -904,23 +958,11 @@
     },
     "payments": {
       "title": "Paiements",
-      "description": "Dépôts bancaires des membres et virements aux commerces.",
+      "description": "Virements aux commerces.",
       "tabs": {
-        "transactions": "Transactions",
-        "unmatched": "Non attribuées",
         "drafts": "Brouillons",
         "pending": "En attente",
         "completed": "Réglés"
-      },
-      "transactions": {
-        "date": "Date",
-        "counterpart": "Contrepartie",
-        "reference": "Référence",
-        "member": "Membre",
-        "period": "Période",
-        "amount": "Montant",
-        "unmatched": "Non attribuée",
-        "empty": "Aucune transaction pour le moment."
       },
       "settlement": {
         "place": "Commerce",
@@ -1417,8 +1459,8 @@
         "title": "E-mails aux membres",
         "description": "E-mails automatiques envoyés aux membres concernant leurs dépôts et allocations.",
         "pause": {
-          "label": "Suspendre les e-mails de confirmation d'allocation et de paiement",
-          "description": "Pendant la pause, les membres ne reçoivent pas d'e-mail lorsqu'un dépôt est enregistré ou que des jetons sont alloués. Les e-mails ignorés ne sont pas mis en attente — rien n'est envoyé rétroactivement à la reprise. Les invitations, vérifications et autres e-mails ne sont pas concernés."
+          "label": "Suspendre les e-mails de notification aux membres",
+          "description": "Pendant la pause, les membres ne reçoivent aucun e-mail de notification : confirmations de dépôt et d'allocation, activation, invitations et primes de parrainage sont tous ignorés — pas mis en attente, donc rien n'est envoyé rétroactivement à la reprise. Les e-mails d'inscription (vérification, bienvenue) et de mot de passe continuent de fonctionner. Les e-mails aux commerçants et à l'équipe ne sont pas concernés."
         }
       }
     }

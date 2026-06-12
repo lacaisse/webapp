@@ -40,6 +40,7 @@ export async function runFullBankSyncChunkAction(input: {
         citizenPayFundId: fund.citizenPayFundId,
         citizenPayApiKeyId: fund.citizenPayApiKeyId,
         citizenPayApiKeyEnc: fund.citizenPayApiKeyEnc,
+        tokenChainId: fund.tokenChainId,
         citizenPayLastSyncedAt: fund.citizenPayLastSyncedAt,
         allocationMode: fund.allocationMode,
         allocationCutoffDay: fund.allocationCutoffDay,

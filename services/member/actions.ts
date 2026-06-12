@@ -87,6 +87,10 @@ export async function signupMemberAction(input: {
 
   const requireVerify = fund.requireMemberEmailVerification;
 
+  // Note: signup emails (verification + welcome) deliberately ignore the
+  // member-email pause (Fund.confirmationEmailsPausedAt) — the member is
+  // actively signing up and these emails are functional, not notifications.
+
   // Retry loop on paymentReference collisions. We INSERT and catch P2002
   // rather than SELECT-then-INSERT to avoid TOCTOU.
   for (let attempt = 0; attempt < MAX_REFERENCE_RETRIES; attempt++) {

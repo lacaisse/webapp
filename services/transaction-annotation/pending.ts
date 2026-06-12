@@ -48,9 +48,12 @@ export async function enqueuePendingAnnotation(input: {
 
 // The annotation entry point for any userOp-based tx. A userOp's settlement
 // hash isn't final until `success` (a retry can change it), so we never
-// annotate an eagerly-resolved hash. Check the bundler once: annotate now if
-// already `success`, drop on `reverted`/`timeout`, otherwise queue and let the
-// cron finish. Non-blocking — a single fast poll, then return.
+// annotate an eagerly-resolved hash. Poll the bundler: annotate now if
+// `success`, drop on `reverted`/`timeout`, otherwise queue and let the cron
+// finish. By default a single fast poll (non-blocking). `waitMs` keeps
+// re-polling within that budget before falling back to the queue — useful
+// when an admin is watching and the userOp settles in seconds, so the
+// annotation (and its trigger) is visible on the very first refresh.
 export async function resolveOrEnqueueAnnotation(input: {
   fundId: string;
   chainId: number;
@@ -59,32 +62,43 @@ export async function resolveOrEnqueueAnnotation(input: {
   note?: string | null;
   trigger?: string | null;
   triggeredByUserId?: string | null;
+  waitMs?: number;
 }): Promise<void> {
-  let res;
-  try {
-    res = await getUserOpTx(input.chainId, input.userOpHash);
-  } catch (e) {
-    // Bundler unreachable right now — queue it; the cron will resolve later.
-    console.warn("[annotation] immediate resolve failed; queueing", input.userOpHash, e);
-    await enqueuePendingAnnotation(input);
-    return;
-  }
+  const deadline = Date.now() + (input.waitMs ?? 0);
+  for (;;) {
+    let res;
+    try {
+      res = await getUserOpTx(input.chainId, input.userOpHash);
+    } catch (e) {
+      // Bundler unreachable right now — queue it; the cron will resolve later.
+      console.warn(
+        "[annotation] immediate resolve failed; queueing",
+        input.userOpHash,
+        e,
+      );
+      await enqueuePendingAnnotation(input);
+      return;
+    }
 
-  if (res.status === "success" && res.txHash) {
-    await annotateTransaction({
-      fundId: input.fundId,
-      txHash: res.txHash,
-      kind: input.kind,
-      note: input.note,
-      trigger: input.trigger,
-      triggeredByUserId: input.triggeredByUserId,
-    });
-  } else if (res.status === "reverted" || res.status === "timeout") {
-    // The tx won't land — nothing to annotate.
-    return;
-  } else {
-    await enqueuePendingAnnotation(input);
+    if (res.status === "success" && res.txHash) {
+      await annotateTransaction({
+        fundId: input.fundId,
+        txHash: res.txHash,
+        kind: input.kind,
+        note: input.note,
+        trigger: input.trigger,
+        triggeredByUserId: input.triggeredByUserId,
+      });
+      return;
+    }
+    if (res.status === "reverted" || res.status === "timeout") {
+      // The tx won't land — nothing to annotate.
+      return;
+    }
+    if (Date.now() >= deadline) break;
+    await new Promise((r) => setTimeout(r, 1_000));
   }
+  await enqueuePendingAnnotation(input);
 }
 
 export type ProcessResult = {

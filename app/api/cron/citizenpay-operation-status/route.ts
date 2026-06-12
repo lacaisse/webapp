@@ -91,10 +91,14 @@ export async function GET(request: NextRequest) {
       //   - Bank-sync allocation (sources non-empty) → ALLOCATION_CONFIRMATION
       //     to the recipient member
       // A mint can be only one of these in practice; check referral first.
+      // Both recipients are members, so both respect the fund-level member-
+      // email pause: the op still flips CONFIRMED, only the notification is
+      // skipped (never sent retroactively on resume).
       if (
         op.referral &&
         op.referral.sponsor.email &&
-        op.referral.fund.referralBonusAmount
+        op.referral.fund.referralBonusAmount &&
+        !op.fund.confirmationEmailsPausedAt
       ) {
         await queueAndSendReferralBonusEmail({
           fundId: op.fundId,
@@ -112,8 +116,6 @@ export async function GET(request: NextRequest) {
         op.sources.length > 0 &&
         op.member?.email &&
         op.memberId &&
-        // Fund-level pause: the op still flips CONFIRMED, only the member
-        // notification is skipped (never sent retroactively on resume).
         !op.fund.confirmationEmailsPausedAt
       ) {
         await queueAndSendAllocationConfirmation({

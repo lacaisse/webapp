@@ -50,6 +50,7 @@ export const ANNOTATION_TRIGGERS = {
   bankSync: "BANK_SYNC", // cron: auto-mint on a matched deposit
   periodClose: "PERIOD_CLOSE", // cron: batch mint at period cutoff
   manualAttribution: "MANUAL_ATTRIBUTION", // admin attributed an unmatched deposit
+  allocationRun: "ALLOCATION_RUN", // admin ran a period allocation (single or bulk)
 } as const;
 
 // Best-effort upsert — never throws, so it can't fail the action that produced

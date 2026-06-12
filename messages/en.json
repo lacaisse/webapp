@@ -155,7 +155,8 @@
         "PAYOUT_FEE": "Payout fee",
         "REFERRAL_REWARD": "Referral reward",
         "BANK_SYNC": "Bank deposit (auto)",
-        "PERIOD_CLOSE": "Period close"
+        "PERIOD_CLOSE": "Period close",
+        "ALLOCATION_RUN": "Allocation run"
       },
       "edit": "Annotate",
       "title": "Annotate transaction",
@@ -582,8 +583,20 @@
       "description": "Distribute tokens to members based on tiers and bank synchronisation.",
       "tabs": {
         "history": "History",
+        "transactions": "Transactions",
+        "unmatched": "Unmatched",
         "tiers": "Tiers",
         "schedule": "Schedule"
+      },
+      "transactions": {
+        "date": "Date",
+        "counterpart": "Counterpart",
+        "reference": "Reference",
+        "member": "Member",
+        "period": "Period",
+        "amount": "Amount",
+        "unmatched": "Unmatched",
+        "empty": "No transactions yet."
       },
       "history": {
         "date": "Date",
@@ -671,7 +684,48 @@
           "member": "Member",
           "reference": "Reference",
           "amount": "Amount",
+          "allocation": "Allocation",
+          "allocated": "Allocated",
+          "allocationPending": "In flight",
+          "allocationFailed": "Failed",
+          "notAllocated": "Not allocated",
           "empty": "No deposits in this period yet."
+        },
+        "ready": {
+          "title": "{count, plural, =0 {Ready to allocate} one {Ready to allocate (#)} other {Ready to allocate (#)}}",
+          "hint": "Members whose deposits reached their tier minimum and who haven't received this period's allocation yet — including late payments attributed after the close.",
+          "member": "Member",
+          "tier": "Tier",
+          "deposited": "Deposited",
+          "allocation": "Allocation",
+          "empty": "Nothing waiting — every qualifying deposit has been allocated."
+        },
+        "allocateMember": {
+          "button": "Allocate",
+          "title": "Run this allocation?",
+          "description": "Mint {amount} tokens to {name} for period {period}. This submits an on-chain mint and can't be undone. No email is sent to the member.",
+          "cancel": "Cancel",
+          "confirm": "Mint allocation",
+          "minting": "Minting…"
+        },
+        "run": {
+          "trigger": "Allocate all ({count})",
+          "confirmTitle": "Run the token allocation?",
+          "confirmDescription": "This mints the tier allocation for {count, plural, one {# member} other {# members}} ({total} tokens in total), in small batches. Members below their tier minimum are left for review. You can stop after any batch; resuming never allocates the same member twice. No emails are sent to members.",
+          "confirmCancel": "Cancel",
+          "confirmRun": "Run allocation",
+          "running": "Allocating…",
+          "progress": "{minted} of {total} minted · {submitted} submitted",
+          "stop": "Stop",
+          "resume": "Resume",
+          "completeTitle": "Allocation run complete",
+          "completeSummary": "{minted} allocations minted: {submitted} confirmed on-chain, {failed} failed, {skipped} members skipped (below minimum). Failed members stay in the ready list — run again to retry. No emails are sent to members for these allocations.",
+          "errorTitle": "Allocation run stopped",
+          "errors": {
+            "notEligible": "This member can't be allocated for this period — no qualifying deposit total, or the allocation already ran.",
+            "alreadyAllocated": "This member already received their allocation for this period.",
+            "submitFailed": "The mint couldn't be submitted to CitizenPay — the operation is marked failed. The member stays in the ready list; try again."
+          }
         },
         "mints": {
           "title": "Mints",
@@ -904,23 +958,11 @@
     },
     "payments": {
       "title": "Payments",
-      "description": "Bank deposits from members and payouts to merchants.",
+      "description": "Payouts to merchants.",
       "tabs": {
-        "transactions": "Transactions",
-        "unmatched": "Unmatched",
         "drafts": "Drafts",
         "pending": "Pending",
         "completed": "Completed"
-      },
-      "transactions": {
-        "date": "Date",
-        "counterpart": "Counterpart",
-        "reference": "Reference",
-        "member": "Member",
-        "period": "Period",
-        "amount": "Amount",
-        "unmatched": "Unmatched",
-        "empty": "No transactions yet."
       },
       "settlement": {
         "place": "Place",
@@ -1417,8 +1459,8 @@
         "title": "Member emails",
         "description": "Automatic emails sent to members about their deposits and allocations.",
         "pause": {
-          "label": "Pause allocation and payment confirmation emails",
-          "description": "While paused, members are not emailed when a deposit is recorded or when tokens are allocated. Skipped emails are not queued — nothing is sent retroactively when you resume. Invitations, verification and other emails are unaffected."
+          "label": "Pause member notification emails",
+          "description": "While paused, members receive no notification emails: deposit and allocation confirmations, activation, invitation and referral-bonus emails are all skipped — not queued, so nothing is sent retroactively when you resume. Signup emails (verification, welcome) and password emails keep working. Merchant and team emails are unaffected."
         }
       }
     }
