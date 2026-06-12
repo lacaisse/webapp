@@ -305,13 +305,15 @@ export type InviteMemberResult =
   | { ok: true }
   | { error: string; field?: "firstName" | "lastName" | "email" };
 
-// Admin-initiated invite: creates a NEW member from a paper-form or
-// admin-known recipient, emails them a heads-up, and shows up in the
-// "new" tab so the admin can activate them when a card is in hand.
+// Admin-initiated add: creates a NEW member from a paper-form or
+// admin-known recipient and shows up in the "new" tab so the admin can
+// activate them when a card is in hand. When `notify` is true we also
+// email them a heads-up; when false the member is added silently.
 export async function inviteMemberAction(input: {
   firstName: string;
   lastName: string;
   email: string;
+  notify?: boolean;
 }): Promise<InviteMemberResult> {
   const t = await getTranslations();
   const { fund } = await requireFundRole("ADMIN");
@@ -325,6 +327,8 @@ export async function inviteMemberAction(input: {
     };
   }
 
+  const notify = input.notify ?? true;
+
   const inviteSubject = t("members.admin.email.invited.subject" as never, {
     fundName: fund.name,
   } as never);
@@ -332,7 +336,7 @@ export async function inviteMemberAction(input: {
   for (let attempt = 0; attempt < MAX_REFERENCE_RETRIES; attempt++) {
     const paymentReference = generatePaymentReference();
 
-    let result: { memberId: string; emailId: string } | null = null;
+    let result: { memberId: string; emailId: string | null } | null = null;
     try {
       result = await prisma.$transaction(async (tx) => {
         const m = await tx.member.create({
@@ -347,6 +351,7 @@ export async function inviteMemberAction(input: {
             emailVerifiedAt: new Date(),
           },
         });
+        if (!notify) return { memberId: m.id, emailId: null };
         const email = await tx.email.create({
           data: {
             fundId: fund.id,
@@ -370,17 +375,19 @@ export async function inviteMemberAction(input: {
       throw e;
     }
 
-    await sendMemberInvited({
-      emailId: result.emailId,
-      toEmail: parsed.data.email,
-      fund: {
-        name: fund.name,
-        primaryColor: fund.primaryColor,
-        logoUrl: fund.logoUrl,
-      },
-      firstName: parsed.data.firstName,
-      paymentReference,
-    });
+    if (notify && result.emailId) {
+      await sendMemberInvited({
+        emailId: result.emailId,
+        toEmail: parsed.data.email,
+        fund: {
+          name: fund.name,
+          primaryColor: fund.primaryColor,
+          logoUrl: fund.logoUrl,
+        },
+        firstName: parsed.data.firstName,
+        paymentReference,
+      });
+    }
 
     revalidatePath("/members");
     return { ok: true };

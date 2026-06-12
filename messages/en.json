@@ -388,7 +388,7 @@
     "members": {
       "title": "Members",
       "description": "Manage member accounts, onboarding, and tier assignments.",
-      "invite": "Invite member",
+      "invite": "Add member",
       "tabs": {
         "all": "All",
         "new": "New",
@@ -1612,14 +1612,17 @@
         "activating": "Activating…"
       },
       "invite": {
-        "title": "Invite a member",
-        "description": "Create a member from a paper form or known applicant. They'll appear in the \"pending\" tab and be notified by email.",
+        "title": "Add a member",
+        "description": "Create a member from a paper form or known applicant. They'll appear in the \"pending\" tab.",
         "firstNameLabel": "First name",
         "lastNameLabel": "Last name",
         "emailLabel": "Email",
+        "notifyLabel": "Notify the member by email",
         "cancel": "Cancel",
         "confirm": "Invite member",
-        "inviting": "Sending invite…"
+        "confirmSilent": "Add member",
+        "inviting": "Sending invite…",
+        "adding": "Adding…"
       },
       "addCard": {
         "button": "Add card",

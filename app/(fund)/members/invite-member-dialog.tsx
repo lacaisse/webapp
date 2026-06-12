@@ -7,6 +7,7 @@ import { useState, useTransition } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -28,6 +29,7 @@ export function InviteMemberDialog({ triggerLabel }: { triggerLabel: string }) {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
+  const [notify, setNotify] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [errorField, setErrorField] = useState<FieldError | null>(null);
   const [pending, startTransition] = useTransition();
@@ -36,6 +38,7 @@ export function InviteMemberDialog({ triggerLabel }: { triggerLabel: string }) {
     setFirstName("");
     setLastName("");
     setEmail("");
+    setNotify(true);
     setError(null);
     setErrorField(null);
   };
@@ -44,7 +47,12 @@ export function InviteMemberDialog({ triggerLabel }: { triggerLabel: string }) {
     setError(null);
     setErrorField(null);
     startTransition(async () => {
-      const result = await inviteMemberAction({ firstName, lastName, email });
+      const result = await inviteMemberAction({
+        firstName,
+        lastName,
+        email,
+        notify,
+      });
       if ("error" in result) {
         setError(result.error);
         setErrorField(result.field ?? null);
@@ -122,6 +130,20 @@ export function InviteMemberDialog({ triggerLabel }: { triggerLabel: string }) {
             aria-invalid={errorField === "email"}
           />
         </div>
+        <div className="flex items-start gap-2 pt-1">
+          <Checkbox
+            id="invite-notify"
+            checked={notify}
+            onCheckedChange={(value) => setNotify(value)}
+            className="mt-0.5"
+          />
+          <Label
+            htmlFor="invite-notify"
+            className="text-sm font-normal text-muted-foreground"
+          >
+            {t("notifyLabel")}
+          </Label>
+        </div>
         {error && (
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
@@ -136,7 +158,13 @@ export function InviteMemberDialog({ triggerLabel }: { triggerLabel: string }) {
             {t("cancel")}
           </Button>
           <Button onClick={onSubmit} disabled={pending}>
-            {pending ? t("inviting") : t("confirm")}
+            {pending
+              ? notify
+                ? t("inviting")
+                : t("adding")
+              : notify
+                ? t("confirm")
+                : t("confirmSilent")}
           </Button>
         </DialogFooter>
       </DialogContent>
