@@ -1420,3 +1420,34 @@ enum EmailStatus {
   SENT // Resend accepted; resendMessageId populated
   FAILED // Resend rejected or network failure; errorMessage populated
 }
+
+// Public waitlist signups from the marketing landing. Self-serve account
+// creation is closed — visitors leave their email here and we invite them
+// out of band. Intentionally no FK to User/Fund: these are pre-account leads.
+model WaitlistEntry {
+  id String @id @default(cuid())
+
+  // Stored lowercased. Unique so a repeat submit updates the existing row
+  // instead of piling up duplicates.
+  email String @unique
+
+  // Optional free text — what they'd call their fund / why they're interested.
+  fundName String?
+
+  // Locale captured at submit time so a follow-up email matches their language.
+  locale String?
+
+  status WaitlistStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+}
+
+enum WaitlistStatus {
+  PENDING // signed up, not yet contacted
+  INVITED // we've sent them an invite to create an account
+  CONVERTED // they created an account
+  DECLINED // not a fit / opted out
+}

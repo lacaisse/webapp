@@ -7,7 +7,6 @@ import { LandingLogo } from "./landing-logo";
 export async function LandingNav() {
   const t = await getTranslations("landing.nav");
   const loginUrl = getAuthUrl("/login");
-  const signupUrl = getAuthUrl("/signup");
 
   const items = [
     { label: t("howItWorks"), href: "#how-it-works" },
@@ -58,11 +57,11 @@ export async function LandingNav() {
             {t("signIn")}
           </a>
           <a
-            href={signupUrl}
+            href="#get-started"
             className="inline-flex h-9 items-center rounded-lg px-3.5 text-sm font-medium text-primary-foreground no-underline transition-colors hover:opacity-90"
             style={{ background: "var(--primary)" }}
           >
-            {t("startFund")}
+            {t("joinWaitlist")}
           </a>
         </div>
       </div>

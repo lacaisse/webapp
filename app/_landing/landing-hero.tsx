@@ -191,9 +191,6 @@ function Configurator({
     if (/\s/.test(v)) return t("errors.tokenMultiWord");
     return null;
   })();
-  const disabled =
-    !fundDraft.trim() || !tokenDraft.trim() || !!fundErr || !!tokenErr;
-
   return (
     <div
       className="rounded-xl p-6"
@@ -275,30 +272,19 @@ function Configurator({
         />
 
         <div className="mt-1 flex flex-col gap-2.5 pt-2">
-          <button
-            type="button"
-            disabled={disabled}
-            className="inline-flex h-11 w-full items-center justify-between rounded-lg px-[18px] text-[15px] font-medium transition-opacity"
+          <a
+            href="#get-started"
+            className="inline-flex h-11 w-full items-center justify-between rounded-lg px-[18px] text-[15px] font-medium text-primary-foreground no-underline transition-opacity hover:opacity-90"
             style={{
-              background: disabled ? "oklch(0.85 0.01 75)" : color.oklch,
-              color: disabled ? "var(--muted-foreground)" : "var(--primary-foreground)",
-              cursor: disabled ? "not-allowed" : "pointer",
+              background: color.oklch,
               border: "1px solid transparent",
               transition:
                 "background 280ms var(--ease-out), opacity 120ms var(--ease-out)",
             }}
           >
-            <span>{t("tryWith")}</span>
+            <span>{t("joinWaitlist")}</span>
             <span>→</span>
-          </button>
-          <button
-            type="button"
-            className="inline-flex h-11 w-full items-center justify-between rounded-lg border bg-transparent px-[18px] text-[15px] font-medium text-foreground transition-colors hover:bg-muted"
-            style={{ borderColor: "var(--border)" }}
-          >
-            <span>{t("skipDemo")}</span>
-            <span>→</span>
-          </button>
+          </a>
         </div>
       </div>
     </div>

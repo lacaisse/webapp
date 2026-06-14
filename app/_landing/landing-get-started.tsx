@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { getTranslations } from "next-intl/server";
-import { getAuthUrl } from "@/services/host/server";
+import { WaitlistForm } from "./waitlist-form";
 
 export async function LandingGetStarted() {
   const t = await getTranslations("landing.getStarted");
-  const signupUrl = getAuthUrl("/signup");
 
   return (
     <section className="px-8 pb-6 pt-2 max-[760px]:px-5">
@@ -41,15 +40,7 @@ export async function LandingGetStarted() {
                 {t("left.body")}
               </p>
             </div>
-            <div className="flex gap-2.5 max-[420px]:flex-col">
-              <a
-                href={signupUrl}
-                className="inline-flex h-11 items-center gap-2 rounded-lg px-[18px] text-[15px] font-medium text-primary-foreground no-underline transition-opacity hover:opacity-90"
-                style={{ background: "var(--primary)" }}
-              >
-                {t("left.ctaPrimary")} →
-              </a>
-            </div>
+            <WaitlistForm />
           </div>
 
           <div

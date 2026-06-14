@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { getCurrentUser } from "@/services/auth/dal";
 import { buildPostAuthRedirect } from "@/services/auth/redirects";
+import { getApexUrl } from "@/services/fund/server";
 import { LoginForm } from "./login-form";
 
 export default async function LoginPage({
@@ -35,9 +36,6 @@ export default async function LoginPage({
   }
 
   const t = await getTranslations("auth.login");
-  const signupHref = return_to
-    ? `/signup?return_to=${encodeURIComponent(return_to)}`
-    : "/signup";
 
   return (
     <Card>
@@ -49,10 +47,30 @@ export default async function LoginPage({
         <LoginForm />
       </CardContent>
       <CardFooter className="text-sm text-muted-foreground">
-        {t("noAccount")}&nbsp;
-        <Link href={signupHref} className="text-foreground underline">
-          {t("createAccount")}
-        </Link>
+        {return_to ? (
+          // Invited users (e.g. a team-invite accept URL) can still create an
+          // account — keep the path open for them.
+          <>
+            {t("noAccount")}&nbsp;
+            <Link
+              href={`/signup?return_to=${encodeURIComponent(return_to)}`}
+              className="text-foreground underline"
+            >
+              {t("createAccount")}
+            </Link>
+          </>
+        ) : (
+          // Public self-serve signup is closed — point newcomers at the waitlist.
+          <>
+            {t("waitlistPrompt")}&nbsp;
+            <Link
+              href={getApexUrl("/#get-started")}
+              className="text-foreground underline"
+            >
+              {t("joinWaitlist")}
+            </Link>
+          </>
+        )}
       </CardFooter>
     </Card>
   );
