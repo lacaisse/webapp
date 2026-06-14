@@ -72,6 +72,15 @@ export async function signupAction(
   returnTo?: string,
 ): Promise<ActionResult> {
   const t = await getTranslations("auth");
+
+  // Self-serve signups are closed (waitlist-only). Invited users carry a
+  // `returnTo` (e.g. a team-invite accept URL) — only those may create an
+  // account. The public signup route no longer renders the form, so this is
+  // defense-in-depth against a direct POST.
+  if (!returnTo) {
+    return { error: t("errors.signupsClosed") };
+  }
+
   const parsed = SignupSchema.safeParse(input);
   if (!parsed.success) {
     return { error: t("errors.invalidInput") };

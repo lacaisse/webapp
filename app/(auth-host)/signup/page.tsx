@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { getCurrentUser } from "@/services/auth/dal";
 import { buildPostAuthRedirect } from "@/services/auth/redirects";
+import { getApexUrl } from "@/services/fund/server";
 import { SignupForm } from "./signup-form";
 
 export default async function SignupPage({
@@ -32,6 +33,13 @@ export default async function SignupPage({
         returnTo: return_to,
       }),
     );
+  }
+
+  // Self-serve account creation is closed — visitors join the waitlist instead.
+  // Invited users arrive with a `return_to` (e.g. a team-invite accept URL);
+  // only they get the create-account form.
+  if (!return_to) {
+    redirect(getApexUrl("/#get-started"));
   }
 
   const t = await getTranslations("auth.signup");

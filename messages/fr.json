@@ -34,7 +34,9 @@
       "createAccount": "Créer un compte",
       "passkeyButton": "Se connecter avec une passkey",
       "passkeyWaiting": "En attente de la passkey…",
-      "passkeyEmailRequired": "Saisissez votre email pour vous connecter avec une passkey."
+      "passkeyEmailRequired": "Saisissez votre email pour vous connecter avec une passkey.",
+      "waitlistPrompt": "Vous n'avez pas encore de compte ?",
+      "joinWaitlist": "Rejoindre la liste d'attente"
     },
     "forgotPassword": {
       "title": "Réinitialiser votre mot de passe",
@@ -71,6 +73,7 @@
       "passwordsDontMatch": "Les mots de passe ne correspondent pas.",
       "invalidCredentials": "Identifiants invalides.",
       "invalidInput": "Saisie invalide.",
+      "signupsClosed": "Les inscriptions sont sur invitation pour le moment. Rejoignez la liste d'attente pour demander un accès.",
       "passkeyStartFailed": "Impossible de démarrer la connexion par passkey.",
       "passkeyVerifyFailed": "Impossible de vérifier la réponse de la passkey.",
       "signInFailed": "Échec de la connexion.",
@@ -2192,7 +2195,8 @@
       "features": "Fonctionnalités",
       "getStarted": "Commencer",
       "signIn": "Se connecter",
-      "startFund": "Créer une caisse"
+      "startFund": "Créer une caisse",
+      "joinWaitlist": "Rejoindre la liste d'attente"
     },
     "hero": {
       "badge": "Open source · Multi-caisses · Hébergé ou auto-hébergé",
@@ -2218,8 +2222,7 @@
         "primaryColor": "Couleur principale",
         "tokenName": "Nom du jeton",
         "tokenNameHelper": "Comment s'appelle la monnaie de votre caisse. Au singulier — on gère le pluriel.",
-        "tryWith": "Essayer avec cette identité",
-        "skipDemo": "Passer la démo, créer une caisse",
+        "joinWaitlist": "Rejoindre la liste d'attente",
         "swatchHelperDefault": "la couleur par défaut de la caisse.",
         "swatchHelperOther": "utilisée pour les boutons, accents et mises en avant.",
         "errors": {
@@ -2498,15 +2501,34 @@
     },
     "getStarted": {
       "left": {
-        "eyebrow": "Quand vous êtes prêt",
-        "title": "Lancez une caisse en une après-midi.",
-        "body": "Configurez votre sous-domaine, invitez vos premiers membres, intégrez vos premiers commerçants et fournisseurs. En français clair, avec des valeurs par défaut sensées. 20 €/mois — gratuit pour les associations enregistrées et les écoles.",
+        "eyebrow": "Liste d'attente",
+        "title": "Soyez les premiers à lancer votre caisse.",
+        "body": "Nous intégrons les nouvelles caisses par petits groupes. Laissez-nous votre email et nous vous enverrons une invitation pour configurer la vôtre — sous-domaine, membres, commerçants, tout y est. 20 €/mois, gratuit pour les associations enregistrées et les écoles.",
         "ctaPrimary": "Créer une caisse"
       },
       "right": {
         "eyebrow": "Pour les développeurs",
         "title": "Auto-hébergez sur votre serveur.",
         "body": "Tirez l'image, lancez la migration, pointez un domaine. Sous AGPL-3.0 sur GitHub."
+      }
+    },
+    "waitlist": {
+      "emailLabel": "Email",
+      "emailPlaceholder": "vous@exemple.com",
+      "fundNameLabel": "Comment appelleriez-vous votre caisse ? (facultatif)",
+      "fundNamePlaceholder": "Caisse de Saint-Gilles",
+      "submit": "Demander une invitation",
+      "submitting": "Inscription…",
+      "successTitle": "Vous êtes sur la liste.",
+      "successBody": "Merci — nous vous écrirons dès que votre invitation sera prête.",
+      "errors": {
+        "fundNameMax": "Limitez-vous à {max} caractères."
+      },
+      "emails": {
+        "confirm": {
+          "subject": "Vous êtes sur la liste d'attente La Caisse",
+          "text": "Bonjour,\n\nMerci de votre intérêt pour La Caisse — vous êtes sur la liste d'attente. Nous intégrons les nouvelles caisses par petits groupes et nous vous enverrons une invitation dès qu'une place se libère.\n\nRien à faire pour l'instant.\n\nL'équipe La Caisse"
+        }
       }
     },
     "footer": {

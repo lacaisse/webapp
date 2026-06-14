@@ -34,7 +34,9 @@
       "createAccount": "Create an account",
       "passkeyButton": "Sign in with a passkey",
       "passkeyWaiting": "Waiting for passkey…",
-      "passkeyEmailRequired": "Enter your email to sign in with a passkey."
+      "passkeyEmailRequired": "Enter your email to sign in with a passkey.",
+      "waitlistPrompt": "Don't have an account yet?",
+      "joinWaitlist": "Join the waitlist"
     },
     "forgotPassword": {
       "title": "Reset your password",
@@ -71,6 +73,7 @@
       "passwordsDontMatch": "Passwords don't match.",
       "invalidCredentials": "Invalid credentials.",
       "invalidInput": "Invalid input.",
+      "signupsClosed": "Sign-ups are invite-only right now. Join the waitlist to request access.",
       "passkeyStartFailed": "Could not start passkey sign-in.",
       "passkeyVerifyFailed": "Could not verify the passkey response.",
       "signInFailed": "Sign-in failed.",
@@ -2192,7 +2195,8 @@
       "features": "Features",
       "getStarted": "Get started",
       "signIn": "Sign in",
-      "startFund": "Start a fund"
+      "startFund": "Start a fund",
+      "joinWaitlist": "Join the waitlist"
     },
     "hero": {
       "badge": "Open source · Multi-tenant · Hosted or self-hosted",
@@ -2218,8 +2222,7 @@
         "primaryColor": "Primary color",
         "tokenName": "Token name",
         "tokenNameHelper": "What your fund's currency is called. Singular form — we'll handle the plural.",
-        "tryWith": "Try it with this branding",
-        "skipDemo": "Skip the demo, start a fund",
+        "joinWaitlist": "Join the waitlist",
         "swatchHelperDefault": "the la caisse default.",
         "swatchHelperOther": "used for buttons, highlights, and accents.",
         "errors": {
@@ -2498,15 +2501,34 @@
     },
     "getStarted": {
       "left": {
-        "eyebrow": "Ready when you are",
-        "title": "Start a fund in an afternoon.",
-        "body": "Set up your subdomain, invite your first members, onboard your first merchants and suppliers. Plain English, sensible defaults. €20/month — free for registered non-profits and schools.",
+        "eyebrow": "Join the waitlist",
+        "title": "Be first to start your fund.",
+        "body": "We're onboarding new funds in small batches. Leave your email and we'll send you an invite to set yours up — subdomain, members, merchants and all. €20/month, free for registered non-profits and schools.",
         "ctaPrimary": "Start a fund"
       },
       "right": {
         "eyebrow": "For developers",
         "title": "Self-host on your own box.",
         "body": "Pull the image, run the migration, point a domain. AGPL-3.0 on GitHub."
+      }
+    },
+    "waitlist": {
+      "emailLabel": "Email",
+      "emailPlaceholder": "you@example.com",
+      "fundNameLabel": "What would you call your fund? (optional)",
+      "fundNamePlaceholder": "Caisse de Saint-Gilles",
+      "submit": "Request an invite",
+      "submitting": "Adding you…",
+      "successTitle": "You're on the list.",
+      "successBody": "Thanks — we'll email you as soon as your invite is ready.",
+      "errors": {
+        "fundNameMax": "Keep it under {max} characters."
+      },
+      "emails": {
+        "confirm": {
+          "subject": "You're on the La Caisse waitlist",
+          "text": "Hi,\n\nThanks for your interest in La Caisse — you're on the waitlist. We're onboarding new funds in small batches and we'll email you an invite as soon as a spot opens up.\n\nNothing to do for now.\n\nThe La Caisse team"
+        }
       }
     },
     "footer": {
