@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
       confirmationEmailsPausedAt: true,
       primaryColor: true,
       logoUrl: true,
+      senderEmail: true,
     },
   });
 
@@ -57,6 +58,7 @@ export async function GET(request: NextRequest) {
         confirmationEmailsPausedAt: f.confirmationEmailsPausedAt,
         primaryColor: f.primaryColor,
         logoUrl: f.logoUrl,
+        senderEmail: f.senderEmail,
       });
       results[f.id] = stats;
     } catch (e) {

@@ -47,6 +47,7 @@ export async function runFullBankSyncChunkAction(input: {
         confirmationEmailsPausedAt: fund.confirmationEmailsPausedAt,
         primaryColor: fund.primaryColor,
         logoUrl: fund.logoUrl,
+        senderEmail: fund.senderEmail,
       },
       input.cursor,
     );

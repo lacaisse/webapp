@@ -203,6 +203,7 @@ export async function signupMemberAction(input: {
       name: fund.name,
       primaryColor: fund.primaryColor,
       logoUrl: fund.logoUrl,
+      senderEmail: fund.senderEmail,
     };
     if (requireVerify) {
       const verifyUrl = `${getFundUrl(fund.domain)}/verify-email?token=${encodeURIComponent(verificationToken!)}`;

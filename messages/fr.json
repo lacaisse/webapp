@@ -909,6 +909,7 @@
         "unverified": "Email non vérifié",
         "connected": "Citizen Pay connecté",
         "notConnected": "Citizen Pay non connecté",
+        "hidden": "Masqué",
         "invite": {
           "title": "Invitation Citizen Pay",
           "description": "Statut de l'invitation envoyée au commerce.",
@@ -933,6 +934,7 @@
           "description": "Statut interne et lien Citizen Pay.",
           "joined": "Inscrit le",
           "position": "Position dans l'annuaire",
+          "publiclyVisible": "Annuaire public",
           "conditions": "Conditions d'acceptation",
           "citizenPayPlace": "Identifiant du lieu Citizen Pay",
           "citizenPayBusiness": "Identifiant entreprise Citizen Pay",
@@ -1491,6 +1493,11 @@
         "pause": {
           "label": "Suspendre les e-mails de notification aux membres",
           "description": "Pendant la pause, les membres ne reçoivent aucun e-mail de notification : confirmations de dépôt et d'allocation, activation, invitations et primes de parrainage sont tous ignorés — pas mis en attente, donc rien n'est envoyé rétroactivement à la reprise. Les e-mails d'inscription (vérification, bienvenue) et de mot de passe continuent de fonctionner. Les e-mails aux commerçants et à l'équipe ne sont pas concernés."
+        },
+        "sender": {
+          "label": "Adresse d'expéditeur",
+          "description": "Adresse « De » des e-mails aux membres. Le nom affiché est celui de votre caisse. Le domaine doit être vérifié chez votre fournisseur d'e-mail, sinon les envois échoueront. Laissez vide pour utiliser l'adresse par défaut de la plateforme. Les e-mails aux commerçants, à l'équipe et de connexion ne sont pas concernés.",
+          "placeholder": "noreply@votrecaisse.org"
         }
       },
       "emailTemplates": {
@@ -1524,7 +1531,25 @@
         "htmlLabel": "Corps (HTML)",
         "htmlHint": "Rédigez le corps en HTML — il est intégré à la mise en page de votre caisse (logo, pied de page). Utilisez les variables ci-dessous ; elles sont remplacées pour chaque membre à l'envoi.",
         "previewLabel": "Aperçu",
-        "previewSubject": "Objet :"
+        "previewSubject": "Objet :",
+        "test": {
+          "title": "Envoyer un test",
+          "description": "Choisissez un membre pour renseigner les détails de l'e-mail (montant, n° de carte, …), puis envoyez une copie à l'adresse de votre choix. Le montant est l'allocation du palier du membre — ce qui serait réellement crédité sur sa carte.",
+          "memberLabel": "Utiliser les données de ce membre",
+          "emailLabel": "Envoyer à",
+          "emailPlaceholder": "vous@exemple.com",
+          "send": "Envoyer le test",
+          "sending": "Envoi…",
+          "sent": "E-mail de test envoyé.",
+          "noMembers": "Aucun membre actif avec un palier d'allocation pour le moment — ajoutez-en un pour envoyer un test.",
+          "subjectPrefix": "[Test]",
+          "errors": {
+            "emailInvalid": "Saisissez une adresse e-mail valide.",
+            "memberNotFound": "Ce membre est introuvable.",
+            "noTier": "Ce membre n'a pas de palier d'allocation, il n'y a donc aucun montant à afficher.",
+            "sendFailed": "Impossible d'envoyer l'e-mail de test. Vérifiez l'adresse d'expéditeur et réessayez."
+          }
+        }
       }
     }
   },
@@ -1565,6 +1590,7 @@
   "settings": {
     "errors": {
       "nameMin": "Le nom de la caisse doit contenir au moins 2 caractères.",
+      "emailInvalid": "Saisissez une adresse e-mail valide.",
       "localeUnsupported": "Langue non prise en charge.",
       "timezoneRequired": "Le fuseau horaire est requis.",
       "colorInvalid": "Utilisez une couleur hex à 6 chiffres (ex. #1a73e8).",
@@ -2056,6 +2082,20 @@
         "rejectReasonPlaceholder": "Partagé avec le commerce dans l'email de refus.",
         "reasonRequired": "Un motif est requis pour que le commerce comprenne la décision."
       },
+      "visibility": {
+        "visible": "Visible",
+        "hidden": "Masqué"
+      },
+      "editName": {
+        "trigger": "Modifier le nom",
+        "title": "Modifier le nom du commerce",
+        "description": "Il s'agit du nom public du commerce — affiché dans l'annuaire, les e-mails d'allocation et les libellés de versement.",
+        "label": "Nom",
+        "placeholder": "Nom du commerce",
+        "cancel": "Annuler",
+        "save": "Enregistrer",
+        "saving": "Enregistrement…"
+      },
       "email": {
         "approved": {
           "subject": "Demande approuvée — {fundName}",
@@ -2073,7 +2113,9 @@
         "alreadyApproved": "Ce commerce est déjà approuvé.",
         "alreadyRejected": "Ce commerce est déjà refusé.",
         "notRejected": "Seuls les commerces refusés peuvent être réexaminés.",
-        "reasonRequired": "Un motif est requis."
+        "reasonRequired": "Un motif est requis.",
+        "nameRequired": "Saisissez un nom.",
+        "nameTaken": "Un autre commerce de cette caisse utilise déjà ce nom."
       },
       "sync": {
         "trigger": "Synchroniser avec Citizen Pay",

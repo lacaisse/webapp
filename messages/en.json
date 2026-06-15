@@ -909,6 +909,7 @@
         "unverified": "Email not verified",
         "connected": "Citizen Pay connected",
         "notConnected": "Citizen Pay not connected",
+        "hidden": "Hidden",
         "invite": {
           "title": "Citizen Pay invite",
           "description": "Status of the invite sent to the merchant.",
@@ -933,6 +934,7 @@
           "description": "Internal status and Citizen Pay linkage.",
           "joined": "Joined",
           "position": "Directory position",
+          "publiclyVisible": "Public directory",
           "conditions": "Acceptance conditions",
           "citizenPayPlace": "Citizen Pay place ID",
           "citizenPayBusiness": "Citizen Pay business ID",
@@ -1491,6 +1493,11 @@
         "pause": {
           "label": "Pause member notification emails",
           "description": "While paused, members receive no notification emails: deposit and allocation confirmations, activation, invitation and referral-bonus emails are all skipped — not queued, so nothing is sent retroactively when you resume. Signup emails (verification, welcome) and password emails keep working. Merchant and team emails are unaffected."
+        },
+        "sender": {
+          "label": "Sender address",
+          "description": "From address for member emails. The display name is your fund's name. The domain must be verified in your email provider, or sends will fail. Leave blank to use the platform default. Merchant, team and sign-in emails are unaffected.",
+          "placeholder": "noreply@yourfund.org"
         }
       },
       "emailTemplates": {
@@ -1524,7 +1531,25 @@
         "htmlLabel": "Body (HTML)",
         "htmlHint": "Write the body in HTML — it's wrapped in your fund's branded layout (logo, footer). Use the placeholders below; they're replaced per member when the email is sent.",
         "previewLabel": "Preview",
-        "previewSubject": "Subject:"
+        "previewSubject": "Subject:",
+        "test": {
+          "title": "Send a test",
+          "description": "Pick a member to fill in the email's details (amount, card serial, …), then send a copy to any address. The amount is the member's tier allocation — what would actually be minted to their card.",
+          "memberLabel": "Use this member's data",
+          "emailLabel": "Send to",
+          "emailPlaceholder": "you@example.com",
+          "send": "Send test",
+          "sending": "Sending…",
+          "sent": "Test email sent.",
+          "noMembers": "No active members with an allocation tier yet — add one to send a test.",
+          "subjectPrefix": "[Test]",
+          "errors": {
+            "emailInvalid": "Enter a valid email address.",
+            "memberNotFound": "That member could not be found.",
+            "noTier": "That member has no allocation tier, so there's no amount to show.",
+            "sendFailed": "The test email could not be sent. Check the sender address and try again."
+          }
+        }
       }
     }
   },
@@ -1565,6 +1590,7 @@
   "settings": {
     "errors": {
       "nameMin": "Fund name must be at least 2 characters.",
+      "emailInvalid": "Enter a valid email address.",
       "localeUnsupported": "Unsupported language.",
       "timezoneRequired": "Timezone is required.",
       "colorInvalid": "Use a 6-digit hex color (e.g. #1a73e8).",
@@ -2056,6 +2082,20 @@
         "rejectReasonPlaceholder": "Shared with the merchant in the rejection email.",
         "reasonRequired": "A reason is required so the merchant understands the decision."
       },
+      "visibility": {
+        "visible": "Visible",
+        "hidden": "Hidden"
+      },
+      "editName": {
+        "trigger": "Edit name",
+        "title": "Edit merchant name",
+        "description": "This is the merchant's public name — shown in the directory, allocation emails and payout labels.",
+        "label": "Name",
+        "placeholder": "Merchant name",
+        "cancel": "Cancel",
+        "save": "Save",
+        "saving": "Saving…"
+      },
       "email": {
         "approved": {
           "subject": "Application approved — {fundName}",
@@ -2073,7 +2113,9 @@
         "alreadyApproved": "This merchant is already approved.",
         "alreadyRejected": "This merchant is already rejected.",
         "notRejected": "Only rejected merchants can be reconsidered.",
-        "reasonRequired": "A reason is required."
+        "reasonRequired": "A reason is required.",
+        "nameRequired": "Enter a name.",
+        "nameTaken": "Another merchant in this fund already uses that name."
       },
       "sync": {
         "trigger": "Sync with Citizen Pay",

@@ -21,6 +21,11 @@ export type FundBranding = {
   name: string;
   primaryColor: string | null;
   logoUrl: string | null;
+  // Optional per-fund From address. When set, the email is sent from
+  // "<name> <senderEmail>" instead of the platform default. Only the
+  // member-facing senders thread this through (merchant/team sends leave it
+  // undefined and keep the platform EMAIL_FROM).
+  senderEmail?: string | null;
 };
 
 export async function sendMemberEmailVerification(args: {
@@ -384,6 +389,11 @@ async function dispatchTemplate(args: {
       subject: rendered.subject,
       text: rendered.text,
       html,
+      // Per-fund sender (member emails only); falls back to EMAIL_FROM when
+      // the fund hasn't configured one.
+      from: args.fund.senderEmail
+        ? `${args.fund.name} <${args.fund.senderEmail}>`
+        : undefined,
     });
     await prisma.email.update({
       where: { id: args.emailId },

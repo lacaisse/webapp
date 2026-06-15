@@ -58,6 +58,7 @@ type IngestionFund = {
   name: string;
   primaryColor: string | null;
   logoUrl: string | null;
+  senderEmail: string | null;
 };
 
 // Bank transactions can appear in the Ponto feed days after their
@@ -369,6 +370,7 @@ async function dispatchPaymentConfirmation(args: {
         name: args.fund.name,
         primaryColor: args.fund.primaryColor,
         logoUrl: args.fund.logoUrl,
+        senderEmail: args.fund.senderEmail,
       },
       amount: args.amount,
       occurredAt: args.occurredAt,

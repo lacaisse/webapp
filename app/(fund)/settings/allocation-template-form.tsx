@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 "use client";
 
-import { Loader2, RotateCcw } from "lucide-react";
+import { Loader2, RotateCcw, Send } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useState, useTransition } from "react";
 
@@ -23,7 +23,15 @@ import {
   previewEmailTemplateAction,
   resetEmailTemplateAction,
   saveEmailTemplateAction,
+  sendTestAllocationEmailAction,
 } from "@/services/email/template-actions";
+
+export type TestMember = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+};
 
 // Editor for the per-fund ALLOCATION_CONFIRMATION email override. Subject + a
 // rich-HTML body (source), with a live preview rendered server-side in the
@@ -35,11 +43,13 @@ export function AllocationTemplateForm({
   base,
   hasOverride,
   variables,
+  testMembers,
 }: {
   initial: { subject: string; bodyHtml: string };
   base: { subject: string; bodyHtml: string };
   hasOverride: boolean;
   variables: readonly string[];
+  testMembers: TestMember[];
 }) {
   const t = useTranslations("fund.settings.emailTemplates");
   const tRoot = useTranslations("fund.settings");
@@ -51,6 +61,39 @@ export function AllocationTemplateForm({
   const [overridden, setOverridden] = useState(hasOverride);
   const [pending, startTransition] = useTransition();
   const [resetting, startReset] = useTransition();
+
+  // Test send: pick a member (populates the email's data) + the address to
+  // deliver to (editable, defaults to the picked member's own email).
+  const [testMemberId, setTestMemberId] = useState(testMembers[0]?.id ?? "");
+  const [testEmail, setTestEmail] = useState(testMembers[0]?.email ?? "");
+  const [testError, setTestError] = useState<string | null>(null);
+  const [testSent, setTestSent] = useState(false);
+  const [testing, startTest] = useTransition();
+
+  const onTestMemberChange = (id: string) => {
+    setTestSent(false);
+    setTestError(null);
+    setTestMemberId(id);
+    // Convenience: prefill the destination with the picked member's address.
+    const m = testMembers.find((m) => m.id === id);
+    if (m) setTestEmail(m.email);
+  };
+
+  const onSendTest = () => {
+    setTestError(null);
+    setTestSent(false);
+    startTest(async () => {
+      const result = await sendTestAllocationEmailAction({
+        memberId: testMemberId,
+        toEmail: testEmail,
+      });
+      if ("error" in result) {
+        setTestError(result.error);
+        return;
+      }
+      setTestSent(true);
+    });
+  };
 
   // Debounced live preview (server-rendered branded HTML).
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
@@ -112,6 +155,7 @@ export function AllocationTemplateForm({
   };
 
   return (
+    <div className="space-y-6">
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Editor column */}
@@ -242,5 +286,75 @@ export function AllocationTemplateForm({
         </div>
       </div>
     </form>
+
+      <div className="space-y-3 rounded-md border border-border bg-muted/20 p-4">
+        <div className="space-y-0.5">
+          <h3 className="text-sm font-medium">{t("test.title")}</h3>
+          <p className="text-xs text-muted-foreground">
+            {t("test.description")}
+          </p>
+        </div>
+
+        {testMembers.length === 0 ? (
+          <p className="text-xs text-muted-foreground">{t("test.noMembers")}</p>
+        ) : (
+          <>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="test-member">{t("test.memberLabel")}</Label>
+                <select
+                  id="test-member"
+                  value={testMemberId}
+                  onChange={(e) => onTestMemberChange(e.target.value)}
+                  className="w-full rounded-md bg-background px-2.5 py-1.5 text-sm ring-1 ring-foreground/15 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {testMembers.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {`${m.firstName} ${m.lastName}`.trim()} — {m.email}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="test-email">{t("test.emailLabel")}</Label>
+                <Input
+                  id="test-email"
+                  type="email"
+                  value={testEmail}
+                  onChange={(e) => {
+                    setTestSent(false);
+                    setTestEmail(e.target.value);
+                  }}
+                  placeholder={t("test.emailPlaceholder")}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+              </div>
+            </div>
+
+            {testError && (
+              <Alert variant="destructive">
+                <AlertDescription>{testError}</AlertDescription>
+              </Alert>
+            )}
+
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-xs text-muted-foreground">
+                {testSent && !testing ? t("test.sent") : null}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onSendTest}
+                disabled={testing || !testMemberId || !testEmail.trim()}
+              >
+                <Send className="size-3.5" />
+                {testing ? t("test.sending") : t("test.send")}
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
   );
 }

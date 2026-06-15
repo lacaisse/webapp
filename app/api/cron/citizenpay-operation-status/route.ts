@@ -44,6 +44,7 @@ export async function GET(request: NextRequest) {
           citizenPayApiKeyId: true,
           citizenPayApiKeyEnc: true,
           confirmationEmailsPausedAt: true,
+          senderEmail: true,
         },
       },
       member: { select: { email: true, firstName: true, lastName: true } },
@@ -57,6 +58,7 @@ export async function GET(request: NextRequest) {
               primaryColor: true,
               logoUrl: true,
               referralBonusAmount: true,
+              senderEmail: true,
             },
           },
         },
@@ -110,6 +112,7 @@ export async function GET(request: NextRequest) {
             name: op.referral.fund.name,
             primaryColor: op.referral.fund.primaryColor,
             logoUrl: op.referral.fund.logoUrl,
+            senderEmail: op.referral.fund.senderEmail,
           },
           amount: op.referral.fund.referralBonusAmount.toString(),
         });
@@ -131,6 +134,7 @@ export async function GET(request: NextRequest) {
             name: op.fund.name,
             primaryColor: op.fund.primaryColor,
             logoUrl: op.fund.logoUrl,
+            senderEmail: op.fund.senderEmail,
           },
           amount: op.amount.toString(),
         });
@@ -159,7 +163,12 @@ async function queueAndSendAllocationConfirmation(args: {
   firstName: string;
   lastName: string;
   account: string | null;
-  fundBranding: { name: string; primaryColor: string | null; logoUrl: string | null };
+  fundBranding: {
+    name: string;
+    primaryColor: string | null;
+    logoUrl: string | null;
+    senderEmail: string | null;
+  };
   amount: string;
 }) {
   const idempotencyKey = `ALLOCATION_CONFIRMATION:operation:${args.tokenOperationId}`;
@@ -198,7 +207,12 @@ async function queueAndSendReferralBonusEmail(args: {
   referralId: string;
   sponsorEmail: string;
   sponsorFirstName: string;
-  fundBranding: { name: string; primaryColor: string | null; logoUrl: string | null };
+  fundBranding: {
+    name: string;
+    primaryColor: string | null;
+    logoUrl: string | null;
+    senderEmail: string | null;
+  };
   amount: string;
 }) {
   // Idempotency: one bonus-awarded email per referral, regardless of how

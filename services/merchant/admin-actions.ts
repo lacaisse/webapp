@@ -90,6 +90,81 @@ export async function approveMerchantAction(input: {
 }
 
 // =============================================================================
+// Public-directory visibility
+// =============================================================================
+// Hides a merchant from public-facing surfaces (the {shopList} email variable
+// today, the public directory/map later) without touching its lifecycle
+// status. Independent of archive: an ACTIVE merchant can be hidden and stay
+// connected/payable.
+
+export async function setMerchantVisibilityAction(input: {
+  merchantId: string;
+  publiclyVisible: boolean;
+}): Promise<ReviewMerchantResult> {
+  const t = await getTranslations();
+  const { fund } = await requireFundRole("ADMIN");
+
+  const merchant = await prisma.merchant.findFirst({
+    where: { id: input.merchantId, fundId: fund.id },
+    select: { id: true },
+  });
+  if (!merchant) return { error: t("merchants.admin.errors.notFound" as never) };
+
+  await prisma.merchant.update({
+    where: { id: merchant.id },
+    data: { publiclyVisible: input.publiclyVisible },
+  });
+
+  revalidatePath("/merchants");
+  revalidatePath(`/merchants/${merchant.id}`);
+  return { ok: true };
+}
+
+// =============================================================================
+// Edit name
+// =============================================================================
+// The merchant's public-facing name (shown in the directory, the {shopList}
+// email variable, payout labels). Per-fund unique (@@unique([fundId, name])),
+// so a clash returns a friendly error rather than a Prisma throw.
+
+export async function updateMerchantNameAction(input: {
+  merchantId: string;
+  name: string;
+}): Promise<ReviewMerchantResult> {
+  const t = await getTranslations();
+  const { fund } = await requireFundRole("ADMIN");
+
+  const name = input.name.trim();
+  if (!name) {
+    return { error: t("merchants.admin.errors.nameRequired" as never) };
+  }
+
+  const merchant = await prisma.merchant.findFirst({
+    where: { id: input.merchantId, fundId: fund.id },
+    select: { id: true, name: true },
+  });
+  if (!merchant) return { error: t("merchants.admin.errors.notFound" as never) };
+  if (merchant.name === name) return { ok: true };
+
+  try {
+    await prisma.merchant.update({
+      where: { id: merchant.id },
+      data: { name },
+    });
+  } catch (e) {
+    // @@unique([fundId, name]) — another merchant in this fund owns the name.
+    if ((e as { code?: string }).code === "P2002") {
+      return { error: t("merchants.admin.errors.nameTaken" as never) };
+    }
+    throw e;
+  }
+
+  revalidatePath("/merchants");
+  revalidatePath(`/merchants/${merchant.id}`);
+  return { ok: true };
+}
+
+// =============================================================================
 // Archive / restore (status: ACTIVE ↔ INACTIVE)
 // =============================================================================
 // INACTIVE is the project's archive state — the merchant row stays in

@@ -3,9 +3,11 @@
 
 import { getTranslations } from "next-intl/server";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
 import { requireFundRole } from "@/services/auth/dal";
 import { prisma } from "@/services/db/prisma";
+import { sendEmail } from "./resend";
 import { renderBrandedEmail } from "./template";
 import {
   PREVIEW_SAMPLE_VALUES,
@@ -15,7 +17,12 @@ import {
   type PreviewEmailTemplateInput,
   type SaveEmailTemplateInput,
 } from "./template-config";
-import { buildShopList, htmlToPlainText, interpolate } from "./templates";
+import {
+  buildShopList,
+  htmlToPlainText,
+  interpolate,
+  resolveAllocationTemplate,
+} from "./templates";
 
 export type TemplateActionResult = { ok: true } | { error: string };
 
@@ -95,4 +102,89 @@ export async function previewEmailTemplateAction(
     html: interpolate(bodyHtml, { ...scalar, shopList: shop.html }),
   });
   return { ok: true, html };
+}
+
+export type SendTestEmailResult = { ok: true } | { error: string };
+
+// Send a one-off test of the ALLOCATION_CONFIRMATION email to an
+// admin-specified address, populated from a real member so the variables
+// ({firstName}, {amount}, {cardSerial}, {shopList}) render with live data.
+// The {amount} is the member's tier allocation amount — the "montant cible"
+// that actually gets minted to their card — matching the real send.
+//
+// Renders + sends directly (no Email row, no idempotency): it's a transient
+// admin tool, not a tracked member notification. Honours the fund's custom
+// sender so the test reflects exactly what members would receive.
+export async function sendTestAllocationEmailAction(input: {
+  memberId: string;
+  toEmail: string;
+}): Promise<SendTestEmailResult> {
+  const t = await getTranslations();
+  const { fund } = await requireFundRole("ADMIN");
+
+  const toEmail = input.toEmail.trim();
+  if (!z.string().email().safeParse(toEmail).success) {
+    return {
+      error: t("fund.settings.emailTemplates.test.errors.emailInvalid" as never),
+    };
+  }
+
+  const member = await prisma.member.findFirst({
+    where: { id: input.memberId, fundId: fund.id },
+    select: {
+      firstName: true,
+      lastName: true,
+      tier: { select: { allocationAmount: true } },
+      primaryCard: { select: { account: true } },
+    },
+  });
+  if (!member) {
+    return {
+      error: t("fund.settings.emailTemplates.test.errors.memberNotFound" as never),
+    };
+  }
+  if (!member.tier) {
+    return {
+      error: t("fund.settings.emailTemplates.test.errors.noTier" as never),
+    };
+  }
+
+  const rendered = await resolveAllocationTemplate({
+    fundId: fund.id,
+    account: member.primaryCard?.account ?? null,
+    vars: {
+      firstName: member.firstName,
+      lastName: member.lastName,
+      fundName: fund.name,
+      amount: member.tier.allocationAmount.toString(),
+    },
+  });
+
+  const subject = `${t("fund.settings.emailTemplates.test.subjectPrefix" as never)} ${rendered.subject}`;
+  const html = await renderBrandedEmail({
+    fundName: fund.name,
+    primaryColor: fund.primaryColor,
+    logoUrl: fund.logoUrl,
+    subject,
+    text: rendered.text,
+    html: rendered.html,
+  });
+
+  try {
+    await sendEmail({
+      to: toEmail,
+      subject,
+      text: rendered.text,
+      html,
+      from: fund.senderEmail
+        ? `${fund.name} <${fund.senderEmail}>`
+        : undefined,
+    });
+  } catch (e) {
+    console.error("[email] test allocation send failed", fund.id, e);
+    return {
+      error: t("fund.settings.emailTemplates.test.errors.sendFailed" as never),
+    };
+  }
+  return { ok: true };
 }

@@ -8,24 +8,36 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { prisma } from "@/services/db/prisma";
 import { getAllocationTemplateForEditing } from "@/services/email/templates";
 import { AllocationTemplateForm } from "./allocation-template-form";
 import { EmailSettings } from "./email-settings";
+import { MemberSenderForm } from "./member-sender-form";
 
-// "Emails" settings tab: the member-notification pause switch plus the
-// editable allocation-confirmation template. Server component — it loads the
-// fund's template override (or the built-in default) and hands it to the
-// client editor.
+// "Emails" settings tab: the member-notification pause switch, the custom
+// sender address, plus the editable allocation-confirmation template (with a
+// test-send picker). Server component — it loads the fund's template override
+// (or the built-in default) and a list of members for the test picker, and
+// hands them to the client editor.
 export async function EmailsTab({
   fund,
   initialPaused,
 }: {
-  fund: { id: string; defaultLocale: string };
+  fund: { id: string; defaultLocale: string; senderEmail: string | null };
   initialPaused: boolean;
 }) {
   const t = await getTranslations("fund.settings");
   const { override, base, variables } = await getAllocationTemplateForEditing({
     fund,
+  });
+
+  // Members that can seed a test allocation email — ACTIVE with a tier (the
+  // tier supplies the {amount}). Ordered by name for the picker.
+  const members = await prisma.member.findMany({
+    where: { fundId: fund.id, status: "ACTIVE", tierId: { not: null } },
+    select: { id: true, firstName: true, lastName: true, email: true },
+    orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
+    take: 500,
   });
 
   return (
@@ -35,8 +47,9 @@ export async function EmailsTab({
           <CardTitle>{t("emails.title")}</CardTitle>
           <CardDescription>{t("emails.description")}</CardDescription>
         </CardHeader>
-        <CardContent className="pb-4">
+        <CardContent className="space-y-6 pb-4">
           <EmailSettings initialPaused={initialPaused} />
+          <MemberSenderForm initialSenderEmail={fund.senderEmail} />
         </CardContent>
       </Card>
 
@@ -53,6 +66,7 @@ export async function EmailsTab({
             base={base}
             hasOverride={override !== null}
             variables={variables}
+            testMembers={members}
           />
         </CardContent>
       </Card>
