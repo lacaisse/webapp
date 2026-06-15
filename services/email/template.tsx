@@ -51,6 +51,10 @@ export type BrandedEmailArgs = {
   // bare URL, that paragraph renders as a primary button. When unset,
   // bare-URL paragraphs render as a plain link.
   ctaLabel?: string;
+  // Rich-HTML body. When provided, it's injected into the branded card as-is
+  // (header/footer/card chrome preserved) and `text`/`ctaLabel` block-parsing
+  // is bypassed. `text` is still used for the plain-text MIME part.
+  html?: string;
 };
 
 export async function renderBrandedEmail(
@@ -66,6 +70,7 @@ function EmailTemplate({
   subject,
   text,
   ctaLabel,
+  html,
 }: BrandedEmailArgs) {
   const brand = normalizeHex(primaryColor);
   const blocks = text.split(/\n{2,}/);
@@ -102,14 +107,25 @@ function EmailTemplate({
             }}
           >
             <BrandHeader fundName={fundName} logoUrl={logoUrl} />
-            {blocks.map((block, i) => (
-              <Block
-                key={i}
-                text={block}
-                brand={brand}
-                ctaLabel={ctaLabel}
+            {html != null ? (
+              <div
+                style={{
+                  fontSize: 15,
+                  lineHeight: "23px",
+                  color: COLORS.foreground,
+                }}
+                dangerouslySetInnerHTML={{ __html: html }}
               />
-            ))}
+            ) : (
+              blocks.map((block, i) => (
+                <Block
+                  key={i}
+                  text={block}
+                  brand={brand}
+                  ctaLabel={ctaLabel}
+                />
+              ))
+            )}
           </Section>
           <Text
             style={{

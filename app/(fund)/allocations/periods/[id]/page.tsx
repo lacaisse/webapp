@@ -27,6 +27,8 @@ import { prisma } from "@/services/db/prisma";
 import { requireCurrentFund } from "@/services/fund/server";
 
 import { AllocateMemberButton } from "./allocate-member-button";
+import { NotifyAllButton } from "./notify-all-button";
+import { NotifyAllocationButton } from "./notify-allocation-button";
 import { RemoveDepositButton } from "./remove-deposit-button";
 import { RunAllocation } from "./run-allocation";
 
@@ -58,8 +60,16 @@ export default async function AllocationPeriodDetailPage({
       tokenOperations: {
         orderBy: { submittedAt: "desc" },
         include: {
-          member: { select: { id: true, firstName: true, lastName: true } },
+          member: {
+            select: { id: true, firstName: true, lastName: true, email: true },
+          },
           tier: { select: { name: true } },
+          // Allocation-confirmation emails for this mint drive the per-mint
+          // notification badge + send/retry button.
+          emails: {
+            where: { type: "ALLOCATION_CONFIRMATION" },
+            select: { status: true },
+          },
         },
       },
     },
@@ -150,6 +160,17 @@ export default async function AllocationPeriodDetailPage({
   const readyTotal = ready
     .reduce((sum, p) => sum.add(p.amount), new Prisma.Decimal(0))
     .toString();
+
+  // Confirmed mints still awaiting a member notification (drives the Notify-all
+  // button + its count). Notifiable = a CONFIRMED MINT to a member with an
+  // email; "pending" = no SENT allocation-confirmation email yet.
+  const notifyPendingCount = period.tokenOperations.filter(
+    (op) =>
+      op.type === "MINT" &&
+      op.status === "CONFIRMED" &&
+      op.member?.email &&
+      !op.emails.some((e) => e.status === "SENT"),
+  ).length;
 
   return (
     <>
@@ -373,6 +394,10 @@ export default async function AllocationPeriodDetailPage({
 
       <section className="space-y-3">
         <h2 className="font-heading text-lg font-medium">{t("mints.title")}</h2>
+        <NotifyAllButton
+          periodId={period.id}
+          pendingCount={notifyPendingCount}
+        />
         <Table>
           <TableHeader>
             <TableRow>
@@ -381,40 +406,72 @@ export default async function AllocationPeriodDetailPage({
               <TableHead>{t("mints.tier")}</TableHead>
               <TableHead className="text-right">{t("mints.amount")}</TableHead>
               <TableHead>{t("mints.status")}</TableHead>
+              <TableHead>{t("notify.column")}</TableHead>
+              <TableHead />
             </TableRow>
           </TableHeader>
           <TableBody>
             {period.tokenOperations.length === 0 ? (
-              <TableEmpty colSpan={5}>{t("mints.empty")}</TableEmpty>
+              <TableEmpty colSpan={7}>{t("mints.empty")}</TableEmpty>
             ) : (
-              period.tokenOperations.map((op) => (
-                <TableRow key={op.id}>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {format.dateTime(op.submittedAt, { dateStyle: "medium" })}
-                  </TableCell>
-                  <TableCell>
-                    {op.member ? (
-                      <Link
-                        href={`/members/${op.member.id}`}
-                        className="hover:underline"
-                      >
-                        {`${op.member.firstName} ${op.member.lastName}`.trim()}
-                      </Link>
-                    ) : (
-                      "—"
-                    )}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {op.tier?.name ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-right font-medium">
-                    {op.amount.toString()}
-                  </TableCell>
-                  <TableCell>
-                    <OperationStatusBadge status={op.status} />
-                  </TableCell>
-                </TableRow>
-              ))
+              period.tokenOperations.map((op) => {
+                const memberName = op.member
+                  ? `${op.member.firstName} ${op.member.lastName}`.trim()
+                  : "—";
+                const notif = mintNotification({
+                  type: op.type,
+                  status: op.status,
+                  hasEmail: Boolean(op.member?.email),
+                  emailStatuses: op.emails.map((e) => e.status),
+                });
+                return (
+                  <TableRow key={op.id}>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {format.dateTime(op.submittedAt, { dateStyle: "medium" })}
+                    </TableCell>
+                    <TableCell>
+                      {op.member ? (
+                        <Link
+                          href={`/members/${op.member.id}`}
+                          className="hover:underline"
+                        >
+                          {memberName}
+                        </Link>
+                      ) : (
+                        "—"
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {op.tier?.name ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      {op.amount.toString()}
+                    </TableCell>
+                    <TableCell>
+                      <OperationStatusBadge status={op.status} />
+                    </TableCell>
+                    <TableCell>
+                      {notif.badge ? (
+                        <Badge variant={notif.badge.variant}>
+                          {t(`notify.status.${notif.badge.key}`)}
+                        </Badge>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {notif.action && (
+                        <NotifyAllocationButton
+                          tokenOperationId={op.id}
+                          memberName={memberName}
+                          amount={op.amount.toString()}
+                          isRetry={notif.action === "retry"}
+                        />
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
@@ -528,6 +585,32 @@ function depositAllocation(
   if (statuses.length > 0)
     return { variant: "destructive", key: "allocationFailed" };
   return { variant: "outline", key: "notAllocated" };
+}
+
+// Per-mint notification state for the mints table. Only CONFIRMED mints to a
+// member with an email can be notified; everything else shows no badge/button.
+//   - sent:    a SENT allocation-confirmation email exists → no action
+//   - failed:  only FAILED/QUEUED attempts so far → "Retry"
+//   - notSent: no email yet → "Send"
+function mintNotification(op: {
+  type: "MINT" | "BURN" | "TRANSFER";
+  status: "PENDING" | "CONFIRMED" | "FAILED";
+  hasEmail: boolean;
+  emailStatuses: Array<"QUEUED" | "SENT" | "FAILED">;
+}): {
+  badge: { variant: "success" | "destructive" | "outline"; key: string } | null;
+  action: "send" | "retry" | null;
+} {
+  if (op.type !== "MINT" || op.status !== "CONFIRMED" || !op.hasEmail) {
+    return { badge: null, action: null };
+  }
+  if (op.emailStatuses.includes("SENT")) {
+    return { badge: { variant: "success", key: "sent" }, action: null };
+  }
+  if (op.emailStatuses.length > 0) {
+    return { badge: { variant: "destructive", key: "failed" }, action: "retry" };
+  }
+  return { badge: { variant: "outline", key: "notSent" }, action: "send" };
 }
 
 function KpiCard({

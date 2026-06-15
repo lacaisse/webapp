@@ -295,6 +295,7 @@ model Fund {
   linkedBankAccounts LinkedBankAccount[] // learned IBAN → member mappings
   referrals          Referral[] // referral programme records (5.3.4)
   emails             Email[] // transactional email outbox/log
+  emailTemplates     EmailTemplate[] // per-fund overrides of the default email wording
 
   citizenPayConnectAttempts CitizenPayConnectAttempt[] // in-flight CP connect handoffs
   addressProfiles           AddressProfileCache[] // CP profile cache (token explorer / transfers)
@@ -1392,6 +1393,30 @@ model Email {
   @@index([memberId])
   @@index([merchantId])
   @@index([status])
+}
+
+// Per-fund override of an email's wording. Absence of a row for a (fund, type)
+// pair = use the built-in i18n default (messages/*.json); a row replaces the
+// default subject/body for that fund. Bodies use {placeholder} tokens
+// interpolated at send time — the allowed set per type lives in
+// services/email/template-config.ts and is validated on save. Only
+// ALLOCATION_CONFIRMATION is wired today; the model is type-generic so more
+// templates can be made editable without a schema change.
+model EmailTemplate {
+  id     String @id @default(cuid())
+  fundId String
+  fund   Fund   @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  type     EmailType
+  subject  String
+  bodyText String // plain-text body / text-MIME part (derived from bodyHtml when an HTML body is authored)
+  bodyHtml String? // rich-HTML body, injected into the branded shell; null = use bodyText as plain text
+  ctaLabel String? // for templates that render a CTA button (unused by ALLOCATION_CONFIRMATION)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([fundId, type])
 }
 
 enum EmailType {

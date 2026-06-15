@@ -5,6 +5,7 @@ import { getTranslations } from "next-intl/server";
 
 import { prisma } from "@/services/db/prisma";
 import { renderBrandedEmail } from "./template";
+import { resolveAllocationTemplate } from "./templates";
 import { sendEmail } from "./resend";
 
 // One function per EmailType that renders the body, calls Resend, and updates
@@ -77,25 +78,33 @@ export async function sendMemberActivated(args: {
 
 export async function sendAllocationConfirmation(args: {
   emailId: string;
+  fundId: string;
   toEmail: string;
   firstName: string;
+  lastName: string;
+  // Recipient wallet address (TokenOperation.account) — used to resolve the
+  // {cardSerial} variable. Pass null if unknown.
+  account: string | null;
   fund: FundBranding;
   amount: string;
 }): Promise<void> {
   await dispatchTemplate({
     emailId: args.emailId,
     fund: args.fund,
-    render: async () => {
-      const t = await getTranslations("members.email.allocationConfirmation");
-      return {
-        subject: t("subject", { fundName: args.fund.name }),
-        text: t("textBody", {
+    // Prefer the fund's editable override (services/email/templates.ts),
+    // falling back to the i18n default. {placeholder} tokens are interpolated
+    // inside the resolver.
+    render: () =>
+      resolveAllocationTemplate({
+        fundId: args.fundId,
+        account: args.account,
+        vars: {
           firstName: args.firstName,
+          lastName: args.lastName,
           fundName: args.fund.name,
           amount: args.amount,
-        }),
-      };
-    },
+        },
+      }),
     to: args.toEmail,
   });
 }
@@ -346,6 +355,9 @@ type RenderedTemplate = {
   subject: string;
   text: string;
   ctaLabel?: string;
+  // Rich-HTML body. When set, it's injected into the branded shell and `text`
+  // is used only for the plain-text MIME part.
+  html?: string;
 };
 
 async function dispatchTemplate(args: {
@@ -365,6 +377,7 @@ async function dispatchTemplate(args: {
       subject: rendered.subject,
       text: rendered.text,
       ctaLabel: rendered.ctaLabel,
+      html: rendered.html,
     });
     const { id } = await sendEmail({
       to: args.to,
