@@ -97,7 +97,11 @@ export default async function SettingsPage({
 
       {active === "emails" && (
         <EmailsTab
-          fund={{ id: fund.id, defaultLocale: fund.defaultLocale }}
+          fund={{
+            id: fund.id,
+            defaultLocale: fund.defaultLocale,
+            senderEmail: fund.senderEmail,
+          }}
           initialPaused={fund.confirmationEmailsPausedAt !== null}
         />
       )}

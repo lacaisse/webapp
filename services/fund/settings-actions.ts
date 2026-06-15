@@ -68,6 +68,27 @@ export async function setConfirmationEmailsPausedAction(input: {
   return { ok: true };
 }
 
+// --- Member sender address -----------------------------------------------
+// Custom From for member-facing transactional emails. Stored as a bare
+// address; the display name is the fund name at send time. Blank clears it
+// (falls back to the platform EMAIL_FROM). Merchant/team and Supabase auth
+// emails are unaffected.
+
+const MemberSenderSchema = z.object({
+  senderEmail: z
+    .string()
+    .email({ error: "settings.errors.emailInvalid" })
+    .or(z.literal(""))
+    .nullable()
+    .optional(),
+});
+
+export async function updateMemberSenderEmailAction(
+  input: z.infer<typeof MemberSenderSchema>,
+): Promise<SettingsResult> {
+  return runUpdate(MemberSenderSchema, normaliseBlanks(input), "/settings");
+}
+
 // --- General -------------------------------------------------------------
 
 const GeneralSchema = z.object({

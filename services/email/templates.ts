@@ -59,14 +59,15 @@ export function htmlToPlainText(html: string): string {
     .trim();
 }
 
-// The fund's active merchants, formatted as a {shopList} value — an HTML <ul>
-// for the HTML body and dashed lines for the text part. Empty when the fund
-// has no active merchants yet.
+// The fund's active, publicly-visible merchants, formatted as a {shopList}
+// value — an HTML <ul> for the HTML body and dashed lines for the text part.
+// Merchants flagged not publicly visible are excluded. Empty when the fund has
+// no listable merchants yet.
 export async function buildShopList(
   fundId: string,
 ): Promise<{ html: string; text: string }> {
   const merchants = await prisma.merchant.findMany({
-    where: { fundId, status: "ACTIVE" },
+    where: { fundId, status: "ACTIVE", publiclyVisible: true },
     select: { name: true, city: true },
     orderBy: { name: "asc" },
   });

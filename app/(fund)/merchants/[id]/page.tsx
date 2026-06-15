@@ -37,7 +37,9 @@ import { requireCurrentFund } from "@/services/fund/server";
 
 import { AddressLabel, buildAddressDirectory } from "../../token/address-label";
 import { getPlacesForFund, getProfile } from "../../token/data";
+import { EditMerchantName } from "../edit-merchant-name";
 import { MerchantRowActions } from "../merchant-row-actions";
+import { MerchantVisibilityToggle } from "../merchant-visibility-toggle";
 
 // On-chain transfer history paginates 20 per page via the dual-stream cursor
 // from listTransfersForAccount — same scheme as the card detail page and the
@@ -306,6 +308,10 @@ export default async function MerchantDetailPage({
             <h1 className="font-heading text-2xl font-medium">
               {merchant.name}
             </h1>
+            <EditMerchantName
+              merchantId={merchant.id}
+              currentName={merchant.name}
+            />
             <StatusBadge status={merchant.status} />
             {emailVerified ? (
               <Badge variant="success">{t("verified")}</Badge>
@@ -316,6 +322,9 @@ export default async function MerchantDetailPage({
               <Badge variant="success">{t("connected")}</Badge>
             ) : (
               <Badge>{t("notConnected")}</Badge>
+            )}
+            {!merchant.publiclyVisible && (
+              <Badge variant="warning">{t("hidden")}</Badge>
             )}
           </div>
           {merchant.description && (
@@ -431,6 +440,12 @@ export default async function MerchantDetailPage({
                 {format.dateTime(merchant.joinedAt, { dateStyle: "medium" })}
               </DtDd>
               <DtDd label={t("business.position")}>{merchant.position}</DtDd>
+              <DtDd label={t("business.publiclyVisible")}>
+                <MerchantVisibilityToggle
+                  merchantId={merchant.id}
+                  initialVisible={merchant.publiclyVisible}
+                />
+              </DtDd>
               <DtDd label={t("business.conditions")}>
                 {merchant.conditions ?? "—"}
               </DtDd>

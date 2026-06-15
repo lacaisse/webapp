@@ -36,6 +36,12 @@ export type SendEmailInput = {
   html?: string;
   /** Optional reply-to address; defaults to the from address. */
   replyTo?: string;
+  /**
+   * Optional From override (e.g. a per-fund sender). Falls back to the
+   * platform EMAIL_FROM when omitted. Caller is responsible for a verified
+   * domain — Resend rejects unverified senders.
+   */
+  from?: string;
 };
 
 /**
@@ -55,7 +61,7 @@ export async function sendEmail(input: SendEmailInput): Promise<{ id: string }> 
   // content branch with at least one of html/text — the cast satisfies
   // TypeScript without us mirroring the whole union shape.
   const payload = {
-    from: getFromAddress(),
+    from: input.from ?? getFromAddress(),
     to: input.to,
     subject: input.subject,
     text: input.text,

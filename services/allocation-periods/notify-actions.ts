@@ -38,7 +38,13 @@ const OP_SELECT = {
   account: true,
   member: { select: { email: true, firstName: true, lastName: true } },
   fund: {
-    select: { id: true, name: true, primaryColor: true, logoUrl: true },
+    select: {
+      id: true,
+      name: true,
+      primaryColor: true,
+      logoUrl: true,
+      senderEmail: true,
+    },
   },
 } satisfies Prisma.TokenOperationSelect;
 
@@ -134,6 +140,7 @@ async function sendOne(op: OpForNotify): Promise<SingleStatus> {
     name: op.fund.name,
     primaryColor: op.fund.primaryColor,
     logoUrl: op.fund.logoUrl,
+    senderEmail: op.fund.senderEmail,
   };
 
   let emailId: string;
