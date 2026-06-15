@@ -747,6 +747,32 @@
           "cancel": "Annuler",
           "confirm": "Retirer",
           "removing": "Retrait…"
+        },
+        "notify": {
+          "column": "Notification",
+          "send": "Notifier",
+          "retry": "Réessayer",
+          "sending": "Envoi…",
+          "cancel": "Annuler",
+          "confirmSend": "Envoyer l'e-mail",
+          "confirmTitle": "Envoyer l'e-mail d'allocation ?",
+          "confirmDescription": "Envoyer la confirmation d'allocation à {name} pour {amount} ?",
+          "status": {
+            "sent": "Envoyé",
+            "failed": "Échec",
+            "notSent": "Non envoyé"
+          },
+          "allTrigger": "Tout notifier ({count})",
+          "allConfirmTitle": "Notifier tous les membres ?",
+          "allConfirmDescription": "Envoyer la confirmation d'allocation à {count} membre(s) pas encore notifié(s). Les allocations déjà notifiées sont ignorées.",
+          "allConfirmSend": "Envoyer les e-mails",
+          "allDoneTitle": "Notifications envoyées",
+          "allDoneSummary": "{sent} envoyé(s) · {skipped} déjà notifié(s) · {failed} en échec.",
+          "errors": {
+            "notNotifiable": "Cette allocation ne peut pas être notifiée — ce n'est pas une allocation confirmée.",
+            "noEmail": "Ce membre n'a pas d'adresse e-mail.",
+            "sendFailed": "L'e-mail n'a pas pu être envoyé. Réessayez."
+          }
         }
       },
       "schedule": {
@@ -1296,7 +1322,8 @@
         "onboarding": "Onboarding",
         "terms": "Conditions",
         "citizenpay": "Citizen Pay",
-        "fees": "Frais"
+        "fees": "Frais",
+        "emails": "E-mails"
       },
       "general": {
         "title": "Général",
@@ -1465,6 +1492,39 @@
           "label": "Suspendre les e-mails de notification aux membres",
           "description": "Pendant la pause, les membres ne reçoivent aucun e-mail de notification : confirmations de dépôt et d'allocation, activation, invitations et primes de parrainage sont tous ignorés — pas mis en attente, donc rien n'est envoyé rétroactivement à la reprise. Les e-mails d'inscription (vérification, bienvenue) et de mot de passe continuent de fonctionner. Les e-mails aux commerçants et à l'équipe ne sont pas concernés."
         }
+      },
+      "emailTemplates": {
+        "allocationTitle": "E-mail de confirmation d'allocation",
+        "allocationDescription": "L'e-mail que reçoivent les membres lorsqu'une allocation est créditée sur leur carte. Laissez-le tel quel pour conserver le texte par défaut, ou personnalisez-le pour cette caisse.",
+        "subjectLabel": "Objet",
+        "bodyLabel": "Message",
+        "variablesHint": "Vous pouvez utiliser ces variables — elles sont remplacées par les informations de chaque membre à l'envoi :",
+        "variables": {
+          "firstName": "Le prénom du membre",
+          "fundName": "Le nom de cette caisse",
+          "amount": "Le montant alloué",
+          "lastName": "Le nom de famille du membre",
+          "cardSerial": "Le numéro de série de la carte du membre",
+          "shopList": "Liste à puces des commerçants actifs de la caisse"
+        },
+        "usingDefault": "Modèle par défaut utilisé.",
+        "usingOverride": "Modèle personnalisé utilisé pour cette caisse.",
+        "reset": "Réinitialiser",
+        "resetConfirmTitle": "Réinitialiser le modèle par défaut ?",
+        "resetConfirmDescription": "Cette action supprime votre texte personnalisé et rétablit l'e-mail de confirmation d'allocation par défaut. Irréversible.",
+        "resetConfirmCancel": "Annuler",
+        "resetConfirmConfirm": "Réinitialiser",
+        "errors": {
+          "subjectRequired": "Saisissez un objet.",
+          "subjectTooLong": "L'objet est trop long.",
+          "bodyRequired": "Saisissez un message.",
+          "bodyTooLong": "Le message est trop long.",
+          "unknownVariable": "Variable inconnue « {name} ». Supprimez-la ou utilisez l'une des variables listées."
+        },
+        "htmlLabel": "Corps (HTML)",
+        "htmlHint": "Rédigez le corps en HTML — il est intégré à la mise en page de votre caisse (logo, pied de page). Utilisez les variables ci-dessous ; elles sont remplacées pour chaque membre à l'envoi.",
+        "previewLabel": "Aperçu",
+        "previewSubject": "Objet :"
       }
     }
   },

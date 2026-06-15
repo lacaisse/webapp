@@ -34,6 +34,7 @@ export async function GET(request: NextRequest) {
       fundId: true,
       memberId: true,
       amount: true,
+      account: true,
       fund: {
         select: {
           id: true,
@@ -45,7 +46,7 @@ export async function GET(request: NextRequest) {
           confirmationEmailsPausedAt: true,
         },
       },
-      member: { select: { email: true, firstName: true } },
+      member: { select: { email: true, firstName: true, lastName: true } },
       referral: {
         select: {
           id: true,
@@ -124,6 +125,8 @@ export async function GET(request: NextRequest) {
           memberId: op.memberId,
           toEmail: op.member.email,
           firstName: op.member.firstName,
+          lastName: op.member.lastName,
+          account: op.account,
           fundBranding: {
             name: op.fund.name,
             primaryColor: op.fund.primaryColor,
@@ -154,6 +157,8 @@ async function queueAndSendAllocationConfirmation(args: {
   memberId: string;
   toEmail: string;
   firstName: string;
+  lastName: string;
+  account: string | null;
   fundBranding: { name: string; primaryColor: string | null; logoUrl: string | null };
   amount: string;
 }) {
@@ -172,8 +177,11 @@ async function queueAndSendAllocationConfirmation(args: {
     });
     await sendAllocationConfirmation({
       emailId: emailRow.id,
+      fundId: args.fundId,
       toEmail: args.toEmail,
       firstName: args.firstName,
+      lastName: args.lastName,
+      account: args.account,
       fund: args.fundBranding,
       amount: args.amount,
     });

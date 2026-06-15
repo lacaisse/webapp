@@ -762,6 +762,32 @@
           "cancel": "Cancel",
           "confirm": "Remove",
           "removing": "Removing…"
+        },
+        "notify": {
+          "column": "Notification",
+          "send": "Notify",
+          "retry": "Retry",
+          "sending": "Sending…",
+          "cancel": "Cancel",
+          "confirmSend": "Send email",
+          "confirmTitle": "Send allocation email?",
+          "confirmDescription": "Send the allocation confirmation to {name} for {amount}?",
+          "status": {
+            "sent": "Sent",
+            "failed": "Failed",
+            "notSent": "Not sent"
+          },
+          "allTrigger": "Notify all ({count})",
+          "allConfirmTitle": "Notify all members?",
+          "allConfirmDescription": "Send the allocation confirmation to {count} member(s) who haven't been notified yet. Already-notified allocations are skipped.",
+          "allConfirmSend": "Send emails",
+          "allDoneTitle": "Notifications sent",
+          "allDoneSummary": "{sent} sent · {skipped} already notified · {failed} failed.",
+          "errors": {
+            "notNotifiable": "This allocation can't be notified — it isn't a confirmed allocation.",
+            "noEmail": "This member has no email address.",
+            "sendFailed": "The email couldn't be sent. Try again."
+          }
         }
       },
       "periods": {
@@ -1296,7 +1322,8 @@
         "onboarding": "Onboarding",
         "terms": "Terms",
         "citizenpay": "Citizen Pay",
-        "fees": "Fees"
+        "fees": "Fees",
+        "emails": "Emails"
       },
       "general": {
         "title": "General",
@@ -1465,6 +1492,39 @@
           "label": "Pause member notification emails",
           "description": "While paused, members receive no notification emails: deposit and allocation confirmations, activation, invitation and referral-bonus emails are all skipped — not queued, so nothing is sent retroactively when you resume. Signup emails (verification, welcome) and password emails keep working. Merchant and team emails are unaffected."
         }
+      },
+      "emailTemplates": {
+        "allocationTitle": "Allocation confirmation email",
+        "allocationDescription": "The email members receive when an allocation lands on their card. Leave it untouched to keep the default wording, or customise it for this fund.",
+        "subjectLabel": "Subject",
+        "bodyLabel": "Body",
+        "variablesHint": "You can use these placeholders — they're replaced with each member's details when the email is sent:",
+        "variables": {
+          "firstName": "The member's first name",
+          "fundName": "This fund's name",
+          "amount": "The allocated amount",
+          "lastName": "The member's last name",
+          "cardSerial": "The member's card serial number",
+          "shopList": "Bulleted list of the fund's active merchants"
+        },
+        "usingDefault": "Using the default template.",
+        "usingOverride": "Using a custom template for this fund.",
+        "reset": "Reset to default",
+        "resetConfirmTitle": "Reset to default template?",
+        "resetConfirmDescription": "This removes your custom wording and restores the default allocation-confirmation email. This can't be undone.",
+        "resetConfirmCancel": "Cancel",
+        "resetConfirmConfirm": "Reset",
+        "errors": {
+          "subjectRequired": "Enter a subject.",
+          "subjectTooLong": "The subject is too long.",
+          "bodyRequired": "Enter a message body.",
+          "bodyTooLong": "The message body is too long.",
+          "unknownVariable": "Unknown placeholder \"{name}\". Remove it or use one of the listed variables."
+        },
+        "htmlLabel": "Body (HTML)",
+        "htmlHint": "Write the body in HTML — it's wrapped in your fund's branded layout (logo, footer). Use the placeholders below; they're replaced per member when the email is sent.",
+        "previewLabel": "Preview",
+        "previewSubject": "Subject:"
       }
     }
   },

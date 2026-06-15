@@ -16,7 +16,7 @@ import {
   type FieldRow,
 } from "./onboarding-fields";
 import { OnboardingSettings } from "./onboarding-settings";
-import { EmailSettings } from "./email-settings";
+import { EmailsTab } from "./emails-tab";
 import { CitizenPayConnect } from "./citizenpay-connect";
 import { TokenInfo } from "./token-info";
 import {
@@ -31,6 +31,7 @@ import {
 const TABS = [
   { value: "general" },
   { value: "branding" },
+  { value: "emails" },
   { value: "token" },
   { value: "onboarding" },
   { value: "terms" },
@@ -83,28 +84,22 @@ export default async function SettingsPage({
       />
 
       {active === "general" && (
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("general.title")}</CardTitle>
-              <CardDescription>{t("general.description")}</CardDescription>
-            </CardHeader>
-            <CardContent className="pb-4">
-              <GeneralForm fund={fundForForms} />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("emails.title")}</CardTitle>
-              <CardDescription>{t("emails.description")}</CardDescription>
-            </CardHeader>
-            <CardContent className="pb-4">
-              <EmailSettings
-                initialPaused={fund.confirmationEmailsPausedAt !== null}
-              />
-            </CardContent>
-          </Card>
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("general.title")}</CardTitle>
+            <CardDescription>{t("general.description")}</CardDescription>
+          </CardHeader>
+          <CardContent className="pb-4">
+            <GeneralForm fund={fundForForms} />
+          </CardContent>
+        </Card>
+      )}
+
+      {active === "emails" && (
+        <EmailsTab
+          fund={{ id: fund.id, defaultLocale: fund.defaultLocale }}
+          initialPaused={fund.confirmationEmailsPausedAt !== null}
+        />
       )}
 
       {active === "branding" && (
