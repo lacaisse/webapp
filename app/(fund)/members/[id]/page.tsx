@@ -27,6 +27,7 @@ import { AddCardDialog } from "../add-card-dialog";
 import { MemberRowActions } from "../member-row-actions";
 import { StatusChangeDialog } from "../status-change-dialog";
 import { MemberTierPicker } from "../tier-picker";
+import { EditProfileDialog } from "./edit-profile-dialog";
 import { MintDialog } from "./mint-dialog";
 
 export default async function MemberDetailPage({
@@ -60,17 +61,6 @@ export default async function MemberDetailPage({
         orderBy: { occurredAt: "desc" },
         take: 50,
         include: { allocationPeriod: { select: { label: true } } },
-      },
-      sponsoredReferrals: {
-        orderBy: { createdAt: "desc" },
-        include: {
-          referee: { select: { id: true, firstName: true, lastName: true } },
-        },
-      },
-      referralRecord: {
-        include: {
-          sponsor: { select: { id: true, firstName: true, lastName: true } },
-        },
       },
       emails: { orderBy: { createdAt: "desc" }, take: 20 },
     },
@@ -107,6 +97,22 @@ export default async function MemberDetailPage({
           {t("back")}
         </Link>
         <div className="inline-flex items-center gap-2">
+          <EditProfileDialog
+            memberId={member.id}
+            member={{
+              firstName: member.firstName,
+              lastName: member.lastName,
+              email: member.email,
+              phone: member.phone,
+              address: member.address,
+              postalCode: member.postalCode,
+              city: member.city,
+              iban: member.iban,
+              householdAdults: member.householdAdults,
+              householdChildren: member.householdChildren,
+              notes: member.notes,
+            }}
+          />
           {member.status === "NEW" && !member.primaryCardId && (
             <MemberRowActions
               memberId={member.id}
@@ -167,6 +173,11 @@ export default async function MemberDetailPage({
                   {format.dateTime(member.leftAt, { dateStyle: "medium" })}
                 </DtDd>
               )}
+              {member.notes && (
+                <DtDd label={t("profile.notes")}>
+                  <span className="whitespace-pre-wrap">{member.notes}</span>
+                </DtDd>
+              )}
             </dl>
           </CardContent>
         </Card>
@@ -188,12 +199,6 @@ export default async function MemberDetailPage({
               </dd>
               <DtDd label={t("banking.iban")} mono>
                 {member.iban ?? "—"}
-              </DtDd>
-              <DtDd label={t("banking.reference")} mono>
-                {member.paymentReference ?? "—"}
-              </DtDd>
-              <DtDd label={t("banking.referralCode")} mono>
-                {member.referralCode ?? "—"}
               </DtDd>
               <DtDd label={t("banking.primaryCard")} mono>
                 {member.primaryCard?.account ??
@@ -371,69 +376,6 @@ export default async function MemberDetailPage({
         </Table>
       </section>
 
-      <section className="grid gap-3 lg:grid-cols-2">
-        <Card size="sm">
-          <CardHeader>
-            <CardTitle>{t("referrals.sponsorTitle")}</CardTitle>
-            <CardDescription>
-              {t("referrals.sponsorDescription")}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pb-3 text-sm">
-            {member.referralRecord ? (
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <Link
-                  href={`/members/${member.referralRecord.sponsor.id}`}
-                  className="font-medium hover:underline"
-                >
-                  {`${member.referralRecord.sponsor.firstName} ${member.referralRecord.sponsor.lastName}`.trim()}
-                </Link>
-                <ReferralStatusBadge status={member.referralRecord.status} />
-              </div>
-            ) : (
-              <p className="text-muted-foreground">
-                {t("referrals.sponsorEmpty")}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card size="sm">
-          <CardHeader>
-            <CardTitle>{t("referrals.sponsoredTitle")}</CardTitle>
-            <CardDescription>
-              {t("referrals.sponsoredDescription", {
-                count: member.sponsoredReferrals.length,
-              })}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pb-3">
-            {member.sponsoredReferrals.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                {t("referrals.sponsoredEmpty")}
-              </p>
-            ) : (
-              <ul className="space-y-2 text-sm">
-                {member.sponsoredReferrals.map((r) => (
-                  <li
-                    key={r.id}
-                    className="flex flex-wrap items-center justify-between gap-2"
-                  >
-                    <Link
-                      href={`/members/${r.referee.id}`}
-                      className="hover:underline"
-                    >
-                      {`${r.referee.firstName} ${r.referee.lastName}`.trim()}
-                    </Link>
-                    <ReferralStatusBadge status={r.status} />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-      </section>
-
       <section className="space-y-3">
         <h2 className="font-heading text-lg font-medium">
           {t("emails.title")}
@@ -541,15 +483,6 @@ function OperationStatusBadge({
 }) {
   if (status === "CONFIRMED") return <Badge variant="success">{status}</Badge>;
   if (status === "FAILED") return <Badge variant="destructive">{status}</Badge>;
-  return <Badge variant="warning">{status}</Badge>;
-}
-
-function ReferralStatusBadge({
-  status,
-}: {
-  status: "PENDING" | "ACTIVATED";
-}) {
-  if (status === "ACTIVATED") return <Badge variant="success">{status}</Badge>;
   return <Badge variant="warning">{status}</Badge>;
 }
 

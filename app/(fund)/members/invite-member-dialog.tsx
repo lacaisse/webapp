@@ -29,7 +29,7 @@ export function InviteMemberDialog({ triggerLabel }: { triggerLabel: string }) {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
-  const [notify, setNotify] = useState(true);
+  const [notify, setNotify] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errorField, setErrorField] = useState<FieldError | null>(null);
   const [pending, startTransition] = useTransition();
@@ -38,7 +38,7 @@ export function InviteMemberDialog({ triggerLabel }: { triggerLabel: string }) {
     setFirstName("");
     setLastName("");
     setEmail("");
-    setNotify(true);
+    setNotify(false);
     setError(null);
     setErrorField(null);
   };
