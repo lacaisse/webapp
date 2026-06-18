@@ -44,6 +44,8 @@ export type TokenInfo = {
   citizenPayAccountFactoryAddress: string | null;
   citizenPayPaymasterAddress: string | null;
   citizenPayPaymasterType: string | null;
+  // Treasury slug — the `network` segment of a card's public tap URL.
+  citizenPayTreasurySlug: string | null;
   // CP's echo of the platform fee, normalised to a 2-decimal percent string
   // (e.g. "2.50"). Canonical on our side — reconciled, not cached. See header.
   payoutFeePercentage: string | null;
@@ -120,6 +122,7 @@ function normaliseTreasury(wire: TreasuryWire): TokenInfo {
     citizenPayAccountFactoryAddress: wire.account_factory_address ?? null,
     citizenPayPaymasterAddress: wire.paymaster_address ?? null,
     citizenPayPaymasterType: wire.paymaster_type ?? null,
+    citizenPayTreasurySlug: wire.slug ?? null,
     payoutFeePercentage,
   };
 }

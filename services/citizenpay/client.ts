@@ -214,6 +214,11 @@ class MockCitizenPayClient implements CitizenPayClient {
     return null;
   }
 
+  async getTreasurySlug(): Promise<string | null> {
+    this.log("getTreasurySlug", {});
+    return "mock-network";
+  }
+
   async listPayoutDrafts(
     query: { from?: string; to?: string } = {},
   ): Promise<PayoutDraft[]> {

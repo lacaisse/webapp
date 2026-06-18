@@ -62,6 +62,7 @@ export default async function CardsPage({
         fallback={
           <TableSkeleton
             columns={[
+              { width: "w-8" },
               { label: t("columns.number") },
               { label: t("columns.serial") },
               { label: t("columns.holder") },

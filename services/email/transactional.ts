@@ -5,7 +5,10 @@ import { getTranslations } from "next-intl/server";
 
 import { prisma } from "@/services/db/prisma";
 import { renderBrandedEmail } from "./template";
-import { resolveAllocationTemplate } from "./templates";
+import {
+  resolveAllocationTemplate,
+  resolveCardAssignedTemplate,
+} from "./templates";
 import { sendEmail } from "./resend";
 
 // One function per EmailType that renders the body, calls Resend, and updates
@@ -108,6 +111,39 @@ export async function sendAllocationConfirmation(args: {
           lastName: args.lastName,
           fundName: args.fund.name,
           amount: args.amount,
+        },
+      }),
+    to: args.toEmail,
+  });
+}
+
+export async function sendCardAssigned(args: {
+  emailId: string;
+  fundId: string;
+  toEmail: string;
+  fund: FundBranding;
+  firstName: string;
+  lastName: string;
+  // Pre-resolved scalars (see services/email/templates.ts): formatted postal
+  // address, public tap URL, per-fund card number.
+  address: string;
+  cardLink: string;
+  cardNumber: string;
+}): Promise<void> {
+  await dispatchTemplate({
+    emailId: args.emailId,
+    fund: args.fund,
+    // Prefer the fund's editable override, falling back to the i18n default.
+    render: () =>
+      resolveCardAssignedTemplate({
+        fundId: args.fundId,
+        vars: {
+          firstName: args.firstName,
+          lastName: args.lastName,
+          fundName: args.fund.name,
+          address: args.address,
+          cardLink: args.cardLink,
+          cardNumber: args.cardNumber,
         },
       }),
     to: args.toEmail,

@@ -369,6 +369,8 @@ export type TreasuryWire = {
   id?: string;
   business_id?: string;
   name?: string;
+  // Treasury slug — the `network` query param of a card's public tap URL.
+  slug?: string;
   symbol?: string;
   decimals?: number;
   chain?: string;

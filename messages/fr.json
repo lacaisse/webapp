@@ -1503,6 +1503,8 @@
       "emailTemplates": {
         "allocationTitle": "E-mail de confirmation d'allocation",
         "allocationDescription": "L'e-mail que reçoivent les membres lorsqu'une allocation est créditée sur leur carte. Laissez-le tel quel pour conserver le texte par défaut, ou personnalisez-le pour cette caisse.",
+        "cardAssignedTitle": "E-mail « carte en route »",
+        "cardAssignedDescription": "L'e-mail qu'un membre reçoit lorsque sa carte lui est attribuée et est en route. Laissez-le tel quel pour conserver le texte par défaut, ou personnalisez-le pour cette caisse.",
         "subjectLabel": "Objet",
         "bodyLabel": "Message",
         "variablesHint": "Vous pouvez utiliser ces variables — elles sont remplacées par les informations de chaque membre à l'envoi :",
@@ -1512,7 +1514,10 @@
           "amount": "Le montant alloué",
           "lastName": "Le nom de famille du membre",
           "cardSerial": "Le numéro de série de la carte du membre",
-          "shopList": "Liste à puces des commerçants actifs de la caisse"
+          "shopList": "Liste à puces des commerçants actifs de la caisse",
+          "address": "L'adresse postale du membre",
+          "cardLink": "Lien vers la page publique de la carte du membre",
+          "cardNumber": "Le numéro de carte du membre"
         },
         "usingDefault": "Modèle par défaut utilisé.",
         "usingOverride": "Modèle personnalisé utilisé pour cette caisse.",
@@ -1534,7 +1539,7 @@
         "previewSubject": "Objet :",
         "test": {
           "title": "Envoyer un test",
-          "description": "Choisissez un membre pour renseigner les détails de l'e-mail (montant, n° de carte, …), puis envoyez une copie à l'adresse de votre choix. Le montant est l'allocation du palier du membre — ce qui serait réellement crédité sur sa carte.",
+          "description": "Choisissez un membre pour renseigner les détails de l'e-mail, puis envoyez une copie à l'adresse de votre choix — avec les données réelles de ce membre.",
           "memberLabel": "Utiliser les données de ce membre",
           "emailLabel": "Envoyer à",
           "emailPlaceholder": "vous@exemple.com",
@@ -1547,6 +1552,7 @@
             "emailInvalid": "Saisissez une adresse e-mail valide.",
             "memberNotFound": "Ce membre est introuvable.",
             "noTier": "Ce membre n'a pas de palier d'allocation, il n'y a donc aucun montant à afficher.",
+            "noCard": "Ce membre n'a pas encore de carte, il n'y a donc aucun lien à inclure.",
             "sendFailed": "Impossible d'envoyer l'e-mail de test. Vérifiez l'adresse d'expéditeur et réessayez."
           }
         }
@@ -1920,10 +1926,74 @@
         "submitting": "Retrait…",
         "success": "Retrait confirmé sur la blockchain."
       },
+      "status": {
+        "button": "Changer le statut",
+        "title": "Changer le statut de la carte",
+        "description": "Définir le statut de la carte de {holderLabel}. Le changement est répercuté sur Citizen Pay.",
+        "statusLabel": "Statut",
+        "options": {
+          "ACTIVE": {
+            "label": "Active",
+            "description": "La carte est utilisée. Une carte passe automatiquement en « active » lors de sa première recharge."
+          },
+          "INACTIVE": {
+            "label": "Inactive",
+            "description": "État d'usine — pas encore rechargée. Ne bloque rien ; la carte passe en « active » lors de sa première recharge."
+          },
+          "BLOCKED": {
+            "label": "Bloquée",
+            "description": "Le terminal refuse cette carte."
+          }
+        },
+        "lostLabel": "Signalée perdue",
+        "lostDescription": "Indicateur interne pour le suivi des cartes perdues. N'affecte pas le comportement du terminal.",
+        "cancel": "Annuler",
+        "confirm": "Enregistrer",
+        "saving": "Enregistrement…"
+      },
+      "notify": {
+        "rowLabel": "Notification",
+        "noEmail": "Aucune adresse e-mail",
+        "status": {
+          "sent": "Notifié",
+          "failed": "Échec de l'envoi",
+          "unsent": "Non notifié"
+        },
+        "send": "Notifier le membre",
+        "retry": "Réessayer",
+        "resend": "Renvoyer",
+        "confirmTitle": "Notifier le membre ?",
+        "confirmDescription": "Envoyer à {name} l'e-mail « votre carte est en route ».",
+        "cancel": "Annuler",
+        "confirmSend": "Envoyer l'e-mail",
+        "sending": "Envoi…",
+        "errors": {
+          "notFound": "Carte introuvable.",
+          "noMember": "Cette carte n'est pas encore attribuée à un membre.",
+          "noEmail": "Ce membre n'a pas d'adresse e-mail enregistrée.",
+          "sendFailed": "Impossible d'envoyer l'e-mail. Réessayez."
+        }
+      },
+      "bulk": {
+        "selectAll": "Sélectionner toutes les cartes de cette page",
+        "selectRow": "Sélectionner {holder}",
+        "selected": "{count, plural, one {# carte sélectionnée} other {# cartes sélectionnées}}",
+        "changeStatus": "Changer le statut",
+        "clear": "Effacer",
+        "dialogTitle": "Changer le statut des cartes",
+        "dialogDescription": "{count, plural, one {Définir le statut de # carte sélectionnée.} other {Définir le statut des # cartes sélectionnées.}} Le changement est répercuté sur Citizen Pay.",
+        "cancel": "Annuler",
+        "apply": "Appliquer",
+        "applying": "Application…",
+        "errors": {
+          "none": "Aucune carte correspondante sélectionnée."
+        }
+      },
       "errors": {
         "notFound": "Carte introuvable.",
         "alreadyBlocked": "Cette carte est déjà bloquée.",
         "alreadyActive": "Cette carte est déjà active.",
+        "invalidStatus": "Statut de carte invalide.",
         "noAccount": "Cette carte n'a pas encore d'adresse blockchain — elle n'est pas complètement enregistrée chez Citizen Pay.",
         "amountInvalid": "Le montant doit être un nombre avec au maximum 2 décimales.",
         "amountPositive": "Le montant doit être supérieur à zéro.",

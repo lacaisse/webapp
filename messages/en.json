@@ -1503,6 +1503,8 @@
       "emailTemplates": {
         "allocationTitle": "Allocation confirmation email",
         "allocationDescription": "The email members receive when an allocation lands on their card. Leave it untouched to keep the default wording, or customise it for this fund.",
+        "cardAssignedTitle": "Card-on-its-way email",
+        "cardAssignedDescription": "The email a member receives when their card is assigned and on its way. Leave it untouched to keep the default wording, or customise it for this fund.",
         "subjectLabel": "Subject",
         "bodyLabel": "Body",
         "variablesHint": "You can use these placeholders — they're replaced with each member's details when the email is sent:",
@@ -1512,7 +1514,10 @@
           "amount": "The allocated amount",
           "lastName": "The member's last name",
           "cardSerial": "The member's card serial number",
-          "shopList": "Bulleted list of the fund's active merchants"
+          "shopList": "Bulleted list of the fund's active merchants",
+          "address": "The member's postal address",
+          "cardLink": "Link to the member's public card page",
+          "cardNumber": "The member's card number"
         },
         "usingDefault": "Using the default template.",
         "usingOverride": "Using a custom template for this fund.",
@@ -1534,7 +1539,7 @@
         "previewSubject": "Subject:",
         "test": {
           "title": "Send a test",
-          "description": "Pick a member to fill in the email's details (amount, card serial, …), then send a copy to any address. The amount is the member's tier allocation — what would actually be minted to their card.",
+          "description": "Pick a member to fill in the email's details, then send a copy to any address — populated with that member's live data.",
           "memberLabel": "Use this member's data",
           "emailLabel": "Send to",
           "emailPlaceholder": "you@example.com",
@@ -1547,6 +1552,7 @@
             "emailInvalid": "Enter a valid email address.",
             "memberNotFound": "That member could not be found.",
             "noTier": "That member has no allocation tier, so there's no amount to show.",
+            "noCard": "That member has no card yet, so there's nothing to link to.",
             "sendFailed": "The test email could not be sent. Check the sender address and try again."
           }
         }
@@ -1920,10 +1926,74 @@
         "submitting": "Withdrawing…",
         "success": "Withdrawal confirmed on-chain."
       },
+      "status": {
+        "button": "Change status",
+        "title": "Change card status",
+        "description": "Set the status of {holderLabel}'s card. The change is mirrored to Citizen Pay.",
+        "statusLabel": "Status",
+        "options": {
+          "ACTIVE": {
+            "label": "Active",
+            "description": "The card is in use. Cards switch to active automatically the first time they're charged."
+          },
+          "INACTIVE": {
+            "label": "Inactive",
+            "description": "Factory default — not charged yet. It doesn't block anything; the card turns active on its first charge."
+          },
+          "BLOCKED": {
+            "label": "Blocked",
+            "description": "The terminal refuses this card."
+          }
+        },
+        "lostLabel": "Reported lost",
+        "lostDescription": "Internal flag for tracking lost cards. Doesn't affect terminal behaviour.",
+        "cancel": "Cancel",
+        "confirm": "Save",
+        "saving": "Saving…"
+      },
+      "notify": {
+        "rowLabel": "Notification",
+        "noEmail": "No email on file",
+        "status": {
+          "sent": "Notified",
+          "failed": "Send failed",
+          "unsent": "Not notified"
+        },
+        "send": "Notify member",
+        "retry": "Retry",
+        "resend": "Send again",
+        "confirmTitle": "Notify the member?",
+        "confirmDescription": "Send {name} the \"your card is on its way\" email.",
+        "cancel": "Cancel",
+        "confirmSend": "Send email",
+        "sending": "Sending…",
+        "errors": {
+          "notFound": "Card not found.",
+          "noMember": "This card isn't assigned to a member yet.",
+          "noEmail": "This member has no email address on file.",
+          "sendFailed": "The email couldn't be sent. Try again."
+        }
+      },
+      "bulk": {
+        "selectAll": "Select all cards on this page",
+        "selectRow": "Select {holder}",
+        "selected": "{count, plural, one {# card selected} other {# cards selected}}",
+        "changeStatus": "Change status",
+        "clear": "Clear",
+        "dialogTitle": "Change card status",
+        "dialogDescription": "{count, plural, one {Set the status of # selected card.} other {Set the status of # selected cards.}} This is mirrored to Citizen Pay.",
+        "cancel": "Cancel",
+        "apply": "Apply",
+        "applying": "Applying…",
+        "errors": {
+          "none": "No matching cards selected."
+        }
+      },
       "errors": {
         "notFound": "Card not found.",
         "alreadyBlocked": "This card is already blocked.",
         "alreadyActive": "This card is already active.",
+        "invalidStatus": "Invalid card status.",
         "noAccount": "This card has no on-chain account yet — it isn't fully registered with Citizen Pay.",
         "amountInvalid": "Amount must be a number with up to 2 decimal places.",
         "amountPositive": "Amount must be greater than zero.",

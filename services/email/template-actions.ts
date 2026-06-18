@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireFundRole } from "@/services/auth/dal";
+import { resolveTreasurySlug } from "@/services/citizenpay/treasury-slug";
 import { prisma } from "@/services/db/prisma";
 import { sendEmail } from "./resend";
 import { renderBrandedEmail } from "./template";
@@ -18,10 +19,13 @@ import {
   type SaveEmailTemplateInput,
 } from "./template-config";
 import {
+  buildCardLink,
   buildShopList,
+  formatMemberAddress,
   htmlToPlainText,
   interpolate,
   resolveAllocationTemplate,
+  resolveCardAssignedTemplate,
 } from "./templates";
 
 export type TemplateActionResult = { ok: true } | { error: string };
@@ -182,6 +186,93 @@ export async function sendTestAllocationEmailAction(input: {
     });
   } catch (e) {
     console.error("[email] test allocation send failed", fund.id, e);
+    return {
+      error: t("fund.settings.emailTemplates.test.errors.sendFailed" as never),
+    };
+  }
+  return { ok: true };
+}
+
+// Send a one-off test of the CARD_ASSIGNED email, populated from a real
+// member's primary card so {address}, {cardLink} and {cardNumber} render with
+// live data. Transient (no Email row / idempotency) — same as the allocation
+// test. Honours the fund's custom sender.
+export async function sendTestCardAssignedEmailAction(input: {
+  memberId: string;
+  toEmail: string;
+}): Promise<SendTestEmailResult> {
+  const t = await getTranslations();
+  const { fund } = await requireFundRole("ADMIN");
+
+  const toEmail = input.toEmail.trim();
+  if (!z.string().email().safeParse(toEmail).success) {
+    return {
+      error: t("fund.settings.emailTemplates.test.errors.emailInvalid" as never),
+    };
+  }
+
+  const member = await prisma.member.findFirst({
+    where: { id: input.memberId, fundId: fund.id },
+    select: {
+      firstName: true,
+      lastName: true,
+      address: true,
+      postalCode: true,
+      city: true,
+      primaryCard: { select: { serialNumber: true, number: true } },
+    },
+  });
+  if (!member) {
+    return {
+      error: t("fund.settings.emailTemplates.test.errors.memberNotFound" as never),
+    };
+  }
+  if (!member.primaryCard) {
+    return {
+      error: t("fund.settings.emailTemplates.test.errors.noCard" as never),
+    };
+  }
+
+  const rendered = await resolveCardAssignedTemplate({
+    fundId: fund.id,
+    vars: {
+      firstName: member.firstName,
+      lastName: member.lastName,
+      fundName: fund.name,
+      address: formatMemberAddress(member),
+      cardLink: buildCardLink(
+        member.primaryCard.serialNumber,
+        await resolveTreasurySlug(fund),
+      ),
+      cardNumber:
+        member.primaryCard.number != null
+          ? String(member.primaryCard.number)
+          : "",
+    },
+  });
+
+  const subject = `${t("fund.settings.emailTemplates.test.subjectPrefix" as never)} ${rendered.subject}`;
+  const html = await renderBrandedEmail({
+    fundName: fund.name,
+    primaryColor: fund.primaryColor,
+    logoUrl: fund.logoUrl,
+    subject,
+    text: rendered.text,
+    html: rendered.html,
+  });
+
+  try {
+    await sendEmail({
+      to: toEmail,
+      subject,
+      text: rendered.text,
+      html,
+      from: fund.senderEmail
+        ? `${fund.name} <${fund.senderEmail}>`
+        : undefined,
+    });
+  } catch (e) {
+    console.error("[email] test card-assigned send failed", fund.id, e);
     return {
       error: t("fund.settings.emailTemplates.test.errors.sendFailed" as never),
     };
