@@ -23,8 +23,8 @@ import {
   previewEmailTemplateAction,
   resetEmailTemplateAction,
   saveEmailTemplateAction,
-  sendTestAllocationEmailAction,
 } from "@/services/email/template-actions";
+import type { EditableEmailType } from "@/services/email/template-config";
 
 export type TestMember = {
   id: string;
@@ -33,23 +33,32 @@ export type TestMember = {
   email: string;
 };
 
-// Editor for the per-fund ALLOCATION_CONFIRMATION email override. Subject + a
-// rich-HTML body (source), with a live preview rendered server-side in the
-// fund's branded shell using sample values. Validation re-runs server-side and
-// any error string comes back translated. "Reset to default" drops the
-// override and restores the built-in wording.
-export function AllocationTemplateForm({
+export type TestSendAction = (input: {
+  memberId: string;
+  toEmail: string;
+}) => Promise<{ ok: true } | { error: string }>;
+
+// Editor for a per-fund editable email template (subject + rich-HTML body),
+// with a live server-rendered preview in the fund's branded shell and a
+// test-send picker. Generic over the template `type`; the caller supplies the
+// matching `testAction` (the test-send populates variables from a real member).
+// Validation re-runs server-side and any error string comes back translated.
+export function EmailTemplateForm({
+  type,
   initial,
   base,
   hasOverride,
   variables,
   testMembers,
+  testAction,
 }: {
+  type: EditableEmailType;
   initial: { subject: string; bodyHtml: string };
   base: { subject: string; bodyHtml: string };
   hasOverride: boolean;
   variables: readonly string[];
   testMembers: TestMember[];
+  testAction: TestSendAction;
 }) {
   const t = useTranslations("fund.settings.emailTemplates");
   const tRoot = useTranslations("fund.settings");
@@ -83,7 +92,7 @@ export function AllocationTemplateForm({
     setTestError(null);
     setTestSent(false);
     startTest(async () => {
-      const result = await sendTestAllocationEmailAction({
+      const result = await testAction({
         memberId: testMemberId,
         toEmail: testEmail,
       });
@@ -104,7 +113,7 @@ export function AllocationTemplateForm({
     const handle = setTimeout(async () => {
       setPreviewing(true);
       const result = await previewEmailTemplateAction({
-        type: "ALLOCATION_CONFIRMATION",
+        type,
         subject,
         bodyHtml,
       });
@@ -116,18 +125,14 @@ export function AllocationTemplateForm({
       cancelled = true;
       clearTimeout(handle);
     };
-  }, [subject, bodyHtml]);
+  }, [type, subject, bodyHtml]);
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSaved(false);
     startTransition(async () => {
-      const result = await saveEmailTemplateAction({
-        type: "ALLOCATION_CONFIRMATION",
-        subject,
-        bodyHtml,
-      });
+      const result = await saveEmailTemplateAction({ type, subject, bodyHtml });
       if ("error" in result) {
         setError(result.error);
         return;
@@ -141,9 +146,7 @@ export function AllocationTemplateForm({
     setError(null);
     setSaved(false);
     startReset(async () => {
-      const result = await resetEmailTemplateAction({
-        type: "ALLOCATION_CONFIRMATION",
-      });
+      const result = await resetEmailTemplateAction({ type });
       if ("error" in result) {
         setError(result.error);
         return;
@@ -156,143 +159,145 @@ export function AllocationTemplateForm({
 
   return (
     <div className="space-y-6">
-    <form onSubmit={onSubmit} className="space-y-4">
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Editor column */}
-        <div className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="alloc-template-subject">{t("subjectLabel")}</Label>
-            <Input
-              id="alloc-template-subject"
-              value={subject}
-              onChange={(e) => {
-                setSaved(false);
-                setSubject(e.target.value);
-              }}
-              autoComplete="off"
-              spellCheck={false}
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="alloc-template-body">{t("htmlLabel")}</Label>
-            <textarea
-              id="alloc-template-body"
-              value={bodyHtml}
-              onChange={(e) => {
-                setSaved(false);
-                setBodyHtml(e.target.value);
-              }}
-              rows={14}
-              spellCheck={false}
-              className="w-full rounded-md bg-background px-2.5 py-1.5 font-mono text-xs ring-1 ring-foreground/15 outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            />
-            <p className="text-xs text-muted-foreground">{t("htmlHint")}</p>
-          </div>
-
-          <div className="space-y-1.5">
-            <p className="text-xs text-muted-foreground">{t("variablesHint")}</p>
-            <div className="flex flex-wrap gap-1.5">
-              {variables.map((v) => (
-                <span
-                  key={v}
-                  title={t(`variables.${v}` as never)}
-                  className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground"
-                >
-                  {`{${v}}`}
-                </span>
-              ))}
+      <form onSubmit={onSubmit} className="space-y-4">
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Editor column */}
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor={`${type}-template-subject`}>
+                {t("subjectLabel")}
+              </Label>
+              <Input
+                id={`${type}-template-subject`}
+                value={subject}
+                onChange={(e) => {
+                  setSaved(false);
+                  setSubject(e.target.value);
+                }}
+                autoComplete="off"
+                spellCheck={false}
+              />
             </div>
-          </div>
-        </div>
 
-        {/* Preview column */}
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2">
-            <Label>{t("previewLabel")}</Label>
-            {previewing && (
-              <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
-            )}
-          </div>
-          <div className="overflow-hidden rounded-md border border-border">
-            <div className="border-b border-border bg-muted/40 px-3 py-2 text-xs">
-              <span className="text-muted-foreground">{t("previewSubject")} </span>
-              <span className="font-medium">{subject}</span>
+            <div className="space-y-1.5">
+              <Label htmlFor={`${type}-template-body`}>{t("htmlLabel")}</Label>
+              <textarea
+                id={`${type}-template-body`}
+                value={bodyHtml}
+                onChange={(e) => {
+                  setSaved(false);
+                  setBodyHtml(e.target.value);
+                }}
+                rows={14}
+                spellCheck={false}
+                className="w-full rounded-md bg-background px-2.5 py-1.5 font-mono text-xs ring-1 ring-foreground/15 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+              <p className="text-xs text-muted-foreground">{t("htmlHint")}</p>
             </div>
-            <iframe
-              title={t("previewLabel")}
-              sandbox=""
-              srcDoc={previewHtml ?? ""}
-              className="h-[460px] w-full bg-white"
-            />
-          </div>
-        </div>
-      </div>
 
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-
-      <div className="flex items-center justify-between gap-3">
-        <div className="text-xs text-muted-foreground">
-          {saved && !pending
-            ? tRoot("saved")
-            : overridden
-              ? t("usingOverride")
-              : t("usingDefault")}
-        </div>
-        <div className="flex items-center gap-2">
-          {overridden && (
-            <Dialog>
-              <DialogTrigger
-                render={
-                  <Button type="button" variant="outline" disabled={resetting} />
-                }
-              >
-                <RotateCcw className="size-3.5" />
-                {t("reset")}
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>{t("resetConfirmTitle")}</DialogTitle>
-                  <DialogDescription>
-                    {t("resetConfirmDescription")}
-                  </DialogDescription>
-                </DialogHeader>
-                <DialogFooter>
-                  <DialogClose render={<Button type="button" variant="outline" />}>
-                    {t("resetConfirmCancel")}
-                  </DialogClose>
-                  <DialogClose
-                    render={
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        onClick={onReset}
-                      />
-                    }
+            <div className="space-y-1.5">
+              <p className="text-xs text-muted-foreground">{t("variablesHint")}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {variables.map((v) => (
+                  <span
+                    key={v}
+                    title={t(`variables.${v}` as never)}
+                    className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground"
                   >
-                    {t("resetConfirmConfirm")}
-                  </DialogClose>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          )}
-          <Button type="submit" disabled={pending}>
-            {pending ? tRoot("saving") : tRoot("save")}
-          </Button>
+                    {`{${v}}`}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Preview column */}
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <Label>{t("previewLabel")}</Label>
+              {previewing && (
+                <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
+              )}
+            </div>
+            <div className="overflow-hidden rounded-md border border-border">
+              <div className="border-b border-border bg-muted/40 px-3 py-2 text-xs">
+                <span className="text-muted-foreground">
+                  {t("previewSubject")}{" "}
+                </span>
+                <span className="font-medium">{subject}</span>
+              </div>
+              <iframe
+                title={t("previewLabel")}
+                sandbox=""
+                srcDoc={previewHtml ?? ""}
+                className="h-[460px] w-full bg-white"
+              />
+            </div>
+          </div>
         </div>
-      </div>
-    </form>
+
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-xs text-muted-foreground">
+            {saved && !pending
+              ? tRoot("saved")
+              : overridden
+                ? t("usingOverride")
+                : t("usingDefault")}
+          </div>
+          <div className="flex items-center gap-2">
+            {overridden && (
+              <Dialog>
+                <DialogTrigger
+                  render={
+                    <Button type="button" variant="outline" disabled={resetting} />
+                  }
+                >
+                  <RotateCcw className="size-3.5" />
+                  {t("reset")}
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>{t("resetConfirmTitle")}</DialogTitle>
+                    <DialogDescription>
+                      {t("resetConfirmDescription")}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter>
+                    <DialogClose render={<Button type="button" variant="outline" />}>
+                      {t("resetConfirmCancel")}
+                    </DialogClose>
+                    <DialogClose
+                      render={
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          onClick={onReset}
+                        />
+                      }
+                    >
+                      {t("resetConfirmConfirm")}
+                    </DialogClose>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            )}
+            <Button type="submit" disabled={pending}>
+              {pending ? tRoot("saving") : tRoot("save")}
+            </Button>
+          </div>
+        </div>
+      </form>
 
       <div className="space-y-3 rounded-md border border-border bg-muted/20 p-4">
         <div className="space-y-0.5">
           <h3 className="text-sm font-medium">{t("test.title")}</h3>
-          <p className="text-xs text-muted-foreground">
-            {t("test.description")}
-          </p>
+          <p className="text-xs text-muted-foreground">{t("test.description")}</p>
         </div>
 
         {testMembers.length === 0 ? (
@@ -301,9 +306,11 @@ export function AllocationTemplateForm({
           <>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label htmlFor="test-member">{t("test.memberLabel")}</Label>
+                <Label htmlFor={`${type}-test-member`}>
+                  {t("test.memberLabel")}
+                </Label>
                 <select
-                  id="test-member"
+                  id={`${type}-test-member`}
                   value={testMemberId}
                   onChange={(e) => onTestMemberChange(e.target.value)}
                   className="w-full rounded-md bg-background px-2.5 py-1.5 text-sm ring-1 ring-foreground/15 outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -316,9 +323,9 @@ export function AllocationTemplateForm({
                 </select>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="test-email">{t("test.emailLabel")}</Label>
+                <Label htmlFor={`${type}-test-email`}>{t("test.emailLabel")}</Label>
                 <Input
-                  id="test-email"
+                  id={`${type}-test-email`}
                   type="email"
                   value={testEmail}
                   onChange={(e) => {

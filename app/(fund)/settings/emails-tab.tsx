@@ -9,16 +9,21 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { prisma } from "@/services/db/prisma";
-import { getAllocationTemplateForEditing } from "@/services/email/templates";
-import { AllocationTemplateForm } from "./allocation-template-form";
+import {
+  sendTestAllocationEmailAction,
+  sendTestCardAssignedEmailAction,
+} from "@/services/email/template-actions";
+import { getEmailTemplateForEditing } from "@/services/email/templates";
 import { EmailSettings } from "./email-settings";
+import { EmailTemplateForm } from "./email-template-form";
 import { MemberSenderForm } from "./member-sender-form";
 
 // "Emails" settings tab: the member-notification pause switch, the custom
-// sender address, plus the editable allocation-confirmation template (with a
-// test-send picker). Server component — it loads the fund's template override
-// (or the built-in default) and a list of members for the test picker, and
-// hands them to the client editor.
+// sender address, plus the editable per-fund templates (allocation
+// confirmation, card-assigned) — each with a live preview and a test-send
+// picker. Server component — it loads each fund template override (or the
+// built-in default) and the members that can seed a test, then hands them to
+// the client editors.
 export async function EmailsTab({
   fund,
   initialPaused,
@@ -27,18 +32,32 @@ export async function EmailsTab({
   initialPaused: boolean;
 }) {
   const t = await getTranslations("fund.settings");
-  const { override, base, variables } = await getAllocationTemplateForEditing({
-    fund,
-  });
 
-  // Members that can seed a test allocation email — ACTIVE with a tier (the
-  // tier supplies the {amount}). Ordered by name for the picker.
-  const members = await prisma.member.findMany({
-    where: { fundId: fund.id, status: "ACTIVE", tierId: { not: null } },
-    select: { id: true, firstName: true, lastName: true, email: true },
-    orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
-    take: 500,
-  });
+  const [allocation, cardAssigned] = await Promise.all([
+    getEmailTemplateForEditing({ type: "ALLOCATION_CONFIRMATION", fund }),
+    getEmailTemplateForEditing({ type: "CARD_ASSIGNED", fund }),
+  ]);
+
+  // Test-send picker pools. Allocation needs a tier (supplies {amount});
+  // card-assigned needs a primary card (supplies {cardLink}/{cardNumber}).
+  const [allocationMembers, cardMembers] = await Promise.all([
+    prisma.member.findMany({
+      where: { fundId: fund.id, status: "ACTIVE", tierId: { not: null } },
+      select: { id: true, firstName: true, lastName: true, email: true },
+      orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
+      take: 500,
+    }),
+    prisma.member.findMany({
+      where: {
+        fundId: fund.id,
+        status: "ACTIVE",
+        primaryCardId: { not: null },
+      },
+      select: { id: true, firstName: true, lastName: true, email: true },
+      orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
+      take: 500,
+    }),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -61,12 +80,34 @@ export async function EmailsTab({
           </CardDescription>
         </CardHeader>
         <CardContent className="pb-4">
-          <AllocationTemplateForm
-            initial={override ?? base}
-            base={base}
-            hasOverride={override !== null}
-            variables={variables}
-            testMembers={members}
+          <EmailTemplateForm
+            type="ALLOCATION_CONFIRMATION"
+            initial={allocation.override ?? allocation.base}
+            base={allocation.base}
+            hasOverride={allocation.override !== null}
+            variables={allocation.variables}
+            testMembers={allocationMembers}
+            testAction={sendTestAllocationEmailAction}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("emailTemplates.cardAssignedTitle")}</CardTitle>
+          <CardDescription>
+            {t("emailTemplates.cardAssignedDescription")}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="pb-4">
+          <EmailTemplateForm
+            type="CARD_ASSIGNED"
+            initial={cardAssigned.override ?? cardAssigned.base}
+            base={cardAssigned.base}
+            hasOverride={cardAssigned.override !== null}
+            variables={cardAssigned.variables}
+            testMembers={cardMembers}
+            testAction={sendTestCardAssignedEmailAction}
           />
         </CardContent>
       </Card>

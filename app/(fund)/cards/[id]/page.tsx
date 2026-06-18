@@ -28,6 +28,7 @@ import { TableSkeleton } from "../../token/skeleton";
 import { CardNumberEdit } from "./card-number-edit";
 import { CardSourcePicker } from "./source-picker";
 import { CardTransfersTable } from "./transfers-table";
+import { NotifyCardButton } from "./notify-card-button";
 
 export default async function CardDetailPage({
   params,
@@ -38,6 +39,7 @@ export default async function CardDetailPage({
 }) {
   const t = await getTranslations("fund.cards.detail");
   const tList = await getTranslations("fund.cards");
+  const tNotify = await getTranslations("cards.admin.notify");
   const format = await getFormatter();
   const fund = await requireCurrentFund();
   const { id } = await params;
@@ -51,6 +53,7 @@ export default async function CardDetailPage({
           id: true,
           firstName: true,
           lastName: true,
+          email: true,
           primaryCardId: true,
         },
       },
@@ -58,6 +61,20 @@ export default async function CardDetailPage({
   });
 
   if (!card) notFound();
+
+  // Status of the "your card is on its way" notification for this (card,
+  // member) pair — drives the notify prompt + "notified" badge below.
+  const notifyEmail = card.memberId
+    ? await prisma.email.findFirst({
+        where: {
+          cardId: card.id,
+          memberId: card.memberId,
+          type: "CARD_ASSIGNED",
+        },
+        orderBy: { queuedAt: "desc" },
+        select: { status: true },
+      })
+    : null;
 
   const memberName = card.member
     ? `${card.member.firstName} ${card.member.lastName}`.trim()
@@ -158,6 +175,52 @@ export default async function CardDetailPage({
                   "—"
                 )}
               </DtDd>
+              {card.memberId && (
+                <DtDd label={tNotify("rowLabel")}>
+                  {card.member?.email == null ? (
+                    <span className="text-muted-foreground">
+                      {tNotify("noEmail")}
+                    </span>
+                  ) : (
+                    <span className="inline-flex flex-wrap items-center gap-2">
+                      {notifyEmail?.status === "SENT" ? (
+                        <>
+                          <Badge variant="success">
+                            {tNotify("status.sent")}
+                          </Badge>
+                          <NotifyCardButton
+                            cardId={card.id}
+                            memberName={memberName || holderLabel}
+                            mode="resend"
+                          />
+                        </>
+                      ) : notifyEmail?.status === "FAILED" ? (
+                        <>
+                          <Badge variant="destructive">
+                            {tNotify("status.failed")}
+                          </Badge>
+                          <NotifyCardButton
+                            cardId={card.id}
+                            memberName={memberName || holderLabel}
+                            mode="retry"
+                          />
+                        </>
+                      ) : (
+                        <>
+                          <Badge variant="outline">
+                            {tNotify("status.unsent")}
+                          </Badge>
+                          <NotifyCardButton
+                            cardId={card.id}
+                            memberName={memberName || holderLabel}
+                            mode="send"
+                          />
+                        </>
+                      )}
+                    </span>
+                  )}
+                </DtDd>
+              )}
               <DtDd label={t("info.account")}>
                 {card.account ? (
                   <span className="inline-flex items-center gap-1">

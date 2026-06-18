@@ -245,6 +245,10 @@ model Fund {
   citizenPayApiKeyEnc       String?
   citizenPayApiKeyUpdatedAt DateTime? // last successful pickup-and-write
   citizenPayLastSyncedAt    DateTime?
+  // CP treasury slug, cached from `GET /v2/treasury` (the `network` segment of
+  // a card's public tap URL: https://tap.citizenpay.xyz/card/<serial>?network=<slug>).
+  // Refreshed whenever the API key is (re)issued — see services/citizenpay/sync.ts.
+  citizenPayTreasurySlug String?
 
   // 4337 stack identity. Cached from CP's `GET /v2/treasury` response —
   // CP picks the entrypoint / factory / paymaster per treasury and we
@@ -641,6 +645,10 @@ model Card {
   // communication match). The mint for such a deposit targets this card.
   bankTransactions BankTransaction[]
 
+  // Emails about this card (e.g. the CARD_ASSIGNED "your card is on its way"
+  // notification). The notify status on the card detail page reads these.
+  emails Email[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -651,8 +659,8 @@ model Card {
 }
 
 enum CardStatus {
-  ACTIVE // terminal can charge
-  INACTIVE // not yet activated
+  ACTIVE // in use; a card flips here automatically on its first charge
+  INACTIVE // factory default — not charged yet; does NOT block the card
   BLOCKED // terminal will refuse
 }
 
@@ -1378,6 +1386,8 @@ model Email {
   allocationPeriod   AllocationPeriod? @relation(fields: [allocationPeriodId], references: [id], onDelete: SetNull)
   referralId         String?
   referral           Referral?         @relation(fields: [referralId], references: [id], onDelete: SetNull)
+  cardId             String?
+  card               Card?             @relation(fields: [cardId], references: [id], onDelete: SetNull)
 
   // Idempotency key prevents double-queueing on cron re-runs. App composes
   // it from the type + context entity IDs (e.g.
@@ -1408,6 +1418,7 @@ model Email {
   @@index([fundId, type, sentAt])
   @@index([memberId])
   @@index([merchantId])
+  @@index([cardId])
   @@index([status])
 }
 
@@ -1454,6 +1465,7 @@ enum EmailType {
   MERCHANT_APPROVED
   MERCHANT_REJECTED
   REFERRAL_BONUS_AWARDED
+  CARD_ASSIGNED
 }
 
 enum EmailStatus {

@@ -26,57 +26,19 @@ import {
 import { computeCardSyncPlan } from "./sync";
 
 // Card lifecycle is two independent dimensions:
-//   - `status` (ACTIVE / INACTIVE / BLOCKED) drives whether CitizenPay's
-//     terminal accepts the card. Source of truth on CP; we mirror it.
+//   - `status` (ACTIVE / INACTIVE / BLOCKED): only BLOCKED makes CitizenPay's
+//     terminal refuse the card. INACTIVE is the factory default (not charged
+//     yet) and does NOT block — a card flips to ACTIVE automatically on its
+//     first charge. Source of truth on CP; we mirror it.
 //   - `reportedLostAt` is internal-only. The fund records that the holder
 //     said they lost the card. Doesn't affect terminal behaviour, but most
-//     lost reports also trigger a block — the block dialog can do both in
-//     one action.
+//     lost reports also trigger a block — `setCardStatusAction` sets both in
+//     one call.
 //
-// Both actions are scoped to the current fund — admin can only manage cards
-// that belong to a member of their fund.
+// The status action is scoped to the current fund — admin can only manage
+// cards that belong to a member of their fund.
 
 export type BlockCardResult = { ok: true } | { error: string };
-
-export async function blockCardAction(input: {
-  cardId: string;
-  reportedLost?: boolean;
-}): Promise<BlockCardResult> {
-  const t = await getTranslations();
-  const { fund } = await requireFundRole("ADMIN");
-
-  const card = await prisma.card.findFirst({
-    where: { id: input.cardId, fundId: fund.id },
-    select: { id: true, serialNumber: true, status: true },
-  });
-  if (!card) return { error: t("cards.admin.errors.notFound" as never) };
-  if (card.status === "BLOCKED") {
-    return { error: t("cards.admin.errors.alreadyBlocked" as never) };
-  }
-
-  const now = new Date();
-  await prisma.card.update({
-    where: { id: card.id },
-    data: {
-      status: "BLOCKED",
-      blockedAt: now,
-      ...(input.reportedLost ? { reportedLostAt: now } : {}),
-    },
-  });
-
-  // Push the block to CitizenPay. Local state is authoritative for the
-  // admin UI; CP failure is logged and a future sync reconciles.
-  try {
-    await getCitizenPayClient(fund).blockCard(card.serialNumber);
-  } catch (e) {
-    console.error("[citizenpay] blockCard failed", e);
-  }
-
-  revalidatePath("/cards");
-  revalidatePath(`/cards/${card.id}`);
-  revalidatePath("/members");
-  return { ok: true };
-}
 
 // =============================================================================
 // Top-up / withdraw
@@ -284,41 +246,122 @@ export async function withdrawFromCardAction(input: {
   }
 }
 
-export async function unblockCardAction(input: {
+// Set a card to any of the three statuses directly (block/unblock are the
+// ACTIVE↔BLOCKED special cases; this also covers the INACTIVE transitions the
+// quick actions can't reach). `reportedLost` mirrors the internal lost flag:
+// omit to leave it untouched, true/false to set/clear it. CP is kept in sync;
+// local stays authoritative and a future sync reconciles a CP failure.
+export async function setCardStatusAction(input: {
   cardId: string;
-  clearLostFlag?: boolean;
+  status: CardStatus;
+  reportedLost?: boolean;
 }): Promise<BlockCardResult> {
   const t = await getTranslations();
   const { fund } = await requireFundRole("ADMIN");
 
+  if (!["ACTIVE", "INACTIVE", "BLOCKED"].includes(input.status)) {
+    return { error: t("cards.admin.errors.invalidStatus" as never) };
+  }
+
   const card = await prisma.card.findFirst({
     where: { id: input.cardId, fundId: fund.id },
-    select: { id: true, serialNumber: true, status: true, reportedLostAt: true },
+    select: {
+      id: true,
+      serialNumber: true,
+      status: true,
+      blockedAt: true,
+      reportedLostAt: true,
+    },
   });
   if (!card) return { error: t("cards.admin.errors.notFound" as never) };
-  if (card.status === "ACTIVE") {
-    return { error: t("cards.admin.errors.alreadyActive" as never) };
-  }
+
+  const now = new Date();
+  const blockedAt =
+    input.status === "BLOCKED" ? (card.blockedAt ?? now) : null;
+  const reportedLostAt =
+    input.reportedLost === undefined
+      ? card.reportedLostAt
+      : input.reportedLost
+        ? (card.reportedLostAt ?? now)
+        : null;
 
   await prisma.card.update({
     where: { id: card.id },
-    data: {
-      status: "ACTIVE",
-      blockedAt: null,
-      ...(input.clearLostFlag ? { reportedLostAt: null } : {}),
-    },
+    data: { status: input.status, blockedAt, reportedLostAt },
   });
 
   try {
-    await getCitizenPayClient(fund).unblockCard(card.serialNumber);
+    await getCitizenPayClient(fund).setCardStatus(
+      card.serialNumber,
+      input.status,
+    );
   } catch (e) {
-    console.error("[citizenpay] unblockCard failed", e);
+    console.error("[citizenpay] setCardStatus failed", e);
   }
 
   revalidatePath("/cards");
   revalidatePath(`/cards/${card.id}`);
   revalidatePath("/members");
   return { ok: true };
+}
+
+export type SetCardsStatusResult =
+  | { ok: true; count: number }
+  | { error: string };
+
+// Bulk status edit from the cards list — set the same status on every selected
+// card. Same dimensions as the single-card action, minus the per-card lost-flag
+// nuance (bulk is status-only): blockedAt is set when blocking, cleared
+// otherwise; reportedLostAt is left untouched. All cards are fund-scoped, and
+// each is mirrored to CitizenPay fail-soft (a CP miss is logged; local stays
+// authoritative and a future sync reconciles).
+export async function setCardsStatusAction(input: {
+  cardIds: string[];
+  status: CardStatus;
+}): Promise<SetCardsStatusResult> {
+  const t = await getTranslations();
+  const { fund } = await requireFundRole("ADMIN");
+
+  if (!["ACTIVE", "INACTIVE", "BLOCKED"].includes(input.status)) {
+    return { error: t("cards.admin.errors.invalidStatus" as never) };
+  }
+
+  const ids = [...new Set(input.cardIds)].filter(Boolean);
+  if (ids.length === 0) {
+    return { error: t("cards.admin.bulk.errors.none" as never) };
+  }
+
+  const cards = await prisma.card.findMany({
+    where: { id: { in: ids }, fundId: fund.id },
+    select: { id: true, serialNumber: true },
+  });
+  if (cards.length === 0) {
+    return { error: t("cards.admin.bulk.errors.none" as never) };
+  }
+
+  const now = new Date();
+  await prisma.card.updateMany({
+    where: { id: { in: cards.map((c) => c.id) }, fundId: fund.id },
+    data: {
+      status: input.status,
+      blockedAt: input.status === "BLOCKED" ? now : null,
+    },
+  });
+
+  const cp = getCitizenPayClient(fund);
+  await Promise.allSettled(
+    cards.map(async (c) => {
+      try {
+        await cp.setCardStatus(c.serialNumber, input.status);
+      } catch (e) {
+        console.error("[citizenpay] setCardStatus (bulk) failed", c.serialNumber, e);
+      }
+    }),
+  );
+
+  revalidatePath("/cards");
+  revalidatePath("/members");
+  return { ok: true, count: cards.length };
 }
 
 // =============================================================================

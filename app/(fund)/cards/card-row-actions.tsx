@@ -18,16 +18,15 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  blockCardAction,
+  setCardStatusAction,
   topUpCardAction,
-  unblockCardAction,
   withdrawFromCardAction,
 } from "@/services/card/admin-actions";
 
-// Block: ACTIVE → BLOCKED. Optionally also flag as lost in the same click.
-// Unblock: BLOCKED → ACTIVE. Optionally also clear the lost flag.
+// Change status: set the card to ACTIVE / INACTIVE / BLOCKED directly, with an
+// optional "reported lost" internal flag. Available on every card (it's the
+// only path to activate an INACTIVE card or set one back to inactive).
 // Top-up / withdraw available on ACTIVE cards with a CP-issued account.
-// INACTIVE cards (not yet CP-confirmed) render no actions.
 
 export function CardRowActions({
   cardId,
@@ -63,43 +62,56 @@ export function CardRowActions({
           />
         </>
       )}
-      {status === "ACTIVE" && (
-        <BlockDialog
-          cardId={cardId}
-          holderLabel={holderLabel}
-          initialReportedLost={isLost}
-        />
-      )}
-      {status === "BLOCKED" && (
-        <UnblockDialog
-          cardId={cardId}
-          holderLabel={holderLabel}
-          isLost={isLost}
-        />
-      )}
+      <ChangeStatusDialog
+        cardId={cardId}
+        status={status}
+        isLost={isLost}
+        holderLabel={holderLabel}
+      />
     </div>
   );
 }
 
-function BlockDialog({
+const STATUS_OPTIONS = ["ACTIVE", "INACTIVE", "BLOCKED"] as const;
+
+function ChangeStatusDialog({
   cardId,
+  status,
+  isLost,
   holderLabel,
-  initialReportedLost,
 }: {
   cardId: string;
+  status: "ACTIVE" | "INACTIVE" | "BLOCKED";
+  isLost: boolean;
   holderLabel: string;
-  initialReportedLost: boolean;
 }) {
-  const t = useTranslations("cards.admin.block");
+  const t = useTranslations("cards.admin.status");
   const [open, setOpen] = useState(false);
-  const [reportedLost, setReportedLost] = useState(initialReportedLost);
+  const [nextStatus, setNextStatus] = useState(status);
+  const [reportedLost, setReportedLost] = useState(isLost);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  function onOpenChange(next: boolean) {
+    if (!next && pending) return;
+    setOpen(next);
+    setError(null);
+    if (next) {
+      setNextStatus(status);
+      setReportedLost(isLost);
+    }
+  }
+
+  const dirty = nextStatus !== status || reportedLost !== isLost;
 
   const onSubmit = () => {
     setError(null);
     startTransition(async () => {
-      const result = await blockCardAction({ cardId, reportedLost });
+      const result = await setCardStatusAction({
+        cardId,
+        status: nextStatus,
+        reportedLost,
+      });
       if ("error" in result) {
         setError(result.error);
         return;
@@ -109,8 +121,8 @@ function BlockDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="destructive" size="sm" />}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogTrigger render={<Button variant="outline" size="sm" />}>
         {t("button")}
       </DialogTrigger>
       <DialogContent>
@@ -120,6 +132,32 @@ function BlockDialog({
             {t("description", { holderLabel })}
           </DialogDescription>
         </DialogHeader>
+        <fieldset className="space-y-2">
+          <legend className="sr-only">{t("statusLabel")}</legend>
+          {STATUS_OPTIONS.map((opt) => (
+            <label
+              key={opt}
+              className="flex cursor-pointer items-start gap-3 rounded-md border border-border bg-card p-3 transition-colors hover:bg-muted/40 has-checked:border-primary"
+            >
+              <input
+                type="radio"
+                name={`card-status-${cardId}`}
+                value={opt}
+                checked={nextStatus === opt}
+                onChange={() => setNextStatus(opt)}
+                className="mt-1 size-4 border-input"
+              />
+              <div className="flex-1 space-y-0.5">
+                <div className="text-sm font-medium">
+                  {t(`options.${opt}.label` as never)}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {t(`options.${opt}.description` as never)}
+                </div>
+              </div>
+            </label>
+          ))}
+        </fieldset>
         <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border bg-card p-3 transition-colors hover:bg-muted/40">
           <input
             type="checkbox"
@@ -142,13 +180,13 @@ function BlockDialog({
         <DialogFooter>
           <Button
             variant="outline"
-            onClick={() => setOpen(false)}
+            onClick={() => onOpenChange(false)}
             disabled={pending}
           >
             {t("cancel")}
           </Button>
-          <Button variant="destructive" onClick={onSubmit} disabled={pending}>
-            {pending ? t("blocking") : t("confirm")}
+          <Button onClick={onSubmit} disabled={pending || !dirty}>
+            {pending ? t("saving") : t("confirm")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -315,79 +353,3 @@ function CardAmountDialog({
   );
 }
 
-function UnblockDialog({
-  cardId,
-  holderLabel,
-  isLost,
-}: {
-  cardId: string;
-  holderLabel: string;
-  isLost: boolean;
-}) {
-  const t = useTranslations("cards.admin.unblock");
-  const [open, setOpen] = useState(false);
-  const [clearLostFlag, setClearLostFlag] = useState(isLost);
-  const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
-
-  const onSubmit = () => {
-    setError(null);
-    startTransition(async () => {
-      const result = await unblockCardAction({ cardId, clearLostFlag });
-      if ("error" in result) {
-        setError(result.error);
-        return;
-      }
-      setOpen(false);
-    });
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="default" size="sm" />}>
-        {t("button")}
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t("title")}</DialogTitle>
-          <DialogDescription>
-            {t("description", { holderLabel })}
-          </DialogDescription>
-        </DialogHeader>
-        {isLost && (
-          <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border bg-card p-3 transition-colors hover:bg-muted/40">
-            <input
-              type="checkbox"
-              checked={clearLostFlag}
-              onChange={(e) => setClearLostFlag(e.target.checked)}
-              className="mt-1 size-4 rounded border-input"
-            />
-            <div className="flex-1 space-y-0.5">
-              <div className="text-sm font-medium">{t("clearLostLabel")}</div>
-              <div className="text-xs text-muted-foreground">
-                {t("clearLostDescription")}
-              </div>
-            </div>
-          </label>
-        )}
-        {error && (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => setOpen(false)}
-            disabled={pending}
-          >
-            {t("cancel")}
-          </Button>
-          <Button onClick={onSubmit} disabled={pending}>
-            {pending ? t("unblocking") : t("confirm")}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}

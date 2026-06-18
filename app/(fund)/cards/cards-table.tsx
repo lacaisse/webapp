@@ -24,6 +24,12 @@ import {
 import { prisma } from "@/services/db/prisma";
 
 import { CardRowActions } from "./card-row-actions";
+import {
+  CardSelectAllCheckbox,
+  CardSelectCheckbox,
+  CardSelectionProvider,
+  CardsBulkBar,
+} from "./cards-selection";
 
 const PAGE_SIZE = 50;
 
@@ -70,6 +76,7 @@ export async function CardsTable({
   q: string | null;
 }) {
   const t = await getTranslations("fund.cards");
+  const tBulk = await getTranslations("cards.admin.bulk");
   const format = await getFormatter();
 
   const where = whereFor(tab, fund.id, q);
@@ -152,11 +159,17 @@ export async function CardsTable({
       : [];
   const sourceBySerial = new Map(sourceCards.map((s) => [s.serialNumber, s]));
 
+  const pageIds = pageCards.map((c) => c.id);
+
   return (
-    <div>
+    <CardSelectionProvider>
+      <CardsBulkBar />
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-8">
+              <CardSelectAllCheckbox ids={pageIds} label={tBulk("selectAll")} />
+            </TableHead>
             <TableHead>{t("columns.number")}</TableHead>
             <TableHead>{t("columns.serial")}</TableHead>
             <TableHead>{t("columns.holder")}</TableHead>
@@ -172,7 +185,7 @@ export async function CardsTable({
         </TableHeader>
         <TableBody>
           {pageCards.length === 0 ? (
-            <TableEmpty colSpan={9}>{t("empty")}</TableEmpty>
+            <TableEmpty colSpan={10}>{t("empty")}</TableEmpty>
           ) : (
             pageCards.map((c) => {
               // Unattached cards (imported from CitizenPay before any member
@@ -193,6 +206,12 @@ export async function CardsTable({
                   : null;
               return (
                 <TableRow key={c.id}>
+                  <TableCell className="w-8">
+                    <CardSelectCheckbox
+                      id={c.id}
+                      label={tBulk("selectRow", { holder: holderLabel })}
+                    />
+                  </TableCell>
                   <TableCell className="tabular-nums text-sm text-muted-foreground">
                     {c.number ?? "—"}
                   </TableCell>
@@ -276,7 +295,7 @@ export async function CardsTable({
           labels={{ prev: t("prev"), next: t("next") }}
         />
       )}
-    </div>
+    </CardSelectionProvider>
   );
 }
 

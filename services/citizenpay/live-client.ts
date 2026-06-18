@@ -593,6 +593,11 @@ export class LiveCitizenPayClient implements CitizenPayClient {
     };
   }
 
+  async getTreasurySlug(): Promise<string | null> {
+    const wire = await apiTreasury.get(this.creds);
+    return wire.slug ?? null;
+  }
+
   async deleteCard(serialNumber: string): Promise<void> {
     try {
       await apiCards.delete(this.creds, serialNumber);

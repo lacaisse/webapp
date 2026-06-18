@@ -12,10 +12,15 @@ import { z } from "zod";
 //                ship a template that renders a broken `{token}`.
 // `hasCta`     — whether this template renders a CTA button (a bare-URL line
 //                in the body). ALLOCATION_CONFIRMATION has none.
+// `defaultIsHtml` — whether the built-in i18n default is authored as rich HTML
+//                (key `bodyHtml`) rather than plain text (key `textBody`). HTML
+//                defaults are used verbatim in the editor; text defaults are
+//                upgraded via plainTextToHtml.
 export const EDITABLE_EMAIL_TEMPLATES = {
   ALLOCATION_CONFIRMATION: {
     i18nKey: "members.email.allocationConfirmation",
     hasCta: false,
+    defaultIsHtml: false,
     // `shopList` is a "rich" variable: it expands to a bulleted list of the
     // fund's active merchants (HTML <ul> in the HTML body, dashed lines in the
     // text part). The rest are plain scalars. See services/email/templates.ts.
@@ -26,6 +31,22 @@ export const EDITABLE_EMAIL_TEMPLATES = {
       "amount",
       "cardSerial",
       "shopList",
+    ],
+  },
+  CARD_ASSIGNED: {
+    i18nKey: "members.email.cardAssigned",
+    hasCta: false,
+    defaultIsHtml: true,
+    // All plain scalars, resolved by the caller (notify action / test send):
+    // {address} is the member's formatted postal address, {cardLink} the public
+    // tap URL, {cardNumber} the per-fund card number. See templates.ts.
+    variables: [
+      "firstName",
+      "lastName",
+      "fundName",
+      "address",
+      "cardLink",
+      "cardNumber",
     ],
   },
 } as const;
@@ -45,6 +66,14 @@ export const PREVIEW_SAMPLE_VALUES: Record<
     fundName: "Your fund",
     amount: "25",
     cardSerial: "04A2B7C9D1",
+  },
+  CARD_ASSIGNED: {
+    firstName: "Alex",
+    lastName: "Dupont",
+    fundName: "Your fund",
+    address: "Rue de l'Exemple 12, 1000 Bruxelles",
+    cardLink: "https://tap.citizenpay.xyz/card/04A2B7C9D1?network=demo",
+    cardNumber: "42",
   },
 };
 

@@ -221,6 +221,15 @@ export interface CitizenPayClient {
   ): Promise<CitizenPayCardDetail | null>;
 
   /**
+   * The connected treasury's slug — the `network` segment of a card's public
+   * tap URL (https://tap.citizenpay.xyz/card/<serial>?network=<slug>). Cached
+   * on `Fund.citizenPayTreasurySlug` at connect time; this is the live read
+   * used to backfill that cache for funds connected before it was stored.
+   * Returns null when the treasury has no slug.
+   */
+  getTreasurySlug(): Promise<string | null>;
+
+  /**
    * Draft payouts: paid/refunded orders not yet attached to a payout,
    * grouped by place. Computed live — calling it never mutates anything.
    * Optional half-open `[from, to)` window narrows the orders considered;
