@@ -422,14 +422,14 @@
           "household": "Household",
           "householdValue": "{adults} adults · {children} children",
           "joined": "Joined",
-          "left": "Left"
+          "left": "Left",
+          "notes": "Notes"
         },
         "banking": {
           "title": "Membership",
           "description": "Tier, banking, and referral identifiers.",
           "tier": "Tier",
           "iban": "IBAN",
-          "reference": "Payment reference",
           "referralCode": "Referral code",
           "primaryCard": "Primary card"
         },
@@ -1883,6 +1883,29 @@
         "statusUnrecognized": "unrecognized",
         "statusesDefaulted": "{count, plural, one {# status value was not recognized and defaulted to New} other {# status values were not recognized and defaulted to New}}:",
         "cardNumbersNotFound": "{count, plural, one {# card number with no existing card (not linked)} other {# card numbers with no existing card (not linked)}}:"
+      },
+      "edit": {
+        "button": "Edit",
+        "title": "Edit member",
+        "description": "Update this member’s contact details, household, and notes.",
+        "firstNameLabel": "First name",
+        "lastNameLabel": "Last name",
+        "emailLabel": "Email",
+        "phoneLabel": "Phone",
+        "ibanLabel": "IBAN",
+        "addressLabel": "Address",
+        "postalCodeLabel": "Postal code",
+        "cityLabel": "City",
+        "householdAdultsLabel": "Adults in household",
+        "householdChildrenLabel": "Children in household",
+        "notesLabel": "Notes",
+        "cancel": "Cancel",
+        "confirm": "Save changes",
+        "saving": "Saving…",
+        "errors": {
+          "tooLong": "This value is too long.",
+          "householdInvalid": "Enter a whole number of 0 or more."
+        }
       }
     }
   },

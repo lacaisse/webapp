@@ -8,7 +8,6 @@ import {
   ArrowUpRight,
   Coins,
   CreditCard,
-  Gift,
   Landmark,
   LayoutDashboard,
   Mail,
@@ -52,7 +51,7 @@ export function FundSidebar({
     { href: "/merchants", label: t("merchants"), icon: Store },
     { href: "/payments", label: t("payments"), icon: Receipt },
     { href: "/bank", label: t("bank"), icon: Landmark },
-    { href: "/referrals", label: t("referrals"), icon: Gift },
+    // Referrals hidden for now — re-add this item to restore the nav link.
     { href: "/emails", label: t("emails"), icon: Mail },
     { href: "/team", label: t("team"), icon: UserCog },
     { href: "/settings", label: t("settings"), icon: Settings },

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { notFound } from "next/navigation";
 import { getFormatter, getTranslations } from "next-intl/server";
 
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +23,13 @@ import { prisma } from "@/services/db/prisma";
 import { requireCurrentFund } from "@/services/fund/server";
 import { ReferralForm } from "@/app/(fund)/settings/settings-forms";
 
+// Referrals are hidden for now. Set this to false to restore the page (and
+// re-add the sidebar nav item in components/fund-sidebar.tsx).
+const REFERRALS_HIDDEN: boolean = true;
+
 export default async function ReferralsPage() {
+  if (REFERRALS_HIDDEN) notFound();
+
   const t = await getTranslations("fund.referrals");
   const format = await getFormatter();
   const fund = await requireCurrentFund();

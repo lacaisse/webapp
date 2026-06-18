@@ -422,14 +422,14 @@
           "household": "Ménage",
           "householdValue": "{adults} adultes · {children} enfants",
           "joined": "Inscrit le",
-          "left": "Parti le"
+          "left": "Parti le",
+          "notes": "Notes"
         },
         "banking": {
           "title": "Adhésion",
           "description": "Palier, coordonnées bancaires et identifiants.",
           "tier": "Palier",
           "iban": "IBAN",
-          "reference": "Communication structurée",
           "referralCode": "Code de parrainage",
           "primaryCard": "Carte principale"
         },
@@ -1883,6 +1883,29 @@
         "statusUnrecognized": "non reconnu",
         "statusesDefaulted": "{count, plural, one {# valeur de statut non reconnue, définie sur Nouveau} other {# valeurs de statut non reconnues, définies sur Nouveau}} :",
         "cardNumbersNotFound": "{count, plural, one {# n° de carte sans carte existante (non lié)} other {# n° de carte sans carte existante (non liés)}} :"
+      },
+      "edit": {
+        "button": "Modifier",
+        "title": "Modifier le membre",
+        "description": "Mettez à jour les coordonnées, le foyer et les notes de ce membre.",
+        "firstNameLabel": "Prénom",
+        "lastNameLabel": "Nom",
+        "emailLabel": "E-mail",
+        "phoneLabel": "Téléphone",
+        "ibanLabel": "IBAN",
+        "addressLabel": "Adresse",
+        "postalCodeLabel": "Code postal",
+        "cityLabel": "Ville",
+        "householdAdultsLabel": "Adultes dans le foyer",
+        "householdChildrenLabel": "Enfants dans le foyer",
+        "notesLabel": "Notes",
+        "cancel": "Annuler",
+        "confirm": "Enregistrer",
+        "saving": "Enregistrement…",
+        "errors": {
+          "tooLong": "Cette valeur est trop longue.",
+          "householdInvalid": "Saisissez un nombre entier supérieur ou égal à 0."
+        }
       }
     }
   },
