@@ -532,6 +532,10 @@
           "newer": "Más recientes",
           "older": "Más antiguas",
           "error": "No se pudieron cargar las transferencias en cadena."
+        },
+        "onboardingLetter": {
+          "rowLabel": "Carta de bienvenida",
+          "download": "Descargar PDF"
         }
       },
       "number": {
@@ -1206,13 +1210,16 @@
         "onboarding": "Incorporación",
         "terms": "Términos",
         "citizenpay": "Citizen Pay",
-        "fees": "Comisiones"
+        "fees": "Comisiones",
+        "documents": "Documentos"
       },
       "general": {
         "title": "General",
         "description": "Información básica sobre tu fondo.",
         "name": "Nombre",
         "nameHint": "Nombre público que se muestra a miembros y comercios.",
+        "fullName": "Nombre completo",
+        "fullNameHint": "El nombre completo o legal del fondo (p. ej. «Caisse Locale d'Alimentation Solidaire de Schaerbeek»). Se usa en los documentos de los miembros. Déjalo en blanco para usar el nombre de arriba.",
         "language": "Idioma predeterminado",
         "languageHint": "Se usa cuando un visitante no tiene una configuración regional definida.",
         "timezone": "Zona horaria",
@@ -1231,7 +1238,9 @@
         "logo": "URL del logotipo",
         "logoHint": "URL pública de una imagen alojada, que se muestra en la barra lateral y en los correos. Déjalo en blanco para usar el valor predeterminado de la plataforma.",
         "primaryColor": "Color principal",
-        "primaryColorHint": "Hex de 6 dígitos. Determina botones y acentos."
+        "primaryColorHint": "Hex de 6 dígitos. Determina botones y acentos.",
+        "website": "URL del sitio web",
+        "websiteHint": "URL pública del sitio web del fondo — se muestra en los documentos de los miembros (p. ej. la carta de bienvenida). Déjalo en blanco para omitirlo."
       },
       "token": {
         "title": "Token",
@@ -1367,6 +1376,36 @@
         "rateHint": "Porcentaje cobrado en cada pago (p. ej. 2.5 para 2.5%). Déjalo vacío para usar la tasa predeterminada de Citizen Pay.",
         "syncPending": "Guardado localmente, pero aún no confirmado por Citizen Pay. Guarda de nuevo para reintentar la sincronización.",
         "syncFailed": "Tasa guardada, pero la sincronización con Citizen Pay falló. Guarda de nuevo para reintentar."
+      },
+      "documentTemplates": {
+        "onboardingLetterTitle": "Carta de bienvenida de la tarjeta",
+        "onboardingLetterDescription": "La carta de bienvenida que se imprime y envía con la tarjeta de un miembro. Descárgala en PDF desde la página de detalle de la tarjeta. Déjala sin cambios para conservar el texto predeterminado o personalízala para este fondo.",
+        "bodyLabel": "Cuerpo de la carta",
+        "bodyHint": "Escribe la carta en markdown sencillo — `#`/`##` para títulos, `**negrita**`, `*cursiva*`, `---` para un separador, `[pagebreak]` en su propia línea para empezar una nueva página y una línea en blanco entre párrafos.",
+        "variablesHint": "Puedes usar estos marcadores — se reemplazan con los datos del miembro al generar la carta:",
+        "previewLabel": "Vista previa",
+        "previewHint": "Vista previa en vivo con datos de ejemplo. La carta real usa los datos del miembro.",
+        "usingDefault": "Usando la carta predeterminada.",
+        "usingOverride": "Usando una carta personalizada para este fondo.",
+        "reset": "Restablecer",
+        "resetConfirmTitle": "¿Restablecer a la carta predeterminada?",
+        "resetConfirmDescription": "Esto elimina tu texto personalizado y restaura la carta de bienvenida predeterminada. No se puede deshacer.",
+        "resetConfirmCancel": "Cancelar",
+        "resetConfirmConfirm": "Restablecer",
+        "variables": {
+          "fund_name": "El nombre de este fondo",
+          "full_name": "El nombre completo / legal del fondo",
+          "website": "La URL del sitio web del fondo",
+          "first_name": "El nombre del miembro",
+          "last_name": "El apellido del miembro",
+          "card_number": "El número de tarjeta del miembro",
+          "payment_reference": "La referencia de pago del miembro"
+        },
+        "errors": {
+          "bodyRequired": "Introduce el cuerpo de la carta.",
+          "bodyTooLong": "El cuerpo de la carta es demasiado largo.",
+          "unknownVariable": "Marcador desconocido «{name}». Elimínalo o usa una de las variables indicadas."
+        }
       }
     }
   },
@@ -1414,7 +1453,8 @@
       "urlInvalid": "Introduzca una URL válida (debe empezar por http:// o https://).",
       "feeInvalid": "La tasa de comisión debe ser un número con hasta 2 decimales.",
       "feeTooHigh": "La tasa de comisión no puede superar el 100%.",
-      "cutoffDayInvalid": "El día de corte debe ser un número entero entre 1 y 31."
+      "cutoffDayInvalid": "El día de corte debe ser un número entero entre 1 y 31.",
+      "nameTooLong": "El nombre es demasiado largo."
     }
   },
   "team": {
@@ -1544,19 +1584,25 @@
         "description": "Emitir una tarjeta para {memberName}. Su cuenta se activa de inmediato.",
         "unverifiedWarning": "Este miembro aún no ha verificado su correo electrónico. Es posible que el correo de activación rebote.",
         "cardLabel": "Tarjeta",
-        "cardPlaceholder": "Busca una tarjeta por número de serie…",
+        "cardPlaceholder": "Busca por número de serie o de tarjeta…",
         "cardHint": "Elige una tarjeta ya importada de Citizen Pay. Si no la ves, sincroniza primero la lista de tarjetas.",
         "cardSearching": "Buscando…",
         "cardEmpty": "Ninguna tarjeta sin asignar coincide con este número de serie.",
         "cardEmptyInitial": "No hay tarjetas sin asignar disponibles. Sincroniza desde la página de tarjetas.",
-        "cardNoAccount": "Aún sin cuenta en cadena",
+        "cardNoNumber": "Aún sin número de tarjeta",
         "cardClear": "Quitar tarjeta",
         "cardRequired": "Elige una tarjeta para activar.",
         "noteLabel": "Nota (opcional, interna)",
         "notePlaceholder": "Cualquier dato que registrar sobre esta activación.",
+        "sendCardEmailLabel": "Enviar al miembro el correo «tu tarjeta está en camino»",
         "cancel": "Cancelar",
         "confirm": "Activar y emitir tarjeta",
-        "activating": "Activando…"
+        "activating": "Activando…",
+        "assignButton": "Asignar tarjeta",
+        "assignTitle": "Asignar una tarjeta",
+        "assignDescription": "Vincula una tarjeta a {memberName}.",
+        "assignConfirm": "Asignar tarjeta",
+        "assigning": "Asignando…"
       },
       "invite": {
         "title": "Invitar a un miembro",
@@ -1615,6 +1661,7 @@
         "notFound": "Miembro no encontrado.",
         "alreadyActive": "Este miembro ya está activo.",
         "alreadyHasPrimaryCard": "Este miembro ya tiene una tarjeta principal.",
+        "notAssignable": "Solo los miembros nuevos o activos pueden recibir una tarjeta.",
         "notActiveForCard": "Solo se pueden emitir tarjetas adicionales a miembros activos.",
         "noPrimaryCard": "Activa primero al miembro — necesita una tarjeta principal antes de poder vincular tarjetas adicionales.",
         "serialRequired": "El número de serie de la tarjeta es obligatorio.",

@@ -13,9 +13,9 @@ import {
 } from "@/services/card/admin-actions";
 
 // Typeahead for the activate-member dialog. Lists unattached cards
-// (memberId is null) in the current fund, filtered by serial number.
-// Empty query surfaces the most-recently-imported cards so the operator
-// has something to scroll if no serial is in hand. Selection commits the
+// (memberId is null) in the current fund, filtered by serial number or
+// card number. Empty query surfaces the most-recently-imported cards so the
+// operator has something to scroll if nothing is in hand. Selection commits the
 // card's id; a chip replaces the input until cleared.
 
 const DEBOUNCE_MS = 200;
@@ -27,7 +27,7 @@ export type UnattachedCardPickerLabels = {
   searching: string;
   empty: string;
   emptyInitial: string;
-  noAccount: string;
+  noNumber: string;
   clear: string;
 };
 
@@ -201,8 +201,8 @@ function SelectedChip({
   clearLabel: string;
 }) {
   // One-line chip: matches the input's height so the dialog doesn't
-  // re-flow when a card is picked. Account is shown muted on the same row
-  // so the operator can still verify identity without doubling height.
+  // re-flow when a card is picked. The card number is shown muted on the same
+  // row so the operator can verify identity without doubling height.
   return (
     <div className="flex items-center gap-2 rounded-lg border border-input bg-muted/30 px-2.5 py-1.5">
       <CreditCard className="size-4 shrink-0 text-muted-foreground" />
@@ -210,9 +210,9 @@ function SelectedChip({
         <span className="shrink-0 font-mono text-sm font-medium">
           {card.serialNumber}
         </span>
-        {card.account && (
+        {card.number != null && (
           <span className="truncate font-mono text-xs text-muted-foreground">
-            {card.account}
+            #{card.number}
           </span>
         )}
       </div>
@@ -282,7 +282,7 @@ function Dropdown({
               {card.serialNumber}
             </div>
             <div className="truncate font-mono text-xs text-muted-foreground">
-              {card.account ?? labels.noAccount}
+              {card.number != null ? `#${card.number}` : labels.noNumber}
             </div>
           </div>
         </button>

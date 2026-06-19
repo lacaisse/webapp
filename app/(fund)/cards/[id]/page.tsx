@@ -2,10 +2,11 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Coins } from "lucide-react";
+import { ArrowLeft, Coins, Download } from "lucide-react";
 import { getFormatter, getTranslations } from "next-intl/server";
 
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -219,6 +220,17 @@ export default async function CardDetailPage({
                       )}
                     </span>
                   )}
+                </DtDd>
+              )}
+              {card.memberId && (
+                <DtDd label={t("onboardingLetter.rowLabel")}>
+                  <a
+                    href={`/api/cards/${card.id}/onboarding-letter`}
+                    className={buttonVariants({ variant: "outline", size: "sm" })}
+                  >
+                    <Download className="size-3.5" />
+                    {t("onboardingLetter.download")}
+                  </a>
                 </DtDd>
               )}
               <DtDd label={t("info.account")}>

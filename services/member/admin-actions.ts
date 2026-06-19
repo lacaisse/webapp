@@ -5,6 +5,7 @@ import { getTranslations } from "next-intl/server";
 import { revalidatePath } from "next/cache";
 
 import { requireFundRole } from "@/services/auth/dal";
+import { dispatchCardAssignedEmail } from "@/services/card/notify";
 import { getCitizenPayClient } from "@/services/citizenpay/client";
 import { prisma } from "@/services/db/prisma";
 import { nextCardNumber } from "@/services/card/numbering";
@@ -33,6 +34,10 @@ export async function activateMemberAction(input: {
   memberId: string;
   cardId: string;
   note?: string;
+  // Also send the CARD_ASSIGNED ("your card is on its way") email. Defaults to
+  // true; the assign dialog surfaces it as a checkbox. Still gated by the
+  // fund-wide member-email pause.
+  sendCardEmail?: boolean;
 }): Promise<ActivateMemberResult> {
   const t = await getTranslations();
   const { fund, user } = await requireFundRole("ADMIN");
@@ -48,24 +53,38 @@ export async function activateMemberAction(input: {
       email: true,
       firstName: true,
       lastName: true,
+      address: true,
+      postalCode: true,
+      city: true,
       status: true,
       paymentReference: true,
       primaryCardId: true,
     },
   });
   if (!member) return { error: t("members.admin.errors.notFound" as never) };
-  if (member.status === "ACTIVE") {
-    return { error: t("members.admin.errors.alreadyActive" as never) };
-  }
   if (member.primaryCardId) {
     return { error: t("members.admin.errors.alreadyHasPrimaryCard" as never) };
   }
+  // Assigning a primary card is the activation step for a NEW member, and the
+  // catch-up step for an ACTIVE member who has none yet (e.g. imported ACTIVE
+  // with no matching serial). Other statuses must be moved to active first.
+  if (member.status !== "NEW" && member.status !== "ACTIVE") {
+    return { error: t("members.admin.errors.notAssignable" as never) };
+  }
+  // True activation (status flip + welcome email) only when coming from NEW.
+  const isActivation = member.status === "NEW";
 
   // Pick must be a fund-scoped, unattached card. Anything else (foreign
   // fund, already-linked) means the operator's picker is stale.
   const card = await prisma.card.findFirst({
     where: { id: input.cardId, fundId: fund.id },
-    select: { id: true, serialNumber: true, account: true, memberId: true },
+    select: {
+      id: true,
+      serialNumber: true,
+      number: true,
+      account: true,
+      memberId: true,
+    },
   });
   if (!card) {
     return { error: t("members.admin.errors.cardNotFound" as never) };
@@ -124,9 +143,10 @@ export async function activateMemberAction(input: {
       },
     });
 
-    // 3. Queue + return the welcome (activation) email — unless member
-    // emails are paused (fund settings): skipped, not queued.
-    const emailRow = fund.confirmationEmailsPausedAt
+    // 3. Queue + return the welcome (activation) email — only on a real
+    // activation (NEW → ACTIVE), and unless member emails are paused (fund
+    // settings): skipped, not queued.
+    const emailRow = !isActivation || fund.confirmationEmailsPausedAt
       ? null
       : await tx.email.create({
           data: {
@@ -221,6 +241,36 @@ export async function activateMemberAction(input: {
       cardSerial: tx.cardSerial,
       paymentReference: member.paymentReference ?? "",
     });
+  }
+
+  // Card-assigned ("your card is on its way") email — opt-in from the assign
+  // dialog, default on. Same member-email pause gate as the welcome email; a
+  // send failure never fails the activation (dispatch swallows send errors and
+  // we swallow the rare DB error).
+  const sendCardEmail =
+    (input.sendCardEmail ?? true) && !fund.confirmationEmailsPausedAt;
+  if (sendCardEmail) {
+    try {
+      await dispatchCardAssignedEmail({
+        fund,
+        card: {
+          id: card.id,
+          serialNumber: card.serialNumber,
+          number: card.number,
+          memberId: member.id,
+          member: {
+            email: member.email,
+            firstName: member.firstName,
+            lastName: member.lastName,
+            address: member.address,
+            postalCode: member.postalCode,
+            city: member.city,
+          },
+        },
+      });
+    } catch (e) {
+      console.error("[activate] card-assigned email dispatch failed", card.id, e);
+    }
   }
 
   revalidatePath("/members");

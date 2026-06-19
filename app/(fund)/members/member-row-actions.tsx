@@ -6,6 +6,7 @@ import { useState, useTransition } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -29,15 +30,21 @@ export function MemberRowActions({
   memberId,
   memberName,
   emailVerified,
+  // The member is already ACTIVE but has no primary card (e.g. imported active
+  // with no matching serial). Same flow, but we're assigning a card rather than
+  // activating — the wording and the welcome email change accordingly.
+  alreadyActive = false,
 }: {
   memberId: string;
   memberName: string;
   emailVerified: boolean;
+  alreadyActive?: boolean;
 }) {
   const t = useTranslations("members.admin.activate");
   const [open, setOpen] = useState(false);
   const [cardId, setCardId] = useState<string | null>(null);
   const [note, setNote] = useState("");
+  const [sendCardEmail, setSendCardEmail] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -48,7 +55,7 @@ export function MemberRowActions({
     searching: t("cardSearching"),
     empty: t("cardEmpty"),
     emptyInitial: t("cardEmptyInitial"),
-    noAccount: t("cardNoAccount"),
+    noNumber: t("cardNoNumber"),
     clear: t("cardClear"),
   };
 
@@ -63,6 +70,7 @@ export function MemberRowActions({
         memberId,
         cardId,
         note,
+        sendCardEmail,
       });
       if ("error" in result) {
         setError(result.error);
@@ -71,22 +79,46 @@ export function MemberRowActions({
       setOpen(false);
       setCardId(null);
       setNote("");
+      setSendCardEmail(true);
     });
   };
 
+  // Assigning to an already-active member is the same flow with card-centric
+  // wording (no "becomes active", no welcome email).
+  const labels = alreadyActive
+    ? {
+        button: t("assignButton"),
+        title: t("assignTitle"),
+        description: t("assignDescription", { memberName }),
+        confirm: t("assignConfirm"),
+        pending: t("assigning"),
+      }
+    : {
+        button: t("button"),
+        title: t("title"),
+        description: t("description", { memberName }),
+        confirm: t("confirm"),
+        pending: t("activating"),
+      };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="default" size="sm" />}>
-        {t("button")}
+      <DialogTrigger
+        render={
+          <Button
+            variant={alreadyActive ? "outline" : "default"}
+            size="sm"
+          />
+        }
+      >
+        {labels.button}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{t("title")}</DialogTitle>
-          <DialogDescription>
-            {t("description", { memberName })}
-          </DialogDescription>
+          <DialogTitle>{labels.title}</DialogTitle>
+          <DialogDescription>{labels.description}</DialogDescription>
         </DialogHeader>
-        {!emailVerified && (
+        {!emailVerified && !alreadyActive && (
           <Alert variant="warning">
             <AlertDescription>{t("unverifiedWarning")}</AlertDescription>
           </Alert>
@@ -109,6 +141,20 @@ export function MemberRowActions({
             className="w-full rounded-md bg-background px-2.5 py-1.5 text-sm ring-1 ring-foreground/15 outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
         </div>
+        <div className="flex items-start gap-2 pt-1">
+          <Checkbox
+            id={`activate-card-email-${memberId}`}
+            checked={sendCardEmail}
+            onCheckedChange={(value) => setSendCardEmail(value)}
+            className="mt-0.5"
+          />
+          <Label
+            htmlFor={`activate-card-email-${memberId}`}
+            className="text-sm font-normal text-muted-foreground"
+          >
+            {t("sendCardEmailLabel")}
+          </Label>
+        </div>
         {error && (
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
@@ -123,7 +169,7 @@ export function MemberRowActions({
             {t("cancel")}
           </Button>
           <Button onClick={onActivate} disabled={pending}>
-            {pending ? t("activating") : t("confirm")}
+            {pending ? labels.pending : labels.confirm}
           </Button>
         </DialogFooter>
       </DialogContent>

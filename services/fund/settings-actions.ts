@@ -93,6 +93,14 @@ export async function updateMemberSenderEmailAction(
 
 const GeneralSchema = z.object({
   name: z.string().min(2, { error: "settings.errors.nameMin" }),
+  // Optional full / legal name. Blank is stored as null (falls back to `name`).
+  // Transformed here rather than via normaliseBlanks so the required `name`
+  // field keeps its own validation message.
+  fullName: z
+    .string()
+    .max(200, { error: "settings.errors.nameTooLong" })
+    .nullish()
+    .transform((v) => (v && v.trim() ? v.trim() : null)),
   defaultLocale: z
     .string()
     .refine((v) => isSupportedLocale(v), {
@@ -121,6 +129,12 @@ const BrandingSchema = z.object({
   primaryColor: z
     .string()
     .regex(/^#?[0-9a-fA-F]{6}$/, { error: "settings.errors.colorInvalid" })
+    .or(z.literal(""))
+    .nullable()
+    .optional(),
+  websiteUrl: z
+    .string()
+    .url({ error: "settings.errors.urlInvalid" })
     .or(z.literal(""))
     .nullable()
     .optional(),

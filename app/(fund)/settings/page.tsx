@@ -17,6 +17,7 @@ import {
 } from "./onboarding-fields";
 import { OnboardingSettings } from "./onboarding-settings";
 import { EmailsTab } from "./emails-tab";
+import { DocumentsTab } from "./documents-tab";
 import { CitizenPayConnect } from "./citizenpay-connect";
 import { TokenInfo } from "./token-info";
 import {
@@ -32,6 +33,7 @@ const TABS = [
   { value: "general" },
   { value: "branding" },
   { value: "emails" },
+  { value: "documents" },
   { value: "token" },
   { value: "onboarding" },
   { value: "terms" },
@@ -52,12 +54,14 @@ export default async function SettingsPage({
   // Serialize Decimal → string so we can pass into a client component.
   const fundForForms = {
     name: fund.name,
+    fullName: fund.fullName,
     defaultLocale: fund.defaultLocale,
     timezone: fund.timezone,
     allocationMode: fund.allocationMode,
     allocationCutoffDay: fund.allocationCutoffDay,
     logoUrl: fund.logoUrl,
     primaryColor: fund.primaryColor,
+    websiteUrl: fund.websiteUrl,
     termsUrl: fund.termsUrl,
     privacyUrl: fund.privacyUrl,
     citizenPayFundId: fund.citizenPayFundId,
@@ -103,6 +107,12 @@ export default async function SettingsPage({
             senderEmail: fund.senderEmail,
           }}
           initialPaused={fund.confirmationEmailsPausedAt !== null}
+        />
+      )}
+
+      {active === "documents" && (
+        <DocumentsTab
+          fund={{ id: fund.id, defaultLocale: fund.defaultLocale }}
         />
       )}
 

@@ -557,6 +557,10 @@
         "source": {
           "none": "Aucune source",
           "hint": "Si le solde de cette carte est insuffisant lors d'un paiement, le montant manquant est prélevé sur la carte source."
+        },
+        "onboardingLetter": {
+          "rowLabel": "Courrier d'accueil",
+          "download": "Télécharger le PDF"
         }
       },
       "number": {
@@ -1325,13 +1329,16 @@
         "terms": "Conditions",
         "citizenpay": "Citizen Pay",
         "fees": "Frais",
-        "emails": "E-mails"
+        "emails": "E-mails",
+        "documents": "Documents"
       },
       "general": {
         "title": "Général",
         "description": "Informations de base sur la caisse.",
         "name": "Nom",
         "nameHint": "Nom public affiché aux membres et aux commerces.",
+        "fullName": "Nom complet",
+        "fullNameHint": "Le nom complet ou légal de la caisse (par ex. « Caisse Locale d'Alimentation Solidaire de Schaerbeek »). Utilisé dans les documents des membres. Laissez vide pour utiliser le nom ci-dessus.",
         "language": "Langue par défaut",
         "languageHint": "Utilisée si le visiteur n'a pas de langue définie.",
         "timezone": "Fuseau horaire",
@@ -1350,7 +1357,9 @@
         "logo": "URL du logo",
         "logoHint": "URL publique d'une image hébergée — affichée dans la barre latérale et les emails. Laissez vide pour utiliser le défaut de la plateforme.",
         "primaryColor": "Couleur primaire",
-        "primaryColorHint": "Hex à 6 chiffres. Utilisée pour les boutons et accents."
+        "primaryColorHint": "Hex à 6 chiffres. Utilisée pour les boutons et accents.",
+        "website": "URL du site web",
+        "websiteHint": "URL publique du site web de la caisse — affichée dans les documents des membres (par ex. le courrier d'accueil). Laissez vide pour l'omettre."
       },
       "token": {
         "title": "Jeton",
@@ -1556,6 +1565,36 @@
             "sendFailed": "Impossible d'envoyer l'e-mail de test. Vérifiez l'adresse d'expéditeur et réessayez."
           }
         }
+      },
+      "documentTemplates": {
+        "onboardingLetterTitle": "Courrier d'accueil de la carte",
+        "onboardingLetterDescription": "Le courrier de bienvenue imprimé et envoyé avec la carte d'un membre. Téléchargez-le en PDF depuis la page de détail de la carte. Laissez-le tel quel pour conserver le texte par défaut, ou personnalisez-le pour cette caisse.",
+        "bodyLabel": "Corps du courrier",
+        "bodyHint": "Rédigez le courrier en markdown simple — `#`/`##` pour les titres, `**gras**`, `*italique*`, `---` pour un séparateur, `[pagebreak]` seul sur une ligne pour commencer une nouvelle page, et une ligne vide entre les paragraphes.",
+        "variablesHint": "Vous pouvez utiliser ces variables — elles sont remplacées par les informations du membre lors de la génération du courrier :",
+        "previewLabel": "Aperçu",
+        "previewHint": "Aperçu en direct avec des données d'exemple. Le courrier réel utilise les informations du membre.",
+        "usingDefault": "Modèle par défaut utilisé.",
+        "usingOverride": "Modèle personnalisé utilisé pour cette caisse.",
+        "reset": "Réinitialiser",
+        "resetConfirmTitle": "Réinitialiser au courrier par défaut ?",
+        "resetConfirmDescription": "Cela supprime votre texte personnalisé et restaure le courrier d'accueil par défaut. Action irréversible.",
+        "resetConfirmCancel": "Annuler",
+        "resetConfirmConfirm": "Réinitialiser",
+        "variables": {
+          "fund_name": "Le nom de la caisse",
+          "full_name": "Le nom complet / légal de la caisse",
+          "website": "L'URL du site web de la caisse",
+          "first_name": "Le prénom du membre",
+          "last_name": "Le nom du membre",
+          "card_number": "Le numéro de carte du membre",
+          "payment_reference": "La référence de paiement du membre"
+        },
+        "errors": {
+          "bodyRequired": "Saisissez le corps du courrier.",
+          "bodyTooLong": "Le corps du courrier est trop long.",
+          "unknownVariable": "Variable inconnue « {name} ». Supprimez-la ou utilisez l'une des variables listées."
+        }
       }
     }
   },
@@ -1604,7 +1643,8 @@
       "urlInvalid": "Saisissez une URL valide (doit commencer par http:// ou https://).",
       "feeInvalid": "Le taux doit être un nombre avec jusqu'à 2 décimales.",
       "feeTooHigh": "Le taux ne peut pas dépasser 100 %.",
-      "cutoffDayInvalid": "Le jour de clôture doit être un entier entre 1 et 31."
+      "cutoffDayInvalid": "Le jour de clôture doit être un entier entre 1 et 31.",
+      "nameTooLong": "Le nom est trop long."
     }
   },
   "team": {
@@ -1734,19 +1774,25 @@
         "description": "Attribuez une carte à {memberName}. Son compte devient actif immédiatement.",
         "unverifiedWarning": "Ce membre n'a pas encore vérifié son email. L'email d'activation pourrait revenir.",
         "cardLabel": "Carte",
-        "cardPlaceholder": "Recherchez une carte par numéro de série…",
+        "cardPlaceholder": "Recherchez par numéro de série ou de carte…",
         "cardHint": "Choisissez une carte déjà importée depuis CitizenPay. Si elle n'apparaît pas, synchronisez d'abord la liste des cartes.",
         "cardSearching": "Recherche…",
         "cardEmpty": "Aucune carte non attribuée ne correspond à ce numéro.",
         "cardEmptyInitial": "Aucune carte non attribuée. Synchronisez depuis la page des cartes.",
-        "cardNoAccount": "Pas encore de compte on-chain",
+        "cardNoNumber": "Pas encore de numéro de carte",
         "cardClear": "Retirer la carte",
         "cardRequired": "Choisissez une carte à activer.",
         "noteLabel": "Note (optionnel, interne)",
         "notePlaceholder": "Notes internes sur cette activation.",
+        "sendCardEmailLabel": "Envoyer l'email « votre carte est en route » au membre",
         "cancel": "Annuler",
         "confirm": "Activer et attribuer la carte",
-        "activating": "Activation…"
+        "activating": "Activation…",
+        "assignButton": "Attribuer une carte",
+        "assignTitle": "Attribuer une carte",
+        "assignDescription": "Associez une carte à {memberName}.",
+        "assignConfirm": "Attribuer la carte",
+        "assigning": "Attribution…"
       },
       "invite": {
         "title": "Ajouter un membre",
@@ -1808,6 +1854,7 @@
         "notFound": "Membre introuvable.",
         "alreadyActive": "Ce membre est déjà actif.",
         "alreadyHasPrimaryCard": "Ce membre a déjà une carte principale.",
+        "notAssignable": "Seuls les membres nouveaux ou actifs peuvent recevoir une carte.",
         "notActiveForCard": "Seuls les membres actifs peuvent recevoir des cartes supplémentaires.",
         "noPrimaryCard": "Activez d'abord le membre — il a besoin d'une carte principale avant de pouvoir en lier d'autres.",
         "serialRequired": "Le numéro de série de la carte est requis.",

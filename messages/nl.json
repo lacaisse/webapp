@@ -409,6 +409,10 @@
           "error": "Kon on-chain transfers niet laden.",
           "trigger": "Trigger",
           "note": "Notitie"
+        },
+        "onboardingLetter": {
+          "rowLabel": "Onboardingbrief",
+          "download": "Pdf downloaden"
         }
       },
       "number": {
@@ -1083,13 +1087,16 @@
         "onboarding": "Onboarding",
         "terms": "Voorwaarden",
         "citizenpay": "Citizen Pay",
-        "fees": "Kosten"
+        "fees": "Kosten",
+        "documents": "Documenten"
       },
       "general": {
         "title": "Algemeen",
         "description": "Basisinformatie over het fonds.",
         "name": "Naam",
         "nameHint": "Publieke naam getoond aan leden en handelaars.",
+        "fullName": "Volledige naam",
+        "fullNameHint": "De volledige of wettelijke naam van het fonds (bijv. \"Caisse Locale d'Alimentation Solidaire de Schaerbeek\"). Gebruikt in documenten voor leden. Laat leeg om de naam hierboven te gebruiken.",
         "language": "Standaardtaal",
         "languageHint": "Gebruikt wanneer een bezoeker geen taal heeft ingesteld.",
         "timezone": "Tijdzone",
@@ -1108,7 +1115,9 @@
         "logo": "Logo-URL",
         "logoHint": "Publieke URL van een gehoste afbeelding — getoond in de zijbalk en in e-mails. Leeg laten om de platformstandaard te gebruiken.",
         "primaryColor": "Primaire kleur",
-        "primaryColorHint": "Hex met 6 tekens. Gebruikt voor knoppen en accenten."
+        "primaryColorHint": "Hex met 6 tekens. Gebruikt voor knoppen en accenten.",
+        "website": "Website-URL",
+        "websiteHint": "Publieke URL van de website van het fonds — getoond in documenten voor leden (bijv. de onboardingbrief). Laat leeg om hem weg te laten."
       },
       "token": {
         "title": "Token",
@@ -1244,6 +1253,36 @@
         "rateHint": "Percentage dat op elke betaling wordt ingehouden (bijv. 2,5 voor 2,5%). Laat leeg om het standaardtarief van Citizen Pay te gebruiken.",
         "syncPending": "Lokaal opgeslagen, maar nog niet bevestigd door Citizen Pay. Sla opnieuw op om de synchronisatie te herhalen.",
         "syncFailed": "Tarief opgeslagen, maar de synchronisatie met Citizen Pay is mislukt. Sla opnieuw op om opnieuw te proberen."
+      },
+      "documentTemplates": {
+        "onboardingLetterTitle": "Onboardingbrief voor de kaart",
+        "onboardingLetterDescription": "De welkomstbrief die met de kaart van een lid wordt afgedrukt en verstuurd. Download hem als pdf op de detailpagina van de kaart. Laat hem ongewijzigd voor de standaardtekst, of pas hem aan voor dit fonds.",
+        "bodyLabel": "Brieftekst",
+        "bodyHint": "Schrijf de brief in eenvoudige markdown — `#`/`##` voor koppen, `**vet**`, `*cursief*`, `---` voor een scheidingslijn, `[pagebreak]` op een eigen regel om een nieuwe pagina te beginnen, en een lege regel tussen alinea's.",
+        "variablesHint": "Je kunt deze plaatshouders gebruiken — ze worden vervangen door de gegevens van het lid bij het genereren van de brief:",
+        "previewLabel": "Voorbeeld",
+        "previewHint": "Live voorbeeld met voorbeeldgegevens. De echte brief gebruikt de gegevens van het lid.",
+        "usingDefault": "Standaardbrief in gebruik.",
+        "usingOverride": "Aangepaste brief voor dit fonds in gebruik.",
+        "reset": "Terugzetten naar standaard",
+        "resetConfirmTitle": "Terugzetten naar standaardbrief?",
+        "resetConfirmDescription": "Dit verwijdert je aangepaste tekst en herstelt de standaard onboardingbrief. Dit kan niet ongedaan worden gemaakt.",
+        "resetConfirmCancel": "Annuleren",
+        "resetConfirmConfirm": "Terugzetten",
+        "variables": {
+          "fund_name": "De naam van dit fonds",
+          "full_name": "De volledige / wettelijke naam van het fonds",
+          "website": "De website-URL van het fonds",
+          "first_name": "De voornaam van het lid",
+          "last_name": "De achternaam van het lid",
+          "card_number": "Het kaartnummer van het lid",
+          "payment_reference": "De betalingsreferentie van het lid"
+        },
+        "errors": {
+          "bodyRequired": "Voer de brieftekst in.",
+          "bodyTooLong": "De brieftekst is te lang.",
+          "unknownVariable": "Onbekende plaatshouder \"{name}\". Verwijder hem of gebruik een van de vermelde variabelen."
+        }
       }
     },
     "annotations": {
@@ -1403,7 +1442,8 @@
       "urlInvalid": "Voer een geldige URL in (moet beginnen met http:// of https://).",
       "feeInvalid": "Kostentarief moet een getal met maximaal 2 decimalen zijn.",
       "feeTooHigh": "Kostentarief mag niet hoger zijn dan 100%.",
-      "cutoffDayInvalid": "Afkapdag moet een geheel getal tussen 1 en 31 zijn."
+      "cutoffDayInvalid": "Afkapdag moet een geheel getal tussen 1 en 31 zijn.",
+      "nameTooLong": "De naam is te lang."
     }
   },
   "team": {
@@ -1533,19 +1573,25 @@
         "description": "Geef een kaart uit aan {memberName}. Hun account wordt onmiddellijk actief.",
         "unverifiedWarning": "Dit lid heeft de e-mail nog niet geverifieerd. De activatiemail kan retour komen.",
         "cardLabel": "Kaart",
-        "cardPlaceholder": "Zoek een kaart op serienummer…",
+        "cardPlaceholder": "Zoek op serienummer of kaartnummer…",
         "cardHint": "Kies een kaart die al vanuit CitizenPay is geïmporteerd. Synchroniseer de kaartenlijst als de kaart ontbreekt.",
         "cardSearching": "Zoeken…",
         "cardEmpty": "Geen niet-gekoppelde kaart komt overeen met dit serienummer.",
         "cardEmptyInitial": "Geen niet-gekoppelde kaarten beschikbaar. Synchroniseer vanaf de kaartenpagina.",
-        "cardNoAccount": "Nog geen on-chain account",
+        "cardNoNumber": "Nog geen kaartnummer",
         "cardClear": "Kaart verwijderen",
         "cardRequired": "Kies een kaart om te activeren.",
         "noteLabel": "Notitie (optioneel, intern)",
         "notePlaceholder": "Interne notitie over deze activering.",
+        "sendCardEmailLabel": "Stuur de e-mail 'je kaart is onderweg' naar het lid",
         "cancel": "Annuleren",
         "confirm": "Activeren en kaart uitgeven",
-        "activating": "Activeren…"
+        "activating": "Activeren…",
+        "assignButton": "Kaart toewijzen",
+        "assignTitle": "Een kaart toewijzen",
+        "assignDescription": "Koppel een kaart aan {memberName}.",
+        "assignConfirm": "Kaart toewijzen",
+        "assigning": "Toewijzen…"
       },
       "invite": {
         "title": "Lid uitnodigen",
@@ -1591,6 +1637,7 @@
         "notFound": "Lid niet gevonden.",
         "alreadyActive": "Dit lid is al actief.",
         "alreadyHasPrimaryCard": "Dit lid heeft al een primaire kaart.",
+        "notAssignable": "Alleen nieuwe of actieve leden kunnen een kaart krijgen.",
         "notActiveForCard": "Alleen actieve leden kunnen extra kaarten krijgen.",
         "noPrimaryCard": "Activeer eerst het lid — het heeft een primaire kaart nodig voordat er extra kaarten kunnen worden gekoppeld.",
         "serialRequired": "Serienummer van de kaart is verplicht.",

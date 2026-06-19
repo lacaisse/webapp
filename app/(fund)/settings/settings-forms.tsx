@@ -183,12 +183,14 @@ function FieldRow<T extends Record<string, string>>({
 
 type Fund = {
   name: string;
+  fullName: string | null;
   defaultLocale: string;
   timezone: string;
   allocationMode: "FIXED_PERIOD" | "PAY_AND_GO" | "DISABLED";
   allocationCutoffDay: number;
   logoUrl: string | null;
   primaryColor: string | null;
+  websiteUrl: string | null;
   termsUrl: string | null;
   privacyUrl: string | null;
   citizenPayFundId: string | null;
@@ -208,6 +210,7 @@ export function GeneralForm({ fund }: { fund: Fund }) {
       savingLabel={tRoot("saving")}
       initial={{
         name: fund.name,
+        fullName: fund.fullName ?? "",
         defaultLocale: fund.defaultLocale,
         timezone: fund.timezone,
         allocationMode: fund.allocationMode,
@@ -216,6 +219,7 @@ export function GeneralForm({ fund }: { fund: Fund }) {
       action={async (v) =>
         updateGeneralSettingsAction({
           name: v.name,
+          fullName: v.fullName,
           // The SettingsForm state holds plain `string`, but the action's
           // schema narrows these (locale via a type-guard refine, allocation
           // mode via a Zod enum, cutoff day via z.coerce.number), so cast /
@@ -231,6 +235,7 @@ export function GeneralForm({ fund }: { fund: Fund }) {
       }
       fields={[
         { key: "name", label: t("name"), hint: t("nameHint") },
+        { key: "fullName", label: t("fullName"), hint: t("fullNameHint") },
         {
           key: "defaultLocale",
           label: t("language"),
@@ -278,11 +283,13 @@ export function BrandingForm({ fund }: { fund: Fund }) {
       initial={{
         logoUrl: fund.logoUrl ?? "",
         primaryColor: fund.primaryColor ?? "",
+        websiteUrl: fund.websiteUrl ?? "",
       }}
       action={async (v) =>
         updateBrandingSettingsAction({
           logoUrl: v.logoUrl,
           primaryColor: v.primaryColor,
+          websiteUrl: v.websiteUrl,
         })
       }
       fields={[
@@ -292,6 +299,12 @@ export function BrandingForm({ fund }: { fund: Fund }) {
           label: t("primaryColor"),
           hint: t("primaryColorHint"),
           type: "color",
+        },
+        {
+          key: "websiteUrl",
+          label: t("website"),
+          hint: t("websiteHint"),
+          type: "url",
         },
       ]}
     />

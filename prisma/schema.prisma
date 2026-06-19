@@ -165,12 +165,14 @@ model Passkey {
 
 model Fund {
   id     String @id @default(cuid())
-  domain String @unique // full hostname: "acme.lacaisse.eu" or "funds.acme.com"
-  name   String
+  domain   String  @unique // full hostname: "acme.lacaisse.eu" or "funds.acme.com"
+  name     String
+  fullName String? // full / legal name, e.g. "Caisse Locale d'Alimentation Solidaire de Schaerbeek" for "La CLASS"; falls back to `name`
 
   // Branding (per the multi-tenant spec, 4.2)
   logoUrl      String?
   primaryColor String? // hex e.g. "#1a73e8"
+  websiteUrl   String? // the fund's public website, surfaced in member-facing docs (e.g. the onboarding letter)
 
   // Token identity. PSD2's €1M cap is regulatory, not stored per-fund.
   // Bank-sync minting must assert these are set before running.
@@ -309,6 +311,7 @@ model Fund {
   referrals          Referral[] // referral programme records (5.3.4)
   emails             Email[] // transactional email outbox/log
   emailTemplates     EmailTemplate[] // per-fund overrides of the default email wording
+  documentTemplates  DocumentTemplate[] // per-fund overrides of printable document wording (PDF letters)
 
   citizenPayConnectAttempts CitizenPayConnectAttempt[] // in-flight CP connect handoffs
   addressProfiles           AddressProfileCache[] // CP profile cache (token explorer / transfers)
@@ -1444,6 +1447,29 @@ model EmailTemplate {
   updatedAt DateTime @updatedAt
 
   @@unique([fundId, type])
+}
+
+// Per-fund override of a printable document's wording (e.g. the card
+// onboarding letter rendered to PDF). One row per (fund, type); absence = use
+// the built-in default. Type-generic so more documents can be made editable
+// without DDL. The body is markdown-ish text with {{token}} placeholders;
+// services/document/pdf.tsx renders it to PDF via @react-pdf/renderer.
+model DocumentTemplate {
+  id     String @id @default(cuid())
+  fundId String
+  fund   Fund   @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  type DocumentType
+  body String // markdown-ish body with {{token}} placeholders
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([fundId, type])
+}
+
+enum DocumentType {
+  CARD_ONBOARDING_LETTER
 }
 
 enum EmailType {
