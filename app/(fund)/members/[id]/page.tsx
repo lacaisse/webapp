@@ -113,13 +113,15 @@ export default async function MemberDetailPage({
               notes: member.notes,
             }}
           />
-          {member.status === "NEW" && !member.primaryCardId && (
-            <MemberRowActions
-              memberId={member.id}
-              memberName={fullName}
-              emailVerified={emailVerified}
-            />
-          )}
+          {!member.primaryCardId &&
+            (member.status === "NEW" || member.status === "ACTIVE") && (
+              <MemberRowActions
+                memberId={member.id}
+                memberName={fullName}
+                emailVerified={emailVerified}
+                alreadyActive={member.status === "ACTIVE"}
+              />
+            )}
           {member.status === "ACTIVE" && member.primaryCard?.account && (
             <MintDialog memberId={member.id} memberName={fullName} />
           )}

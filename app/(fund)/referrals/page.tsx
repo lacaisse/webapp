@@ -61,12 +61,14 @@ export default async function ReferralsPage() {
           <ReferralForm
             fund={{
               name: fund.name,
+              fullName: fund.fullName,
               defaultLocale: fund.defaultLocale,
               timezone: fund.timezone,
               allocationMode: fund.allocationMode,
               allocationCutoffDay: fund.allocationCutoffDay,
               logoUrl: fund.logoUrl,
               primaryColor: fund.primaryColor,
+              websiteUrl: fund.websiteUrl,
               termsUrl: fund.termsUrl,
               privacyUrl: fund.privacyUrl,
               citizenPayFundId: fund.citizenPayFundId,

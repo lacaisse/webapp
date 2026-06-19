@@ -557,6 +557,10 @@
         "source": {
           "none": "No source",
           "hint": "When this card can't cover a charge, the missing amount is pulled from the source card."
+        },
+        "onboardingLetter": {
+          "rowLabel": "Onboarding letter",
+          "download": "Download PDF"
         }
       },
       "number": {
@@ -1325,13 +1329,16 @@
         "terms": "Terms",
         "citizenpay": "Citizen Pay",
         "fees": "Fees",
-        "emails": "Emails"
+        "emails": "Emails",
+        "documents": "Documents"
       },
       "general": {
         "title": "General",
         "description": "Basic information about your fund.",
         "name": "Name",
         "nameHint": "Public name displayed to members and merchants.",
+        "fullName": "Full name",
+        "fullNameHint": "The fund's full or legal name (e.g. \"Caisse Locale d'Alimentation Solidaire de Schaerbeek\"). Used in member documents. Leave blank to use the name above.",
         "language": "Default language",
         "languageHint": "Used when a visitor has no locale set.",
         "timezone": "Timezone",
@@ -1350,7 +1357,9 @@
         "logo": "Logo URL",
         "logoHint": "Public URL of a hosted image — shown in the sidebar and on emails. Leave blank to use the platform default.",
         "primaryColor": "Primary colour",
-        "primaryColorHint": "6-digit hex. Drives buttons and accents."
+        "primaryColorHint": "6-digit hex. Drives buttons and accents.",
+        "website": "Website URL",
+        "websiteHint": "Public URL of the fund's website — shown in member documents (e.g. the onboarding letter). Leave blank to omit it."
       },
       "token": {
         "title": "Token",
@@ -1556,6 +1565,36 @@
             "sendFailed": "The test email could not be sent. Check the sender address and try again."
           }
         }
+      },
+      "documentTemplates": {
+        "onboardingLetterTitle": "Card onboarding letter",
+        "onboardingLetterDescription": "The welcome letter printed and sent with a member's card. Download it as a PDF from the card's detail page. Leave it untouched to keep the default wording, or customise it for this fund.",
+        "bodyLabel": "Letter body",
+        "bodyHint": "Write the letter in simple markdown — `#`/`##` for headings, `**bold**`, `*italic*`, `---` for a divider, `[pagebreak]` on its own line to start a new page, and a blank line between paragraphs.",
+        "variablesHint": "You can use these placeholders — they're replaced with the member's details when the letter is generated:",
+        "previewLabel": "Preview",
+        "previewHint": "Live preview with sample data. The real letter uses the member's own details.",
+        "usingDefault": "Using the default letter.",
+        "usingOverride": "Using a custom letter for this fund.",
+        "reset": "Reset to default",
+        "resetConfirmTitle": "Reset to default letter?",
+        "resetConfirmDescription": "This removes your custom wording and restores the default onboarding letter. This can't be undone.",
+        "resetConfirmCancel": "Cancel",
+        "resetConfirmConfirm": "Reset",
+        "variables": {
+          "fund_name": "This fund's name",
+          "full_name": "The fund's full / legal name",
+          "website": "The fund's website URL",
+          "first_name": "The member's first name",
+          "last_name": "The member's last name",
+          "card_number": "The member's card number",
+          "payment_reference": "The member's payment reference"
+        },
+        "errors": {
+          "bodyRequired": "Enter the letter body.",
+          "bodyTooLong": "The letter body is too long.",
+          "unknownVariable": "Unknown placeholder \"{name}\". Remove it or use one of the listed variables."
+        }
       }
     }
   },
@@ -1604,7 +1643,8 @@
       "urlInvalid": "Enter a valid URL (must start with http:// or https://).",
       "feeInvalid": "Fee rate must be a number with up to 2 decimal places.",
       "feeTooHigh": "Fee rate can't exceed 100%.",
-      "cutoffDayInvalid": "Cutoff day must be a whole number between 1 and 31."
+      "cutoffDayInvalid": "Cutoff day must be a whole number between 1 and 31.",
+      "nameTooLong": "The name is too long."
     }
   },
   "team": {
@@ -1734,19 +1774,25 @@
         "description": "Issue a card to {memberName}. Their account becomes active immediately.",
         "unverifiedWarning": "This member hasn't verified their email yet. The activation email might bounce.",
         "cardLabel": "Card",
-        "cardPlaceholder": "Search a card by serial number…",
+        "cardPlaceholder": "Search by serial or card number…",
         "cardHint": "Pick a card already imported from CitizenPay. If you don't see it, sync the cards list first.",
         "cardSearching": "Searching…",
         "cardEmpty": "No unattached cards match this serial.",
         "cardEmptyInitial": "No unattached cards available. Sync from the cards page.",
-        "cardNoAccount": "No on-chain account yet",
+        "cardNoNumber": "No card number yet",
         "cardClear": "Clear card",
         "cardRequired": "Pick a card to activate.",
         "noteLabel": "Note (optional, internal)",
         "notePlaceholder": "Anything to record about this activation.",
+        "sendCardEmailLabel": "Send the \"your card is on its way\" email to the member",
         "cancel": "Cancel",
         "confirm": "Activate and issue card",
-        "activating": "Activating…"
+        "activating": "Activating…",
+        "assignButton": "Assign card",
+        "assignTitle": "Assign a card",
+        "assignDescription": "Link a card to {memberName}.",
+        "assignConfirm": "Assign card",
+        "assigning": "Assigning…"
       },
       "invite": {
         "title": "Add a member",
@@ -1808,6 +1854,7 @@
         "notFound": "Member not found.",
         "alreadyActive": "This member is already active.",
         "alreadyHasPrimaryCard": "This member already has a primary card.",
+        "notAssignable": "Only new or active members can be assigned a card.",
         "notActiveForCard": "Only active members can be issued additional cards.",
         "noPrimaryCard": "Activate the member first — they need a primary card before additional ones can be linked.",
         "serialRequired": "Card serial number is required.",

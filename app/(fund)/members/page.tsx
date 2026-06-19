@@ -163,13 +163,15 @@ export default async function MembersPage({
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="inline-flex items-center gap-1">
-                      {m.status === "NEW" && !m.primaryCardId && (
-                        <MemberRowActions
-                          memberId={m.id}
-                          memberName={fullName}
-                          emailVerified={m.emailVerifiedAt !== null}
-                        />
-                      )}
+                      {!m.primaryCardId &&
+                        (m.status === "NEW" || m.status === "ACTIVE") && (
+                          <MemberRowActions
+                            memberId={m.id}
+                            memberName={fullName}
+                            emailVerified={m.emailVerifiedAt !== null}
+                            alreadyActive={m.status === "ACTIVE"}
+                          />
+                        )}
                       {m.status === "ACTIVE" && m.primaryCardId && (
                         <AddCardDialog
                           memberId={m.id}

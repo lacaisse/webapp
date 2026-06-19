@@ -5,10 +5,9 @@ import { getTranslations } from "next-intl/server";
 import { revalidatePath } from "next/cache";
 
 import { requireFundRole } from "@/services/auth/dal";
-import { resolveTreasurySlug } from "@/services/citizenpay/treasury-slug";
 import { prisma } from "@/services/db/prisma";
-import { buildCardLink, formatMemberAddress } from "@/services/email/templates";
-import { sendCardAssigned } from "@/services/email/transactional";
+
+import { dispatchCardAssignedEmail } from "./notify";
 
 // Manual "your card is on its way" notification, driven from the card detail
 // page. There's no automatic trigger — an admin sends it by hand once the card
@@ -55,79 +54,23 @@ export async function notifyCardAssignedAction(input: {
     return { error: t("cards.admin.notify.errors.noEmail" as never) };
   }
 
-  const idempotencyKey = `CARD_ASSIGNED:card:${card.id}:member:${card.memberId}`;
-
-  let emailId: string;
+  let status: "SENT" | "FAILED";
   try {
-    const row = await prisma.email.create({
-      data: {
-        fundId: fund.id,
-        type: "CARD_ASSIGNED",
-        toEmail: card.member.email,
+    status = await dispatchCardAssignedEmail({
+      fund,
+      card: {
+        ...card,
         memberId: card.memberId,
-        cardId: card.id,
-        idempotencyKey,
-        subject: "Card",
+        member: { ...card.member, email: card.member.email },
       },
-      select: { id: true },
     });
-    emailId = row.id;
   } catch (e) {
-    if ((e as { code?: string }).code !== "P2002") {
-      console.error("[notify] failed to queue card-assigned email", card.id, e);
-      return { error: t("cards.admin.notify.errors.sendFailed" as never) };
-    }
-    // Row already exists for this (card, member) — reuse it and (re)send. Reset
-    // it to QUEUED so a prior SENT/FAILED row is sent afresh; dispatchTemplate
-    // stamps sentAt again on success.
-    const existing = await prisma.email.findUnique({
-      where: { idempotencyKey },
-      select: { id: true },
-    });
-    if (!existing) {
-      return { error: t("cards.admin.notify.errors.sendFailed" as never) };
-    }
-    await prisma.email.update({
-      where: { id: existing.id },
-      data: {
-        status: "QUEUED",
-        errorMessage: null,
-        failedAt: null,
-        sentAt: null,
-      },
-    });
-    emailId = existing.id;
+    console.error("[notify] failed to queue card-assigned email", card.id, e);
+    return { error: t("cards.admin.notify.errors.sendFailed" as never) };
   }
-
-  await sendCardAssigned({
-    emailId,
-    fundId: fund.id,
-    toEmail: card.member.email,
-    fund: {
-      name: fund.name,
-      primaryColor: fund.primaryColor,
-      logoUrl: fund.logoUrl,
-      senderEmail: fund.senderEmail,
-    },
-    firstName: card.member.firstName,
-    lastName: card.member.lastName,
-    address: formatMemberAddress(card.member),
-    cardLink: buildCardLink(
-      card.serialNumber,
-      await resolveTreasurySlug(fund),
-    ),
-    cardNumber: card.number != null ? String(card.number) : "",
-  });
-
-  // sendCardAssigned swallows errors and marks the row FAILED — read back the
-  // outcome so the admin gets accurate feedback.
-  const after = await prisma.email.findUnique({
-    where: { id: emailId },
-    select: { status: true },
-  });
 
   revalidatePath("/cards");
   revalidatePath(`/cards/${card.id}`);
-  if (after?.status === "SENT") return { ok: true };
+  if (status === "SENT") return { ok: true };
   return { error: t("cards.admin.notify.errors.sendFailed" as never) };
 }
