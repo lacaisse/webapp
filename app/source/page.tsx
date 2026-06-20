@@ -5,8 +5,6 @@ import { CodeXml } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 import { buttonVariants } from "@/components/ui/button";
 
-export const dynamic = "force-static";
-
 const REPO_URL = "https://github.com/lacaisse/webapp";
 
 function getCommitSha(): string | null {

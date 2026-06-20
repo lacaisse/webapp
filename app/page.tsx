@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
 import Image from "next/image";
 import Link from "next/link";
@@ -12,6 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { getCurrentUser } from "@/services/auth/dal";
 import { prisma } from "@/services/db/prisma";
 import { getApexUrl, getFundUrl } from "@/services/fund/server";
@@ -19,7 +21,36 @@ import { getHostType } from "@/services/host/server";
 import { LandingPage } from "./_landing/landing-page";
 import { PasskeySuggestion } from "./passkey-suggestion";
 
-export default async function HomePage({
+// The apex home does host-based redirects + a fund-picker query — all dynamic.
+// Keep the page component synchronous and stream the work behind <Suspense> so
+// the route paints an instant shell (Cache Components requirement).
+export default function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ welcome?: string }>;
+}) {
+  return (
+    <Suspense fallback={<HomeSkeleton />}>
+      <HomeContent searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+function HomeSkeleton() {
+  return (
+    <div className="flex flex-1 items-start justify-center bg-muted/40 px-4 py-12">
+      <div className="w-full max-w-2xl space-y-6">
+        <Skeleton className="h-9 w-56" />
+        <div className="grid gap-3">
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-20 w-full" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+async function HomeContent({
   searchParams,
 }: {
   searchParams: Promise<{ welcome?: string }>;

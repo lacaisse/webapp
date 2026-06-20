@@ -9,8 +9,6 @@ import { getHostType } from "@/services/host/server";
 // resolved Better Auth session. Use this to debug cross-subdomain session
 // propagation.
 
-export const dynamic = "force-dynamic";
-
 export default async function WhoamiPage() {
   if (process.env.NODE_ENV === "production") notFound();
 

@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { Suspense } from "react";
 import Link from "next/link";
 import { getFormatter, getTranslations } from "next-intl/server";
 
 import { TableSearch } from "@/components/table-search";
+import { TableSkeleton } from "@/components/table-skeleton";
 import { Badge, badgeVariants } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, resolveActiveTab } from "@/components/ui/tabs";
 import {
   Table,
@@ -90,7 +93,53 @@ function memberSearchWhere(q: string) {
   };
 }
 
-export default async function MembersPage({
+// Synchronous shell: the header (with its tier-aware import dialog) and the
+// searchable member table each stream behind their own <Suspense>; the table
+// boundary is keyed on tab+query so it re-shows the skeleton on filter changes.
+export default function MembersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string; q?: string }>;
+}) {
+  return (
+    <>
+      <Suspense fallback={<MembersHeaderSkeleton />}>
+        <MembersHeader />
+      </Suspense>
+      <Suspense fallback={<MembersToolbarSkeleton />}>
+        <MembersContent searchParams={searchParams} />
+      </Suspense>
+    </>
+  );
+}
+
+async function MembersHeader() {
+  const t = await getTranslations("fund.members");
+  const fund = await requireCurrentFund();
+  const tiers = await prisma.allocationTier.findMany({
+    where: { fundId: fund.id, archivedAt: null },
+    orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+    select: { name: true },
+  });
+
+  return (
+    <header className="flex items-end justify-between gap-4">
+      <div className="space-y-1">
+        <h1 className="font-heading text-2xl font-medium">{t("title")}</h1>
+        <p className="text-sm text-muted-foreground">{t("description")}</p>
+      </div>
+      <div className="flex items-center gap-2">
+        <MemberImportDialog
+          triggerLabel={t("import.button")}
+          tiers={tiers.map((tier) => tier.name)}
+        />
+        <InviteMemberDialog triggerLabel={t("invite")} />
+      </div>
+    </header>
+  );
+}
+
+async function MembersContent({
   searchParams,
 }: {
   searchParams: Promise<{ tab?: string; q?: string }>;
@@ -129,20 +178,6 @@ export default async function MembersPage({
 
   return (
     <>
-      <header className="flex items-end justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="font-heading text-2xl font-medium">{t("title")}</h1>
-          <p className="text-sm text-muted-foreground">{t("description")}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <MemberImportDialog
-            triggerLabel={t("import.button")}
-            tiers={tiers.map((tier) => tier.name)}
-          />
-          <InviteMemberDialog triggerLabel={t("invite")} />
-        </div>
-      </header>
-
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Tabs
           active={active}
@@ -286,4 +321,35 @@ function StatusBadge({ status, label }: { status: string; label: string }) {
           ? "destructive"
           : "default"; // INACTIVE, STOPPED
   return <Badge variant={variant}>{label}</Badge>;
+}
+
+function MembersHeaderSkeleton() {
+  return (
+    <header className="flex items-end justify-between gap-4">
+      <div className="space-y-1">
+        <Skeleton className="h-7 w-40" />
+        <Skeleton className="h-4 w-72" />
+      </div>
+      <div className="flex items-center gap-2">
+        <Skeleton className="h-9 w-28" />
+        <Skeleton className="h-9 w-28" />
+      </div>
+    </header>
+  );
+}
+
+function MembersToolbarSkeleton() {
+  return (
+    <>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex gap-2">
+          {Array.from({ length: 7 }).map((_, i) => (
+            <Skeleton key={i} className="h-8 w-16" />
+          ))}
+        </div>
+        <Skeleton className="h-9 w-48" />
+      </div>
+      <TableSkeleton columns={7} alignRight={1} />
+    </>
+  );
 }

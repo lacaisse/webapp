@@ -1,9 +1,12 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { getFormatter, getTranslations } from "next-intl/server";
 
+import { TableSkeleton } from "@/components/table-skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Card,
   CardContent,
@@ -30,7 +33,21 @@ import { MemberTierPicker } from "../tier-picker";
 import { EditProfileDialog } from "./edit-profile-dialog";
 import { MintDialog } from "./mint-dialog";
 
-export default async function MemberDetailPage({
+// Synchronous shell so the route paints its skeleton instantly; the member
+// (params-dependent, uncached) streams in behind <Suspense>.
+export default function MemberDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  return (
+    <Suspense fallback={<MemberDetailSkeleton />}>
+      <MemberDetail params={params} />
+    </Suspense>
+  );
+}
+
+async function MemberDetail({
   params,
 }: {
   params: Promise<{ id: string }>;
@@ -415,6 +432,36 @@ export default async function MemberDetailPage({
             )}
           </TableBody>
         </Table>
+      </section>
+    </>
+  );
+}
+
+function MemberDetailSkeleton() {
+  return (
+    <>
+      <div className="flex items-center justify-between gap-4">
+        <Skeleton className="h-4 w-24" />
+        <div className="inline-flex gap-2">
+          <Skeleton className="h-9 w-24" />
+          <Skeleton className="h-9 w-24" />
+        </div>
+      </div>
+      <header className="space-y-2">
+        <Skeleton className="h-7 w-56" />
+        <Skeleton className="h-4 w-72 max-w-full" />
+      </header>
+      <section className="grid gap-3 lg:grid-cols-2">
+        <Skeleton className="h-44 w-full" />
+        <Skeleton className="h-44 w-full" />
+      </section>
+      <section className="space-y-3">
+        <Skeleton className="h-6 w-32" />
+        <TableSkeleton columns={5} rows={3} alignRight={1} />
+      </section>
+      <section className="space-y-3">
+        <Skeleton className="h-6 w-40" />
+        <TableSkeleton columns={6} rows={3} alignRight={1} />
       </section>
     </>
   );

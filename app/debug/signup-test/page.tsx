@@ -14,8 +14,6 @@ import { auth } from "@/services/auth/better-auth";
 // Each load attempts a signup with the given email and a fixed password. Use
 // a fresh email each time to avoid the duplicate path.
 
-export const dynamic = "force-dynamic";
-
 export default async function SignupTestPage({
   searchParams,
 }: {
