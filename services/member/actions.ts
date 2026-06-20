@@ -138,6 +138,10 @@ export async function signupMemberAction(input: {
             lastName: parsed.data.lastName,
             status: "NEW",
             paymentReference,
+            emailUnsubscribed: parsed.data.remindersOptOut ?? false,
+            emailUnsubscribedAt: parsed.data.remindersOptOut
+              ? new Date()
+              : null,
             emailVerifiedAt: requireVerify ? null : new Date(),
             applicationData:
               Object.keys(filtered).length > 0 ? filtered : undefined,

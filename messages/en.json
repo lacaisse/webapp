@@ -1515,6 +1515,8 @@
         "allocationDescription": "The email members receive when an allocation lands on their card. Leave it untouched to keep the default wording, or customise it for this fund.",
         "cardAssignedTitle": "Card-on-its-way email",
         "cardAssignedDescription": "The email a member receives when their card is assigned and on its way. Leave it untouched to keep the default wording, or customise it for this fund.",
+        "paymentReminderTitle": "Contribution reminder email",
+        "paymentReminderDescription": "The monthly reminder sent on the 1st to members who haven't yet contributed for the period. Leave it untouched to keep the default wording, or customise it for this fund.",
         "subjectLabel": "Subject",
         "bodyLabel": "Body",
         "variablesHint": "You can use these placeholders — they're replaced with each member's details when the email is sent:",
@@ -1527,7 +1529,8 @@
           "shopList": "Bulleted list of the fund's active merchants",
           "address": "The member's postal address",
           "cardLink": "Link to the member's public card page",
-          "cardNumber": "The member's card number"
+          "cardNumber": "The member's card number",
+          "paymentReference": "The reference to include on the bank transfer"
         },
         "usingDefault": "Using the default template.",
         "usingOverride": "Using a custom template for this fund.",
@@ -1726,6 +1729,9 @@
       "allocationConfirmation": {
         "subject": "{amount} just landed on your card — {fundName}",
         "textBody": "Hi {firstName},\n\nYour allocation of {amount} has just been credited to your {fundName} card. You can spend it at any partner merchant.\n\nThe {fundName} team"
+      },
+      "footer": {
+        "unsubscribe": "Unsubscribe from payment reminders"
       }
     },
     "signup": {
@@ -1734,6 +1740,7 @@
       "firstName": "First name",
       "lastName": "Last name",
       "email": "Email",
+      "remindersOptOut": "I don't want to receive payment reminder emails.",
       "submit": "Apply",
       "submitting": "Submitting…",
       "errors": {
@@ -2372,6 +2379,21 @@
         "email_mismatch": "The email address has changed since this link was issued."
       },
       "nextSteps": "Contact the fund admin or apply again to get a fresh verification email."
+    }
+  },
+  "unsubscribe": {
+    "title": "Payment reminders",
+    "errorTitle": "Invalid link",
+    "description": "Hi {firstName}, manage your payment-reminder email preferences below.",
+    "status": {
+      "subscribed": "You currently receive payment reminder emails.",
+      "unsubscribed": "You no longer receive payment reminder emails."
+    },
+    "unsubscribe": "Unsubscribe from reminders",
+    "resubscribe": "Resubscribe to reminders",
+    "saving": "Saving…",
+    "errors": {
+      "invalidLink": "This unsubscribe link isn't valid or has expired."
     }
   },
   "account": {

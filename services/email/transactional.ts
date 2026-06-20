@@ -4,10 +4,13 @@ import "server-only";
 import { getTranslations } from "next-intl/server";
 
 import { prisma } from "@/services/db/prisma";
+import { getFundUrl } from "@/services/fund/server";
+import { buildUnsubscribeToken } from "@/services/member/unsubscribe";
 import { renderBrandedEmail } from "./template";
 import {
   resolveAllocationTemplate,
   resolveCardAssignedTemplate,
+  resolvePaymentReminderTemplate,
 } from "./templates";
 import { sendEmail } from "./resend";
 
@@ -200,6 +203,41 @@ export async function sendPaymentConfirmation(args: {
         }),
       };
     },
+    to: args.toEmail,
+  });
+}
+
+export async function sendPaymentReminder(args: {
+  emailId: string;
+  fundId: string;
+  toEmail: string;
+  fund: FundBranding;
+  firstName: string;
+  lastName: string;
+  // The member's expected monthly contribution (tier minimum), already
+  // stringified. "" when the member has no tier assigned.
+  amount: string;
+  // Bank-transfer communication bank-sync matches on.
+  paymentReference: string;
+  // Public account / tap URL ({cardLink}); "" when the member has no card.
+  cardLink: string;
+}): Promise<void> {
+  await dispatchTemplate({
+    emailId: args.emailId,
+    fund: args.fund,
+    // Prefer the fund's editable override, falling back to the HTML default.
+    render: () =>
+      resolvePaymentReminderTemplate({
+        fundId: args.fundId,
+        vars: {
+          firstName: args.firstName,
+          lastName: args.lastName,
+          fundName: args.fund.name,
+          amount: args.amount,
+          paymentReference: args.paymentReference,
+          cardLink: args.cardLink,
+        },
+      }),
     to: args.toEmail,
   });
 }
@@ -401,6 +439,26 @@ type RenderedTemplate = {
   html?: string;
 };
 
+// The opt-out footer for a queued email (issue #40). Resolved centrally here —
+// from the Email row's memberId + fund domain — so every member-facing send
+// carries the deregistration link without each sender threading it through.
+// Returns undefined for merchant / team emails (no member) so they get no link.
+async function buildUnsubscribeFooter(
+  emailId: string,
+): Promise<{ url: string; label: string } | undefined> {
+  const row = await prisma.email.findUnique({
+    where: { id: emailId },
+    select: { memberId: true, fund: { select: { domain: true } } },
+  });
+  if (!row?.memberId || !row.fund) return undefined;
+  const t = await getTranslations("members.email.footer");
+  const token = buildUnsubscribeToken(row.memberId);
+  return {
+    url: `${getFundUrl(row.fund.domain)}/unsubscribe?token=${encodeURIComponent(token)}`,
+    label: t("unsubscribe"),
+  };
+}
+
 async function dispatchTemplate(args: {
   emailId: string;
   to: string;
@@ -411,6 +469,7 @@ async function dispatchTemplate(args: {
   let html: string | null = null;
   try {
     rendered = await args.render();
+    const unsubscribe = await buildUnsubscribeFooter(args.emailId);
     html = await renderBrandedEmail({
       fundName: args.fund.name,
       primaryColor: args.fund.primaryColor,
@@ -419,6 +478,7 @@ async function dispatchTemplate(args: {
       text: rendered.text,
       ctaLabel: rendered.ctaLabel,
       html: rendered.html,
+      unsubscribe,
     });
     const { id } = await sendEmail({
       to: args.to,
