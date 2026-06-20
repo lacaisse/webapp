@@ -45,7 +45,7 @@ async function handleLogout(request: NextRequest) {
   if (user) {
     try {
       const ctx = await auth.$context;
-      await ctx.internalAdapter.deleteSessions(user.id);
+      await ctx.internalAdapter.deleteUserSessions(user.id);
     } catch (e) {
       console.error("logout: deleteSessions failed", e);
     }

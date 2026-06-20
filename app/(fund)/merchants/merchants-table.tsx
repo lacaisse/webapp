@@ -66,6 +66,9 @@ export async function MerchantsTable({
     },
   });
 
+  // Server component: renders once per request, so reading the clock here is
+  // safe. The react-hooks/purity rule targets client re-renders.
+  // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
 
   // CP-side balances. One listPlaces() returns every connected place for

@@ -265,6 +265,14 @@ export default async function MerchantDetailPage({
   const invitePendingState =
     merchant.status === "PENDING" && merchant.citizenPayInviteEmail !== null;
 
+  // Server component: renders once per request, so reading the clock here is
+  // safe. The react-hooks/purity rule targets client re-renders.
+  // eslint-disable-next-line react-hooks/purity
+  const nowMs = Date.now();
+  const invitePending =
+    merchant.citizenPayInviteToken !== null &&
+    (merchant.citizenPayInviteExpiresAt?.getTime() ?? 0) > nowMs;
+
   return (
     <>
       <div className="flex items-center justify-between gap-4">
@@ -282,10 +290,7 @@ export default async function MerchantDetailPage({
           emailVerified={emailVerified}
           status={merchant.status}
           connected={merchant.citizenPayBusinessId !== null}
-          invitePending={
-            merchant.citizenPayInviteToken !== null &&
-            (merchant.citizenPayInviteExpiresAt?.getTime() ?? 0) > Date.now()
-          }
+          invitePending={invitePending}
         />
       </div>
 
