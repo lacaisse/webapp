@@ -2,10 +2,10 @@
 import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
 
+import { TableSearch } from "@/components/table-search";
 import { Tabs, resolveActiveTab } from "@/components/ui/tabs";
 import { requireCurrentFund } from "@/services/fund/server";
 
-import { CardsSearch } from "./cards-search";
 import { CardsTable } from "./cards-table";
 import { CardSyncDialog } from "./sync-dialog";
 import { NumberImportDialog } from "./number-import-dialog";
@@ -51,7 +51,7 @@ export default async function CardsPage({
             label: t(`tabs.${tab.value}`),
           }))}
         />
-        <CardsSearch placeholder={t("searchPlaceholder")} />
+        <TableSearch placeholder={t("searchPlaceholder")} />
       </div>
 
       <Suspense

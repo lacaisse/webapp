@@ -3,18 +3,18 @@
 
 import { Search } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 
 import { Input } from "@/components/ui/input";
 
-// URL-driven search input. Debounces typing into `?q=…` (and clears
-// `?page` so a fresh search lands on page 1). Re-syncs from the URL when
-// it changes from outside (e.g. tab switch clears the query) so the
-// input never holds a stale value.
+// URL-driven search input shared by the admin tables (members, cards).
+// Debounces typing into `?q=…` (and clears `?page` so a fresh search lands
+// on page 1). Re-syncs from the URL when it changes from outside (e.g. tab
+// switch clears the query) so the input never holds a stale value.
 
 const DEBOUNCE_MS = 250;
 
-export function CardsSearch({ placeholder }: { placeholder: string }) {
+export function TableSearch({ placeholder }: { placeholder: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const currentQ = searchParams.get("q") ?? "";
@@ -22,10 +22,14 @@ export function CardsSearch({ placeholder }: { placeholder: string }) {
   const [, startTransition] = useTransition();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // External URL change (tab switch clears q) → reset the local input.
-  useEffect(() => {
+  // Re-sync from the URL when it changes from outside (e.g. a tab switch
+  // clears `q`). Tracking the previous URL value and adjusting during render
+  // is React's recommended alternative to a setState-in-effect.
+  const [prevQ, setPrevQ] = useState(currentQ);
+  if (currentQ !== prevQ) {
+    setPrevQ(currentQ);
     setValue(currentQ);
-  }, [currentQ]);
+  }
 
   function handleChange(next: string) {
     setValue(next);

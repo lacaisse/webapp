@@ -254,6 +254,7 @@
       "title": "Leden",
       "description": "Beheer ledenaccounts, onboarding en niveau-toewijzingen.",
       "invite": "Lid uitnodigen",
+      "searchPlaceholder": "Zoek op naam of kaartnummer…",
       "tabs": {
         "all": "Alle",
         "pending": "In afwachting",
@@ -370,7 +371,7 @@
       "empty": "Geen kaarten om te tonen.",
       "prev": "Vorige",
       "next": "Volgende",
-      "searchPlaceholder": "Zoek op serienummer…",
+      "searchPlaceholder": "Zoek op nummer, serie of houder…",
       "detail": {
         "back": "Alle kaarten",
         "balance": {
