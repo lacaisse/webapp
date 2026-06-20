@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+version: 2
+updates:
+  # Application dependencies. Security updates are opened immediately by GitHub
+  # regardless of schedule; this covers routine version bumps.
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      # Batch low-risk dev/type/lint bumps into one PR to cut noise.
+      dev-dependencies:
+        dependency-type: development
+        update-types: ["minor", "patch"]
+      # Batch routine prod patch/minor bumps; majors still come as solo PRs.
+      production-minor-patch:
+        dependency-type: production
+        update-types: ["minor", "patch"]
+
+  # Keep the GitHub Actions used in these workflows current (and patched).
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly

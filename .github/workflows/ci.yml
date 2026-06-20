@@ -1,0 +1,77 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Cancel superseded runs on the same ref (e.g. rapid pushes to a PR).
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Dummy values so `prisma generate` and `next build` can run without real
+  # infrastructure. None of these reach a live service in CI. Pages in this app
+  # are dynamic (cookies/headers), so the build does not execute DB queries.
+  APP_DOMAIN: localhost
+  NEXT_PUBLIC_APP_DOMAIN: localhost
+  BETTER_AUTH_SECRET: ci-dummy-better-auth-secret-not-a-real-secret
+  DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+  DIRECT_URL: postgresql://ci:ci@localhost:5432/ci
+  # 32 bytes / 64 hex — satisfies services/crypto/secret.ts key parsing.
+  APP_CRED_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+
+jobs:
+  verify:
+    name: Lint, typecheck, test & build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # `npm ci` runs postinstall (`prisma generate`), so the generated client
+      # exists before typecheck/build.
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm run test
+      - name: Build
+        run: npm run build
+
+  guards:
+    name: Convention & permission guards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Pure Node, no install needed.
+      - run: npm run guard
+
+  audit:
+    name: Dependency vulnerability audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # We only need the dependency tree resolved — skip postinstall scripts.
+      - run: npm ci --ignore-scripts
+      # Gate on high+ advisories, minus the documented triage allowlist in
+      # scripts/audit-check.mjs. New high vulns fail; known transitive/dev ones
+      # are accepted with a review-by date.
+      - name: Audit dependencies
+        run: npm run audit:ci
