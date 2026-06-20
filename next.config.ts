@@ -3,6 +3,20 @@ import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
 
 const nextConfig: NextConfig = {
+  // Cache Components: data fetching is excluded from prerenders unless wrapped
+  // in `use cache`. Each route paints a static (skeleton) shell immediately and
+  // streams its dynamic content behind <Suspense>, so client-side navigation
+  // feels instant. (We don't use the `unstable_instant` validation export: its
+  // `static` mode can't pass here because every fund page reads the locale
+  // cookie + fund-host headers, which are inherently runtime.)
+  // See AGENTS.md / node_modules/next/dist/docs/.../instant-navigation.md.
+  cacheComponents: true,
+  experimental: {
+    // Surfaces the "Instant Navs" panel in Next DevTools for inspecting the
+    // static shell on page load and client navigation.
+    instantNavigationDevToolsToggle: true,
+  },
+
   // The PDF renderer (services/document/pdf.tsx) reads the Geist TTFs from
   // app/fonts at runtime via fs. Next's tracer can't see that dynamic read, so
   // include the files explicitly in the bundles that render letters (the

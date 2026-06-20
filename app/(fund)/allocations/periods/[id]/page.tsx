@@ -1,9 +1,12 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { getFormatter, getTranslations } from "next-intl/server";
 
+import { TableSkeleton } from "@/components/table-skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Card,
   CardContent,
@@ -32,7 +35,21 @@ import { NotifyAllocationButton } from "./notify-allocation-button";
 import { RemoveDepositButton } from "./remove-deposit-button";
 import { RunAllocation } from "./run-allocation";
 
-export default async function AllocationPeriodDetailPage({
+// Synchronous shell so the route paints its skeleton instantly; the period
+// (params-dependent, uncached) streams in behind <Suspense>.
+export default function AllocationPeriodDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  return (
+    <Suspense fallback={<AllocationPeriodDetailSkeleton />}>
+      <AllocationPeriodDetail params={params} />
+    </Suspense>
+  );
+}
+
+async function AllocationPeriodDetail({
   params,
 }: {
   params: Promise<{ id: string }>;
@@ -611,6 +628,31 @@ function mintNotification(op: {
     return { badge: { variant: "destructive", key: "failed" }, action: "retry" };
   }
   return { badge: { variant: "outline", key: "notSent" }, action: "send" };
+}
+
+function AllocationPeriodDetailSkeleton() {
+  return (
+    <>
+      <Skeleton className="h-4 w-24" />
+      <header className="space-y-2">
+        <Skeleton className="h-7 w-48" />
+        <Skeleton className="h-4 w-80 max-w-full" />
+      </header>
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-24 w-full" />
+        ))}
+      </section>
+      <section className="space-y-3">
+        <Skeleton className="h-6 w-40" />
+        <TableSkeleton columns={5} rows={4} alignRight={2} />
+      </section>
+      <section className="space-y-3">
+        <Skeleton className="h-6 w-32" />
+        <TableSkeleton columns={6} rows={4} alignRight={1} />
+      </section>
+    </>
+  );
 }
 
 function KpiCard({

@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { Suspense } from "react";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
 import { requireCurrentFund } from "@/services/fund/server";
 
 import { AccountManage } from "./account-manage";
 import { MoveTokensDialog } from "./move-tokens-dialog";
 import { TransferDialog } from "./transfer-dialog";
 import { TransfersTable } from "./transfers-table";
+import { AccountDetailSkeleton } from "../skeleton";
 
 import {
   getAccountBalance,
@@ -19,7 +22,21 @@ import {
   getTokenAccount,
 } from "../data";
 
-export default async function AccountDetailPage({
+// Synchronous shell so the route paints its skeleton instantly; the account
+// (params-dependent, uncached) streams in behind <Suspense>.
+export default function AccountDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  return (
+    <Suspense fallback={<AccountDetailSkeleton />}>
+      <AccountDetail params={params} />
+    </Suspense>
+  );
+}
+
+async function AccountDetail({
   params,
 }: {
   params: Promise<{ id: string }>;
@@ -37,11 +54,6 @@ export default async function AccountDetailPage({
     tokenDecimals: fund.tokenDecimals,
   };
   const balance = await getAccountBalance(account.address, token);
-  const first = await getAccountTransfersFirstPage(
-    fund.id,
-    token,
-    account.address,
-  );
   const otherAccounts = (await getAccountOptions(fund.id, account.id)).map(
     (a) => ({ ...a, name: a.name || t("defaultName") }),
   );
@@ -119,19 +131,68 @@ export default async function AccountDetailPage({
         <h2 className="font-heading text-lg font-medium">
           {t("transfers.title")}
         </h2>
-        {first.error && (
-          <Alert variant="warning">
-            <AlertDescription>{t("transfers.loadError")}</AlertDescription>
-          </Alert>
-        )}
-        <TransfersTable
-          id={account.id}
-          initial={first.transfers}
-          initialCursor={first.nextCursor}
-          symbol={fund.tokenSymbol}
-          accountNames={accountNames}
-        />
+        <Suspense fallback={<TransfersTableSkeleton />}>
+          <TransfersSection
+            fundId={fund.id}
+            token={token}
+            accountId={account.id}
+            address={account.address}
+            symbol={fund.tokenSymbol}
+            accountNames={accountNames}
+          />
+        </Suspense>
       </section>
+    </div>
+  );
+}
+
+// The transfer feed comes from Alchemy (separate slow call) — stream it in its
+// own boundary so the account header + balance paint first.
+async function TransfersSection({
+  fundId,
+  token,
+  accountId,
+  address,
+  symbol,
+  accountNames,
+}: {
+  fundId: string;
+  token: {
+    tokenAddress: string | null;
+    tokenChainId: number | null;
+    tokenDecimals: number | null;
+  };
+  accountId: string;
+  address: string;
+  symbol: string | null;
+  accountNames: Record<string, string>;
+}) {
+  const t = await getTranslations("fund.accounts");
+  const first = await getAccountTransfersFirstPage(fundId, token, address);
+  return (
+    <>
+      {first.error && (
+        <Alert variant="warning">
+          <AlertDescription>{t("transfers.loadError")}</AlertDescription>
+        </Alert>
+      )}
+      <TransfersTable
+        id={accountId}
+        initial={first.transfers}
+        initialCursor={first.nextCursor}
+        symbol={symbol}
+        accountNames={accountNames}
+      />
+    </>
+  );
+}
+
+function TransfersTableSkeleton({ rows = 5 }: { rows?: number }) {
+  return (
+    <div className="space-y-2">
+      {Array.from({ length: rows }).map((_, i) => (
+        <Skeleton key={i} className="h-10 w-full" />
+      ))}
     </div>
   );
 }

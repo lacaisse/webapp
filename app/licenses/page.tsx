@@ -21,8 +21,6 @@ type LicensePackage = {
   publisher: string | null;
 };
 
-export const dynamic = "force-static";
-
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("licenses");
   return { title: t("title") };

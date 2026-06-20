@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { Suspense } from "react";
 import Link from "next/link";
 import { getFormatter, getTranslations } from "next-intl/server";
 
@@ -9,6 +10,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { TableSkeleton } from "@/components/table-skeleton";
 import { Tabs, resolveActiveTab } from "@/components/ui/tabs";
 import {
   Table,
@@ -34,7 +37,37 @@ const TABS = [
   { value: "schedule" },
 ] as const;
 
-export default async function AllocationsPage({
+// Synchronous shell: header + tab bar stream quickly; the active tab's data
+// table streams behind its own (keyed) <Suspense> so switching tabs re-shows
+// the skeleton instead of blocking.
+export default function AllocationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
+  return (
+    <>
+      <Suspense fallback={<AllocationsHeaderSkeleton />}>
+        <AllocationsHeader />
+      </Suspense>
+      <Suspense fallback={<AllocationsTabsSkeleton />}>
+        <AllocationsTabs searchParams={searchParams} />
+      </Suspense>
+    </>
+  );
+}
+
+async function AllocationsHeader() {
+  const t = await getTranslations("fund.allocations");
+  return (
+    <header className="space-y-1">
+      <h1 className="font-heading text-2xl font-medium">{t("title")}</h1>
+      <p className="text-sm text-muted-foreground">{t("description")}</p>
+    </header>
+  );
+}
+
+async function AllocationsTabs({
   searchParams,
 }: {
   searchParams: Promise<{ tab?: string }>;
@@ -46,11 +79,6 @@ export default async function AllocationsPage({
 
   return (
     <>
-      <header className="space-y-1">
-        <h1 className="font-heading text-2xl font-medium">{t("title")}</h1>
-        <p className="text-sm text-muted-foreground">{t("description")}</p>
-      </header>
-
       <Tabs
         active={active}
         items={TABS.map((tab) => ({
@@ -59,20 +87,41 @@ export default async function AllocationsPage({
         }))}
       />
 
-      {active === "history" && <HistoryTab fundId={fund.id} />}
-      {active === "transactions" && (
-        <DepositsTable fundId={fund.id} onlyUnmatched={false} />
-      )}
-      {active === "unmatched" && (
-        <DepositsTable fundId={fund.id} onlyUnmatched={true} />
-      )}
-      {active === "tiers" && <TiersTab fundId={fund.id} />}
-      {active === "schedule" && (
-        <ScheduleTab
-          fundId={fund.id}
-          allocationMode={fund.allocationMode}
-        />
-      )}
+      <Suspense key={active} fallback={<TableSkeleton columns={6} />}>
+        {active === "history" && <HistoryTab fundId={fund.id} />}
+        {active === "transactions" && (
+          <DepositsTable fundId={fund.id} onlyUnmatched={false} />
+        )}
+        {active === "unmatched" && (
+          <DepositsTable fundId={fund.id} onlyUnmatched={true} />
+        )}
+        {active === "tiers" && <TiersTab fundId={fund.id} />}
+        {active === "schedule" && (
+          <ScheduleTab fundId={fund.id} allocationMode={fund.allocationMode} />
+        )}
+      </Suspense>
+    </>
+  );
+}
+
+function AllocationsHeaderSkeleton() {
+  return (
+    <div className="space-y-1">
+      <Skeleton className="h-7 w-40" />
+      <Skeleton className="h-4 w-80 max-w-full" />
+    </div>
+  );
+}
+
+function AllocationsTabsSkeleton() {
+  return (
+    <>
+      <div className="flex gap-2">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Skeleton key={i} className="h-8 w-24" />
+        ))}
+      </div>
+      <TableSkeleton columns={6} />
     </>
   );
 }

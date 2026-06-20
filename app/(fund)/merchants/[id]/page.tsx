@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -10,7 +11,9 @@ import {
 } from "lucide-react";
 import { getFormatter, getTranslations } from "next-intl/server";
 
+import { TableSkeleton } from "@/components/table-skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { buttonVariants } from "@/components/ui/button";
 import {
   Card,
@@ -47,7 +50,24 @@ import { MerchantVisibilityToggle } from "../merchant-visibility-toggle";
 // shareable links work.
 const TRANSFERS_PAGE_SIZE = 20;
 
-export default async function MerchantDetailPage({
+// Synchronous shell so the route paints its skeleton instantly; the merchant
+// (params-dependent, uncached) streams in behind <Suspense>, and the heavy
+// on-chain transfer history streams in its own nested boundary below.
+export default function MerchantDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ cursor?: string }>;
+}) {
+  return (
+    <Suspense fallback={<MerchantDetailSkeleton />}>
+      <MerchantDetail params={params} searchParams={searchParams} />
+    </Suspense>
+  );
+}
+
+async function MerchantDetail({
   params,
   searchParams,
 }: {
@@ -55,7 +75,6 @@ export default async function MerchantDetailPage({
   searchParams: Promise<{ cursor?: string }>;
 }) {
   const t = await getTranslations("fund.merchants.detail");
-  const tAcc = await getTranslations("fund.accounts");
   const format = await getFormatter();
   const fund = await requireCurrentFund();
   const { id } = await params;
@@ -108,12 +127,10 @@ export default async function MerchantDetailPage({
     }
   }
 
-  // On-chain transfer history for this merchant's wallet. Only attempt the
-  // Alchemy read when the merchant has a wallet AND the fund's token identity
-  // is fully cached (address + chain + decimals + symbol). Degrade silently on
-  // any failure (Alchemy unconfigured / down) — same posture as the balance
-  // call above. We reuse the token explorer's per-account transfers service
-  // and address directory so counterparties resolve to member/merchant names.
+  // Token identity must be fully cached before on-chain transfers can be read.
+  // The heavy Alchemy + CP-profile fetching is deferred to
+  // <MerchantTransfersSection> so it streams in its own <Suspense> boundary
+  // rather than blocking the rest of the merchant detail.
   const tokenReady =
     Boolean(fund.tokenAddress) &&
     typeof fund.tokenChainId === "number" &&
@@ -121,138 +138,6 @@ export default async function MerchantDetailPage({
     Boolean(fund.tokenSymbol);
   const transferAccount = merchant.citizenPayPlaceAccount;
   const showTransfers = tokenReady && Boolean(transferAccount);
-
-  let transferRows: Array<{
-    uniqueId: string;
-    blockTimestamp: string | null;
-    direction: "in" | "out";
-    counterparty: string;
-    rawValue: string;
-  }> = [];
-  let transferDirectory: ReturnType<typeof buildAddressDirectory> | null = null;
-  let transfersNextPageKey: string | null = null;
-  let transfersUnavailable = false;
-
-  if (showTransfers && transferAccount) {
-    try {
-      const account = transferAccount.toLowerCase();
-      const [page, cards, placesResult, merchants, tokenAccounts] =
-        await Promise.all([
-          listTransfersForAccount({
-            chainId: fund.tokenChainId!,
-            contractAddress: fund.tokenAddress!,
-            account: transferAccount,
-            pageSize: TRANSFERS_PAGE_SIZE,
-            cursor: cursor ?? null,
-          }),
-          prisma.card.findMany({
-            where: { account: { not: null }, fundId: fund.id },
-            include: {
-              member: { select: { firstName: true, lastName: true } },
-            },
-          }),
-          getPlacesForFund(
-            fund.id,
-            fund.citizenPayApiKeyId,
-            fund.citizenPayApiKeyEnc,
-          ),
-          prisma.merchant.findMany({
-            where: { fundId: fund.id, citizenPayPlaceId: { not: null } },
-            select: { citizenPayPlaceId: true, name: true },
-          }),
-          prisma.fundTokenAccount.findMany({
-            where: { fundId: fund.id, archivedAt: null },
-            select: { name: true, address: true },
-          }),
-        ]);
-
-      const merchantNameByPlaceId = new Map<string, string>();
-      for (const m of merchants) {
-        if (m.citizenPayPlaceId)
-          merchantNameByPlaceId.set(m.citizenPayPlaceId, m.name);
-      }
-
-      // Addresses we can already label locally — skip the CP profile fetch.
-      const knownLocal = new Set<string>();
-      for (const c of cards)
-        if (c.account) knownLocal.add(c.account.toLowerCase());
-      for (const p of placesResult)
-        if (p.account) knownLocal.add(p.account.toLowerCase());
-      if (fund.tokenMinterEoaAddress)
-        knownLocal.add(fund.tokenMinterEoaAddress.toLowerCase());
-      if (fund.tokenMinterSmartAccountAddress)
-        knownLocal.add(fund.tokenMinterSmartAccountAddress.toLowerCase());
-
-      // Counterparties on this page that we can't label locally — resolve a
-      // CP profile so they show a name instead of "Unknown".
-      const unresolved = new Set<string>();
-      for (const tx of page.transfers) {
-        const counter =
-          tx.from.toLowerCase() === account ? tx.to : tx.from;
-        const lower = counter.toLowerCase();
-        if (isZeroAddress(lower) || knownLocal.has(lower)) continue;
-        unresolved.add(lower);
-      }
-
-      const fetchedProfiles =
-        unresolved.size === 0
-          ? []
-          : await Promise.all(
-              [...unresolved].map(async (addr) => {
-                const p = await getProfile(
-                  fund.id,
-                  fund.citizenPayApiKeyId,
-                  fund.citizenPayApiKeyEnc,
-                  addr,
-                );
-                if (!p) return null;
-                const name = p.name?.trim() || p.username?.trim();
-                if (!name) return null;
-                return { account: addr, name, imageSmall: p.imageSmall };
-              }),
-            ).then((arr) =>
-              arr.filter((x): x is NonNullable<typeof x> => x != null),
-            );
-
-      transferDirectory = buildAddressDirectory({
-        cards: cards.map((c) => ({
-          account: c.account,
-          holderName: c.holderName,
-          memberName: c.member
-            ? `${c.member.firstName} ${c.member.lastName}`.trim()
-            : "",
-          serialNumber: c.serialNumber,
-        })),
-        places: placesResult.map((p) => ({
-          account: p.account,
-          name: merchantNameByPlaceId.get(p.id) ?? p.name,
-        })),
-        accounts: tokenAccounts.map((a) => ({
-          account: a.address,
-          name: a.name || tAcc("defaultName"),
-        })),
-        profiles: fetchedProfiles,
-        minterEoa: fund.tokenMinterEoaAddress,
-        minterSmartAccount: fund.tokenMinterSmartAccountAddress,
-      });
-
-      transferRows = page.transfers.map((tx) => {
-        const isOut = tx.from.toLowerCase() === account;
-        return {
-          uniqueId: tx.uniqueId,
-          blockTimestamp: tx.blockTimestamp,
-          direction: isOut ? ("out" as const) : ("in" as const),
-          counterparty: isOut ? tx.to : tx.from,
-          rawValue: tx.rawValue,
-        };
-      });
-
-      transfersNextPageKey = page.nextPageKey;
-    } catch (e) {
-      console.warn("[merchant-detail] transfers fetch failed", e);
-      transfersUnavailable = true;
-    }
-  }
 
   const coords =
     merchant.latitude !== null && merchant.longitude !== null
@@ -632,96 +517,282 @@ export default async function MerchantDetailPage({
         </Table>
       </section>
 
-      {showTransfers && (
+      {showTransfers && transferAccount && (
         <section className="space-y-3">
           <h2 className="font-heading text-lg font-medium">
             {t("transfers.title")}
           </h2>
-          {transfersUnavailable ? (
-            <div className="rounded-lg border border-dashed bg-muted/30 p-6 text-sm text-muted-foreground">
-              {t("transfers.unavailable")}
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("transfers.date")}</TableHead>
-                  <TableHead>{t("transfers.direction")}</TableHead>
-                  <TableHead>{t("transfers.counterparty")}</TableHead>
-                  <TableHead className="text-right">
-                    {t("transfers.amount")}
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {transferRows.length === 0 || !transferDirectory ? (
-                  <TableEmpty colSpan={4}>{t("transfers.empty")}</TableEmpty>
-                ) : (
-                  transferRows.map((tx) => (
-                    <TableRow key={tx.uniqueId}>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {tx.blockTimestamp
-                          ? format.dateTime(new Date(tx.blockTimestamp), {
-                              dateStyle: "medium",
-                              timeStyle: "short",
-                            })
-                          : "—"}
-                      </TableCell>
-                      <TableCell>
-                        {tx.direction === "in" ? (
-                          <span className="inline-flex items-center gap-1.5 text-sm">
-                            <ArrowDownLeft className="size-3.5 text-success" />
-                            {t("transfers.in")}
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 text-sm">
-                            <ArrowUpRight className="size-3.5 text-muted-foreground" />
-                            {t("transfers.out")}
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <AddressLabel
-                          address={tx.counterparty}
-                          directory={transferDirectory}
-                          // The counterparty's role in the transfer is the
-                          // opposite of the merchant's: an incoming transfer
-                          // means the counterparty was the sender ("from").
-                          side={tx.direction === "in" ? "from" : "to"}
-                          labels={{
-                            issued: t("transfers.issued"),
-                            retired: t("transfers.retired"),
-                            treasury: t("transfers.treasury"),
-                            unknown: t("transfers.unknown"),
-                          }}
-                        />
-                      </TableCell>
-                      <TableCell className="text-right font-medium tabular-nums">
-                        {formatTokenAmount(tx.rawValue, fund.tokenDecimals)}
-                        {fund.tokenSymbol && (
-                          <span className="ml-1 text-xs text-muted-foreground">
-                            {fund.tokenSymbol}
-                          </span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          )}
-          {!transfersUnavailable && (
-            <TransfersPager
+          <Suspense
+            key={cursor ?? "first"}
+            fallback={<TableSkeleton columns={4} alignRight={1} />}
+          >
+            <MerchantTransfersSection
+              fund={fund}
+              account={transferAccount}
               cursor={cursor ?? null}
-              nextPageKey={transfersNextPageKey}
-              labels={{
-                newer: t("transfers.newer"),
-                older: t("transfers.older"),
-              }}
             />
-          )}
+          </Suspense>
         </section>
       )}
+    </>
+  );
+}
+
+// On-chain transfer history for this merchant's wallet, streamed in its own
+// <Suspense> boundary. Reuses the token explorer's per-account transfers
+// service + address directory so counterparties resolve to member/merchant
+// names. Degrades silently on any failure (Alchemy unconfigured / down).
+async function MerchantTransfersSection({
+  fund,
+  account: transferAccount,
+  cursor,
+}: {
+  fund: Awaited<ReturnType<typeof requireCurrentFund>>;
+  account: string;
+  cursor: string | null;
+}) {
+  const t = await getTranslations("fund.merchants.detail");
+  const tAcc = await getTranslations("fund.accounts");
+  const format = await getFormatter();
+
+  let transferRows: Array<{
+    uniqueId: string;
+    blockTimestamp: string | null;
+    direction: "in" | "out";
+    counterparty: string;
+    rawValue: string;
+  }> = [];
+  let transferDirectory: ReturnType<typeof buildAddressDirectory> | null = null;
+  let transfersNextPageKey: string | null = null;
+  let transfersUnavailable = false;
+
+  try {
+    const account = transferAccount.toLowerCase();
+    const [page, cards, placesResult, merchants, tokenAccounts] =
+      await Promise.all([
+        listTransfersForAccount({
+          chainId: fund.tokenChainId!,
+          contractAddress: fund.tokenAddress!,
+          account: transferAccount,
+          pageSize: TRANSFERS_PAGE_SIZE,
+          cursor: cursor ?? null,
+        }),
+        prisma.card.findMany({
+          where: { account: { not: null }, fundId: fund.id },
+          include: {
+            member: { select: { firstName: true, lastName: true } },
+          },
+        }),
+        getPlacesForFund(
+          fund.id,
+          fund.citizenPayApiKeyId,
+          fund.citizenPayApiKeyEnc,
+        ),
+        prisma.merchant.findMany({
+          where: { fundId: fund.id, citizenPayPlaceId: { not: null } },
+          select: { citizenPayPlaceId: true, name: true },
+        }),
+        prisma.fundTokenAccount.findMany({
+          where: { fundId: fund.id, archivedAt: null },
+          select: { name: true, address: true },
+        }),
+      ]);
+
+    const merchantNameByPlaceId = new Map<string, string>();
+    for (const m of merchants) {
+      if (m.citizenPayPlaceId)
+        merchantNameByPlaceId.set(m.citizenPayPlaceId, m.name);
+    }
+
+    // Addresses we can already label locally — skip the CP profile fetch.
+    const knownLocal = new Set<string>();
+    for (const c of cards)
+      if (c.account) knownLocal.add(c.account.toLowerCase());
+    for (const p of placesResult)
+      if (p.account) knownLocal.add(p.account.toLowerCase());
+    if (fund.tokenMinterEoaAddress)
+      knownLocal.add(fund.tokenMinterEoaAddress.toLowerCase());
+    if (fund.tokenMinterSmartAccountAddress)
+      knownLocal.add(fund.tokenMinterSmartAccountAddress.toLowerCase());
+
+    // Counterparties on this page that we can't label locally — resolve a
+    // CP profile so they show a name instead of "Unknown".
+    const unresolved = new Set<string>();
+    for (const tx of page.transfers) {
+      const counter = tx.from.toLowerCase() === account ? tx.to : tx.from;
+      const lower = counter.toLowerCase();
+      if (isZeroAddress(lower) || knownLocal.has(lower)) continue;
+      unresolved.add(lower);
+    }
+
+    const fetchedProfiles =
+      unresolved.size === 0
+        ? []
+        : await Promise.all(
+            [...unresolved].map(async (addr) => {
+              const p = await getProfile(
+                fund.id,
+                fund.citizenPayApiKeyId,
+                fund.citizenPayApiKeyEnc,
+                addr,
+              );
+              if (!p) return null;
+              const name = p.name?.trim() || p.username?.trim();
+              if (!name) return null;
+              return { account: addr, name, imageSmall: p.imageSmall };
+            }),
+          ).then((arr) =>
+            arr.filter((x): x is NonNullable<typeof x> => x != null),
+          );
+
+    transferDirectory = buildAddressDirectory({
+      cards: cards.map((c) => ({
+        account: c.account,
+        holderName: c.holderName,
+        memberName: c.member
+          ? `${c.member.firstName} ${c.member.lastName}`.trim()
+          : "",
+        serialNumber: c.serialNumber,
+      })),
+      places: placesResult.map((p) => ({
+        account: p.account,
+        name: merchantNameByPlaceId.get(p.id) ?? p.name,
+      })),
+      accounts: tokenAccounts.map((a) => ({
+        account: a.address,
+        name: a.name || tAcc("defaultName"),
+      })),
+      profiles: fetchedProfiles,
+      minterEoa: fund.tokenMinterEoaAddress,
+      minterSmartAccount: fund.tokenMinterSmartAccountAddress,
+    });
+
+    transferRows = page.transfers.map((tx) => {
+      const isOut = tx.from.toLowerCase() === account;
+      return {
+        uniqueId: tx.uniqueId,
+        blockTimestamp: tx.blockTimestamp,
+        direction: isOut ? ("out" as const) : ("in" as const),
+        counterparty: isOut ? tx.to : tx.from,
+        rawValue: tx.rawValue,
+      };
+    });
+
+    transfersNextPageKey = page.nextPageKey;
+  } catch (e) {
+    console.warn("[merchant-detail] transfers fetch failed", e);
+    transfersUnavailable = true;
+  }
+
+  if (transfersUnavailable) {
+    return (
+      <div className="rounded-lg border border-dashed bg-muted/30 p-6 text-sm text-muted-foreground">
+        {t("transfers.unavailable")}
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>{t("transfers.date")}</TableHead>
+            <TableHead>{t("transfers.direction")}</TableHead>
+            <TableHead>{t("transfers.counterparty")}</TableHead>
+            <TableHead className="text-right">{t("transfers.amount")}</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {transferRows.length === 0 || !transferDirectory ? (
+            <TableEmpty colSpan={4}>{t("transfers.empty")}</TableEmpty>
+          ) : (
+            transferRows.map((tx) => (
+              <TableRow key={tx.uniqueId}>
+                <TableCell className="text-sm text-muted-foreground">
+                  {tx.blockTimestamp
+                    ? format.dateTime(new Date(tx.blockTimestamp), {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      })
+                    : "—"}
+                </TableCell>
+                <TableCell>
+                  {tx.direction === "in" ? (
+                    <span className="inline-flex items-center gap-1.5 text-sm">
+                      <ArrowDownLeft className="size-3.5 text-success" />
+                      {t("transfers.in")}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 text-sm">
+                      <ArrowUpRight className="size-3.5 text-muted-foreground" />
+                      {t("transfers.out")}
+                    </span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <AddressLabel
+                    address={tx.counterparty}
+                    directory={transferDirectory}
+                    // The counterparty's role in the transfer is the opposite
+                    // of the merchant's: an incoming transfer means the
+                    // counterparty was the sender ("from").
+                    side={tx.direction === "in" ? "from" : "to"}
+                    labels={{
+                      issued: t("transfers.issued"),
+                      retired: t("transfers.retired"),
+                      treasury: t("transfers.treasury"),
+                      unknown: t("transfers.unknown"),
+                    }}
+                  />
+                </TableCell>
+                <TableCell className="text-right font-medium tabular-nums">
+                  {formatTokenAmount(tx.rawValue, fund.tokenDecimals)}
+                  {fund.tokenSymbol && (
+                    <span className="ml-1 text-xs text-muted-foreground">
+                      {fund.tokenSymbol}
+                    </span>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+      <TransfersPager
+        cursor={cursor ?? null}
+        nextPageKey={transfersNextPageKey}
+        labels={{
+          newer: t("transfers.newer"),
+          older: t("transfers.older"),
+        }}
+      />
+    </>
+  );
+}
+
+function MerchantDetailSkeleton() {
+  return (
+    <>
+      <div className="flex items-center justify-between gap-4">
+        <Skeleton className="h-4 w-24" />
+        <Skeleton className="h-9 w-28" />
+      </div>
+      <header className="flex items-start gap-4">
+        <Skeleton className="size-14 shrink-0 rounded-lg" />
+        <div className="space-y-2">
+          <Skeleton className="h-7 w-56" />
+          <Skeleton className="h-4 w-72 max-w-full" />
+        </div>
+      </header>
+      <section className="grid gap-3 lg:grid-cols-2">
+        <Skeleton className="h-56 w-full" />
+        <Skeleton className="h-56 w-full" />
+      </section>
+      <section className="space-y-3">
+        <Skeleton className="h-6 w-32" />
+        <TableSkeleton columns={3} rows={3} alignRight={1} />
+      </section>
     </>
   );
 }

@@ -5,8 +5,6 @@ import { getTranslations } from "next-intl/server";
 import { buttonVariants } from "@/components/ui/button";
 import { PolicySection } from "../_policy/section";
 
-export const dynamic = "force-static";
-
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("privacy");
   return { title: t("title") };

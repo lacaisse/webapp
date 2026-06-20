@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
 
 import {
@@ -8,6 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, resolveActiveTab } from "@/components/ui/tabs";
 import { prisma } from "@/services/db/prisma";
 import { requireCurrentFund } from "@/services/fund/server";
@@ -41,7 +43,58 @@ const TABS = [
   { value: "fees" },
 ] as const;
 
-export default async function SettingsPage({
+// Synchronous shell: header + tab bar stream first; the active tab's content
+// streams behind its own <Suspense>.
+export default function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string; connect?: string }>;
+}) {
+  return (
+    <>
+      <Suspense fallback={<SettingsHeaderSkeleton />}>
+        <SettingsHeader />
+      </Suspense>
+      <Suspense fallback={<SettingsTabsSkeleton />}>
+        <SettingsContent searchParams={searchParams} />
+      </Suspense>
+    </>
+  );
+}
+
+async function SettingsHeader() {
+  const t = await getTranslations("fund.settings");
+  return (
+    <header className="space-y-1">
+      <h1 className="font-heading text-2xl font-medium">{t("title")}</h1>
+      <p className="text-sm text-muted-foreground">{t("description")}</p>
+    </header>
+  );
+}
+
+function SettingsHeaderSkeleton() {
+  return (
+    <div className="space-y-1">
+      <Skeleton className="h-7 w-40" />
+      <Skeleton className="h-4 w-80 max-w-full" />
+    </div>
+  );
+}
+
+function SettingsTabsSkeleton() {
+  return (
+    <>
+      <div className="flex flex-wrap gap-2">
+        {Array.from({ length: 9 }).map((_, i) => (
+          <Skeleton key={i} className="h-8 w-20" />
+        ))}
+      </div>
+      <Skeleton className="h-64 w-full" />
+    </>
+  );
+}
+
+async function SettingsContent({
   searchParams,
 }: {
   searchParams: Promise<{ tab?: string; connect?: string }>;
@@ -74,11 +127,6 @@ export default async function SettingsPage({
 
   return (
     <>
-      <header className="space-y-1">
-        <h1 className="font-heading text-2xl font-medium">{t("title")}</h1>
-        <p className="text-sm text-muted-foreground">{t("description")}</p>
-      </header>
-
       <Tabs
         active={active}
         items={TABS.map((tab) => ({
@@ -157,14 +205,16 @@ export default async function SettingsPage({
       )}
 
       {active === "onboarding" && (
-        <OnboardingTab
-          fundId={fund.id}
-          requireMemberEmailVerification={fund.requireMemberEmailVerification}
-          requireMerchantEmailVerification={
-            fund.requireMerchantEmailVerification
-          }
-          fundForForms={fundForForms}
-        />
+        <Suspense fallback={<Skeleton className="h-64 w-full" />}>
+          <OnboardingTab
+            fundId={fund.id}
+            requireMemberEmailVerification={fund.requireMemberEmailVerification}
+            requireMerchantEmailVerification={
+              fund.requireMerchantEmailVerification
+            }
+            fundForForms={fundForForms}
+          />
+        </Suspense>
       )}
 
       {active === "terms" && (

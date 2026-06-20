@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { Suspense } from "react";
 import { Info } from "lucide-react";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -17,17 +19,26 @@ import { requireCurrentFund } from "@/services/fund/server";
 
 import { CreateAccountDialog } from "./create-account-dialog";
 import { getTokenAccounts } from "./data";
+import { AccountsTableSkeleton } from "./skeleton";
 
-export default async function AccountsPage() {
+// Synchronous shell: the header (with its create CTA) and the balance table
+// (Alchemy-backed, slow) each stream behind their own <Suspense>.
+export default function AccountsPage() {
+  return (
+    <div className="space-y-6">
+      <Suspense fallback={<AccountsHeaderFallback />}>
+        <AccountsHeader />
+      </Suspense>
+      <Suspense fallback={<AccountsTableSkeleton />}>
+        <AccountsTable />
+      </Suspense>
+    </div>
+  );
+}
+
+async function AccountsHeader() {
   const t = await getTranslations("fund.accounts");
   const fund = await requireCurrentFund();
-
-  const token = {
-    tokenAddress: fund.tokenAddress,
-    tokenChainId: fund.tokenChainId,
-    tokenDecimals: fund.tokenDecimals,
-  };
-  const { accounts, balancesError } = await getTokenAccounts(fund.id, token);
 
   // Deriving a new account needs the minter EOA + CP's Safe factory.
   const canCreate = Boolean(
@@ -35,7 +46,7 @@ export default async function AccountsPage() {
   );
 
   return (
-    <div className="space-y-6">
+    <>
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-1">
           <h1 className="font-heading text-2xl font-medium">{t("title")}</h1>
@@ -50,7 +61,23 @@ export default async function AccountsPage() {
           <AlertDescription>{t("notConnected")}</AlertDescription>
         </Alert>
       )}
+    </>
+  );
+}
 
+async function AccountsTable() {
+  const t = await getTranslations("fund.accounts");
+  const fund = await requireCurrentFund();
+
+  const token = {
+    tokenAddress: fund.tokenAddress,
+    tokenChainId: fund.tokenChainId,
+    tokenDecimals: fund.tokenDecimals,
+  };
+  const { accounts, balancesError } = await getTokenAccounts(fund.id, token);
+
+  return (
+    <>
       {balancesError && (
         <Alert variant="warning">
           <AlertDescription>{t("balancesError")}</AlertDescription>
@@ -99,6 +126,18 @@ export default async function AccountsPage() {
           </TableBody>
         </Table>
       )}
-    </div>
+    </>
+  );
+}
+
+function AccountsHeaderFallback() {
+  return (
+    <header className="flex flex-wrap items-start justify-between gap-4">
+      <div className="space-y-1">
+        <Skeleton className="h-7 w-40" />
+        <Skeleton className="h-4 w-72" />
+      </div>
+      <Skeleton className="h-9 w-32" />
+    </header>
   );
 }

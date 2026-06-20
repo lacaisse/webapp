@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { Suspense } from "react";
 import { getFormatter, getTranslations } from "next-intl/server";
 
+import { TableSkeleton } from "@/components/table-skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -18,7 +21,42 @@ import { InviteMemberDialog } from "./invite-member-dialog";
 import { InviteRowActions } from "./invite-row-actions";
 import { MemberRowActions } from "./member-row-actions";
 
-export default async function TeamPage() {
+// Synchronous shell: header (with its role-aware invite dialog) and the
+// staff/invite tables each stream behind their own <Suspense>.
+export default function TeamPage() {
+  return (
+    <>
+      <Suspense fallback={<TeamHeaderSkeleton />}>
+        <TeamHeader />
+      </Suspense>
+      <Suspense fallback={<TeamTablesSkeleton />}>
+        <TeamTables />
+      </Suspense>
+    </>
+  );
+}
+
+async function TeamHeader() {
+  const t = await getTranslations("fund.team");
+  const { membership } = await requireFundRole("ADMIN");
+  const grantableRoles: InvitableRole[] =
+    membership.role === "OWNER" ? ["OWNER", "ADMIN"] : ["ADMIN"];
+
+  return (
+    <header className="flex items-end justify-between gap-4">
+      <div className="space-y-1">
+        <h1 className="font-heading text-2xl font-medium">{t("title")}</h1>
+        <p className="text-sm text-muted-foreground">{t("description")}</p>
+      </div>
+      <InviteMemberDialog
+        triggerLabel={t("invite")}
+        grantableRoles={grantableRoles}
+      />
+    </header>
+  );
+}
+
+async function TeamTables() {
   const t = await getTranslations("fund.team");
   const roleLabel = await getTranslations("team.roles");
   const format = await getFormatter();
@@ -56,17 +94,6 @@ export default async function TeamPage() {
 
   return (
     <>
-      <header className="flex items-end justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="font-heading text-2xl font-medium">{t("title")}</h1>
-          <p className="text-sm text-muted-foreground">{t("description")}</p>
-        </div>
-        <InviteMemberDialog
-          triggerLabel={t("invite")}
-          grantableRoles={grantableRoles}
-        />
-      </header>
-
       <section className="space-y-3">
         <h2 className="text-sm font-medium text-muted-foreground">
           {t("staffHeading")}
@@ -164,6 +191,33 @@ export default async function TeamPage() {
             )}
           </TableBody>
         </Table>
+      </section>
+    </>
+  );
+}
+
+function TeamHeaderSkeleton() {
+  return (
+    <header className="flex items-end justify-between gap-4">
+      <div className="space-y-1">
+        <Skeleton className="h-7 w-40" />
+        <Skeleton className="h-4 w-72" />
+      </div>
+      <Skeleton className="h-9 w-28" />
+    </header>
+  );
+}
+
+function TeamTablesSkeleton() {
+  return (
+    <>
+      <section className="space-y-3">
+        <Skeleton className="h-4 w-32" />
+        <TableSkeleton columns={5} rows={3} />
+      </section>
+      <section className="space-y-3">
+        <Skeleton className="h-4 w-32" />
+        <TableSkeleton columns={5} rows={2} />
       </section>
     </>
   );

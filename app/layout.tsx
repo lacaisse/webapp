@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
 import localFont from "next/font/local";
 import { NextIntlClientProvider } from "next-intl";
-import { getLocale } from "next-intl/server";
+import { DEFAULT_LOCALE } from "@/services/i18n/config";
+import { HtmlLang } from "./html-lang";
 import "./globals.css";
 
 const geistSans = localFont({
@@ -34,19 +36,31 @@ export const viewport: Viewport = {
   themeColor: "#c46a4a",
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const locale = await getLocale();
+  // `lang` ships as the build-time default in the static shell (Cache
+  // Components can't read the locale cookie at prerender) and is corrected to
+  // the user's locale on the client by <HtmlLang />.
   return (
     <html
-      lang={locale}
+      lang={DEFAULT_LOCALE}
       className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <NextIntlClientProvider>{children}</NextIntlClientProvider>
+        {/* NextIntlClientProvider resolves the locale + messages from the
+            request (cookie-based), which is runtime data. Under Cache
+            Components that must sit inside a <Suspense> boundary so the
+            document shell stays static; per-route boundaries below stream
+            their own skeletons. */}
+        <Suspense fallback={null}>
+          <NextIntlClientProvider>
+            <HtmlLang />
+            {children}
+          </NextIntlClientProvider>
+        </Suspense>
       </body>
     </html>
   );
