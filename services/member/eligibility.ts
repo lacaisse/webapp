@@ -14,3 +14,12 @@ export const ALLOCATION_ELIGIBLE_STATUS: MemberStatus = "ACTIVE";
 export function isAllocationEligible(status: MemberStatus): boolean {
   return status === ALLOCATION_ELIGIBLE_STATUS;
 }
+
+// Members who receive the monthly payment-request reminder (issue #39). Same
+// status gate as allocations: only ACTIVE members are expected to contribute;
+// NEW / INACTIVE / PAUSED / STOPPED / REJECTED are all excluded (the issue
+// calls out PAUSED/STOPPED explicitly — the rest never reach a contributing
+// state). The other exclusions the issue lists (no card assigned, opted out of
+// reminders, already paid this period) are runtime conditions, not status, so
+// they're applied as query filters by the reminder cron — not encoded here.
+export const REMINDER_ELIGIBLE_STATUS: MemberStatus = "ACTIVE";

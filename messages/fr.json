@@ -1515,6 +1515,8 @@
         "allocationDescription": "L'e-mail que reçoivent les membres lorsqu'une allocation est créditée sur leur carte. Laissez-le tel quel pour conserver le texte par défaut, ou personnalisez-le pour cette caisse.",
         "cardAssignedTitle": "E-mail « carte en route »",
         "cardAssignedDescription": "L'e-mail qu'un membre reçoit lorsque sa carte lui est attribuée et est en route. Laissez-le tel quel pour conserver le texte par défaut, ou personnalisez-le pour cette caisse.",
+        "paymentReminderTitle": "E-mail de rappel de cotisation",
+        "paymentReminderDescription": "Le rappel mensuel envoyé le 1er du mois aux membres qui n'ont pas encore cotisé pour la période. Laissez-le tel quel pour conserver le texte par défaut, ou personnalisez-le pour cette caisse.",
         "subjectLabel": "Objet",
         "bodyLabel": "Message",
         "variablesHint": "Vous pouvez utiliser ces variables — elles sont remplacées par les informations de chaque membre à l'envoi :",
@@ -1527,7 +1529,8 @@
           "shopList": "Liste à puces des commerçants actifs de la caisse",
           "address": "L'adresse postale du membre",
           "cardLink": "Lien vers la page publique de la carte du membre",
-          "cardNumber": "Le numéro de carte du membre"
+          "cardNumber": "Le numéro de carte du membre",
+          "paymentReference": "La communication à indiquer sur le virement bancaire"
         },
         "usingDefault": "Modèle par défaut utilisé.",
         "usingOverride": "Modèle personnalisé utilisé pour cette caisse.",
@@ -1726,6 +1729,9 @@
       "allocationConfirmation": {
         "subject": "{amount} viennent d'arriver sur votre carte — {fundName}",
         "textBody": "Bonjour {firstName},\n\nVotre allocation de {amount} vient d'être créditée sur votre carte {fundName}. Vous pouvez l'utiliser chez tout commerce partenaire.\n\nL'équipe {fundName}"
+      },
+      "footer": {
+        "unsubscribe": "Se désinscrire des rappels de paiement"
       }
     },
     "signup": {
@@ -1734,6 +1740,7 @@
       "firstName": "Prénom",
       "lastName": "Nom",
       "email": "Email",
+      "remindersOptOut": "Je ne souhaite pas recevoir les rappels de paiement par email.",
       "submit": "Envoyer",
       "submitting": "Envoi…",
       "errors": {
@@ -2372,6 +2379,21 @@
         "email_mismatch": "L'adresse email a changé depuis l'envoi de ce lien."
       },
       "nextSteps": "Contactez l'administrateur de la caisse ou refaites une demande pour recevoir un nouveau lien de vérification."
+    }
+  },
+  "unsubscribe": {
+    "title": "Rappels de paiement",
+    "errorTitle": "Lien invalide",
+    "description": "Bonjour {firstName}, gérez vos préférences de rappels de paiement par email ci-dessous.",
+    "status": {
+      "subscribed": "Vous recevez actuellement les rappels de paiement par email.",
+      "unsubscribed": "Vous ne recevez plus les rappels de paiement par email."
+    },
+    "unsubscribe": "Me désinscrire des rappels",
+    "resubscribe": "Réactiver les rappels",
+    "saving": "Enregistrement…",
+    "errors": {
+      "invalidLink": "Ce lien de désinscription n'est pas valide ou a expiré."
     }
   },
   "account": {

@@ -17,6 +17,10 @@ export const BuiltinSignupSchema = z.object({
     error: "members.signup.errors.lastNameRequired",
   }),
   email: z.string().email({ error: "members.signup.errors.emailInvalid" }),
+  // Opt out of payment-reminder emails at registration (issue #39/#40).
+  // Persists to Member.emailUnsubscribed; the member can flip it later via the
+  // deregistration link. Defaults to opted-in.
+  remindersOptOut: z.boolean().optional(),
 });
 
 // Admin-side edit of a member's core record from the detail view. Identity

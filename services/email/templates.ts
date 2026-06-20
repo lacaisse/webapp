@@ -239,13 +239,60 @@ const CARD_ASSIGNED_DEFAULTS: Record<
   },
 };
 
+// The PAYMENT_REMINDER_FIRST ("monthly payment request") default. Adapted from
+// La CLASS's template (issue #39) but tenant-neutral: no fund-specific copy,
+// and — since this platform reconciles contributions by bank transfer matched
+// on the member's reference, not an online checkout — it shows the bank-transfer
+// {paymentReference} instead of a "pay now" button. Colours are kept neutral
+// (the brand colour is only applied to text-mode CTAs, not HTML bodies).
+const PAYMENT_REMINDER_DEFAULTS: Record<
+  string,
+  { subject: string; bodyHtml: string }
+> = {
+  fr: {
+    subject: "Votre cotisation mensuelle — {fundName}",
+    bodyHtml: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+  <p>Bonjour {firstName},</p>
+  <p>Un mois de plus pour soutenir collectivement une alimentation de qualité, accessible à toutes et tous !</p>
+  <div style="background-color: #f3f4f6; padding: 20px; margin: 20px 0; border-radius: 8px;">
+    <h3 style="margin-top: 0;">Détails de votre cotisation</h3>
+    <p style="margin: 8px 0;"><strong>Cotisation mensuelle :</strong> {amount} €</p>
+  </div>
+  <p>Pour effectuer votre cotisation, faites un virement bancaire en indiquant bien la communication suivante, afin que votre paiement soit reconnu automatiquement :</p>
+  <div style="background-color: #f1eee8; padding: 12px 16px; border-radius: 8px; margin: 20px 0; font-family: monospace; font-size: 16px; word-break: break-word;">{paymentReference}</div>
+  <p>Vous pouvez retrouver les informations de votre compte {fundName} <a href="{cardLink}" style="color: #2563eb;">à cette adresse</a>.</p>
+  <p>Merci pour votre soutien, et à bientôt,<br><strong>L'équipe {fundName}</strong></p>
+</div>`,
+  },
+  en: {
+    subject: "Your monthly contribution — {fundName}",
+    bodyHtml: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+  <p>Hi {firstName},</p>
+  <p>Another month to collectively support quality food that's accessible to everyone!</p>
+  <div style="background-color: #f3f4f6; padding: 20px; margin: 20px 0; border-radius: 8px;">
+    <h3 style="margin-top: 0;">Your contribution</h3>
+    <p style="margin: 8px 0;"><strong>Monthly contribution:</strong> {amount} €</p>
+  </div>
+  <p>To make your contribution, send a bank transfer with the following reference so your payment is recognised automatically:</p>
+  <div style="background-color: #f1eee8; padding: 12px 16px; border-radius: 8px; margin: 20px 0; font-family: monospace; font-size: 16px; word-break: break-word;">{paymentReference}</div>
+  <p>You can find your {fundName} account details <a href="{cardLink}" style="color: #2563eb;">at this link</a>.</p>
+  <p>Thanks for your support, and see you soon,<br><strong>The {fundName} team</strong></p>
+</div>`,
+  },
+};
+
 function htmlTemplateDefault(
   type: EditableEmailType,
   locale: string,
 ): { subject: string; bodyHtml: string } {
-  // Only CARD_ASSIGNED has an HTML default today; the registry's defaultIsHtml
-  // flag gates callers so this is never reached for a text-defaulted template.
-  const byLocale = type === "CARD_ASSIGNED" ? CARD_ASSIGNED_DEFAULTS : {};
+  // Registry's defaultIsHtml flag gates callers, so this is only reached for
+  // HTML-defaulted templates. Each maps to its per-locale default constant.
+  const byLocale =
+    type === "CARD_ASSIGNED"
+      ? CARD_ASSIGNED_DEFAULTS
+      : type === "PAYMENT_REMINDER_FIRST"
+        ? PAYMENT_REMINDER_DEFAULTS
+        : {};
   return byLocale[locale] ?? byLocale[DEFAULT_LOCALE] ?? byLocale.fr;
 }
 
@@ -281,6 +328,48 @@ export async function resolveCardAssignedTemplate(args: {
   }
 
   const def = htmlTemplateDefault("CARD_ASSIGNED", await getLocale());
+  const html = interpolate(def.bodyHtml, args.vars);
+  return {
+    subject: interpolate(def.subject, args.vars),
+    text: htmlToPlainText(html),
+    html,
+  };
+}
+
+// The PAYMENT_REMINDER_FIRST email. Same override-or-default shape as
+// CARD_ASSIGNED — every variable is a plain scalar the caller resolves up front
+// (the reminder cron / test send): {amount} the member's monthly contribution,
+// {paymentReference} the bank-transfer communication, {cardLink} the public
+// account URL. The built-in default is authored as rich HTML.
+export async function resolvePaymentReminderTemplate(args: {
+  fundId: string;
+  vars: {
+    firstName: string;
+    lastName: string;
+    fundName: string;
+    amount: string;
+    paymentReference: string;
+    cardLink: string;
+  };
+}): Promise<Rendered> {
+  const override = await prisma.emailTemplate.findUnique({
+    where: {
+      fundId_type: { fundId: args.fundId, type: "PAYMENT_REMINDER_FIRST" },
+    },
+    select: { subject: true, bodyText: true, bodyHtml: true },
+  });
+
+  if (override) {
+    return {
+      subject: interpolate(override.subject, args.vars),
+      text: interpolate(override.bodyText, args.vars),
+      html: override.bodyHtml
+        ? interpolate(override.bodyHtml, args.vars)
+        : undefined,
+    };
+  }
+
+  const def = htmlTemplateDefault("PAYMENT_REMINDER_FIRST", await getLocale());
   const html = interpolate(def.bodyHtml, args.vars);
   return {
     subject: interpolate(def.subject, args.vars),

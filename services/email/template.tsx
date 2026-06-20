@@ -55,6 +55,9 @@ export type BrandedEmailArgs = {
   // (header/footer/card chrome preserved) and `text`/`ctaLabel` block-parsing
   // is bypassed. `text` is still used for the plain-text MIME part.
   html?: string;
+  // Member opt-out footer link (issue #40). Present on every email that targets
+  // a member; absent for merchant / team sends. `label` is pre-localised.
+  unsubscribe?: { url: string; label: string };
 };
 
 export async function renderBrandedEmail(
@@ -71,6 +74,7 @@ function EmailTemplate({
   text,
   ctaLabel,
   html,
+  unsubscribe,
 }: BrandedEmailArgs) {
   const brand = normalizeHex(primaryColor);
   const blocks = text.split(/\n{2,}/);
@@ -127,9 +131,30 @@ function EmailTemplate({
               ))
             )}
           </Section>
+          {unsubscribe ? (
+            <Text
+              style={{
+                margin: "20px 0 0",
+                fontSize: 12,
+                lineHeight: "16px",
+                color: COLORS.mutedForeground,
+                textAlign: "center",
+              }}
+            >
+              <a
+                href={unsubscribe.url}
+                style={{
+                  color: COLORS.mutedForeground,
+                  textDecoration: "underline",
+                }}
+              >
+                {unsubscribe.label}
+              </a>
+            </Text>
+          ) : null}
           <Text
             style={{
-              margin: "20px 0 0",
+              margin: unsubscribe ? "8px 0 0" : "20px 0 0",
               fontSize: 12,
               lineHeight: "16px",
               color: COLORS.mutedForeground,

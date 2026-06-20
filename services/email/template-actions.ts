@@ -26,6 +26,7 @@ import {
   interpolate,
   resolveAllocationTemplate,
   resolveCardAssignedTemplate,
+  resolvePaymentReminderTemplate,
 } from "./templates";
 
 export type TemplateActionResult = { ok: true } | { error: string };
@@ -273,6 +274,95 @@ export async function sendTestCardAssignedEmailAction(input: {
     });
   } catch (e) {
     console.error("[email] test card-assigned send failed", fund.id, e);
+    return {
+      error: t("fund.settings.emailTemplates.test.errors.sendFailed" as never),
+    };
+  }
+  return { ok: true };
+}
+
+// Send a one-off test of the PAYMENT_REMINDER_FIRST email, populated from a
+// real member so {amount} (tier minimum), {paymentReference} and {cardLink}
+// render with live data. Requires a tier (for the amount) and a primary card
+// (for the link), matching what the real reminder cron needs. Transient — no
+// Email row / idempotency. Honours the fund's custom sender.
+export async function sendTestPaymentReminderEmailAction(input: {
+  memberId: string;
+  toEmail: string;
+}): Promise<SendTestEmailResult> {
+  const t = await getTranslations();
+  const { fund } = await requireFundRole("ADMIN");
+
+  const toEmail = input.toEmail.trim();
+  if (!z.string().email().safeParse(toEmail).success) {
+    return {
+      error: t("fund.settings.emailTemplates.test.errors.emailInvalid" as never),
+    };
+  }
+
+  const member = await prisma.member.findFirst({
+    where: { id: input.memberId, fundId: fund.id },
+    select: {
+      firstName: true,
+      lastName: true,
+      paymentReference: true,
+      tier: { select: { minContribution: true } },
+      primaryCard: { select: { serialNumber: true } },
+    },
+  });
+  if (!member) {
+    return {
+      error: t("fund.settings.emailTemplates.test.errors.memberNotFound" as never),
+    };
+  }
+  if (!member.tier) {
+    return {
+      error: t("fund.settings.emailTemplates.test.errors.noTier" as never),
+    };
+  }
+  if (!member.primaryCard) {
+    return {
+      error: t("fund.settings.emailTemplates.test.errors.noCard" as never),
+    };
+  }
+
+  const rendered = await resolvePaymentReminderTemplate({
+    fundId: fund.id,
+    vars: {
+      firstName: member.firstName,
+      lastName: member.lastName,
+      fundName: fund.name,
+      amount: member.tier.minContribution.toString(),
+      paymentReference: member.paymentReference ?? "",
+      cardLink: buildCardLink(
+        member.primaryCard.serialNumber,
+        await resolveTreasurySlug(fund),
+      ),
+    },
+  });
+
+  const subject = `${t("fund.settings.emailTemplates.test.subjectPrefix" as never)} ${rendered.subject}`;
+  const html = await renderBrandedEmail({
+    fundName: fund.name,
+    primaryColor: fund.primaryColor,
+    logoUrl: fund.logoUrl,
+    subject,
+    text: rendered.text,
+    html: rendered.html,
+  });
+
+  try {
+    await sendEmail({
+      to: toEmail,
+      subject,
+      text: rendered.text,
+      html,
+      from: fund.senderEmail
+        ? `${fund.name} <${fund.senderEmail}>`
+        : undefined,
+    });
+  } catch (e) {
+    console.error("[email] test payment-reminder send failed", fund.id, e);
     return {
       error: t("fund.settings.emailTemplates.test.errors.sendFailed" as never),
     };

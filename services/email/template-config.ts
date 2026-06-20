@@ -49,6 +49,25 @@ export const EDITABLE_EMAIL_TEMPLATES = {
       "cardNumber",
     ],
   },
+  PAYMENT_REMINDER_FIRST: {
+    // i18nKey is structural only — HTML-defaulted templates take their default
+    // from the constant in templates.ts, never from i18n (see htmlTemplateDefault).
+    i18nKey: "members.email.paymentReminder",
+    hasCta: false,
+    defaultIsHtml: true,
+    // Plain scalars resolved by the caller (cron / test send): {amount} is the
+    // member's monthly contribution (tier minimum), {paymentReference} the bank
+    // transfer communication that bank-sync matches on, {cardLink} the public
+    // account/tap URL. See templates.ts.
+    variables: [
+      "firstName",
+      "lastName",
+      "fundName",
+      "amount",
+      "paymentReference",
+      "cardLink",
+    ],
+  },
 } as const;
 
 export type EditableEmailType = keyof typeof EDITABLE_EMAIL_TEMPLATES;
@@ -74,6 +93,14 @@ export const PREVIEW_SAMPLE_VALUES: Record<
     address: "Rue de l'Exemple 12, 1000 Bruxelles",
     cardLink: "https://tap.citizenpay.xyz/card/04A2B7C9D1?network=demo",
     cardNumber: "42",
+  },
+  PAYMENT_REMINDER_FIRST: {
+    firstName: "Alex",
+    lastName: "Dupont",
+    fundName: "Your fund",
+    amount: "25",
+    paymentReference: "ABCD2345",
+    cardLink: "https://tap.citizenpay.xyz/card/04A2B7C9D1?network=demo",
   },
 };
 

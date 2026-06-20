@@ -38,6 +38,7 @@ export function SignupForm({
       firstName: "",
       lastName: "",
       email: "",
+      remindersOptOut: false,
       extras: Object.fromEntries(
         fields.map((f) => [f.key, defaultValueFor(f)]),
       ),
@@ -130,6 +131,15 @@ export function SignupForm({
           )}
         />
       ))}
+
+      <label className="flex cursor-pointer items-start gap-2 text-sm">
+        <input
+          type="checkbox"
+          {...form.register("remindersOptOut")}
+          className="mt-0.5 size-4 rounded border-input"
+        />
+        <span>{t("remindersOptOut")}</span>
+      </label>
 
       {errors.root && (
         <Alert variant="destructive">
