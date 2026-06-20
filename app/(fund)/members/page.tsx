@@ -2,7 +2,8 @@
 import Link from "next/link";
 import { getFormatter, getTranslations } from "next-intl/server";
 
-import { Badge } from "@/components/ui/badge";
+import { TableSearch } from "@/components/table-search";
+import { Badge, badgeVariants } from "@/components/ui/badge";
 import { Tabs, resolveActiveTab } from "@/components/ui/tabs";
 import {
   Table,
@@ -13,6 +14,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { parseCardNumber, searchTokens } from "@/lib/search";
+import { cn } from "@/lib/utils";
 import { MemberStatus } from "@/services/db/generated/enums";
 import { prisma } from "@/services/db/prisma";
 import { requireCurrentFund } from "@/services/fund/server";
@@ -56,10 +59,41 @@ function statusFilterFor(tab: TabValue) {
   }
 }
 
+// Free-text member search (issue #29): match on the member's name — each
+// whitespace token must hit a first/last name — OR on one of their cards by
+// serial / card number. A clean integer query also matches a card number
+// exactly.
+function memberSearchWhere(q: string) {
+  const tokens = searchTokens(q);
+  const number = parseCardNumber(q);
+  return {
+    OR: [
+      {
+        AND: tokens.map((tok) => ({
+          OR: [
+            { firstName: { contains: tok, mode: "insensitive" as const } },
+            { lastName: { contains: tok, mode: "insensitive" as const } },
+          ],
+        })),
+      },
+      {
+        cards: {
+          some: {
+            OR: [
+              { serialNumber: { contains: q, mode: "insensitive" as const } },
+              ...(number !== null ? [{ number }] : []),
+            ],
+          },
+        },
+      },
+    ],
+  };
+}
+
 export default async function MembersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; q?: string }>;
 }) {
   const t = await getTranslations("fund.members");
   const tStatus = await getTranslations("members.admin.status.values");
@@ -67,15 +101,23 @@ export default async function MembersPage({
   const fund = await requireCurrentFund();
   const sp = await searchParams;
   const active = resolveActiveTab(sp.tab, TABS);
+  const q = sp.q?.trim() || null;
 
   const status = statusFilterFor(active);
   const [members, tiers] = await Promise.all([
     prisma.member.findMany({
-      where: { fundId: fund.id, ...(status ? { status } : {}) },
+      where: {
+        fundId: fund.id,
+        ...(status ? { status } : {}),
+        ...(q ? memberSearchWhere(q) : {}),
+      },
       orderBy: { createdAt: "desc" },
       include: {
         tier: { select: { name: true } },
-        _count: { select: { cards: true } },
+        cards: {
+          select: { id: true, number: true, serialNumber: true },
+          orderBy: [{ number: { sort: "asc", nulls: "last" } }],
+        },
       },
     }),
     prisma.allocationTier.findMany({
@@ -101,13 +143,16 @@ export default async function MembersPage({
         </div>
       </header>
 
-      <Tabs
-        active={active}
-        items={TABS.map((tab) => ({
-          value: tab.value,
-          label: t(`tabs.${tab.value}`),
-        }))}
-      />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Tabs
+          active={active}
+          items={TABS.map((tab) => ({
+            value: tab.value,
+            label: t(`tabs.${tab.value}`),
+          }))}
+        />
+        <TableSearch placeholder={t("searchPlaceholder")} />
+      </div>
 
       <Table>
         <TableHeader>
@@ -155,8 +200,32 @@ export default async function MembersPage({
                       tiers={tiers}
                     />
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {m._count.cards}
+                  <TableCell>
+                    {m.cards.length === 0 ? (
+                      <span className="text-sm text-muted-foreground">—</span>
+                    ) : (
+                      <div className="flex flex-wrap gap-1">
+                        {primaryFirst(m.cards, m.primaryCardId).map((card) => (
+                          <Link
+                            key={card.id}
+                            href={`/cards/${card.id}`}
+                            className={cn(
+                              badgeVariants({ variant: "outline" }),
+                              "transition-colors hover:bg-muted",
+                            )}
+                          >
+                            {card.number !== null && (
+                              <span className="tabular-nums">
+                                #{card.number}
+                              </span>
+                            )}
+                            <span className="font-mono text-muted-foreground">
+                              {card.serialNumber}
+                            </span>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {format.dateTime(m.joinedAt, { dateStyle: "medium" })}
@@ -193,6 +262,18 @@ export default async function MembersPage({
       </Table>
     </>
   );
+}
+
+// Surface the member's primary card first; the rest keep their incoming
+// (card-number ascending) order.
+function primaryFirst<T extends { id: string }>(
+  cards: T[],
+  primaryCardId: string | null,
+): T[] {
+  if (!primaryCardId) return cards;
+  const primary = cards.find((c) => c.id === primaryCardId);
+  if (!primary) return cards;
+  return [primary, ...cards.filter((c) => c.id !== primaryCardId)];
 }
 
 function StatusBadge({ status, label }: { status: string; label: string }) {

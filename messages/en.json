@@ -393,6 +393,7 @@
       "title": "Members",
       "description": "Manage member accounts, onboarding, and tier assignments.",
       "invite": "Add member",
+      "searchPlaceholder": "Search by name or card number…",
       "tabs": {
         "all": "All",
         "new": "New",
@@ -513,7 +514,7 @@
       "empty": "No cards to show.",
       "prev": "Previous",
       "next": "Next",
-      "searchPlaceholder": "Search by serial…",
+      "searchPlaceholder": "Search by number, serial or holder…",
       "detail": {
         "back": "All cards",
         "balance": {

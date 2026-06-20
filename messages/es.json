@@ -377,6 +377,7 @@
       "title": "Miembros",
       "description": "Gestione las cuentas de miembros, la incorporación y la asignación de niveles.",
       "invite": "Invitar miembro",
+      "searchPlaceholder": "Buscar por nombre o número de tarjeta…",
       "tabs": {
         "all": "Todos",
         "pending": "Pendientes",
@@ -493,7 +494,7 @@
       "empty": "No hay tarjetas que mostrar.",
       "prev": "Anterior",
       "next": "Siguiente",
-      "searchPlaceholder": "Buscar por número de serie…",
+      "searchPlaceholder": "Buscar por número, serie o titular…",
       "detail": {
         "back": "Todas las tarjetas",
         "balance": {

@@ -393,6 +393,7 @@
       "title": "Membres",
       "description": "Gérez les comptes membres, l'onboarding et les paliers.",
       "invite": "Ajouter un membre",
+      "searchPlaceholder": "Rechercher par nom ou numéro de carte…",
       "tabs": {
         "all": "Tous",
         "new": "Nouveaux",
@@ -513,7 +514,7 @@
       "empty": "Aucune carte à afficher.",
       "prev": "Précédent",
       "next": "Suivant",
-      "searchPlaceholder": "Rechercher par numéro de série…",
+      "searchPlaceholder": "Rechercher par numéro, série ou titulaire…",
       "detail": {
         "back": "Toutes les cartes",
         "balance": {

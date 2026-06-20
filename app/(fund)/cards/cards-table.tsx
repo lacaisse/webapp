@@ -14,6 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { parseCardNumber, searchTokens } from "@/lib/search";
 import { cn } from "@/lib/utils";
 import { getBalances } from "@/services/alchemy/balances";
 import { formatTokenAmount } from "@/services/alchemy/format";
@@ -39,12 +40,11 @@ export type CardsTab = "all" | "active" | "lost" | "blocked";
 //   - `lost`: reportedLostAt is not null (regardless of status)
 //   - status filters: ACTIVE / BLOCKED
 // So a lost+blocked card shows up in both the "lost" and "blocked" tabs.
-// `q` is an optional case-insensitive contains-match against the card's
-// serial number — admins typically search by the printed number.
+// `q` is an optional case-insensitive search across the card number, serial,
+// holder name, and the bound member's name (issue #30). A purely numeric
+// query also matches the per-fund card number exactly.
 function whereFor(tab: CardsTab, fundId: string, q: string | null) {
-  const search = q
-    ? { serialNumber: { contains: q, mode: "insensitive" as const } }
-    : {};
+  const search = q ? { OR: cardSearchOr(q) } : {};
   const baseWhere = { fundId, ...search };
   switch (tab) {
     case "all":
@@ -56,6 +56,31 @@ function whereFor(tab: CardsTab, fundId: string, q: string | null) {
     case "lost":
       return { ...baseWhere, reportedLostAt: { not: null } };
   }
+}
+
+// Build the OR branches for a card search query: substring matches on serial
+// and holder name, the bound member's name (each whitespace token must match
+// a first/last name), and — when the query is a clean integer — an exact card
+// number match.
+function cardSearchOr(q: string) {
+  const insensitive = { contains: q, mode: "insensitive" as const };
+  const number = parseCardNumber(q);
+  const tokens = searchTokens(q);
+  return [
+    { serialNumber: insensitive },
+    { holderName: insensitive },
+    {
+      member: {
+        AND: tokens.map((tok) => ({
+          OR: [
+            { firstName: { contains: tok, mode: "insensitive" as const } },
+            { lastName: { contains: tok, mode: "insensitive" as const } },
+          ],
+        })),
+      },
+    },
+    ...(number !== null ? [{ number }] : []),
+  ];
 }
 
 export async function CardsTable({
