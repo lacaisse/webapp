@@ -33,6 +33,8 @@ import { requireCurrentFund } from "@/services/fund/server";
 import { AllocateMemberButton } from "./allocate-member-button";
 import { NotifyAllButton } from "./notify-all-button";
 import { NotifyAllocationButton } from "./notify-allocation-button";
+import { RemindMemberButton } from "./remind-member-button";
+import { RemindUnpaidButton } from "./remind-unpaid-button";
 import { RemoveDepositButton } from "./remove-deposit-button";
 import { RunAllocation } from "./run-allocation";
 
@@ -143,12 +145,24 @@ async function AllocationPeriodDetail({
       id: true,
       firstName: true,
       lastName: true,
+      email: true,
+      emailUnsubscribed: true,
       tier: {
         select: { name: true, minContribution: true },
       },
       bankTransactions: {
         where: { allocationPeriodId: period.id, direction: "INCOMING" },
         select: { amount: true },
+      },
+      // Payment reminders already sent for this period drive the per-member
+      // reminder badge + send/retry button on the Missing tab (FIRST = the
+      // monthly cron's automatic request, SECOND = a manual nudge).
+      emails: {
+        where: {
+          allocationPeriodId: period.id,
+          type: { in: ["PAYMENT_REMINDER_FIRST", "PAYMENT_REMINDER_SECOND"] },
+        },
+        select: { status: true },
       },
     },
     orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
@@ -161,7 +175,14 @@ async function AllocationPeriodDetail({
     min: string;
     deposited: string;
   };
-  const missing: ExpectedRow[] = [];
+  // Missing rows additionally carry whether the member can still be reminded
+  // and their current reminder state, so the Missing tab can show a badge and a
+  // send/retry button next to each unpaid member.
+  type MissingRow = ExpectedRow & {
+    reminder: ReminderState;
+    canRemind: boolean;
+  };
+  const missing: MissingRow[] = [];
   const belowMin: ExpectedRow[] = [];
   for (const m of expectedMembers) {
     if (!m.tier) continue; // tierId not null guarantees this, but narrow the type
@@ -177,12 +198,27 @@ async function AllocationPeriodDetail({
       deposited: total.toString(),
     };
     if (m.bankTransactions.length === 0) {
-      missing.push(row);
+      const reminder = reminderState({
+        hasEmail: Boolean(m.email),
+        optedOut: m.emailUnsubscribed,
+        statuses: m.emails.map((e) => e.status),
+      });
+      missing.push({
+        ...row,
+        reminder,
+        // Can be sent now: emailable, and not already successfully reminded.
+        canRemind:
+          reminder !== "noEmail" &&
+          reminder !== "optedOut" &&
+          reminder !== "sent",
+      });
     } else if (total.lt(m.tier.minContribution)) {
       belowMin.push(row);
     }
     // else: reached the minimum — allocated, not listed here.
   }
+  // How many unpaid members the "Remind all" button would actually email.
+  const remindPendingCount = missing.filter((m) => m.canRemind).length;
 
   // Members ready to allocate right now: qualifying deposit total, no mint for
   // this period yet. Same logic as the close cron and the run actions (see
@@ -557,6 +593,10 @@ async function AllocationPeriodDetail({
             </h2>
             <p className="text-sm text-muted-foreground">{t("missing.hint")}</p>
           </div>
+          <RemindUnpaidButton
+            periodId={period.id}
+            pendingCount={remindPendingCount}
+          />
           <Table>
             <TableHeader>
               <TableRow>
@@ -565,11 +605,13 @@ async function AllocationPeriodDetail({
                 <TableHead className="text-right">
                   {t("missing.minimum")}
                 </TableHead>
+                <TableHead>{t("remind.column")}</TableHead>
+                <TableHead />
               </TableRow>
             </TableHeader>
             <TableBody>
               {missing.length === 0 ? (
-                <TableEmpty colSpan={3}>{t("missing.empty")}</TableEmpty>
+                <TableEmpty colSpan={5}>{t("missing.empty")}</TableEmpty>
               ) : (
                 missing.map((m) => (
                   <TableRow key={m.id}>
@@ -586,6 +628,21 @@ async function AllocationPeriodDetail({
                     </TableCell>
                     <TableCell className="text-right text-sm text-muted-foreground">
                       {m.min}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={reminderBadgeVariant(m.reminder)}>
+                        {t(`remind.status.${m.reminder}`)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {m.canRemind && (
+                        <RemindMemberButton
+                          periodId={period.id}
+                          memberId={m.id}
+                          memberName={m.name}
+                          isRetry={m.reminder === "failed"}
+                        />
+                      )}
                     </TableCell>
                   </TableRow>
                 ))
@@ -698,6 +755,33 @@ function mintNotification(op: {
     };
   }
   return { badge: { variant: "outline", key: "notSent" }, action: "send" };
+}
+
+// Per-member payment-reminder state for the Missing tab. "noEmail"/"optedOut"
+// mean the member can't be reminded (no send button); the rest drive the badge:
+//   - sent:    a SENT reminder exists for this period → no action
+//   - failed:  only FAILED/QUEUED attempts so far → "Retry"
+//   - notSent: emailable, no reminder yet → "Send"
+type ReminderState = "noEmail" | "optedOut" | "sent" | "failed" | "notSent";
+
+function reminderState(args: {
+  hasEmail: boolean;
+  optedOut: boolean;
+  statuses: Array<"QUEUED" | "SENT" | "FAILED">;
+}): ReminderState {
+  if (!args.hasEmail) return "noEmail";
+  if (args.optedOut) return "optedOut";
+  if (args.statuses.includes("SENT")) return "sent";
+  if (args.statuses.length > 0) return "failed";
+  return "notSent";
+}
+
+function reminderBadgeVariant(
+  state: ReminderState,
+): "success" | "destructive" | "outline" {
+  if (state === "sent") return "success";
+  if (state === "failed") return "destructive";
+  return "outline";
 }
 
 function AllocationPeriodDetailSkeleton() {
