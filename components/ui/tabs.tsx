@@ -17,11 +17,17 @@ export function Tabs({
   items,
   active,
   paramName = "tab",
+  baseQuery,
   className,
 }: {
   items: TabItem[];
   active: string;
   paramName?: string;
+  // Extra query params to keep on every tab link. Without this a tab link
+  // replaces the whole query string — fine for the top-level tab bar, but a
+  // nested filter (e.g. ?tab=transactions&filter=unmatched) needs to preserve
+  // the parent `tab` when it switches its own param.
+  baseQuery?: Record<string, string>;
   className?: string;
 }) {
   return (
@@ -41,7 +47,7 @@ export function Tabs({
             role="tab"
             aria-selected={isActive}
             scroll={false}
-            href={{ query: { [paramName]: item.value } }}
+            href={{ query: { ...baseQuery, [paramName]: item.value } }}
             className={cn(
               "inline-flex h-7 items-center rounded-md px-3 font-medium transition-colors",
               isActive

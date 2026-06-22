@@ -7,6 +7,7 @@ import { getFormatter, getTranslations } from "next-intl/server";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, resolveActiveTab } from "@/components/ui/tabs";
 import {
   Card,
   CardContent,
@@ -39,25 +40,42 @@ import { RunAllocation } from "./run-allocation";
 // (params-dependent, uncached) streams in behind <Suspense>.
 export default function AllocationPeriodDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }) {
   return (
     <Suspense fallback={<AllocationPeriodDetailSkeleton />}>
-      <AllocationPeriodDetail params={params} />
+      <AllocationPeriodDetail params={params} searchParams={searchParams} />
     </Suspense>
   );
 }
 
+// Per-section tabs. The period detail used to stack five tables vertically;
+// they now live behind a tab bar so the page is scannable. `tab` lives in the
+// URL so back/forward and shared links land on the right section.
+const TABS = [
+  { value: "ready" },
+  { value: "deposits" },
+  { value: "mints" },
+  { value: "missing" },
+  { value: "belowMin" },
+] as const;
+
 async function AllocationPeriodDetail({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }) {
   const t = await getTranslations("fund.allocations.periodDetail");
   const format = await getFormatter();
   const fund = await requireCurrentFund();
   const { id } = await params;
+  const { tab } = await searchParams;
+  const active = resolveActiveTab(tab, TABS);
 
   const period = await prisma.allocationPeriod.findFirst({
     where: { id, fundId: fund.id },
@@ -264,278 +282,320 @@ async function AllocationPeriodDetail({
         </Card>
       )}
 
-      <section className="space-y-3">
-        <div className="space-y-1">
-          <h2 className="font-heading text-lg font-medium">
-            {t("ready.title", { count: ready.length })}
-          </h2>
-          <p className="text-sm text-muted-foreground">{t("ready.hint")}</p>
-        </div>
-        <RunAllocation
-          periodId={period.id}
-          readyCount={ready.length}
-          totalAmount={readyTotal}
-        />
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t("ready.member")}</TableHead>
-              <TableHead>{t("ready.tier")}</TableHead>
-              <TableHead className="text-right">
-                {t("ready.deposited")}
-              </TableHead>
-              <TableHead className="text-right">
-                {t("ready.allocation")}
-              </TableHead>
-              <TableHead />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {ready.length === 0 ? (
-              <TableEmpty colSpan={5}>{t("ready.empty")}</TableEmpty>
-            ) : (
-              ready.map((p) => (
-                <TableRow key={p.memberId}>
-                  <TableCell>
-                    <Link
-                      href={`/members/${p.memberId}`}
-                      className="hover:underline"
-                    >
-                      {p.memberName}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {p.tierName}
-                  </TableCell>
-                  <TableCell className="text-right text-sm text-muted-foreground">
-                    {p.deposited.toString()}
-                  </TableCell>
-                  <TableCell className="text-right font-medium">
-                    {p.amount.toString()}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <AllocateMemberButton
-                      periodId={period.id}
-                      memberId={p.memberId}
-                      memberName={p.memberName}
-                      amount={p.amount.toString()}
-                      periodLabel={period.label}
-                    />
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </section>
+      <Tabs
+        active={active}
+        items={[
+          { value: "ready", label: tabLabel(t("tabs.ready"), ready.length) },
+          {
+            value: "deposits",
+            label: tabLabel(t("tabs.deposits"), period.bankTransactions.length),
+          },
+          {
+            value: "mints",
+            label: tabLabel(t("tabs.mints"), period.tokenOperations.length),
+          },
+          {
+            value: "missing",
+            label: tabLabel(t("tabs.missing"), missing.length),
+          },
+          {
+            value: "belowMin",
+            label: tabLabel(t("tabs.belowMin"), belowMin.length),
+          },
+        ]}
+      />
 
-      <section className="space-y-3">
-        <h2 className="font-heading text-lg font-medium">
-          {t("deposits.title")}
-        </h2>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t("deposits.date")}</TableHead>
-              <TableHead>{t("deposits.member")}</TableHead>
-              <TableHead>{t("deposits.reference")}</TableHead>
-              <TableHead className="text-right">
-                {t("deposits.amount")}
-              </TableHead>
-              <TableHead>{t("deposits.allocation")}</TableHead>
-              <TableHead />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {period.bankTransactions.length === 0 ? (
-              <TableEmpty colSpan={6}>{t("deposits.empty")}</TableEmpty>
-            ) : (
-              period.bankTransactions.map((b) => {
-                const allocation = depositAllocation(
-                  b.operationSources.map((s) => s.tokenOperation.status),
-                );
-                return (
-                  <TableRow key={b.id}>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {format.dateTime(b.occurredAt, { dateStyle: "medium" })}
-                    </TableCell>
+      {active === "ready" && (
+        <section className="space-y-3">
+          <div className="space-y-1">
+            <h2 className="font-heading text-lg font-medium">
+              {t("ready.title", { count: ready.length })}
+            </h2>
+            <p className="text-sm text-muted-foreground">{t("ready.hint")}</p>
+          </div>
+          <RunAllocation
+            periodId={period.id}
+            readyCount={ready.length}
+            totalAmount={readyTotal}
+          />
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t("ready.member")}</TableHead>
+                <TableHead>{t("ready.tier")}</TableHead>
+                <TableHead className="text-right">
+                  {t("ready.deposited")}
+                </TableHead>
+                <TableHead className="text-right">
+                  {t("ready.allocation")}
+                </TableHead>
+                <TableHead />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {ready.length === 0 ? (
+                <TableEmpty colSpan={5}>{t("ready.empty")}</TableEmpty>
+              ) : (
+                ready.map((p) => (
+                  <TableRow key={p.memberId}>
                     <TableCell>
-                      {b.member ? (
-                        <Link
-                          href={`/members/${b.member.id}`}
-                          className="hover:underline"
-                        >
-                          {`${b.member.firstName} ${b.member.lastName}`.trim()}
-                        </Link>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-muted-foreground">
-                            {b.counterpartName ?? "—"}
-                          </span>
-                          <AttributeDialog bankTransactionId={b.id} />
-                        </div>
-                      )}
+                      <Link
+                        href={`/members/${p.memberId}`}
+                        className="hover:underline"
+                      >
+                        {p.memberName}
+                      </Link>
                     </TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {b.counterpartReference ?? b.remittanceInfo ?? "—"}
+                    <TableCell className="text-sm text-muted-foreground">
+                      {p.tierName}
+                    </TableCell>
+                    <TableCell className="text-right text-sm text-muted-foreground">
+                      {p.deposited.toString()}
                     </TableCell>
                     <TableCell className="text-right font-medium">
-                      {b.amount.toString()} {b.currency}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={allocation.variant}>
-                        {t(`deposits.${allocation.key}`)}
-                      </Badge>
+                      {p.amount.toString()}
                     </TableCell>
                     <TableCell className="text-right">
-                      {b.operationSources.length === 0 && (
-                        <RemoveDepositButton
-                          bankTransactionId={b.id}
-                          label={
-                            b.member
-                              ? `${b.member.firstName} ${b.member.lastName}`.trim()
-                              : (b.counterpartName ??
-                                b.counterpartReference ??
-                                "—")
-                          }
-                        />
-                      )}
+                      <AllocateMemberButton
+                        periodId={period.id}
+                        memberId={p.memberId}
+                        memberName={p.memberName}
+                        amount={p.amount.toString()}
+                        periodLabel={period.label}
+                      />
                     </TableCell>
                   </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </section>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </section>
+      )}
 
-      <section className="space-y-3">
-        <h2 className="font-heading text-lg font-medium">{t("mints.title")}</h2>
-        <NotifyAllButton
-          periodId={period.id}
-          pendingCount={notifyPendingCount}
-        />
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t("mints.date")}</TableHead>
-              <TableHead>{t("mints.member")}</TableHead>
-              <TableHead>{t("mints.tier")}</TableHead>
-              <TableHead className="text-right">{t("mints.amount")}</TableHead>
-              <TableHead>{t("mints.status")}</TableHead>
-              <TableHead>{t("notify.column")}</TableHead>
-              <TableHead />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {period.tokenOperations.length === 0 ? (
-              <TableEmpty colSpan={7}>{t("mints.empty")}</TableEmpty>
-            ) : (
-              period.tokenOperations.map((op) => {
-                const memberName = op.member
-                  ? `${op.member.firstName} ${op.member.lastName}`.trim()
-                  : "—";
-                const notif = mintNotification({
-                  type: op.type,
-                  status: op.status,
-                  hasEmail: Boolean(op.member?.email),
-                  emailStatuses: op.emails.map((e) => e.status),
-                });
-                return (
-                  <TableRow key={op.id}>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {format.dateTime(op.submittedAt, { dateStyle: "medium" })}
-                    </TableCell>
-                    <TableCell>
-                      {op.member ? (
-                        <Link
-                          href={`/members/${op.member.id}`}
-                          className="hover:underline"
-                        >
-                          {memberName}
-                        </Link>
-                      ) : (
-                        "—"
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {op.tier?.name ?? "—"}
-                    </TableCell>
-                    <TableCell className="text-right font-medium">
-                      {op.amount.toString()}
-                    </TableCell>
-                    <TableCell>
-                      <OperationStatusBadge status={op.status} />
-                    </TableCell>
-                    <TableCell>
-                      {notif.badge ? (
-                        <Badge variant={notif.badge.variant}>
-                          {t(`notify.status.${notif.badge.key}`)}
+      {active === "deposits" && (
+        <section className="space-y-3">
+          <h2 className="font-heading text-lg font-medium">
+            {t("deposits.title")}
+          </h2>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t("deposits.date")}</TableHead>
+                <TableHead>{t("deposits.member")}</TableHead>
+                <TableHead>{t("deposits.reference")}</TableHead>
+                <TableHead className="text-right">
+                  {t("deposits.amount")}
+                </TableHead>
+                <TableHead>{t("deposits.allocation")}</TableHead>
+                <TableHead />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {period.bankTransactions.length === 0 ? (
+                <TableEmpty colSpan={6}>{t("deposits.empty")}</TableEmpty>
+              ) : (
+                period.bankTransactions.map((b) => {
+                  const allocation = depositAllocation(
+                    b.operationSources.map((s) => s.tokenOperation.status),
+                  );
+                  return (
+                    <TableRow key={b.id}>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {format.dateTime(b.occurredAt, { dateStyle: "medium" })}
+                      </TableCell>
+                      <TableCell>
+                        {b.member ? (
+                          <Link
+                            href={`/members/${b.member.id}`}
+                            className="hover:underline"
+                          >
+                            {`${b.member.firstName} ${b.member.lastName}`.trim()}
+                          </Link>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-muted-foreground">
+                              {b.counterpartName ?? "—"}
+                            </span>
+                            <AttributeDialog bankTransactionId={b.id} />
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {b.counterpartReference ?? b.remittanceInfo ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {b.amount.toString()} {b.currency}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={allocation.variant}>
+                          {t(`deposits.${allocation.key}`)}
                         </Badge>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">—</span>
-                      )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {b.operationSources.length === 0 && (
+                          <RemoveDepositButton
+                            bankTransactionId={b.id}
+                            label={
+                              b.member
+                                ? `${b.member.firstName} ${b.member.lastName}`.trim()
+                                : (b.counterpartName ??
+                                  b.counterpartReference ??
+                                  "—")
+                            }
+                          />
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </section>
+      )}
+
+      {active === "mints" && (
+        <section className="space-y-3">
+          <h2 className="font-heading text-lg font-medium">
+            {t("mints.title")}
+          </h2>
+          <NotifyAllButton
+            periodId={period.id}
+            pendingCount={notifyPendingCount}
+          />
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t("mints.date")}</TableHead>
+                <TableHead>{t("mints.member")}</TableHead>
+                <TableHead>{t("mints.tier")}</TableHead>
+                <TableHead className="text-right">
+                  {t("mints.amount")}
+                </TableHead>
+                <TableHead>{t("mints.status")}</TableHead>
+                <TableHead>{t("notify.column")}</TableHead>
+                <TableHead />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {period.tokenOperations.length === 0 ? (
+                <TableEmpty colSpan={7}>{t("mints.empty")}</TableEmpty>
+              ) : (
+                period.tokenOperations.map((op) => {
+                  const memberName = op.member
+                    ? `${op.member.firstName} ${op.member.lastName}`.trim()
+                    : "—";
+                  const notif = mintNotification({
+                    type: op.type,
+                    status: op.status,
+                    hasEmail: Boolean(op.member?.email),
+                    emailStatuses: op.emails.map((e) => e.status),
+                  });
+                  return (
+                    <TableRow key={op.id}>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {format.dateTime(op.submittedAt, {
+                          dateStyle: "medium",
+                        })}
+                      </TableCell>
+                      <TableCell>
+                        {op.member ? (
+                          <Link
+                            href={`/members/${op.member.id}`}
+                            className="hover:underline"
+                          >
+                            {memberName}
+                          </Link>
+                        ) : (
+                          "—"
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {op.tier?.name ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {op.amount.toString()}
+                      </TableCell>
+                      <TableCell>
+                        <OperationStatusBadge status={op.status} />
+                      </TableCell>
+                      <TableCell>
+                        {notif.badge ? (
+                          <Badge variant={notif.badge.variant}>
+                            {t(`notify.status.${notif.badge.key}`)}
+                          </Badge>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">
+                            —
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {notif.action && (
+                          <NotifyAllocationButton
+                            tokenOperationId={op.id}
+                            memberName={memberName}
+                            amount={op.amount.toString()}
+                            isRetry={notif.action === "retry"}
+                          />
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </section>
+      )}
+
+      {active === "missing" && (
+        <section className="space-y-3">
+          <div className="space-y-1">
+            <h2 className="font-heading text-lg font-medium">
+              {t("missing.title", { count: missing.length })}
+            </h2>
+            <p className="text-sm text-muted-foreground">{t("missing.hint")}</p>
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{t("missing.member")}</TableHead>
+                <TableHead>{t("missing.tier")}</TableHead>
+                <TableHead className="text-right">
+                  {t("missing.minimum")}
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {missing.length === 0 ? (
+                <TableEmpty colSpan={3}>{t("missing.empty")}</TableEmpty>
+              ) : (
+                missing.map((m) => (
+                  <TableRow key={m.id}>
+                    <TableCell>
+                      <Link
+                        href={`/members/${m.id}`}
+                        className="hover:underline"
+                      >
+                        {m.name}
+                      </Link>
                     </TableCell>
-                    <TableCell className="text-right">
-                      {notif.action && (
-                        <NotifyAllocationButton
-                          tokenOperationId={op.id}
-                          memberName={memberName}
-                          amount={op.amount.toString()}
-                          isRetry={notif.action === "retry"}
-                        />
-                      )}
+                    <TableCell className="text-sm text-muted-foreground">
+                      {m.tierName}
+                    </TableCell>
+                    <TableCell className="text-right text-sm text-muted-foreground">
+                      {m.min}
                     </TableCell>
                   </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </section>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </section>
+      )}
 
-      <section className="space-y-3">
-        <div className="space-y-1">
-          <h2 className="font-heading text-lg font-medium">
-            {t("missing.title", { count: missing.length })}
-          </h2>
-          <p className="text-sm text-muted-foreground">{t("missing.hint")}</p>
-        </div>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t("missing.member")}</TableHead>
-              <TableHead>{t("missing.tier")}</TableHead>
-              <TableHead className="text-right">
-                {t("missing.minimum")}
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {missing.length === 0 ? (
-              <TableEmpty colSpan={3}>{t("missing.empty")}</TableEmpty>
-            ) : (
-              missing.map((m) => (
-                <TableRow key={m.id}>
-                  <TableCell>
-                    <Link href={`/members/${m.id}`} className="hover:underline">
-                      {m.name}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {m.tierName}
-                  </TableCell>
-                  <TableCell className="text-right text-sm text-muted-foreground">
-                    {m.min}
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </section>
-
-      {belowMin.length > 0 && (
+      {active === "belowMin" && (
         <section className="space-y-3">
           <div className="space-y-1">
             <h2 className="font-heading text-lg font-medium">
@@ -559,24 +619,31 @@ async function AllocationPeriodDetail({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {belowMin.map((m) => (
-                <TableRow key={m.id}>
-                  <TableCell>
-                    <Link href={`/members/${m.id}`} className="hover:underline">
-                      {m.name}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {m.tierName}
-                  </TableCell>
-                  <TableCell className="text-right font-medium">
-                    {m.deposited}
-                  </TableCell>
-                  <TableCell className="text-right text-sm text-muted-foreground">
-                    {m.min}
-                  </TableCell>
-                </TableRow>
-              ))}
+              {belowMin.length === 0 ? (
+                <TableEmpty colSpan={4}>{t("belowMin.empty")}</TableEmpty>
+              ) : (
+                belowMin.map((m) => (
+                  <TableRow key={m.id}>
+                    <TableCell>
+                      <Link
+                        href={`/members/${m.id}`}
+                        className="hover:underline"
+                      >
+                        {m.name}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {m.tierName}
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      {m.deposited}
+                    </TableCell>
+                    <TableCell className="text-right text-sm text-muted-foreground">
+                      {m.min}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </section>
@@ -625,7 +692,10 @@ function mintNotification(op: {
     return { badge: { variant: "success", key: "sent" }, action: null };
   }
   if (op.emailStatuses.length > 0) {
-    return { badge: { variant: "destructive", key: "failed" }, action: "retry" };
+    return {
+      badge: { variant: "destructive", key: "failed" },
+      action: "retry",
+    };
   }
   return { badge: { variant: "outline", key: "notSent" }, action: "send" };
 }
@@ -653,6 +723,12 @@ function AllocationPeriodDetailSkeleton() {
       </section>
     </>
   );
+}
+
+// Tab label with a trailing count, e.g. "Ready (3)". The count shows even when
+// zero so the admin can see an empty list without opening the tab.
+function tabLabel(label: string, count: number): string {
+  return `${label} (${count})`;
 }
 
 function KpiCard({

@@ -30,12 +30,16 @@ import { PeriodDialog } from "./period-dialog";
 import { ArchiveTierButton, TierDialog } from "./tier-dialog";
 
 const TABS = [
-  { value: "history" },
   { value: "transactions" },
-  { value: "unmatched" },
+  { value: "history" },
   { value: "tiers" },
   { value: "schedule" },
 ] as const;
+
+// Deposits sub-filter, nested inside the "transactions" tab. "Unmatched" used
+// to be its own top-level tab, but it's just a filtered view of the same table
+// — surfacing it twice was the confusing part. It now lives here as a filter.
+const DEPOSIT_FILTERS = [{ value: "all" }, { value: "unmatched" }] as const;
 
 // Synchronous shell: header + tab bar stream quickly; the active tab's data
 // table streams behind its own (keyed) <Suspense> so switching tabs re-shows
@@ -43,7 +47,7 @@ const TABS = [
 export default function AllocationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; filter?: string }>;
 }) {
   return (
     <>
@@ -70,12 +74,13 @@ async function AllocationsHeader() {
 async function AllocationsTabs({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; filter?: string }>;
 }) {
   const t = await getTranslations("fund.allocations");
   const fund = await requireCurrentFund();
   const sp = await searchParams;
   const active = resolveActiveTab(sp.tab, TABS);
+  const filter = resolveActiveTab(sp.filter, DEPOSIT_FILTERS);
 
   return (
     <>
@@ -88,13 +93,26 @@ async function AllocationsTabs({
       />
 
       <Suspense key={active} fallback={<TableSkeleton columns={6} />}>
-        {active === "history" && <HistoryTab fundId={fund.id} />}
         {active === "transactions" && (
-          <DepositsTable fundId={fund.id} onlyUnmatched={false} />
+          <div className="space-y-3">
+            <Tabs
+              paramName="filter"
+              baseQuery={{ tab: "transactions" }}
+              active={filter}
+              items={DEPOSIT_FILTERS.map((f) => ({
+                value: f.value,
+                label: t(`filters.${f.value}`),
+              }))}
+            />
+            <Suspense key={filter} fallback={<TableSkeleton columns={7} />}>
+              <DepositsTable
+                fundId={fund.id}
+                onlyUnmatched={filter === "unmatched"}
+              />
+            </Suspense>
+          </div>
         )}
-        {active === "unmatched" && (
-          <DepositsTable fundId={fund.id} onlyUnmatched={true} />
-        )}
+        {active === "history" && <HistoryTab fundId={fund.id} />}
         {active === "tiers" && <TiersTab fundId={fund.id} />}
         {active === "schedule" && (
           <ScheduleTab fundId={fund.id} allocationMode={fund.allocationMode} />
@@ -117,7 +135,7 @@ function AllocationsTabsSkeleton() {
   return (
     <>
       <div className="flex gap-2">
-        {Array.from({ length: 5 }).map((_, i) => (
+        {Array.from({ length: 4 }).map((_, i) => (
           <Skeleton key={i} className="h-8 w-24" />
         ))}
       </div>
@@ -364,9 +382,7 @@ async function ScheduleTab({
                       mode={{
                         kind: "edit",
                         periodId: p.id,
-                        initialCutoff: p.cutoffDate
-                          .toISOString()
-                          .slice(0, 10),
+                        initialCutoff: p.cutoffDate.toISOString().slice(0, 10),
                       }}
                       trigger={
                         <Button variant="ghost" size="sm">

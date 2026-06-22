@@ -590,11 +590,14 @@
       "title": "Allocations",
       "description": "Distribute tokens to members based on tiers and bank synchronisation.",
       "tabs": {
-        "history": "History",
         "transactions": "Transactions",
-        "unmatched": "Unmatched",
+        "history": "History",
         "tiers": "Tiers",
         "schedule": "Schedule"
+      },
+      "filters": {
+        "all": "All",
+        "unmatched": "Unmatched"
       },
       "transactions": {
         "date": "Date",
@@ -672,6 +675,13 @@
         "range": "{starts} → {cutoff}",
         "closedAt": "Closed {date}",
         "notes": "Notes",
+        "tabs": {
+          "ready": "Ready",
+          "deposits": "Deposits",
+          "mints": "Mints",
+          "missing": "Missing",
+          "belowMin": "Below min"
+        },
         "kpi": {
           "deposits": "Deposits collected",
           "depositsHint": "{count} bank transactions",
@@ -758,7 +768,8 @@
           "member": "Member",
           "tier": "Tier",
           "deposited": "Deposited",
-          "minimum": "Minimum"
+          "minimum": "Minimum",
+          "empty": "No below-minimum deposits."
         },
         "removeDeposit": {
           "button": "Remove from period",
