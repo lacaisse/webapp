@@ -590,11 +590,14 @@
       "title": "Allocations",
       "description": "Distribuez les jetons aux membres selon les paliers et la synchronisation bancaire.",
       "tabs": {
-        "history": "Historique",
         "transactions": "Transactions",
-        "unmatched": "Non attribuées",
+        "history": "Historique",
         "tiers": "Paliers",
         "schedule": "Planification"
+      },
+      "filters": {
+        "all": "Toutes",
+        "unmatched": "Non attribuées"
       },
       "transactions": {
         "date": "Date",
@@ -657,6 +660,13 @@
         "range": "{starts} → {cutoff}",
         "closedAt": "Clôturée le {date}",
         "notes": "Notes",
+        "tabs": {
+          "ready": "Prêts",
+          "deposits": "Dépôts",
+          "mints": "Émissions",
+          "missing": "Manquants",
+          "belowMin": "Sous le min"
+        },
         "kpi": {
           "deposits": "Dépôts collectés",
           "depositsHint": "{count} mouvements bancaires",
@@ -743,7 +753,8 @@
           "member": "Membre",
           "tier": "Palier",
           "deposited": "Déposé",
-          "minimum": "Minimum"
+          "minimum": "Minimum",
+          "empty": "Aucun dépôt sous le minimum."
         },
         "removeDeposit": {
           "button": "Retirer de la période",
