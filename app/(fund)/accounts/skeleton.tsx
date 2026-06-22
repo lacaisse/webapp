@@ -31,6 +31,9 @@ export function AccountsTableSkeleton({ rows = 4 }: { rows?: number }) {
           <TableHead>
             <Skeleton className="h-3.5 w-20" />
           </TableHead>
+          <TableHead>
+            <Skeleton className="h-3.5 w-24" />
+          </TableHead>
           <TableHead className="text-right">
             <Skeleton className="ml-auto h-3.5 w-16" />
           </TableHead>
@@ -44,6 +47,9 @@ export function AccountsTableSkeleton({ rows = 4 }: { rows?: number }) {
             </TableCell>
             <TableCell>
               <Skeleton className="h-3.5 w-40" />
+            </TableCell>
+            <TableCell>
+              <Skeleton className="h-3.5 w-28" />
             </TableCell>
             <TableCell className="text-right">
               <Skeleton className="ml-auto h-3.5 w-20" />

@@ -26,6 +26,7 @@ import {
   RenameTokenAccountSchema,
   TransferTokensSchema,
 } from "./schemas";
+import { fundAccountSerial } from "./serial";
 import {
   loadAccountTransfers,
   type AccountTransfersPage,
@@ -41,8 +42,11 @@ export type AccountTransfersResult =
 
 // Create a named account: pick the next free salt for this fund (salt 0 is the
 // minter), derive its counterfactual Safe address from the minter EOA, persist.
+// A SOURCE account additionally gets a serial so it can be referenced as a
+// card's pull-from source on CitizenPay.
 export async function createTokenAccountAction(input: {
   name: string;
+  kind?: "STANDARD" | "SOURCE";
 }): Promise<TokenAccountResult> {
   const t = await getTranslations();
   const { fund } = await requireFundRole("ADMIN");
@@ -74,9 +78,21 @@ export async function createTokenAccountAction(input: {
     return { error: t("fund.accounts.errors.deriveFailed" as never) };
   }
 
+  const serial =
+    parsed.data.kind === "SOURCE"
+      ? fundAccountSerial(fund.id, saltNonce)
+      : null;
+
   try {
     await prisma.fundTokenAccount.create({
-      data: { fundId: fund.id, name: parsed.data.name, saltNonce, address },
+      data: {
+        fundId: fund.id,
+        name: parsed.data.name,
+        saltNonce,
+        address,
+        kind: parsed.data.kind,
+        serial,
+      },
     });
   } catch (e) {
     console.error("[token-account] create failed", e);
@@ -234,9 +250,14 @@ export async function accountTransferAction(input: {
 
   const account = await prisma.fundTokenAccount.findFirst({
     where: { id: parsed.data.id, fundId: fund.id, archivedAt: null },
-    select: { address: true, saltNonce: true },
+    select: { address: true, saltNonce: true, kind: true },
   });
   if (!account) return { error: t("fund.accounts.errors.notFound" as never) };
+  // SOURCE accounts fund cards; they're not a transfer origin. The picker is
+  // hidden for them, but re-check here so the action can't be called directly.
+  if (account.kind === "SOURCE") {
+    return { error: t("fund.accounts.errors.cannotTransferSource" as never) };
+  }
 
   let amountUnits: bigint;
   try {

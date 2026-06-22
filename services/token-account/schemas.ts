@@ -11,7 +11,12 @@ const NAME = z
   .min(1, "fund.accounts.errors.nameRequired")
   .max(80, "fund.accounts.errors.nameTooLong");
 
-export const CreateTokenAccountSchema = z.object({ name: NAME });
+export const CreateTokenAccountSchema = z.object({
+  name: NAME,
+  // SOURCE accounts get a serial and can be used as a card source, but can't
+  // transfer out. Defaults to a standard (fully transferable) account.
+  kind: z.enum(["STANDARD", "SOURCE"]).default("STANDARD"),
+});
 
 export const RenameTokenAccountSchema = z.object({
   id: z.string().min(1, "fund.accounts.errors.notFound"),

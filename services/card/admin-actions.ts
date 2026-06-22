@@ -857,14 +857,14 @@ export async function setCardNumberAction(input: {
 
 export type SetCardSourceResult = { ok: true } | { error: string };
 
-// Set (or clear) the card this card pulls from when its own balance can't
-// cover a charge ("source card"). The relationship lives on CitizenPay —
-// we don't mirror it locally; the detail page reads it back via
-// `getCardSource`. Both cards are fund-scoped here, and CP enforces the
-// same ownership rule on its side.
+// Set (or clear) what this card pulls from when its own balance can't cover a
+// charge ("source"). The source can be another card or a SOURCE token account —
+// both are referenced on CitizenPay by serial. The relationship lives on CP; we
+// don't mirror it locally beyond a display cache. Source is fund-scoped here,
+// and CP enforces the same ownership rule on its side.
 export async function setCardSourceAction(input: {
   cardId: string;
-  sourceCardId: string | null;
+  source: { type: "card" | "account"; id: string } | null;
 }): Promise<SetCardSourceResult> {
   const t = await getTranslations();
   const { fund } = await requireFundRole("ADMIN");
@@ -876,18 +876,34 @@ export async function setCardSourceAction(input: {
   if (!card) return { error: t("cards.admin.source.errors.notFound" as never) };
 
   let sourceSerial: string | null = null;
-  if (input.sourceCardId !== null) {
-    if (input.sourceCardId === card.id) {
-      return { error: t("cards.admin.source.errors.self" as never) };
+  if (input.source !== null) {
+    if (input.source.type === "card") {
+      if (input.source.id === card.id) {
+        return { error: t("cards.admin.source.errors.self" as never) };
+      }
+      const source = await prisma.card.findFirst({
+        where: { id: input.source.id, fundId: fund.id },
+        select: { serialNumber: true },
+      });
+      if (!source) {
+        return { error: t("cards.admin.source.errors.sourceNotFound" as never) };
+      }
+      sourceSerial = source.serialNumber;
+    } else {
+      const account = await prisma.fundTokenAccount.findFirst({
+        where: {
+          id: input.source.id,
+          fundId: fund.id,
+          kind: "SOURCE",
+          archivedAt: null,
+        },
+        select: { serial: true },
+      });
+      if (!account?.serial) {
+        return { error: t("cards.admin.source.errors.sourceNotFound" as never) };
+      }
+      sourceSerial = account.serial;
     }
-    const source = await prisma.card.findFirst({
-      where: { id: input.sourceCardId, fundId: fund.id },
-      select: { serialNumber: true },
-    });
-    if (!source) {
-      return { error: t("cards.admin.source.errors.sourceNotFound" as never) };
-    }
-    sourceSerial = source.serialNumber;
   }
 
   try {

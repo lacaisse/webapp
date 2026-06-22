@@ -179,14 +179,17 @@
       "empty": "Aucun compte pour le moment. Créez-en un pour commencer.",
       "defaultName": "Compte principal",
       "defaultBadge": "Par défaut",
+      "sourceBadge": "Source",
       "table": {
         "name": "Nom",
         "address": "Adresse",
+        "serial": "Série",
         "balance": "Solde"
       },
       "detail": {
         "back": "Tous les comptes",
-        "balance": "Solde"
+        "balance": "Solde",
+        "serial": "Série"
       },
       "create": {
         "trigger": "Nouveau compte",
@@ -194,6 +197,8 @@
         "description": "Un nouveau compte on-chain dérivé de la clé de la caisse.",
         "name": "Nom",
         "namePlaceholder": "ex. Réserve, Frais, Événements",
+        "sourceLabel": "Compte source de carte",
+        "sourceHint": "Donne au compte un numéro de série pour qu'il puisse alimenter des cartes en tant que source. Ces comptes ne peuvent pas transférer vers l'extérieur.",
         "confirm": "Créer le compte"
       },
       "rename": {
@@ -256,6 +261,7 @@
         "amountPositive": "Le montant doit être supérieur à zéro.",
         "addressInvalid": "Saisissez une adresse 0x valide (40 caractères hexadécimaux).",
         "transferFailed": "Échec du transfert on-chain. Réessayez bientôt.",
+        "cannotTransferSource": "Les comptes source de carte ne peuvent pas transférer vers l'extérieur.",
         "transfersFailed": "Impossible de charger les transactions. Réessayez bientôt."
       }
     },
@@ -557,7 +563,14 @@
         },
         "source": {
           "none": "Aucune source",
-          "hint": "Si le solde de cette carte est insuffisant lors d'un paiement, le montant manquant est prélevé sur la carte source."
+          "placeholder": "Rechercher par numéro, série ou nom…",
+          "empty": "Aucun résultat.",
+          "typeCard": "Carte",
+          "typeAccount": "Compte",
+          "unresolved": "Actuel : {serial}",
+          "clear": "Retirer la source",
+          "open": "Ouvrir la liste",
+          "hint": "Si le solde de cette carte est insuffisant lors d'un paiement, le montant manquant est prélevé sur sa source (une autre carte ou un compte source)."
         },
         "onboardingLetter": {
           "rowLabel": "Courrier d'accueil",

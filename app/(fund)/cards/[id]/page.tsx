@@ -27,7 +27,7 @@ import { requireCurrentFund } from "@/services/fund/server";
 import { CardRowActions } from "../card-row-actions";
 import { TableSkeleton } from "../../token/skeleton";
 import { CardNumberEdit } from "./card-number-edit";
-import { CardSourcePicker } from "./source-picker";
+import { CardSourcePicker, type SourceOption } from "./source-picker";
 import { CardTransfersTable } from "./transfers-table";
 import { NotifyCardButton } from "./notify-card-button";
 
@@ -386,10 +386,10 @@ async function BalanceDisplay({
   );
 }
 
-// The card's configured source card (pull-from card at charge time). The
-// relationship lives on CitizenPay — read live here, set via the inline
-// picker. Candidate list comes from the local mirror (every fund card except
-// this one), labelled by number + holder.
+// What the card pulls from at charge time when its own balance falls short.
+// Source can be another fund card or a SOURCE token account — both referenced on
+// CitizenPay by serial. The relationship lives on CP (read live here, set via
+// the inline picker); candidates come from the local mirror.
 async function CardSourceRow({
   fund,
   cardId,
@@ -411,38 +411,57 @@ async function CardSourceRow({
     return <span className="text-muted-foreground">—</span>;
   }
 
-  const candidates = await prisma.card.findMany({
-    where: { fundId: fund.id, id: { not: cardId } },
-    orderBy: [{ number: "asc" }, { serialNumber: "asc" }],
-    select: {
-      id: true,
-      serialNumber: true,
-      number: true,
-      holderName: true,
-      member: { select: { firstName: true, lastName: true } },
-    },
-  });
+  const [cards, accounts] = await Promise.all([
+    prisma.card.findMany({
+      where: { fundId: fund.id, id: { not: cardId } },
+      orderBy: [{ number: "asc" }, { serialNumber: "asc" }],
+      select: {
+        id: true,
+        serialNumber: true,
+        number: true,
+        holderName: true,
+        member: { select: { firstName: true, lastName: true } },
+      },
+    }),
+    prisma.fundTokenAccount.findMany({
+      where: {
+        fundId: fund.id,
+        kind: "SOURCE",
+        archivedAt: null,
+        serial: { not: null },
+      },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, name: true, serial: true },
+    }),
+  ]);
 
-  const options = candidates.map((c) => {
-    const holder =
-      c.holderName ||
-      (c.member ? `${c.member.firstName} ${c.member.lastName}`.trim() : "");
-    const num = c.number !== null ? `#${c.number}` : null;
-    return {
+  const options: SourceOption[] = [
+    ...cards.map((c) => ({
+      type: "card" as const,
       id: c.id,
-      label:
-        [num, holder].filter(Boolean).join(" · ") || c.serialNumber,
-    };
-  });
+      serial: c.serialNumber,
+      number: c.number,
+      name:
+        c.holderName ||
+        (c.member ? `${c.member.firstName} ${c.member.lastName}`.trim() : ""),
+    })),
+    ...accounts.map((a) => ({
+      type: "account" as const,
+      id: a.id,
+      serial: a.serial!,
+      number: null,
+      name: a.name,
+    })),
+  ];
 
   const current = sourceSerial
-    ? (candidates.find((c) => c.serialNumber === sourceSerial) ?? null)
+    ? (options.find((o) => o.serial === sourceSerial) ?? null)
     : null;
 
   return (
     <CardSourcePicker
       cardId={cardId}
-      currentSourceCardId={current?.id ?? null}
+      currentRefId={current ? `${current.type}:${current.id}` : null}
       unresolvedSourceSerial={sourceSerial && !current ? sourceSerial : null}
       options={options}
     />
