@@ -6,6 +6,7 @@ import { refresh, revalidatePath } from "next/cache";
 import { parseUnits } from "viem";
 
 import { requireFundRole } from "@/services/auth/dal";
+import { getCitizenPayClient } from "@/services/citizenpay/client";
 import { prisma } from "@/services/db/prisma";
 import { deriveSmartAccountAddress } from "@/services/token/smart-account";
 import {
@@ -40,10 +41,10 @@ export type AccountTransfersResult =
   | { error: string }
   | ({ ok: true } & AccountTransfersPage);
 
-// Create a named account: pick the next free salt for this fund (salt 0 is the
-// minter), derive its counterfactual Safe address from the minter EOA, persist.
-// A SOURCE account additionally gets a serial so it can be referenced as a
-// card's pull-from source on CitizenPay.
+// Create a named account. STANDARD accounts are counterfactual Safes derived
+// from the minter EOA. A SOURCE account is, on CitizenPay, just a card: we mint
+// a serial (CP's serial accepts any string) and register it via the normal card
+// path, so CP assigns the wallet and the account can back cards as their source.
 export async function createTokenAccountAction(input: {
   name: string;
   kind?: "STANDARD" | "SOURCE";
@@ -61,7 +62,8 @@ export async function createTokenAccountAction(input: {
   }
 
   // Next salt = highest existing + 1 (≥ 1). The unique (fundId, saltNonce)
-  // index is the backstop if two creates race.
+  // index is the backstop if two creates race. For SOURCE accounts this is just
+  // a per-fund sequence number that also seeds the serial (no Safe derivation).
   const last = await prisma.fundTokenAccount.findFirst({
     where: { fundId: fund.id },
     orderBy: { saltNonce: "desc" },
@@ -69,19 +71,42 @@ export async function createTokenAccountAction(input: {
   });
   const saltNonce = (last?.saltNonce ?? 0) + 1;
 
-  const address = await deriveSmartAccountAddress({
-    eoaAddress: fund.tokenMinterEoaAddress,
-    factoryAddress: fund.citizenPayAccountFactoryAddress,
-    saltNonce: BigInt(saltNonce),
-  });
-  if (!address) {
-    return { error: t("fund.accounts.errors.deriveFailed" as never) };
-  }
+  let address: string;
+  let serial: string | null = null;
 
-  const serial =
-    parsed.data.kind === "SOURCE"
-      ? fundAccountSerial(fund.id, saltNonce)
-      : null;
+  if (parsed.data.kind === "SOURCE") {
+    // Register the card on CP with our generated serial; CP assigns the wallet
+    // and returns its address, which is what the account holds and what CP
+    // pulls from when this account backs a card.
+    serial = fundAccountSerial(fund.id, saltNonce);
+    let registered;
+    try {
+      registered = await getCitizenPayClient(fund).registerCard({
+        serialNumber: serial,
+        fundId: fund.id,
+        fundCitizenPayId: fund.citizenPayFundId,
+        holderName: parsed.data.name,
+      });
+    } catch (e) {
+      console.error("[token-account] CP card registration failed", e);
+      return { error: t("fund.accounts.errors.registerFailed" as never) };
+    }
+    if (!registered.account) {
+      // No address back means we'd persist a card we can't fund/pull from.
+      return { error: t("fund.accounts.errors.registerFailed" as never) };
+    }
+    address = registered.account;
+  } else {
+    const derived = await deriveSmartAccountAddress({
+      eoaAddress: fund.tokenMinterEoaAddress,
+      factoryAddress: fund.citizenPayAccountFactoryAddress,
+      saltNonce: BigInt(saltNonce),
+    });
+    if (!derived) {
+      return { error: t("fund.accounts.errors.deriveFailed" as never) };
+    }
+    address = derived;
+  }
 
   try {
     await prisma.fundTokenAccount.create({
