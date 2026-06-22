@@ -2032,7 +2032,20 @@
         "amountLabel": "Montant",
         "confirm": "Recharger",
         "submitting": "Rechargement…",
-        "success": "Rechargement confirmé sur la blockchain."
+        "success": "Rechargement confirmé sur la blockchain.",
+        "attach": {
+          "label": "Rattacher un virement bancaire (facultatif)",
+          "hint": "Choisissez le virement entrant qui a payé cette recharge — son montant pré-remplit le champ et l'allocation est enregistrée comme un vrai virement.",
+          "searchPlaceholder": "Rechercher par nom, référence ou montant…",
+          "loading": "Chargement des virements…",
+          "loadMore": "Afficher plus",
+          "noMatches": "Aucun virement ne correspond à votre recherche.",
+          "none": "Aucun virement entrant non rattaché à choisir.",
+          "unknownCounterpart": "Expéditeur inconnu",
+          "selected": "Virement rattaché",
+          "clear": "Retirer",
+          "loadFailed": "Impossible de charger les virements. Réessayez."
+        }
       },
       "withdraw": {
         "button": "Retirer",
@@ -2115,7 +2128,11 @@
         "amountInvalid": "Le montant doit être un nombre avec au maximum 2 décimales.",
         "amountPositive": "Le montant doit être supérieur à zéro.",
         "tokenNotConfigured": "Cette caisse n'a pas encore de jeton configuré — connectez-vous d'abord à Citizen Pay.",
-        "submitFailed": "L'envoi on-chain a échoué. Consultez le journal des opérations pour plus de détails."
+        "submitFailed": "L'envoi on-chain a échoué. Consultez le journal des opérations pour plus de détails.",
+        "bankTxNeedsMember": "Rattachez d'abord cette carte à un membre pour y associer un virement.",
+        "bankTxNotFound": "Virement bancaire introuvable.",
+        "bankTxNotIncoming": "Seuls les virements entrants peuvent être rattachés à une recharge.",
+        "bankTxAlreadyMatched": "Ce virement est déjà associé à un membre."
       },
       "sync": {
         "trigger": "Synchroniser avec Citizen Pay",
