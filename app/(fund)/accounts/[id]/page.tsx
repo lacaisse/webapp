@@ -89,6 +89,11 @@ async function AccountDetail({
           <p className="font-mono text-xs break-all text-muted-foreground">
             {account.address}
           </p>
+          {account.serial && (
+            <p className="font-mono text-xs text-muted-foreground">
+              {t("detail.serial")}: {account.serial}
+            </p>
+          )}
         </div>
         <AccountManage
           id={account.id}
@@ -119,11 +124,13 @@ async function AccountDetail({
             mode="out"
             symbol={fund.tokenSymbol}
           />
-          <TransferDialog
-            id={account.id}
-            accounts={otherAccounts}
-            symbol={fund.tokenSymbol}
-          />
+          {account.kind !== "SOURCE" && (
+            <TransferDialog
+              id={account.id}
+              accounts={otherAccounts}
+              symbol={fund.tokenSymbol}
+            />
+          )}
         </div>
       </div>
 

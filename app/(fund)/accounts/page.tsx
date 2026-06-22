@@ -94,6 +94,7 @@ async function AccountsTable() {
             <TableRow>
               <TableHead>{t("table.name")}</TableHead>
               <TableHead>{t("table.address")}</TableHead>
+              <TableHead>{t("table.serial")}</TableHead>
               <TableHead className="text-right">{t("table.balance")}</TableHead>
             </TableRow>
           </TableHeader>
@@ -112,9 +113,17 @@ async function AccountsTable() {
                       {t("defaultBadge")}
                     </span>
                   )}
+                  {a.kind === "SOURCE" && (
+                    <span className="ml-2 rounded-sm bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                      {t("sourceBadge")}
+                    </span>
+                  )}
                 </TableCell>
                 <TableCell className="font-mono text-xs text-muted-foreground">
                   {shortAddress(a.address)}
+                </TableCell>
+                <TableCell className="font-mono text-xs text-muted-foreground">
+                  {a.serial ?? "—"}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
                   {a.balance == null

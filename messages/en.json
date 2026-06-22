@@ -179,14 +179,17 @@
       "empty": "No accounts yet. Create one to get started.",
       "defaultName": "Main account",
       "defaultBadge": "Default",
+      "sourceBadge": "Source",
       "table": {
         "name": "Name",
         "address": "Address",
+        "serial": "Serial",
         "balance": "Balance"
       },
       "detail": {
         "back": "All accounts",
-        "balance": "Balance"
+        "balance": "Balance",
+        "serial": "Serial"
       },
       "create": {
         "trigger": "New account",
@@ -194,6 +197,8 @@
         "description": "A new on-chain account derived from the fund's key.",
         "name": "Name",
         "namePlaceholder": "e.g. Reserve, Fees, Events",
+        "sourceLabel": "Card-source account",
+        "sourceHint": "Gives the account a serial so it can fund cards as their source. These accounts can't transfer out.",
         "confirm": "Create account"
       },
       "rename": {
@@ -256,6 +261,7 @@
         "amountPositive": "Amount must be greater than zero.",
         "addressInvalid": "Enter a valid 0x address (40 hex characters).",
         "transferFailed": "On-chain transfer failed. Try again shortly.",
+        "cannotTransferSource": "Card-source accounts can't transfer out.",
         "transfersFailed": "Couldn't load transactions. Try again shortly."
       }
     },
@@ -557,7 +563,14 @@
         },
         "source": {
           "none": "No source",
-          "hint": "When this card can't cover a charge, the missing amount is pulled from the source card."
+          "placeholder": "Search number, serial or name…",
+          "empty": "No matches.",
+          "typeCard": "Card",
+          "typeAccount": "Account",
+          "unresolved": "Current: {serial}",
+          "clear": "Clear source",
+          "open": "Open list",
+          "hint": "When this card can't cover a charge, the missing amount is pulled from its source (another card or a source account)."
         },
         "onboardingLetter": {
           "rowLabel": "Onboarding letter",

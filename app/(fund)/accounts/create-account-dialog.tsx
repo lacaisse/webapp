@@ -16,6 +16,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createTokenAccountAction } from "@/services/token-account/admin-actions";
@@ -25,6 +26,7 @@ export function CreateAccountDialog() {
   const tRoot = useTranslations();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
+  const [isSource, setIsSource] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -32,6 +34,7 @@ export function CreateAccountDialog() {
     setOpen(next);
     if (!next) {
       setName("");
+      setIsSource(false);
       setError(null);
     }
   }
@@ -39,7 +42,10 @@ export function CreateAccountDialog() {
   const onCreate = () => {
     setError(null);
     startTransition(async () => {
-      const result = await createTokenAccountAction({ name: name.trim() });
+      const result = await createTokenAccountAction({
+        name: name.trim(),
+        kind: isSource ? "SOURCE" : "STANDARD",
+      });
       if ("error" in result) {
         setError(result.error);
         return;
@@ -74,6 +80,20 @@ export function CreateAccountDialog() {
               placeholder={t("namePlaceholder")}
               autoComplete="off"
             />
+          </div>
+          <div className="flex items-start gap-2">
+            <Checkbox
+              id="account-source"
+              checked={isSource}
+              onCheckedChange={(checked) => setIsSource(checked === true)}
+              className="mt-0.5"
+            />
+            <div className="space-y-0.5">
+              <Label htmlFor="account-source" className="font-normal">
+                {t("sourceLabel")}
+              </Label>
+              <p className="text-xs text-muted-foreground">{t("sourceHint")}</p>
+            </div>
           </div>
           {error && (
             <Alert variant="destructive">
