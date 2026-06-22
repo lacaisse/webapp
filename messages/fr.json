@@ -789,6 +789,34 @@
             "noEmail": "Ce membre n'a pas d'adresse e-mail.",
             "sendFailed": "L'e-mail n'a pas pu être envoyé. Réessayez."
           }
+        },
+        "remind": {
+          "column": "Rappel",
+          "send": "Rappeler",
+          "retry": "Réessayer",
+          "sending": "Envoi…",
+          "cancel": "Annuler",
+          "confirmSend": "Envoyer le rappel",
+          "confirmTitle": "Envoyer un rappel de paiement ?",
+          "confirmDescription": "Envoyer un rappel de cotisation à {name} pour cette période ?",
+          "status": {
+            "noEmail": "Pas d'e-mail",
+            "optedOut": "Désinscrit",
+            "sent": "Envoyé",
+            "failed": "Échec",
+            "notSent": "Non envoyé"
+          },
+          "allTrigger": "Tout rappeler ({count})",
+          "allConfirmTitle": "Rappeler tous les impayés ?",
+          "allConfirmDescription": "Envoyer un rappel de cotisation à {count} membre(s) n'ayant pas encore cotisé. Les membres déjà relancés, sans e-mail ou désinscrits sont ignorés.",
+          "allConfirmSend": "Envoyer les rappels",
+          "allDoneTitle": "Rappels envoyés",
+          "allDoneSummary": "{sent} envoyé(s) · {skipped} déjà relancé(s) · {failed} en échec.",
+          "errors": {
+            "notRemindable": "Ce membre ne peut pas être relancé — il n'est plus dans la liste des impayés.",
+            "noEmail": "Ce membre n'a pas d'adresse e-mail.",
+            "sendFailed": "Le rappel n'a pas pu être envoyé. Réessayez."
+          }
         }
       },
       "schedule": {

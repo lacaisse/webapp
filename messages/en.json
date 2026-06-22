@@ -804,6 +804,34 @@
             "noEmail": "This member has no email address.",
             "sendFailed": "The email couldn't be sent. Try again."
           }
+        },
+        "remind": {
+          "column": "Reminder",
+          "send": "Remind",
+          "retry": "Retry",
+          "sending": "Sending…",
+          "cancel": "Cancel",
+          "confirmSend": "Send reminder",
+          "confirmTitle": "Send a payment reminder?",
+          "confirmDescription": "Send a payment reminder to {name} for this period?",
+          "status": {
+            "noEmail": "No email",
+            "optedOut": "Opted out",
+            "sent": "Sent",
+            "failed": "Failed",
+            "notSent": "Not sent"
+          },
+          "allTrigger": "Remind all ({count})",
+          "allConfirmTitle": "Remind all unpaid?",
+          "allConfirmDescription": "Send a payment reminder to {count} member(s) who haven't paid yet. Members already reminded, without an email, or opted out are skipped.",
+          "allConfirmSend": "Send reminders",
+          "allDoneTitle": "Reminders sent",
+          "allDoneSummary": "{sent} sent · {skipped} already reminded · {failed} failed.",
+          "errors": {
+            "notRemindable": "This member can't be reminded — they're no longer on the unpaid list.",
+            "noEmail": "This member has no email address.",
+            "sendFailed": "The reminder couldn't be sent. Try again."
+          }
         }
       },
       "periods": {
