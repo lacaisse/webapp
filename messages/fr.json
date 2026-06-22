@@ -257,6 +257,7 @@
         "notConnected": "Connectez d'abord cette caisse à Citizen Pay.",
         "deriveFailed": "Impossible de dériver l'adresse du compte. Réessayez bientôt.",
         "createFailed": "Impossible de créer le compte. Réessayez bientôt.",
+        "registerFailed": "Impossible d'enregistrer le compte source sur Citizen Pay. Réessayez bientôt.",
         "amountInvalid": "Le montant doit être un nombre valide.",
         "amountPositive": "Le montant doit être supérieur à zéro.",
         "addressInvalid": "Saisissez une adresse 0x valide (40 caractères hexadécimaux).",

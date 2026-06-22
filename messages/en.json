@@ -257,6 +257,7 @@
         "notConnected": "Connect this fund to Citizen Pay first.",
         "deriveFailed": "Couldn't derive the account address. Try again shortly.",
         "createFailed": "Couldn't create the account. Try again shortly.",
+        "registerFailed": "Couldn't register the source account on Citizen Pay. Try again shortly.",
         "amountInvalid": "Amount must be a valid number.",
         "amountPositive": "Amount must be greater than zero.",
         "addressInvalid": "Enter a valid 0x address (40 hex characters).",
