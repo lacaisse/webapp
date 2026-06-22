@@ -2032,7 +2032,20 @@
         "amountLabel": "Amount",
         "confirm": "Top up",
         "submitting": "Topping up…",
-        "success": "Top-up confirmed on-chain."
+        "success": "Top-up confirmed on-chain.",
+        "attach": {
+          "label": "Attach a bank transfer (optional)",
+          "hint": "Pick the incoming transfer that paid for this top-up — its amount prefills the field and the allocation is recorded as a real transfer.",
+          "searchPlaceholder": "Search by name, reference or amount…",
+          "loading": "Loading transfers…",
+          "loadMore": "Show more",
+          "noMatches": "No transfers match your search.",
+          "none": "No unmatched incoming transfers to pick from.",
+          "unknownCounterpart": "Unknown sender",
+          "selected": "Transfer attached",
+          "clear": "Remove",
+          "loadFailed": "Couldn't load transfers. Please try again."
+        }
       },
       "withdraw": {
         "button": "Withdraw",
@@ -2115,7 +2128,11 @@
         "amountInvalid": "Amount must be a number with up to 2 decimal places.",
         "amountPositive": "Amount must be greater than zero.",
         "tokenNotConfigured": "This fund has no token configured yet — connect to Citizen Pay first.",
-        "submitFailed": "On-chain submission failed. Check the token operations log for details."
+        "submitFailed": "On-chain submission failed. Check the token operations log for details.",
+        "bankTxNeedsMember": "Attach this card to a member before linking a transfer to it.",
+        "bankTxNotFound": "Bank transfer not found.",
+        "bankTxNotIncoming": "Only incoming transfers can be attached to a top-up.",
+        "bankTxAlreadyMatched": "That transfer is already matched to a member."
       },
       "sync": {
         "trigger": "Sync with Citizen Pay",
