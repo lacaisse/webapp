@@ -25,6 +25,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { prisma } from "@/services/db/prisma";
 import { requireCurrentFund } from "@/services/fund/server";
+import { fetchFundPeriods } from "@/app/(fund)/bank/data";
+import { AllocationPeriodPicker } from "./allocation-period-picker";
 import { DepositsTable } from "./deposits-table";
 import { PeriodDialog } from "./period-dialog";
 import { ArchiveTierButton, TierDialog } from "./tier-dialog";
@@ -148,18 +150,23 @@ async function HistoryTab({ fundId }: { fundId: string }) {
   const t = await getTranslations("fund.allocations.history");
   const format = await getFormatter();
 
-  const ops = await prisma.tokenOperation.findMany({
-    where: { fundId, type: "MINT" },
-    orderBy: { submittedAt: "desc" },
-    take: 200,
-    include: {
-      member: { select: { firstName: true, lastName: true } },
-      tier: { select: { name: true } },
-      allocationPeriod: { select: { label: true } },
-      referral: { select: { id: true } },
-      sources: { select: { id: true }, take: 1 },
-    },
-  });
+  const [ops, periods] = await Promise.all([
+    prisma.tokenOperation.findMany({
+      where: { fundId, type: "MINT" },
+      orderBy: { submittedAt: "desc" },
+      take: 200,
+      include: {
+        member: { select: { firstName: true, lastName: true } },
+        tier: { select: { name: true } },
+        allocationPeriod: { select: { label: true } },
+        referral: { select: { id: true } },
+        sources: { select: { id: true }, take: 1 },
+      },
+    }),
+    // Manual allocations can be tagged to a period inline; periods only exist
+    // for FIXED_PERIOD funds (empty otherwise → the picker isn't shown).
+    fetchFundPeriods(fundId),
+  ]);
 
   return (
     <Table>
@@ -182,6 +189,9 @@ async function HistoryTab({ fundId }: { fundId: string }) {
             const memberName = op.member
               ? `${op.member.firstName} ${op.member.lastName}`.trim()
               : "—";
+            // Manual = not a referral reward and not linked to a deposit. Only
+            // these can be re-tagged to a period from here.
+            const isManual = !op.referral && op.sources.length === 0;
             const source = op.referral
               ? t("sources.referral")
               : op.sources.length > 0
@@ -198,7 +208,15 @@ async function HistoryTab({ fundId }: { fundId: string }) {
                 </TableCell>
                 <TableCell className="text-sm">{source}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">
-                  {op.allocationPeriod?.label ?? "—"}
+                  {isManual && periods.length > 0 ? (
+                    <AllocationPeriodPicker
+                      tokenOperationId={op.id}
+                      currentPeriodId={op.allocationPeriodId}
+                      periods={periods}
+                    />
+                  ) : (
+                    (op.allocationPeriod?.label ?? "—")
+                  )}
                 </TableCell>
                 <TableCell className="text-right font-medium">
                   {op.amount.toString()}
