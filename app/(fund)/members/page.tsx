@@ -162,9 +162,9 @@ async function MembersContent({
       },
       orderBy: { createdAt: "desc" },
       include: {
-        // minContribution drives the "target contribution" shown under the
-        // tier picker (issue #69).
-        tier: { select: { name: true, minContribution: true } },
+        // allocationAmount is the tier's target amount ("montant cible") shown
+        // under the tier picker (issue #69).
+        tier: { select: { name: true, allocationAmount: true } },
         cards: {
           select: { id: true, number: true, serialNumber: true },
           orderBy: [{ number: { sort: "asc", nulls: "last" } }],
@@ -249,7 +249,7 @@ async function MembersContent({
                         <dt>{t("contribution.target")}:</dt>
                         <dd className="tabular-nums text-foreground">
                           {m.tier
-                            ? m.tier.minContribution.toString()
+                            ? m.tier.allocationAmount.toString()
                             : t("contribution.none")}
                         </dd>
                       </div>
