@@ -428,7 +428,8 @@
           "balance": "Saldo",
           "primary": "Tarjeta principal",
           "lost": "Perdida",
-          "empty": "Aún no hay tarjetas."
+          "empty": "Aún no hay tarjetas.",
+          "downloadLetter": "Descargar invitación"
         },
         "tokenOps": {
           "title": "Operaciones de tokens",

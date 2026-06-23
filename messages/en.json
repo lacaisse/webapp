@@ -454,7 +454,8 @@
           "balance": "Balance",
           "primary": "Primary card",
           "lost": "Lost",
-          "empty": "No cards yet."
+          "empty": "No cards yet.",
+          "downloadLetter": "Download invitation"
         },
         "tokenOps": {
           "title": "Token operations",

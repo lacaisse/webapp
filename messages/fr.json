@@ -454,7 +454,8 @@
           "balance": "Solde",
           "primary": "Carte principale",
           "lost": "Perdue",
-          "empty": "Aucune carte pour le moment."
+          "empty": "Aucune carte pour le moment.",
+          "downloadLetter": "Télécharger l'invitation"
         },
         "tokenOps": {
           "title": "Opérations de jetons",

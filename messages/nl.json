@@ -305,7 +305,8 @@
           "balance": "Saldo",
           "primary": "Hoofdkaart",
           "lost": "Verloren",
-          "empty": "Nog geen kaarten."
+          "empty": "Nog geen kaarten.",
+          "downloadLetter": "Uitnodiging downloaden"
         },
         "tokenOps": {
           "title": "Tokenbewerkingen",

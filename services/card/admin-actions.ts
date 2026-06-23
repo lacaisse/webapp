@@ -593,7 +593,7 @@ export async function searchUnattachedCardsAction(
       holderName: true,
       status: true,
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ number: { sort: "asc", nulls: "last" } }, { createdAt: "asc" }],
     take: UNATTACHED_LIMIT,
   });
   return cards;
