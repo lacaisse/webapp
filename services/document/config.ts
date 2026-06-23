@@ -63,16 +63,16 @@ export const DOCUMENT_PREVIEW_SAMPLE_VALUES: Record<
 const CARD_ONBOARDING_LETTER_DEFAULTS: Record<string, string> = {
   fr: `Bonjour {{first_name}},
 
-Bienvenue à la {{full_name}}, **la {{fund_name}}**. Nous sommes très heureux de te compter parmi nous pour ce projet qui veut rassembler tous les habitants autour d'un objectif essentiel : *généraliser l'alimentation de qualité dans tous les foyers schaerbeekois*. Une alimentation digne et choisie, pour toutes et tous.
+Bienvenue à la **{{full_name}}**, **{{fund_name}}**. Nous sommes très heureux de te compter parmi nous pour ce projet qui veut rassembler tous les habitants autour d'un objectif essentiel : *généraliser l'alimentation de qualité dans tous les foyers schaerbeekois*. Une alimentation digne et choisie, pour toutes et tous.
 
-Tu trouveras dans ce courrier ta carte personnelle de la {{fund_name}} à utiliser dans les commerces conventionnés.
+Tu trouveras dans ce courrier ta carte personnelle de {{fund_name}} à utiliser dans les commerces conventionnés.
 
 **Prénom et nom** : {{first_name}} {{last_name}}
 **Carte {{fund_name}} numéro** : {{card_number}}
 **Référence à rajouter lors de ton transfert de cotisation** : {{payment_reference}}
 **Compte {{fund_name}} à créditer avec ta cotisation avant le 9 de chaque mois** : BE 82 1036 0037 1868 NICABEBB ouvert chez CRELAN
 
-Tu trouveras toutes les infos pratiques pour utiliser ta carte au dos de ce courrier et sur le site {{website}}
+Tu trouveras toutes les infos pratiques pour utiliser ta carte au dos de ce courrier et sur le site **{{website}}**
 
 [pagebreak]
 
@@ -80,7 +80,7 @@ Tu trouveras toutes les infos pratiques pour utiliser ta carte au dos de ce cour
 
 ## Où utiliser la carte {{fund_name}} ?
 
-Tu peux trouver la liste des commerces actuellement conventionnés sur le site de la {{fund_name}} en cliquant sur Commerces dans le menu. Cette liste sera régulièrement mise à jour dès que de nouveaux commerces viendront s'ajouter au projet.
+Tu peux trouver la liste des commerces actuellement conventionnés sur le site de {{fund_name}} en cliquant sur Commerces dans le menu. Cette liste sera régulièrement mise à jour dès que de nouveaux commerces viendront s'ajouter au projet.
 
 Chaque commerce sera équipé d'un terminal spécial pour la carte {{fund_name}}. Il suffit de poser sa carte sur le terminal et le montant sera déduit automatiquement. A noter que la carte n'est pas sécurisée par défaut. Tu pourras bientôt ajouter un code PIN de ton choix (nous tiendrons au courant les affilié.es dès que la fonctionnalité sera disponible).
 
@@ -102,13 +102,17 @@ Ta cotisation mensuelle doit être versée avant le 9 du mois sur le compte suiv
 
 Tu peux directement verser ta cotisation via l'application {{fund_name}} ou par virement bancaire. Pour les virements bancaires, nous conseillons de faire un virement automatique afin d'éviter les oublis. Le montant mensuel de ta cotisation est celui que tu nous as communiqué lors de ton inscription et est au minimum de 100 euros.
 
-En participant au projet, les affiliés s'engagent à cotiser pour 1 an minimum, respecter le même montant de cotisation pendant un semestre et respecter les délais de versements.
+En participant au projet, les affiliés s'engagent à respecter le même montant de cotisation pendant un semestre et respecter les délais de versements.
 
 Dans le cas où des circonstances imprévues t'empêcheraient de verser le montant de la cotisation, n'hésite pas à nous contacter via contact@laclass.be pour que nous puissions discuter des solutions ensemble.
 
 ## Quand reçoit-on en retour les 150€ sur la carte {{fund_name}} ?
 
 La carte {{fund_name}} sera créditée de 150€ le 15 de chaque mois.
+
+## Y a-t-il une durée d'engagement minimum ?
+
+Idéalement, nous souhaitons que les adhérents s'engagent pour au moins un an, avec la possibilité d'ajuster leur contribution au bout de six mois. Nous comprenons bien sûr que des circonstances personnelles peuvent évoluer et entraîner un engagement plus court (déménagement, chômage ou autres raisons pratiques). Vous pouvez nous contacter et nous discuterons de chaque situation au cas par cas ; cela ne devrait pas être un frein pour participer.
 
 ## Que se passe-t-il si je ne dépense pas mes 150€ dans le mois en cours ?
 
@@ -122,15 +126,15 @@ La carte {{fund_name}} peut être utilisée par quiconque dans le foyer à condi
 
 ## Que se passe-t-il si ma carte est perdue ou volée ?
 
-Contacte immédiatement contact@laclass.be pour le signaler. Une autre carte te sera attribuée, en transférant le solde restant de ton ancienne carte. Note que la {{fund_name}} ne pourra rembourser aucun paiement qui est déjà passé sur la carte.
+Contacte immédiatement contact@laclass.be pour le signaler. Une autre carte te sera attribuée, en transférant le solde restant de ton ancienne carte. Note que {{fund_name}} ne pourra rembourser aucun paiement qui est déjà passé sur la carte.
 
 ## Que se passe-t-il si je souhaite quitter le projet ?
 
-Tout membre souhaitant quitter le projet peut le faire en prévenant la {{fund_name}} 1 mois à l'avance.
+Tout membre souhaitant quitter le projet peut le faire en prévenant {{fund_name}} 1 mois à l'avance.
 
-## Où trouver plus d'informations sur la {{fund_name}} ?
+## Où trouver plus d'informations sur {{fund_name}} ?
 
-Le site web de la {{fund_name}} est disponible à l'adresse suivante : {{website}}. Tu y retrouveras toutes les informations sur le projet ainsi que les commerces participants.
+Le site web de {{fund_name}} est disponible à l'adresse suivante : **{{website}}**. Tu y retrouveras toutes les informations sur le projet ainsi que les commerces participants.
 
 Pour toutes questions, n'hésite pas à nous contacter via contact@laclass.be.`,
 };

@@ -392,6 +392,11 @@
         "cards": "Tarjetas",
         "joined": "Se unió"
       },
+      "contribution": {
+        "target": "Objetivo",
+        "lastReceived": "Último recibido",
+        "none": "—"
+      },
       "unverified": "Correo electrónico sin verificar",
       "empty": "No hay miembros que mostrar.",
       "detail": {
@@ -428,7 +433,8 @@
           "balance": "Saldo",
           "primary": "Tarjeta principal",
           "lost": "Perdida",
-          "empty": "Aún no hay tarjetas."
+          "empty": "Aún no hay tarjetas.",
+          "downloadLetter": "Descargar invitación"
         },
         "tokenOps": {
           "title": "Operaciones de tokens",
@@ -1585,7 +1591,7 @@
         "description": "Emitir una tarjeta para {memberName}. Su cuenta se activa de inmediato.",
         "unverifiedWarning": "Este miembro aún no ha verificado su correo electrónico. Es posible que el correo de activación rebote.",
         "cardLabel": "Tarjeta",
-        "cardPlaceholder": "Busca por número de serie o de tarjeta…",
+        "cardPlaceholder": "Busca por número de serie, de tarjeta o cuenta de origen…",
         "cardHint": "Elige una tarjeta ya importada de Citizen Pay. Si no la ves, sincroniza primero la lista de tarjetas.",
         "cardSearching": "Buscando…",
         "cardEmpty": "Ninguna tarjeta sin asignar coincide con este número de serie.",

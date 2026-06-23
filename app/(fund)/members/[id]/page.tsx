@@ -1,11 +1,12 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Download } from "lucide-react";
 import { getFormatter, getTranslations } from "next-intl/server";
 
 import { TableSkeleton } from "@/components/table-skeleton";
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Card,
@@ -264,11 +265,12 @@ async function MemberDetail({
               <TableHead>{t("cards.status")}</TableHead>
               <TableHead>{t("cards.issued")}</TableHead>
               <TableHead className="text-right">{t("cards.balance")}</TableHead>
+              <TableHead />
             </TableRow>
           </TableHeader>
           <TableBody>
             {member.cards.length === 0 ? (
-              <TableEmpty colSpan={5}>{t("cards.empty")}</TableEmpty>
+              <TableEmpty colSpan={6}>{t("cards.empty")}</TableEmpty>
             ) : (
               member.cards.map((c) => {
                 const isPrimary = member.primaryCardId === c.id;
@@ -301,6 +303,18 @@ async function MemberDetail({
                     </TableCell>
                     <TableCell className="text-right font-medium">
                       {c.balance?.toString() ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <a
+                        href={`/api/cards/${c.id}/onboarding-letter`}
+                        className={buttonVariants({
+                          variant: "outline",
+                          size: "sm",
+                        })}
+                      >
+                        <Download className="size-3.5" />
+                        {t("cards.downloadLetter")}
+                      </a>
                     </TableCell>
                   </TableRow>
                 );
@@ -457,7 +471,7 @@ function MemberDetailSkeleton() {
       </section>
       <section className="space-y-3">
         <Skeleton className="h-6 w-32" />
-        <TableSkeleton columns={5} rows={3} alignRight={1} />
+        <TableSkeleton columns={6} rows={3} alignRight={1} />
       </section>
       <section className="space-y-3">
         <Skeleton className="h-6 w-40" />

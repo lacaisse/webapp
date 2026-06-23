@@ -269,6 +269,11 @@
         "cards": "Kaarten",
         "joined": "Lid sinds"
       },
+      "contribution": {
+        "target": "Doel",
+        "lastReceived": "Laatst ontvangen",
+        "none": "—"
+      },
       "unverified": "E-mail niet geverifieerd",
       "empty": "Geen leden om te tonen.",
       "detail": {
@@ -305,7 +310,8 @@
           "balance": "Saldo",
           "primary": "Hoofdkaart",
           "lost": "Verloren",
-          "empty": "Nog geen kaarten."
+          "empty": "Nog geen kaarten.",
+          "downloadLetter": "Uitnodiging downloaden"
         },
         "tokenOps": {
           "title": "Tokenbewerkingen",
@@ -1574,7 +1580,7 @@
         "description": "Geef een kaart uit aan {memberName}. Hun account wordt onmiddellijk actief.",
         "unverifiedWarning": "Dit lid heeft de e-mail nog niet geverifieerd. De activatiemail kan retour komen.",
         "cardLabel": "Kaart",
-        "cardPlaceholder": "Zoek op serienummer of kaartnummer…",
+        "cardPlaceholder": "Zoek op serienummer, kaartnummer of bronrekening…",
         "cardHint": "Kies een kaart die al vanuit CitizenPay is geïmporteerd. Synchroniseer de kaartenlijst als de kaart ontbreekt.",
         "cardSearching": "Zoeken…",
         "cardEmpty": "Geen niet-gekoppelde kaart komt overeen met dit serienummer.",
