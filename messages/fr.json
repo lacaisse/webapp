@@ -418,6 +418,11 @@
         "cards": "Cartes",
         "joined": "Inscrit le"
       },
+      "contribution": {
+        "target": "Cotisation cible",
+        "lastReceived": "Dernier reçu",
+        "none": "—"
+      },
       "unverified": "Email non vérifié",
       "empty": "Aucun membre à afficher.",
       "detail": {
@@ -1856,7 +1861,7 @@
         "description": "Attribuez une carte à {memberName}. Son compte devient actif immédiatement.",
         "unverifiedWarning": "Ce membre n'a pas encore vérifié son email. L'email d'activation pourrait revenir.",
         "cardLabel": "Carte",
-        "cardPlaceholder": "Recherchez par numéro de série ou de carte…",
+        "cardPlaceholder": "Recherchez par numéro de série, de carte ou compte source…",
         "cardHint": "Choisissez une carte déjà importée depuis CitizenPay. Si elle n'apparaît pas, synchronisez d'abord la liste des cartes.",
         "cardSearching": "Recherche…",
         "cardEmpty": "Aucune carte non attribuée ne correspond à ce numéro.",

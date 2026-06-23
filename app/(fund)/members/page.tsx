@@ -162,10 +162,20 @@ async function MembersContent({
       },
       orderBy: { createdAt: "desc" },
       include: {
-        tier: { select: { name: true } },
+        // minContribution drives the "target contribution" shown under the
+        // tier picker (issue #69).
+        tier: { select: { name: true, minContribution: true } },
         cards: {
           select: { id: true, number: true, serialNumber: true },
           orderBy: [{ number: { sort: "asc", nulls: "last" } }],
+        },
+        // Most recent incoming deposit = the member's last received
+        // contribution, shown alongside the target in the tier column.
+        bankTransactions: {
+          where: { direction: "INCOMING" },
+          orderBy: { occurredAt: "desc" },
+          take: 1,
+          select: { amount: true, currency: true },
         },
       },
     }),
@@ -234,6 +244,24 @@ async function MembersContent({
                       currentTierId={m.tierId}
                       tiers={tiers}
                     />
+                    <dl className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                      <div className="flex gap-1">
+                        <dt>{t("contribution.target")}:</dt>
+                        <dd className="tabular-nums text-foreground">
+                          {m.tier
+                            ? m.tier.minContribution.toString()
+                            : t("contribution.none")}
+                        </dd>
+                      </div>
+                      <div className="flex gap-1">
+                        <dt>{t("contribution.lastReceived")}:</dt>
+                        <dd className="tabular-nums text-foreground">
+                          {m.bankTransactions[0]
+                            ? `${m.bankTransactions[0].amount.toString()} ${m.bankTransactions[0].currency}`
+                            : t("contribution.none")}
+                        </dd>
+                      </div>
+                    </dl>
                   </TableCell>
                   <TableCell>
                     {m.cards.length === 0 ? (

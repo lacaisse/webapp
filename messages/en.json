@@ -418,6 +418,11 @@
         "cards": "Cards",
         "joined": "Joined"
       },
+      "contribution": {
+        "target": "Target contribution",
+        "lastReceived": "Last received",
+        "none": "—"
+      },
       "unverified": "Email not verified",
       "empty": "No members to show.",
       "detail": {
@@ -1856,7 +1861,7 @@
         "description": "Issue a card to {memberName}. Their account becomes active immediately.",
         "unverifiedWarning": "This member hasn't verified their email yet. The activation email might bounce.",
         "cardLabel": "Card",
-        "cardPlaceholder": "Search by serial or card number…",
+        "cardPlaceholder": "Search by serial, card number or source account…",
         "cardHint": "Pick a card already imported from CitizenPay. If you don't see it, sync the cards list first.",
         "cardSearching": "Searching…",
         "cardEmpty": "No unattached cards match this serial.",

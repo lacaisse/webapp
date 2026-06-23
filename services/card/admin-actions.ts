@@ -556,11 +556,12 @@ export type UnattachedCardHit = {
 };
 
 // Typeahead backing the activate-member dialog. Returns unattached cards
-// (memberId is null) in the current fund matching the query against either the
-// serial number (case-insensitive contains) or the per-fund card number (exact,
-// when the term is all digits) — admin picks one to link instead of free-typing
-// a serial. With an empty query we surface the most-recently-imported cards so
-// the operator has something to scroll if they don't have the card in hand.
+// (memberId is null) in the current fund matching the query against the serial
+// number / UID (case-insensitive contains), the per-fund card number (exact,
+// when the term is all digits), or the source account address (case-insensitive
+// contains) — admin picks one to link instead of free-typing a serial. With an
+// empty query we surface cards in card-number order so the operator can scroll a
+// predictable list if they don't have the card in hand.
 const UNATTACHED_LIMIT = 12;
 
 export async function searchUnattachedCardsAction(
@@ -569,7 +570,7 @@ export async function searchUnattachedCardsAction(
   const { fund } = await requireFundRole("ADMIN");
   const term = q.trim();
   // An all-digits term may be a card number — match it exactly alongside the
-  // serial substring match.
+  // serial / account substring matches.
   const asNumber = /^\d+$/.test(term) ? Number(term) : null;
   const where = {
     fundId: fund.id,
@@ -578,6 +579,7 @@ export async function searchUnattachedCardsAction(
       ? {
           OR: [
             { serialNumber: { contains: term, mode: "insensitive" as const } },
+            { account: { contains: term, mode: "insensitive" as const } },
             ...(asNumber !== null ? [{ number: asNumber }] : []),
           ],
         }
