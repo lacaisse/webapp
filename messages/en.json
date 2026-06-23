@@ -2040,6 +2040,10 @@
       },
       "footer": {
         "unsubscribe": "Unsubscribe from payment reminders"
+      },
+      "paymentBelowMinimum": {
+        "subject": "Your contribution is below the required minimum — {fundName}",
+        "textBody": "Hi {firstName} {lastName},\n\nWe confirm we have received your monthly contribution of {amount} on {occurredAt}. Unfortunately, this amount is below {minContribution}, the minimum monthly contribution required to participate in {fundName}.\n\nTo receive your {allocationAmount}€ allocation (paid on the 15th of each month), please transfer the remaining amount before the 9th of the month.\n\nDon't hesitate to contact us if you have any questions.\n\nThank you for your understanding,\n\nThe {fundName} team"
       }
     },
     "signup": {
