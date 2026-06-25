@@ -155,7 +155,8 @@
         "PAYOUT_FEE": "Comisión de pago",
         "REFERRAL_REWARD": "Recompensa por referido",
         "BANK_SYNC": "Depósito bancario (auto)",
-        "PERIOD_CLOSE": "Cierre de período"
+        "PERIOD_CLOSE": "Cierre de período",
+        "CARD_TRANSFER": "Transferencia de tarjeta"
       },
       "edit": "Anotar",
       "title": "Anotar transacción",
@@ -428,7 +429,8 @@
           "balance": "Saldo",
           "primary": "Tarjeta principal",
           "lost": "Perdida",
-          "empty": "Aún no hay tarjetas."
+          "empty": "Aún no hay tarjetas.",
+          "actions": "Acciones"
         },
         "tokenOps": {
           "title": "Operaciones de tokens",
@@ -1818,6 +1820,45 @@
           "empty": "No se encontraron filas válidas en el CSV.",
           "noMatches": "Ningún serial coincide con una tarjeta de este fondo.",
           "columnMissing": "Elige una columna de serial y una de número."
+        }
+      },
+      "unassign": {
+        "button": "Desasignar",
+        "title": "Desasignar tarjeta",
+        "description": "Desvincular esta tarjeta de {holderLabel}. El saldo no cambia: transfiérelo antes si debe seguir al titular.",
+        "primaryWarning": "Es la tarjeta principal del miembro. Al desasignarla se borra su tarjeta principal para que puedas asignar una de reemplazo.",
+        "cancel": "Cancelar",
+        "confirm": "Desasignar",
+        "confirming": "Desasignando…",
+        "errors": {
+          "notFound": "Tarjeta no encontrada.",
+          "notAssigned": "Esta tarjeta no está asignada a ningún miembro."
+        }
+      },
+      "transfer": {
+        "button": "Transferir",
+        "title": "Transferir saldo",
+        "description": "Mover parte del saldo de {holderLabel} a otra tarjeta.",
+        "amountLabel": "Importe",
+        "submitting": "Transfiriendo…",
+        "confirm": "Transferir",
+        "success": "Transferencia confirmada en la cadena.",
+        "targetRequired": "Elige una tarjeta de destino.",
+        "errors": {
+          "sameCard": "Elige una tarjeta de destino diferente.",
+          "targetNotFound": "Tarjeta de destino no encontrada.",
+          "failed": "La transferencia falló. Consulta el registro de operaciones de tokens.",
+          "debitFailed": "Se acreditó el destino, pero falló el débito de la tarjeta de origen. Retira manualmente el saldo restante de la tarjeta de origen."
+        },
+        "target": {
+          "field": "Tarjeta de destino",
+          "placeholder": "Buscar por número de serie, número o titular",
+          "hint": "Busca las tarjetas del fondo para elegir el destino del saldo.",
+          "searching": "Buscando…",
+          "empty": "No hay tarjetas coincidentes.",
+          "emptyInitial": "Empieza a escribir para encontrar una tarjeta.",
+          "clear": "Borrar",
+          "noName": "Sin titular"
         }
       }
     }

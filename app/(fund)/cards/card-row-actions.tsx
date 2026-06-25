@@ -30,7 +30,9 @@ import { cn } from "@/lib/utils";
 // Change status: set the card to ACTIVE / INACTIVE / BLOCKED directly, with an
 // optional "reported lost" internal flag. Available on every card (it's the
 // only path to activate an INACTIVE card or set one back to inactive).
-// Top-up / withdraw available on ACTIVE cards with a CP-issued account.
+// Top-up / withdraw available on any non-blocked card with a CP-issued account
+// — including INACTIVE ones, since a top-up is exactly what flips a factory
+// INACTIVE card to ACTIVE on its first charge. Only BLOCKED is excluded.
 
 export function CardRowActions({
   cardId,
@@ -49,7 +51,8 @@ export function CardRowActions({
   tokenSymbol: string | null;
   tokenDecimals: number | null;
 }) {
-  const canTransact = status === "ACTIVE" && hasAccount && tokenDecimals != null;
+  const canTransact =
+    status !== "BLOCKED" && hasAccount && tokenDecimals != null;
   return (
     <div className="flex items-center justify-end gap-2">
       {canTransact && (

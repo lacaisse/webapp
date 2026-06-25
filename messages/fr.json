@@ -159,7 +159,8 @@
         "REFERRAL_REWARD": "Récompense de parrainage",
         "BANK_SYNC": "Dépôt bancaire (auto)",
         "PERIOD_CLOSE": "Clôture de période",
-        "ALLOCATION_RUN": "Lancement d'allocation"
+        "ALLOCATION_RUN": "Lancement d'allocation",
+        "CARD_TRANSFER": "Transfert de carte"
       },
       "edit": "Annoter",
       "title": "Annoter la transaction",
@@ -447,7 +448,8 @@
           "balance": "Solde",
           "primary": "Carte principale",
           "lost": "Perdue",
-          "empty": "Aucune carte pour le moment."
+          "empty": "Aucune carte pour le moment.",
+          "actions": "Actions"
         },
         "tokenOps": {
           "title": "Opérations de jetons",
@@ -2178,6 +2180,45 @@
           "sourceNotFound": "Carte source introuvable.",
           "self": "Une carte ne peut pas être sa propre source.",
           "failed": "Impossible de mettre à jour la carte source. Réessayez dans un instant."
+        }
+      },
+      "unassign": {
+        "button": "Dissocier",
+        "title": "Dissocier la carte",
+        "description": "Détacher cette carte de {holderLabel}. Le solde n'est pas modifié — transférez-le d'abord s'il doit suivre le titulaire.",
+        "primaryWarning": "C'est la carte principale du membre. La dissocier efface sa carte principale afin que vous puissiez en attribuer une nouvelle.",
+        "cancel": "Annuler",
+        "confirm": "Dissocier",
+        "confirming": "Dissociation…",
+        "errors": {
+          "notFound": "Carte introuvable.",
+          "notAssigned": "Cette carte n'est associée à aucun membre."
+        }
+      },
+      "transfer": {
+        "button": "Transférer",
+        "title": "Transférer le solde",
+        "description": "Transférer une partie du solde de {holderLabel} vers une autre carte.",
+        "amountLabel": "Montant",
+        "submitting": "Transfert…",
+        "confirm": "Transférer",
+        "success": "Transfert confirmé sur la blockchain.",
+        "targetRequired": "Choisissez une carte de destination.",
+        "errors": {
+          "sameCard": "Choisissez une autre carte de destination.",
+          "targetNotFound": "Carte de destination introuvable.",
+          "failed": "Le transfert a échoué. Consultez le journal des opérations de jetons.",
+          "debitFailed": "La destination a été créditée, mais le débit de la carte source a échoué. Retirez manuellement le solde restant de la carte source."
+        },
+        "target": {
+          "field": "Carte de destination",
+          "placeholder": "Rechercher par numéro de série, numéro ou titulaire",
+          "hint": "Recherchez les cartes de la caisse pour choisir la destination du solde.",
+          "searching": "Recherche…",
+          "empty": "Aucune carte correspondante.",
+          "emptyInitial": "Commencez à taper pour trouver une carte.",
+          "clear": "Effacer",
+          "noName": "Sans titulaire"
         }
       }
     }

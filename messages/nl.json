@@ -305,7 +305,8 @@
           "balance": "Saldo",
           "primary": "Hoofdkaart",
           "lost": "Verloren",
-          "empty": "Nog geen kaarten."
+          "empty": "Nog geen kaarten.",
+          "actions": "Acties"
         },
         "tokenOps": {
           "title": "Tokenbewerkingen",
@@ -1309,7 +1310,8 @@
         "PAYOUT_FEE": "Uitbetalingskosten",
         "REFERRAL_REWARD": "Verwijzingsbeloning",
         "BANK_SYNC": "Bankstorting (auto)",
-        "PERIOD_CLOSE": "Periodeafsluiting"
+        "PERIOD_CLOSE": "Periodeafsluiting",
+        "CARD_TRANSFER": "Kaartoverboeking"
       },
       "edit": "Annoteren",
       "title": "Transactie annoteren",
@@ -1807,6 +1809,45 @@
           "empty": "Geen geldige rijen in de CSV.",
           "noMatches": "Geen enkel serienummer komt overeen met een kaart in dit fonds.",
           "columnMissing": "Kies zowel een serienummer- als een nummerkolom."
+        }
+      },
+      "unassign": {
+        "button": "Loskoppelen",
+        "title": "Kaart loskoppelen",
+        "description": "Maak deze kaart los van {holderLabel}. Het saldo verandert niet — verplaats dat eerst als het de houder moet volgen.",
+        "primaryWarning": "Dit is de primaire kaart van het lid. Loskoppelen wist hun primaire kaart zodat je een vervanging kunt toewijzen.",
+        "cancel": "Annuleren",
+        "confirm": "Loskoppelen",
+        "confirming": "Loskoppelen…",
+        "errors": {
+          "notFound": "Kaart niet gevonden.",
+          "notAssigned": "Deze kaart is niet aan een lid toegewezen."
+        }
+      },
+      "transfer": {
+        "button": "Overboeken",
+        "title": "Saldo overboeken",
+        "description": "Een deel van het saldo van {holderLabel} naar een andere kaart verplaatsen.",
+        "amountLabel": "Bedrag",
+        "submitting": "Overboeken…",
+        "confirm": "Overboeken",
+        "success": "Overboeking bevestigd op de blockchain.",
+        "targetRequired": "Kies een doelkaart.",
+        "errors": {
+          "sameCard": "Kies een andere doelkaart.",
+          "targetNotFound": "Doelkaart niet gevonden.",
+          "failed": "Overboeking mislukt. Bekijk het logboek met tokenbewerkingen.",
+          "debitFailed": "De bestemming is gecrediteerd, maar het debiteren van de bronkaart is mislukt. Neem het resterende saldo handmatig van de bronkaart op."
+        },
+        "target": {
+          "field": "Doelkaart",
+          "placeholder": "Zoek op serienummer, nummer of houder",
+          "hint": "Zoek in de kaarten van het fonds om de bestemming van het saldo te kiezen.",
+          "searching": "Zoeken…",
+          "empty": "Geen overeenkomende kaarten.",
+          "emptyInitial": "Begin met typen om een kaart te vinden.",
+          "clear": "Wissen",
+          "noName": "Geen houder"
         }
       }
     }

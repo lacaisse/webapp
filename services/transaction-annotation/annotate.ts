@@ -39,6 +39,7 @@ export const ANNOTATION_TRIGGERS = {
   adminDirectBurn: "ADMIN_DIRECT_BURN", // ad-hoc burn from a raw address (/token)
   cardTopUp: "CARD_TOPUP",
   cardWithdrawal: "CARD_WITHDRAWAL",
+  cardTransfer: "CARD_TRANSFER", // card-to-card balance move (mint + burn legs)
   accountMint: "ACCOUNT_MINT",
   accountBurn: "ACCOUNT_BURN",
   accountTransfer: "ACCOUNT_TRANSFER",

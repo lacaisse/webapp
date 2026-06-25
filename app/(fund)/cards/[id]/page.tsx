@@ -30,6 +30,8 @@ import { CardNumberEdit } from "./card-number-edit";
 import { CardSourcePicker } from "./source-picker";
 import { CardTransfersTable } from "./transfers-table";
 import { NotifyCardButton } from "./notify-card-button";
+import { TransferDialog } from "./transfer-dialog";
+import { UnassignCardButton } from "../unassign-card-button";
 
 export default async function CardDetailPage({
   params,
@@ -98,15 +100,31 @@ export default async function CardDetailPage({
           <ArrowLeft className="size-3.5" />
           {t("back")}
         </Link>
-        <CardRowActions
-          cardId={card.id}
-          status={card.status}
-          isLost={isLost}
-          holderLabel={holderLabel}
-          hasAccount={card.account !== null}
-          tokenSymbol={fund.tokenSymbol}
-          tokenDecimals={fund.tokenDecimals}
-        />
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {canShowBalance && (
+            <TransferDialog
+              cardId={card.id}
+              holderLabel={holderLabel}
+              tokenSymbol={fund.tokenSymbol}
+            />
+          )}
+          {card.memberId && (
+            <UnassignCardButton
+              cardId={card.id}
+              holderLabel={holderLabel}
+              isPrimary={isPrimary}
+            />
+          )}
+          <CardRowActions
+            cardId={card.id}
+            status={card.status}
+            isLost={isLost}
+            holderLabel={holderLabel}
+            hasAccount={card.account !== null}
+            tokenSymbol={fund.tokenSymbol}
+            tokenDecimals={fund.tokenDecimals}
+          />
+        </div>
       </div>
 
       <header className="space-y-2">

@@ -106,30 +106,55 @@ export async function CardsTable({
 
   const where = whereFor(tab, fund.id, q);
 
+  const cardInclude = {
+    member: {
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        primaryCardId: true,
+      },
+    },
+  } as const;
+
+  // A purely numeric query is a card-number lookup. The exact match is unique
+  // per fund (@@unique([fundId, number])) but otherwise sinks among the many
+  // serial-substring hits — "219" matches any serial *containing* 219, which
+  // can be hundreds. Pin the exact-number card to the top of the first page so
+  // the card the operator actually meant leads, then exclude it from the
+  // paginated remainder so it can't appear twice.
+  const exactNumber = q ? parseCardNumber(q) : null;
+  const pinned =
+    exactNumber !== null
+      ? await prisma.card.findFirst({
+          // Reuse the tab filter (without the search OR) so we never pin a card
+          // the active tab would otherwise hide.
+          where: { ...whereFor(tab, fund.id, null), number: exactNumber },
+          include: cardInclude,
+        })
+      : null;
+  const reserve = pinned ? 1 : 0;
+  const listWhere = pinned ? { ...where, NOT: { id: pinned.id } } : where;
+
   // Count + page fetch in parallel — count is cheap on the indexed (fundId,
   // status) / (fundId) shapes and lets the pager show totals.
-  const [total, pageCards] = await Promise.all([
-    prisma.card.count({ where }),
+  const [remainderTotal, remainderCards] = await Promise.all([
+    prisma.card.count({ where: listWhere }),
     prisma.card.findMany({
-      where,
+      where: listWhere,
       // By card number ascending; unnumbered cards last, newest-first among them.
       orderBy: [{ number: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }],
-      // Clamp the page to a non-negative offset; the renderer will clamp
-      // visually too.
-      skip: Math.max(0, (page - 1) * PAGE_SIZE),
-      take: PAGE_SIZE,
-      include: {
-        member: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            primaryCardId: true,
-          },
-        },
-      },
+      // The pinned card occupies one slot on page 1, so shift the remainder
+      // offset back by one and trim page 1's take to keep PAGE_SIZE rows/page.
+      skip: Math.max(0, (page - 1) * PAGE_SIZE - reserve),
+      take: page === 1 ? PAGE_SIZE - reserve : PAGE_SIZE,
+      include: cardInclude,
     }),
   ]);
+
+  const total = remainderTotal + reserve;
+  const pageCards =
+    pinned && page === 1 ? [pinned, ...remainderCards] : remainderCards;
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const clampedPage = Math.min(Math.max(page, 1), totalPages);

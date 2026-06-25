@@ -159,7 +159,8 @@
         "REFERRAL_REWARD": "Referral reward",
         "BANK_SYNC": "Bank deposit (auto)",
         "PERIOD_CLOSE": "Period close",
-        "ALLOCATION_RUN": "Allocation run"
+        "ALLOCATION_RUN": "Allocation run",
+        "CARD_TRANSFER": "Card transfer"
       },
       "edit": "Annotate",
       "title": "Annotate transaction",
@@ -447,7 +448,8 @@
           "balance": "Balance",
           "primary": "Primary card",
           "lost": "Lost",
-          "empty": "No cards yet."
+          "empty": "No cards yet.",
+          "actions": "Actions"
         },
         "tokenOps": {
           "title": "Token operations",
@@ -2178,6 +2180,45 @@
           "sourceNotFound": "Source card not found.",
           "self": "A card can't be its own source.",
           "failed": "Couldn't update the source card. Try again shortly."
+        }
+      },
+      "unassign": {
+        "button": "Unassign",
+        "title": "Unassign card",
+        "description": "Detach this card from {holderLabel}. The balance is left untouched — move it first if it should follow the holder.",
+        "primaryWarning": "This is the member's primary card. Unassigning it clears their primary card so you can assign a replacement.",
+        "cancel": "Cancel",
+        "confirm": "Unassign",
+        "confirming": "Unassigning…",
+        "errors": {
+          "notFound": "Card not found.",
+          "notAssigned": "This card isn't assigned to a member."
+        }
+      },
+      "transfer": {
+        "button": "Transfer",
+        "title": "Transfer balance",
+        "description": "Move part of {holderLabel}'s balance to another card.",
+        "amountLabel": "Amount",
+        "submitting": "Transferring…",
+        "confirm": "Transfer",
+        "success": "Transfer confirmed on-chain.",
+        "targetRequired": "Pick a destination card.",
+        "errors": {
+          "sameCard": "Pick a different destination card.",
+          "targetNotFound": "Destination card not found.",
+          "failed": "Transfer failed. Check the token operations log for details.",
+          "debitFailed": "The destination was credited, but draining the source card failed. Withdraw the remaining balance from the source card manually."
+        },
+        "target": {
+          "field": "Destination card",
+          "placeholder": "Search by serial, number or holder",
+          "hint": "Search the fund's cards to pick where the balance goes.",
+          "searching": "Searching…",
+          "empty": "No matching cards.",
+          "emptyInitial": "Start typing to find a card.",
+          "clear": "Clear",
+          "noName": "No holder"
         }
       }
     }

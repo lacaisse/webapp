@@ -26,6 +26,7 @@ import {
 import { prisma } from "@/services/db/prisma";
 import { requireCurrentFund } from "@/services/fund/server";
 
+import { UnassignCardButton } from "../../cards/unassign-card-button";
 import { AddCardDialog } from "../add-card-dialog";
 import { MemberRowActions } from "../member-row-actions";
 import { StatusChangeDialog } from "../status-change-dialog";
@@ -264,11 +265,14 @@ async function MemberDetail({
               <TableHead>{t("cards.status")}</TableHead>
               <TableHead>{t("cards.issued")}</TableHead>
               <TableHead className="text-right">{t("cards.balance")}</TableHead>
+              <TableHead className="text-right">
+                <span className="sr-only">{t("cards.actions")}</span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {member.cards.length === 0 ? (
-              <TableEmpty colSpan={5}>{t("cards.empty")}</TableEmpty>
+              <TableEmpty colSpan={6}>{t("cards.empty")}</TableEmpty>
             ) : (
               member.cards.map((c) => {
                 const isPrimary = member.primaryCardId === c.id;
@@ -301,6 +305,13 @@ async function MemberDetail({
                     </TableCell>
                     <TableCell className="text-right font-medium">
                       {c.balance?.toString() ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <UnassignCardButton
+                        cardId={c.id}
+                        holderLabel={c.holderName ?? fullName}
+                        isPrimary={isPrimary}
+                      />
                     </TableCell>
                   </TableRow>
                 );
