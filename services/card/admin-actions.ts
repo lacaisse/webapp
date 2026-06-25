@@ -887,3 +887,293 @@ export async function importCardNumbersAction(input: {
   revalidatePath("/cards");
   return { ok: true, applied: toApply.length, provisioned, displaced, skipped };
 }
+
+// =============================================================================
+// Unassign a card from its member
+// =============================================================================
+// Detach a card from the member it's bound to (e.g. lost / defective card being
+// retired). Clears `Card.memberId`; if the card was the member's primary, also
+// clears `Member.primaryCardId` so the member drops back into the "no primary"
+// state and the assign-card flow (activateMemberAction) can give them a
+// replacement primary. Balance is left untouched — move it first with
+// transferBetweenCardsAction if it should follow the holder.
+
+export type UnassignCardResult = { ok: true } | { error: string };
+
+export async function unassignCardAction(input: {
+  cardId: string;
+}): Promise<UnassignCardResult> {
+  const t = await getTranslations();
+  const { fund } = await requireFundRole("ADMIN");
+
+  const card = await prisma.card.findFirst({
+    where: { id: input.cardId, fundId: fund.id },
+    select: { id: true, memberId: true },
+  });
+  if (!card) return { error: t("cards.admin.unassign.errors.notFound" as never) };
+  if (!card.memberId) {
+    return { error: t("cards.admin.unassign.errors.notAssigned" as never) };
+  }
+  const memberId = card.memberId;
+
+  await prisma.$transaction([
+    prisma.card.update({
+      where: { id: card.id },
+      data: { memberId: null },
+    }),
+    // Only clears the pointer when this card actually was the primary — a
+    // no-op for secondary (dependant) cards.
+    prisma.member.updateMany({
+      where: { id: memberId, primaryCardId: card.id },
+      data: { primaryCardId: null },
+    }),
+  ]);
+
+  revalidatePath("/cards");
+  revalidatePath(`/cards/${card.id}`);
+  revalidatePath("/members");
+  revalidatePath(`/members/${memberId}`);
+  return { ok: true };
+}
+
+// =============================================================================
+// Card-to-card balance transfer
+// =============================================================================
+// Move a balance between two cards in the same fund — e.g. carrying a holder's
+// remaining funds from a lost card onto its replacement. Card accounts are
+// CitizenPay-issued wallets the minter doesn't own, so we can't sign a real
+// ERC20 transfer the way token accounts do (accountTransferAction); instead we
+// compose the two primitives the minter CAN do via its token roles: mint to the
+// destination, then burn from the source. Recorded as two TokenOperation rows
+// (the credit MINT + the debit BURN), each tagged CARD_TRANSFER so the audit
+// log reads as one logical transfer.
+//
+// Order is mint-first on purpose: if the bundler is down the credit leg fails
+// and we abort having moved nothing. The only partial state is the (very
+// unlikely) credit-succeeds-then-debit-fails window, which leaves the holder
+// made whole and merely over-issues the fund by the amount — a CONFIRMED mint +
+// FAILED burn the operator can reconcile, never a holder losing money.
+
+export type TransferBetweenCardsResult =
+  | { ok: true; txHash: string }
+  | { error: string; field?: "amount" | "toCard" };
+
+const CardTransferSchema = z.object({
+  fromCardId: z.string().min(1),
+  toCardId: z.string().min(1),
+  amount: z
+    .string()
+    .regex(/^\d+(\.\d{1,2})?$/, { error: "cards.admin.errors.amountInvalid" })
+    .refine((v) => Number(v) > 0, {
+      error: "cards.admin.errors.amountPositive",
+    }),
+});
+
+export async function transferBetweenCardsAction(input: {
+  fromCardId: string;
+  toCardId: string;
+  amount: string;
+}): Promise<TransferBetweenCardsResult> {
+  const t = await getTranslations();
+  const { fund, user } = await requireFundRole("ADMIN");
+
+  const parsed = CardTransferSchema.safeParse(input);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return {
+      error: t(issue.message as never),
+      field: issue.path[0] === "amount" ? "amount" : undefined,
+    };
+  }
+  if (parsed.data.fromCardId === parsed.data.toCardId) {
+    return {
+      error: t("cards.admin.transfer.errors.sameCard" as never),
+      field: "toCard",
+    };
+  }
+  if (!fund.tokenAddress || fund.tokenDecimals == null) {
+    return { error: t("cards.admin.errors.tokenNotConfigured" as never) };
+  }
+
+  const cardSelect = {
+    id: true,
+    account: true,
+    memberId: true,
+    member: { select: { tierId: true } },
+  } as const;
+  const [from, to] = await Promise.all([
+    prisma.card.findFirst({
+      where: { id: parsed.data.fromCardId, fundId: fund.id },
+      select: cardSelect,
+    }),
+    prisma.card.findFirst({
+      where: { id: parsed.data.toCardId, fundId: fund.id },
+      select: cardSelect,
+    }),
+  ]);
+  if (!from) return { error: t("cards.admin.errors.notFound" as never) };
+  if (!to) {
+    return {
+      error: t("cards.admin.transfer.errors.targetNotFound" as never),
+      field: "toCard",
+    };
+  }
+  if (!from.account || !to.account) {
+    return { error: t("cards.admin.errors.noAccount" as never) };
+  }
+
+  let amountUnits: bigint;
+  try {
+    amountUnits = parseUnits(parsed.data.amount, fund.tokenDecimals);
+  } catch {
+    return {
+      error: t("cards.admin.errors.amountInvalid" as never),
+      field: "amount",
+    };
+  }
+
+  // --- Credit leg: mint to the destination card. ---
+  const mintOp = await prisma.tokenOperation.create({
+    data: {
+      fundId: fund.id,
+      type: "MINT",
+      memberId: to.memberId,
+      account: to.account,
+      amount: parsed.data.amount,
+      tierId: to.member?.tierId ?? null,
+      status: "PENDING",
+    },
+  });
+  let mintTxHash: string;
+  try {
+    const { txHash, userOpHash } = await mintToken({
+      fund: fund as FundMinterContext,
+      to: to.account as `0x${string}`,
+      amount: amountUnits,
+    });
+    mintTxHash = txHash;
+    await prisma.tokenOperation.update({
+      where: { id: mintOp.id },
+      data: { status: "CONFIRMED", txHash, confirmedAt: new Date() },
+    });
+    await resolveOrEnqueueAnnotation({
+      fundId: fund.id,
+      chainId: fund.tokenChainId,
+      userOpHash,
+      kind: ANNOTATION_TRIGGERS.cardTransfer,
+      trigger: ANNOTATION_TRIGGERS.cardTransfer,
+      triggeredByUserId: user.id,
+    });
+  } catch (e) {
+    const errorMessage =
+      e instanceof UserOpError ? `${e.code}: ${e.message}` : String(e);
+    await prisma.tokenOperation.update({
+      where: { id: mintOp.id },
+      data: { status: "FAILED", errorMessage },
+    });
+    console.error("[card] transfer mint leg failed", mintOp.id, e);
+    return { error: t("cards.admin.transfer.errors.failed" as never) };
+  }
+
+  // --- Debit leg: burn from the source card. ---
+  const burnOp = await prisma.tokenOperation.create({
+    data: {
+      fundId: fund.id,
+      type: "BURN",
+      memberId: from.memberId,
+      account: from.account,
+      amount: parsed.data.amount,
+      tierId: from.member?.tierId ?? null,
+      status: "PENDING",
+    },
+  });
+  try {
+    const { txHash, userOpHash } = await burnFromToken({
+      fund: fund as FundMinterContext,
+      from: from.account as `0x${string}`,
+      amount: amountUnits,
+    });
+    await prisma.tokenOperation.update({
+      where: { id: burnOp.id },
+      data: { status: "CONFIRMED", txHash, confirmedAt: new Date() },
+    });
+    await resolveOrEnqueueAnnotation({
+      fundId: fund.id,
+      chainId: fund.tokenChainId,
+      userOpHash,
+      kind: ANNOTATION_TRIGGERS.cardTransfer,
+      trigger: ANNOTATION_TRIGGERS.cardTransfer,
+      triggeredByUserId: user.id,
+    });
+  } catch (e) {
+    // Credit already landed — the holder has their funds. Surface a distinct
+    // error so the operator knows the source still needs draining; the FAILED
+    // burn row carries the detail for reconciliation.
+    const errorMessage =
+      e instanceof UserOpError ? `${e.code}: ${e.message}` : String(e);
+    await prisma.tokenOperation.update({
+      where: { id: burnOp.id },
+      data: { status: "FAILED", errorMessage },
+    });
+    console.error("[card] transfer burn leg failed", burnOp.id, e);
+    revalidatePath("/cards");
+    revalidatePath(`/cards/${from.id}`);
+    revalidatePath(`/cards/${to.id}`);
+    return { error: t("cards.admin.transfer.errors.debitFailed" as never) };
+  }
+
+  revalidatePath("/cards");
+  revalidatePath(`/cards/${from.id}`);
+  revalidatePath(`/cards/${to.id}`);
+  if (from.memberId) revalidatePath(`/members/${from.memberId}`);
+  if (to.memberId) revalidatePath(`/members/${to.memberId}`);
+  revalidatePath("/token");
+  return { ok: true, txHash: mintTxHash };
+}
+
+// Typeahead backing the card-to-card transfer destination picker. Returns
+// fund cards that have a CP account (so they can receive a mint), excluding the
+// source card. Matches serial (case-insensitive contains), card number (exact,
+// digits) or holder name (case-insensitive contains).
+export type TransferTargetHit = {
+  id: string;
+  serialNumber: string;
+  number: number | null;
+  holderName: string | null;
+  status: CardStatus;
+};
+
+export async function searchTransferTargetCardsAction(input: {
+  excludeCardId: string;
+  q: string;
+}): Promise<TransferTargetHit[]> {
+  const { fund } = await requireFundRole("ADMIN");
+  const term = input.q.trim();
+  const asNumber = /^\d+$/.test(term) ? Number(term) : null;
+  const cards = await prisma.card.findMany({
+    where: {
+      fundId: fund.id,
+      id: { not: input.excludeCardId },
+      account: { not: null },
+      ...(term.length > 0
+        ? {
+            OR: [
+              { serialNumber: { contains: term, mode: "insensitive" as const } },
+              { holderName: { contains: term, mode: "insensitive" as const } },
+              ...(asNumber !== null ? [{ number: asNumber }] : []),
+            ],
+          }
+        : {}),
+    },
+    select: {
+      id: true,
+      serialNumber: true,
+      number: true,
+      holderName: true,
+      status: true,
+    },
+    orderBy: { createdAt: "desc" },
+    take: 12,
+  });
+  return cards;
+}

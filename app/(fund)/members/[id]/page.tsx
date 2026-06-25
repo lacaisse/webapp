@@ -27,6 +27,7 @@ import {
 import { prisma } from "@/services/db/prisma";
 import { requireCurrentFund } from "@/services/fund/server";
 
+import { UnassignCardButton } from "../../cards/unassign-card-button";
 import { AddCardDialog } from "../add-card-dialog";
 import { MemberRowActions } from "../member-row-actions";
 import { StatusChangeDialog } from "../status-change-dialog";
@@ -265,7 +266,9 @@ async function MemberDetail({
               <TableHead>{t("cards.status")}</TableHead>
               <TableHead>{t("cards.issued")}</TableHead>
               <TableHead className="text-right">{t("cards.balance")}</TableHead>
-              <TableHead />
+              <TableHead className="text-right">
+                <span className="sr-only">{t("cards.actions")}</span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -305,16 +308,23 @@ async function MemberDetail({
                       {c.balance?.toString() ?? "—"}
                     </TableCell>
                     <TableCell className="text-right">
-                      <a
-                        href={`/api/cards/${c.id}/onboarding-letter`}
-                        className={buttonVariants({
-                          variant: "outline",
-                          size: "sm",
-                        })}
-                      >
-                        <Download className="size-3.5" />
-                        {t("cards.downloadLetter")}
-                      </a>
+                      <div className="flex items-center justify-end gap-2">
+                        <a
+                          href={`/api/cards/${c.id}/onboarding-letter`}
+                          className={buttonVariants({
+                            variant: "outline",
+                            size: "sm",
+                          })}
+                        >
+                          <Download className="size-3.5" />
+                          {t("cards.downloadLetter")}
+                        </a>
+                        <UnassignCardButton
+                          cardId={c.id}
+                          holderLabel={c.holderName ?? fullName}
+                          isPrimary={isPrimary}
+                        />
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
