@@ -6,11 +6,10 @@ import { revalidatePath } from "next/cache";
 import { parseUnits } from "viem";
 import { z } from "zod";
 
-import { ensureOpenPeriod } from "@/services/allocation-periods/ensure";
 import { requireFundRole } from "@/services/auth/dal";
 import { getCitizenPayClient } from "@/services/citizenpay/client";
 import { Prisma } from "@/services/db/generated/client";
-import type { AllocationMode, CardStatus } from "@/services/db/generated/enums";
+import type { CardStatus } from "@/services/db/generated/enums";
 import { prisma } from "@/services/db/prisma";
 import { nextCardNumber } from "@/services/card/numbering";
 import { normalizeSerial } from "@/services/card/serial";
@@ -70,9 +69,6 @@ export type CardOpResult =
 export async function topUpCardAction(input: {
   cardId: string;
   amount: string;
-  // Optional incoming bank transfer to record this recharge against — so the
-  // allocation is tied to a real deposit instead of looking manual (issue #28).
-  bankTransactionId?: string | null;
 }): Promise<CardOpResult> {
   const t = await getTranslations();
   const { fund, user } = await requireFundRole("ADMIN");
@@ -101,27 +97,6 @@ export async function topUpCardAction(input: {
   }
   if (!fund.tokenAddress || fund.tokenDecimals == null) {
     return { error: t("cards.admin.errors.tokenNotConfigured" as never) };
-  }
-
-  // Validate the optional bank transfer up front (before minting) so a bad
-  // pick fails cleanly. It must be an unmatched incoming deposit on this fund,
-  // and the card must belong to a member (the deposit is attributed to them).
-  const bankTransactionId = input.bankTransactionId?.trim() || null;
-  if (bankTransactionId) {
-    if (!card.memberId) {
-      return { error: t("cards.admin.errors.bankTxNeedsMember" as never) };
-    }
-    const tx = await prisma.bankTransaction.findFirst({
-      where: { id: bankTransactionId, fundId: fund.id },
-      select: { id: true, direction: true, matchedAt: true },
-    });
-    if (!tx) return { error: t("cards.admin.errors.bankTxNotFound" as never) };
-    if (tx.direction !== "INCOMING") {
-      return { error: t("cards.admin.errors.bankTxNotIncoming" as never) };
-    }
-    if (tx.matchedAt) {
-      return { error: t("cards.admin.errors.bankTxAlreadyMatched" as never) };
-    }
   }
 
   let amountUnits: bigint;
@@ -156,23 +131,6 @@ export async function topUpCardAction(input: {
       where: { id: op.id },
       data: { status: "CONFIRMED", txHash, confirmedAt: new Date() },
     });
-    // Attach the deposit: link it to the member + card (MANUAL), source-link
-    // it to this mint so it reads as a real bank-transfer allocation, and learn
-    // the IBAN for future auto-matching. The mint already landed, so a link
-    // failure is logged, not surfaced — the recharge itself succeeded.
-    if (bankTransactionId && card.memberId) {
-      try {
-        await linkTopUpDeposit({
-          fund,
-          bankTransactionId,
-          memberId: card.memberId,
-          cardId: card.id,
-          tokenOperationId: op.id,
-        });
-      } catch (e) {
-        console.error("[card] topUp bank-transfer link failed", op.id, e);
-      }
-    }
     await resolveOrEnqueueAnnotation({
       fundId: fund.id,
       chainId: fund.tokenChainId,
@@ -185,10 +143,6 @@ export async function topUpCardAction(input: {
     revalidatePath(`/cards/${card.id}`);
     if (card.memberId) revalidatePath(`/members/${card.memberId}`);
     revalidatePath("/token");
-    if (bankTransactionId) {
-      revalidatePath("/allocations");
-      revalidatePath("/bank");
-    }
     return { ok: true, txHash };
   } catch (e) {
     const errorMessage =
@@ -289,174 +243,6 @@ export async function withdrawFromCardAction(input: {
     });
     console.error("[card] withdrawFromCard failed", op.id, e);
     return { error: t("cards.admin.errors.submitFailed" as never) };
-  }
-}
-
-// Tie a confirmed recharge to the incoming deposit that paid for it: match the
-// deposit to the member + card (MANUAL), source-link it to the mint so it
-// surfaces in allocation history like a bank-driven allocation, and learn the
-// IBAN so the same account auto-matches next time. Mirrors the bank-sync
-// attribution path (services/bank-sync). Not exported — only topUpCardAction
-// calls it, after the mint has confirmed.
-async function linkTopUpDeposit(args: {
-  fund: {
-    id: string;
-    allocationMode: AllocationMode;
-    allocationCutoffDay: number;
-  };
-  bankTransactionId: string;
-  memberId: string;
-  cardId: string;
-  tokenOperationId: string;
-}): Promise<void> {
-  const tx = await prisma.bankTransaction.findFirst({
-    where: { id: args.bankTransactionId, fundId: args.fund.id },
-    select: { id: true, counterpartIban: true, allocationPeriodId: true },
-  });
-  if (!tx) return;
-
-  // FIXED_PERIOD: tag the deposit to the open period so it shows there.
-  let allocationPeriodId = tx.allocationPeriodId;
-  if (args.fund.allocationMode === "FIXED_PERIOD" && !allocationPeriodId) {
-    allocationPeriodId = await ensureOpenPeriod(
-      args.fund.id,
-      args.fund.allocationCutoffDay,
-    );
-  }
-
-  await prisma.$transaction(async (db) => {
-    await db.bankTransaction.update({
-      where: { id: tx.id },
-      data: {
-        memberId: args.memberId,
-        cardId: args.cardId,
-        matchedAt: new Date(),
-        matchMethod: "MANUAL",
-        ...(allocationPeriodId ? { allocationPeriodId } : {}),
-      },
-    });
-    await db.tokenOperationSource.create({
-      data: {
-        bankTransactionId: tx.id,
-        tokenOperationId: args.tokenOperationId,
-      },
-    });
-    if (tx.counterpartIban) {
-      await db.linkedBankAccount.upsert({
-        where: {
-          fundId_iban: { fundId: args.fund.id, iban: tx.counterpartIban },
-        },
-        create: {
-          fundId: args.fund.id,
-          iban: tx.counterpartIban,
-          memberId: args.memberId,
-          source: "MANUAL",
-        },
-        update: { memberId: args.memberId },
-      });
-    }
-  });
-}
-
-// Unmatched incoming deposits the operator can attach to a recharge. Read from
-// our local mirror (populated by the bank-sync cron / full-sync), newest first.
-export type PickableBankTransaction = {
-  id: string;
-  occurredAt: string; // ISO 8601
-  amount: string; // unsigned magnitude, 2dp
-  currency: string;
-  counterpartName: string | null;
-  reference: string | null;
-};
-
-export type ListUnmatchedDepositsResult =
-  | { error: string }
-  | {
-      ok: true;
-      transactions: PickableBankTransaction[];
-      nextCursor: string | null;
-    };
-
-const DEPOSIT_PAGE_SIZE = 20;
-
-// Strip combining diacritics so a search for "François" also matches the
-// un-accented "FRANCOIS" that bank (SEPA) feeds emit. Case is handled by
-// Prisma's `mode: "insensitive"`.
-function stripAccents(s: string): string {
-  return s.normalize("NFD").replace(/[̀-ͯ]/g, "");
-}
-
-// Search + keyset-paginate the fund's UNMATCHED incoming deposits (the review
-// queue) for the recharge attach picker. `cursor` is the last row's id from the
-// previous page; pass it back for the next page (newest-first). `search`
-// matches counterpart name / reference / remittance / IBAN case-insensitively,
-// and the exact amount when it parses as a number.
-export async function listUnmatchedIncomingBankTransactionsAction(input?: {
-  search?: string;
-  cursor?: string;
-}): Promise<ListUnmatchedDepositsResult> {
-  const t = await getTranslations();
-  const { fund } = await requireFundRole("ADMIN");
-
-  const search = input?.search?.trim() ?? "";
-  const cursor = input?.cursor?.trim() || null;
-
-  try {
-    const where: Prisma.BankTransactionWhereInput = {
-      fundId: fund.id,
-      direction: "INCOMING",
-      matchedAt: null,
-    };
-    if (search) {
-      const terms = [...new Set([search, stripAccents(search)])];
-      const or: Prisma.BankTransactionWhereInput[] = terms.flatMap((term) => {
-        const insensitive = { contains: term, mode: "insensitive" as const };
-        return [
-          { counterpartName: insensitive },
-          { counterpartReference: insensitive },
-          { remittanceInfo: insensitive },
-          { counterpartIban: insensitive },
-        ];
-      });
-      const amount = Number(search.replace(",", "."));
-      if (Number.isFinite(amount)) or.push({ amount });
-      where.OR = or;
-    }
-
-    const rows = await prisma.bankTransaction.findMany({
-      where,
-      orderBy: [{ occurredAt: "desc" }, { id: "desc" }],
-      take: DEPOSIT_PAGE_SIZE + 1,
-      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-      select: {
-        id: true,
-        amount: true,
-        currency: true,
-        occurredAt: true,
-        counterpartName: true,
-        counterpartReference: true,
-        remittanceInfo: true,
-      },
-    });
-
-    const hasMore = rows.length > DEPOSIT_PAGE_SIZE;
-    const page = hasMore ? rows.slice(0, DEPOSIT_PAGE_SIZE) : rows;
-
-    return {
-      ok: true,
-      transactions: page.map((b) => ({
-        id: b.id,
-        occurredAt: b.occurredAt.toISOString(),
-        amount: b.amount.toFixed(2),
-        currency: b.currency,
-        counterpartName: b.counterpartName,
-        reference: b.counterpartReference ?? b.remittanceInfo ?? null,
-      })),
-      nextCursor: hasMore ? page[page.length - 1].id : null,
-    };
-  } catch (e) {
-    console.error("[card] listUnmatchedIncomingBankTransactions failed", e);
-    return { error: t("cards.admin.topUp.attach.loadFailed" as never) };
   }
 }
 
@@ -770,11 +556,12 @@ export type UnattachedCardHit = {
 };
 
 // Typeahead backing the activate-member dialog. Returns unattached cards
-// (memberId is null) in the current fund matching the query against either the
-// serial number (case-insensitive contains) or the per-fund card number (exact,
-// when the term is all digits) — admin picks one to link instead of free-typing
-// a serial. With an empty query we surface the most-recently-imported cards so
-// the operator has something to scroll if they don't have the card in hand.
+// (memberId is null) in the current fund matching the query against the serial
+// number / UID (case-insensitive contains), the per-fund card number (exact,
+// when the term is all digits), or the source account address (case-insensitive
+// contains) — admin picks one to link instead of free-typing a serial. With an
+// empty query we surface cards in card-number order so the operator can scroll a
+// predictable list if they don't have the card in hand.
 const UNATTACHED_LIMIT = 12;
 
 export async function searchUnattachedCardsAction(
@@ -783,7 +570,7 @@ export async function searchUnattachedCardsAction(
   const { fund } = await requireFundRole("ADMIN");
   const term = q.trim();
   // An all-digits term may be a card number — match it exactly alongside the
-  // serial substring match.
+  // serial / account substring matches.
   const asNumber = /^\d+$/.test(term) ? Number(term) : null;
   const where = {
     fundId: fund.id,
@@ -792,6 +579,7 @@ export async function searchUnattachedCardsAction(
       ? {
           OR: [
             { serialNumber: { contains: term, mode: "insensitive" as const } },
+            { account: { contains: term, mode: "insensitive" as const } },
             ...(asNumber !== null ? [{ number: asNumber }] : []),
           ],
         }
@@ -807,7 +595,7 @@ export async function searchUnattachedCardsAction(
       holderName: true,
       status: true,
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ number: { sort: "asc", nulls: "last" } }, { createdAt: "asc" }],
     take: UNATTACHED_LIMIT,
   });
   return cards;
@@ -857,14 +645,14 @@ export async function setCardNumberAction(input: {
 
 export type SetCardSourceResult = { ok: true } | { error: string };
 
-// Set (or clear) the card this card pulls from when its own balance can't
-// cover a charge ("source card"). The relationship lives on CitizenPay —
-// we don't mirror it locally; the detail page reads it back via
-// `getCardSource`. Both cards are fund-scoped here, and CP enforces the
-// same ownership rule on its side.
+// Set (or clear) what this card pulls from when its own balance can't cover a
+// charge ("source"). The source can be another card or a SOURCE token account —
+// both are referenced on CitizenPay by serial. The relationship lives on CP; we
+// don't mirror it locally beyond a display cache. Source is fund-scoped here,
+// and CP enforces the same ownership rule on its side.
 export async function setCardSourceAction(input: {
   cardId: string;
-  sourceCardId: string | null;
+  source: { type: "card" | "account"; id: string } | null;
 }): Promise<SetCardSourceResult> {
   const t = await getTranslations();
   const { fund } = await requireFundRole("ADMIN");
@@ -876,18 +664,34 @@ export async function setCardSourceAction(input: {
   if (!card) return { error: t("cards.admin.source.errors.notFound" as never) };
 
   let sourceSerial: string | null = null;
-  if (input.sourceCardId !== null) {
-    if (input.sourceCardId === card.id) {
-      return { error: t("cards.admin.source.errors.self" as never) };
+  if (input.source !== null) {
+    if (input.source.type === "card") {
+      if (input.source.id === card.id) {
+        return { error: t("cards.admin.source.errors.self" as never) };
+      }
+      const source = await prisma.card.findFirst({
+        where: { id: input.source.id, fundId: fund.id },
+        select: { serialNumber: true },
+      });
+      if (!source) {
+        return { error: t("cards.admin.source.errors.sourceNotFound" as never) };
+      }
+      sourceSerial = source.serialNumber;
+    } else {
+      const account = await prisma.fundTokenAccount.findFirst({
+        where: {
+          id: input.source.id,
+          fundId: fund.id,
+          kind: "SOURCE",
+          archivedAt: null,
+        },
+        select: { serial: true },
+      });
+      if (!account?.serial) {
+        return { error: t("cards.admin.source.errors.sourceNotFound" as never) };
+      }
+      sourceSerial = account.serial;
     }
-    const source = await prisma.card.findFirst({
-      where: { id: input.sourceCardId, fundId: fund.id },
-      select: { serialNumber: true },
-    });
-    if (!source) {
-      return { error: t("cards.admin.source.errors.sourceNotFound" as never) };
-    }
-    sourceSerial = source.serialNumber;
   }
 
   try {

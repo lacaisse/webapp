@@ -6,6 +6,7 @@ import { refresh, revalidatePath } from "next/cache";
 import { parseUnits } from "viem";
 
 import { requireFundRole } from "@/services/auth/dal";
+import { getCitizenPayClient } from "@/services/citizenpay/client";
 import { prisma } from "@/services/db/prisma";
 import { deriveSmartAccountAddress } from "@/services/token/smart-account";
 import {
@@ -26,6 +27,7 @@ import {
   RenameTokenAccountSchema,
   TransferTokensSchema,
 } from "./schemas";
+import { fundAccountSerial } from "./serial";
 import {
   loadAccountTransfers,
   type AccountTransfersPage,
@@ -39,10 +41,13 @@ export type AccountTransfersResult =
   | { error: string }
   | ({ ok: true } & AccountTransfersPage);
 
-// Create a named account: pick the next free salt for this fund (salt 0 is the
-// minter), derive its counterfactual Safe address from the minter EOA, persist.
+// Create a named account. STANDARD accounts are counterfactual Safes derived
+// from the minter EOA. A SOURCE account is, on CitizenPay, just a card: we mint
+// a serial (CP's serial accepts any string) and register it via the normal card
+// path, so CP assigns the wallet and the account can back cards as their source.
 export async function createTokenAccountAction(input: {
   name: string;
+  kind?: "STANDARD" | "SOURCE";
 }): Promise<TokenAccountResult> {
   const t = await getTranslations();
   const { fund } = await requireFundRole("ADMIN");
@@ -57,7 +62,8 @@ export async function createTokenAccountAction(input: {
   }
 
   // Next salt = highest existing + 1 (≥ 1). The unique (fundId, saltNonce)
-  // index is the backstop if two creates race.
+  // index is the backstop if two creates race. For SOURCE accounts this is just
+  // a per-fund sequence number that also seeds the serial (no Safe derivation).
   const last = await prisma.fundTokenAccount.findFirst({
     where: { fundId: fund.id },
     orderBy: { saltNonce: "desc" },
@@ -65,18 +71,53 @@ export async function createTokenAccountAction(input: {
   });
   const saltNonce = (last?.saltNonce ?? 0) + 1;
 
-  const address = await deriveSmartAccountAddress({
-    eoaAddress: fund.tokenMinterEoaAddress,
-    factoryAddress: fund.citizenPayAccountFactoryAddress,
-    saltNonce: BigInt(saltNonce),
-  });
-  if (!address) {
-    return { error: t("fund.accounts.errors.deriveFailed" as never) };
+  let address: string;
+  let serial: string | null = null;
+
+  if (parsed.data.kind === "SOURCE") {
+    // Register the card on CP with our generated serial; CP assigns the wallet
+    // and returns its address, which is what the account holds and what CP
+    // pulls from when this account backs a card.
+    serial = fundAccountSerial(fund.id, saltNonce);
+    let registered;
+    try {
+      registered = await getCitizenPayClient(fund).registerCard({
+        serialNumber: serial,
+        fundId: fund.id,
+        fundCitizenPayId: fund.citizenPayFundId,
+        holderName: parsed.data.name,
+      });
+    } catch (e) {
+      console.error("[token-account] CP card registration failed", e);
+      return { error: t("fund.accounts.errors.registerFailed" as never) };
+    }
+    if (!registered.account) {
+      // No address back means we'd persist a card we can't fund/pull from.
+      return { error: t("fund.accounts.errors.registerFailed" as never) };
+    }
+    address = registered.account;
+  } else {
+    const derived = await deriveSmartAccountAddress({
+      eoaAddress: fund.tokenMinterEoaAddress,
+      factoryAddress: fund.citizenPayAccountFactoryAddress,
+      saltNonce: BigInt(saltNonce),
+    });
+    if (!derived) {
+      return { error: t("fund.accounts.errors.deriveFailed" as never) };
+    }
+    address = derived;
   }
 
   try {
     await prisma.fundTokenAccount.create({
-      data: { fundId: fund.id, name: parsed.data.name, saltNonce, address },
+      data: {
+        fundId: fund.id,
+        name: parsed.data.name,
+        saltNonce,
+        address,
+        kind: parsed.data.kind,
+        serial,
+      },
     });
   } catch (e) {
     console.error("[token-account] create failed", e);
@@ -234,9 +275,14 @@ export async function accountTransferAction(input: {
 
   const account = await prisma.fundTokenAccount.findFirst({
     where: { id: parsed.data.id, fundId: fund.id, archivedAt: null },
-    select: { address: true, saltNonce: true },
+    select: { address: true, saltNonce: true, kind: true },
   });
   if (!account) return { error: t("fund.accounts.errors.notFound" as never) };
+  // SOURCE accounts fund cards; they're not a transfer origin. The picker is
+  // hidden for them, but re-check here so the action can't be called directly.
+  if (account.kind === "SOURCE") {
+    return { error: t("fund.accounts.errors.cannotTransferSource" as never) };
+  }
 
   let amountUnits: bigint;
   try {

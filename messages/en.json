@@ -180,14 +180,17 @@
       "empty": "No accounts yet. Create one to get started.",
       "defaultName": "Main account",
       "defaultBadge": "Default",
+      "sourceBadge": "Source",
       "table": {
         "name": "Name",
         "address": "Address",
+        "serial": "Serial",
         "balance": "Balance"
       },
       "detail": {
         "back": "All accounts",
-        "balance": "Balance"
+        "balance": "Balance",
+        "serial": "Serial"
       },
       "create": {
         "trigger": "New account",
@@ -195,6 +198,8 @@
         "description": "A new on-chain account derived from the fund's key.",
         "name": "Name",
         "namePlaceholder": "e.g. Reserve, Fees, Events",
+        "sourceLabel": "Card-source account",
+        "sourceHint": "Gives the account a serial so it can fund cards as their source. These accounts can't transfer out.",
         "confirm": "Create account"
       },
       "rename": {
@@ -253,10 +258,12 @@
         "notConnected": "Connect this fund to Citizen Pay first.",
         "deriveFailed": "Couldn't derive the account address. Try again shortly.",
         "createFailed": "Couldn't create the account. Try again shortly.",
+        "registerFailed": "Couldn't register the source account on Citizen Pay. Try again shortly.",
         "amountInvalid": "Amount must be a valid number.",
         "amountPositive": "Amount must be greater than zero.",
         "addressInvalid": "Enter a valid 0x address (40 hex characters).",
         "transferFailed": "On-chain transfer failed. Try again shortly.",
+        "cannotTransferSource": "Card-source accounts can't transfer out.",
         "transfersFailed": "Couldn't load transactions. Try again shortly."
       }
     },
@@ -412,6 +419,11 @@
         "cards": "Cards",
         "joined": "Joined"
       },
+      "contribution": {
+        "target": "Target",
+        "lastReceived": "Last received",
+        "none": "—"
+      },
       "unverified": "Email not verified",
       "empty": "No members to show.",
       "detail": {
@@ -449,7 +461,8 @@
           "primary": "Primary card",
           "lost": "Lost",
           "empty": "No cards yet.",
-          "actions": "Actions"
+          "actions": "Actions",
+          "downloadLetter": "Download invitation"
         },
         "tokenOps": {
           "title": "Token operations",
@@ -559,7 +572,14 @@
         },
         "source": {
           "none": "No source",
-          "hint": "When this card can't cover a charge, the missing amount is pulled from the source card."
+          "placeholder": "Search number, serial or name…",
+          "empty": "No matches.",
+          "typeCard": "Card",
+          "typeAccount": "Account",
+          "unresolved": "Current: {serial}",
+          "clear": "Clear source",
+          "open": "Open list",
+          "hint": "When this card can't cover a charge, the missing amount is pulled from its source (another card or a source account)."
         },
         "onboardingLetter": {
           "rowLabel": "Onboarding letter",
@@ -624,6 +644,18 @@
           "bankSync": "Bank deposit",
           "referral": "Referral reward",
           "manual": "Manual"
+        }
+      },
+      "reconcile": {
+        "none": "No period",
+        "closedOption": "{label} (closed)",
+        "errors": {
+          "opNotFound": "Allocation not found.",
+          "notManual": "This allocation is linked to a deposit — its period follows that deposit.",
+          "periodNotFound": "Period not found.",
+          "depositNotFound": "Deposit not found.",
+          "alreadyLinked": "This allocation is already linked to a deposit.",
+          "memberMismatch": "That allocation belongs to a different member than this deposit."
         }
       },
       "tiers": {
@@ -780,6 +812,14 @@
           "cancel": "Cancel",
           "confirm": "Remove",
           "removing": "Removing…"
+        },
+        "attachAllocation": {
+          "button": "Attach allocation",
+          "title": "Attach an existing allocation",
+          "description": "Link a manual allocation you already made for {member} to this {amount} deposit.",
+          "loading": "Loading allocations…",
+          "empty": "No manual allocations for this member to attach.",
+          "inPeriod": "in {period}"
         },
         "notify": {
           "column": "Notification",
@@ -1823,7 +1863,7 @@
         "description": "Issue a card to {memberName}. Their account becomes active immediately.",
         "unverifiedWarning": "This member hasn't verified their email yet. The activation email might bounce.",
         "cardLabel": "Card",
-        "cardPlaceholder": "Search by serial or card number…",
+        "cardPlaceholder": "Search by serial, card number or source account…",
         "cardHint": "Pick a card already imported from CitizenPay. If you don't see it, sync the cards list first.",
         "cardSearching": "Searching…",
         "cardEmpty": "No unattached cards match this serial.",
@@ -2034,20 +2074,7 @@
         "amountLabel": "Amount",
         "confirm": "Top up",
         "submitting": "Topping up…",
-        "success": "Top-up confirmed on-chain.",
-        "attach": {
-          "label": "Attach a bank transfer (optional)",
-          "hint": "Pick the incoming transfer that paid for this top-up — its amount prefills the field and the allocation is recorded as a real transfer.",
-          "searchPlaceholder": "Search by name, reference or amount…",
-          "loading": "Loading transfers…",
-          "loadMore": "Show more",
-          "noMatches": "No transfers match your search.",
-          "none": "No unmatched incoming transfers to pick from.",
-          "unknownCounterpart": "Unknown sender",
-          "selected": "Transfer attached",
-          "clear": "Remove",
-          "loadFailed": "Couldn't load transfers. Please try again."
-        }
+        "success": "Top-up confirmed on-chain."
       },
       "withdraw": {
         "button": "Withdraw",
@@ -2130,11 +2157,7 @@
         "amountInvalid": "Amount must be a number with up to 2 decimal places.",
         "amountPositive": "Amount must be greater than zero.",
         "tokenNotConfigured": "This fund has no token configured yet — connect to Citizen Pay first.",
-        "submitFailed": "On-chain submission failed. Check the token operations log for details.",
-        "bankTxNeedsMember": "Attach this card to a member before linking a transfer to it.",
-        "bankTxNotFound": "Bank transfer not found.",
-        "bankTxNotIncoming": "Only incoming transfers can be attached to a top-up.",
-        "bankTxAlreadyMatched": "That transfer is already matched to a member."
+        "submitFailed": "On-chain submission failed. Check the token operations log for details."
       },
       "sync": {
         "trigger": "Sync with Citizen Pay",

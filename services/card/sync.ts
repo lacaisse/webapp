@@ -56,7 +56,7 @@ export async function computeCardSyncPlan(
   fund: SyncFund,
 ): Promise<CardSyncPlan> {
   const client = getCitizenPayClient(fund);
-  const [remote, local] = await Promise.all([
+  const [remote, local, sourceAccounts] = await Promise.all([
     client.listCitizenPayCards(),
     prisma.card.findMany({
       where: { fundId: fund.id },
@@ -70,7 +70,18 @@ export async function computeCardSyncPlan(
         member: { select: { firstName: true, lastName: true } },
       },
     }),
+    // SOURCE token accounts are CP cards too, but they live in
+    // FundTokenAccount — not the member-facing Card table. Their serials are
+    // excluded from import below so a sync doesn't duplicate them as cards.
+    prisma.fundTokenAccount.findMany({
+      where: { fundId: fund.id, kind: "SOURCE", serial: { not: null } },
+      select: { serial: true },
+    }),
   ]);
+
+  const sourceAccountSerials = new Set(
+    sourceAccounts.map((a) => normalizeSerial(a.serial!)),
+  );
 
   // Key by NORMALISED serial so a case/whitespace difference between CP and
   // the local row doesn't read as "two different cards" (which would push one
@@ -124,7 +135,9 @@ export async function computeCardSyncPlan(
   }
 
   for (const r of remote.cards) {
-    if (!localBySerial.has(normalizeSerial(r.serialNumber))) {
+    const serial = normalizeSerial(r.serialNumber);
+    if (sourceAccountSerials.has(serial)) continue; // a source account, not a card
+    if (!localBySerial.has(serial)) {
       // `account` isn't on the list endpoint — the run path fetches it
       // per-card via `getCitizenPayCard`. Preview just shows the count.
       plan.import.push({

@@ -31,6 +31,7 @@ import { prisma } from "@/services/db/prisma";
 import { requireCurrentFund } from "@/services/fund/server";
 
 import { AllocateMemberButton } from "./allocate-member-button";
+import { AttachAllocationDialog } from "./attach-allocation-dialog";
 import { NotifyAllButton } from "./notify-all-button";
 import { NotifyAllocationButton } from "./notify-allocation-button";
 import { RemindMemberButton } from "./remind-member-button";
@@ -469,16 +470,28 @@ async function AllocationPeriodDetail({
                       </TableCell>
                       <TableCell className="text-right">
                         {b.operationSources.length === 0 && (
-                          <RemoveDepositButton
-                            bankTransactionId={b.id}
-                            label={
-                              b.member
-                                ? `${b.member.firstName} ${b.member.lastName}`.trim()
-                                : (b.counterpartName ??
-                                  b.counterpartReference ??
-                                  "—")
-                            }
-                          />
+                          <div className="flex items-center justify-end gap-2">
+                            {/* Matched but not yet allocated: let the admin
+                                attach a manual allocation they already made for
+                                this member instead of running a fresh one. */}
+                            {b.member && (
+                              <AttachAllocationDialog
+                                bankTransactionId={b.id}
+                                memberName={`${b.member.firstName} ${b.member.lastName}`.trim()}
+                                depositAmount={`${b.amount.toString()} ${b.currency}`}
+                              />
+                            )}
+                            <RemoveDepositButton
+                              bankTransactionId={b.id}
+                              label={
+                                b.member
+                                  ? `${b.member.firstName} ${b.member.lastName}`.trim()
+                                  : (b.counterpartName ??
+                                    b.counterpartReference ??
+                                    "—")
+                              }
+                            />
+                          </div>
                         )}
                       </TableCell>
                     </TableRow>

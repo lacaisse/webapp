@@ -180,14 +180,17 @@
       "empty": "Aucun compte pour le moment. Créez-en un pour commencer.",
       "defaultName": "Compte principal",
       "defaultBadge": "Par défaut",
+      "sourceBadge": "Source",
       "table": {
         "name": "Nom",
         "address": "Adresse",
+        "serial": "Série",
         "balance": "Solde"
       },
       "detail": {
         "back": "Tous les comptes",
-        "balance": "Solde"
+        "balance": "Solde",
+        "serial": "Série"
       },
       "create": {
         "trigger": "Nouveau compte",
@@ -195,6 +198,8 @@
         "description": "Un nouveau compte on-chain dérivé de la clé de la caisse.",
         "name": "Nom",
         "namePlaceholder": "ex. Réserve, Frais, Événements",
+        "sourceLabel": "Compte source de carte",
+        "sourceHint": "Donne au compte un numéro de série pour qu'il puisse alimenter des cartes en tant que source. Ces comptes ne peuvent pas transférer vers l'extérieur.",
         "confirm": "Créer le compte"
       },
       "rename": {
@@ -253,10 +258,12 @@
         "notConnected": "Connectez d'abord cette caisse à Citizen Pay.",
         "deriveFailed": "Impossible de dériver l'adresse du compte. Réessayez bientôt.",
         "createFailed": "Impossible de créer le compte. Réessayez bientôt.",
+        "registerFailed": "Impossible d'enregistrer le compte source sur Citizen Pay. Réessayez bientôt.",
         "amountInvalid": "Le montant doit être un nombre valide.",
         "amountPositive": "Le montant doit être supérieur à zéro.",
         "addressInvalid": "Saisissez une adresse 0x valide (40 caractères hexadécimaux).",
         "transferFailed": "Échec du transfert on-chain. Réessayez bientôt.",
+        "cannotTransferSource": "Les comptes source de carte ne peuvent pas transférer vers l'extérieur.",
         "transfersFailed": "Impossible de charger les transactions. Réessayez bientôt."
       }
     },
@@ -412,6 +419,11 @@
         "cards": "Cartes",
         "joined": "Inscrit le"
       },
+      "contribution": {
+        "target": "Cible",
+        "lastReceived": "Dernier reçu",
+        "none": "—"
+      },
       "unverified": "Email non vérifié",
       "empty": "Aucun membre à afficher.",
       "detail": {
@@ -449,7 +461,8 @@
           "primary": "Carte principale",
           "lost": "Perdue",
           "empty": "Aucune carte pour le moment.",
-          "actions": "Actions"
+          "actions": "Actions",
+          "downloadLetter": "Télécharger l'invitation"
         },
         "tokenOps": {
           "title": "Opérations de jetons",
@@ -559,7 +572,14 @@
         },
         "source": {
           "none": "Aucune source",
-          "hint": "Si le solde de cette carte est insuffisant lors d'un paiement, le montant manquant est prélevé sur la carte source."
+          "placeholder": "Rechercher par numéro, série ou nom…",
+          "empty": "Aucun résultat.",
+          "typeCard": "Carte",
+          "typeAccount": "Compte",
+          "unresolved": "Actuel : {serial}",
+          "clear": "Retirer la source",
+          "open": "Ouvrir la liste",
+          "hint": "Si le solde de cette carte est insuffisant lors d'un paiement, le montant manquant est prélevé sur sa source (une autre carte ou un compte source)."
         },
         "onboardingLetter": {
           "rowLabel": "Courrier d'accueil",
@@ -624,6 +644,18 @@
           "bankSync": "Dépôt bancaire",
           "referral": "Récompense parrainage",
           "manual": "Manuel"
+        }
+      },
+      "reconcile": {
+        "none": "Aucune période",
+        "closedOption": "{label} (clôturée)",
+        "errors": {
+          "opNotFound": "Allocation introuvable.",
+          "notManual": "Cette allocation est liée à un dépôt — sa période suit celle du dépôt.",
+          "periodNotFound": "Période introuvable.",
+          "depositNotFound": "Dépôt introuvable.",
+          "alreadyLinked": "Cette allocation est déjà liée à un dépôt.",
+          "memberMismatch": "Cette allocation appartient à un autre membre que ce dépôt."
         }
       },
       "tiers": {
@@ -765,6 +797,14 @@
           "cancel": "Annuler",
           "confirm": "Retirer",
           "removing": "Retrait…"
+        },
+        "attachAllocation": {
+          "button": "Associer une allocation",
+          "title": "Associer une allocation existante",
+          "description": "Liez une allocation manuelle déjà effectuée pour {member} à ce dépôt de {amount}.",
+          "loading": "Chargement des allocations…",
+          "empty": "Aucune allocation manuelle à associer pour ce membre.",
+          "inPeriod": "dans {period}"
         },
         "notify": {
           "column": "Notification",
@@ -1823,7 +1863,7 @@
         "description": "Attribuez une carte à {memberName}. Son compte devient actif immédiatement.",
         "unverifiedWarning": "Ce membre n'a pas encore vérifié son email. L'email d'activation pourrait revenir.",
         "cardLabel": "Carte",
-        "cardPlaceholder": "Recherchez par numéro de série ou de carte…",
+        "cardPlaceholder": "Recherchez par numéro de série, de carte ou compte source…",
         "cardHint": "Choisissez une carte déjà importée depuis CitizenPay. Si elle n'apparaît pas, synchronisez d'abord la liste des cartes.",
         "cardSearching": "Recherche…",
         "cardEmpty": "Aucune carte non attribuée ne correspond à ce numéro.",
@@ -2034,20 +2074,7 @@
         "amountLabel": "Montant",
         "confirm": "Recharger",
         "submitting": "Rechargement…",
-        "success": "Rechargement confirmé sur la blockchain.",
-        "attach": {
-          "label": "Rattacher un virement bancaire (facultatif)",
-          "hint": "Choisissez le virement entrant qui a payé cette recharge — son montant pré-remplit le champ et l'allocation est enregistrée comme un vrai virement.",
-          "searchPlaceholder": "Rechercher par nom, référence ou montant…",
-          "loading": "Chargement des virements…",
-          "loadMore": "Afficher plus",
-          "noMatches": "Aucun virement ne correspond à votre recherche.",
-          "none": "Aucun virement entrant non rattaché à choisir.",
-          "unknownCounterpart": "Expéditeur inconnu",
-          "selected": "Virement rattaché",
-          "clear": "Retirer",
-          "loadFailed": "Impossible de charger les virements. Réessayez."
-        }
+        "success": "Rechargement confirmé sur la blockchain."
       },
       "withdraw": {
         "button": "Retirer",
@@ -2130,11 +2157,7 @@
         "amountInvalid": "Le montant doit être un nombre avec au maximum 2 décimales.",
         "amountPositive": "Le montant doit être supérieur à zéro.",
         "tokenNotConfigured": "Cette caisse n'a pas encore de jeton configuré — connectez-vous d'abord à Citizen Pay.",
-        "submitFailed": "L'envoi on-chain a échoué. Consultez le journal des opérations pour plus de détails.",
-        "bankTxNeedsMember": "Rattachez d'abord cette carte à un membre pour y associer un virement.",
-        "bankTxNotFound": "Virement bancaire introuvable.",
-        "bankTxNotIncoming": "Seuls les virements entrants peuvent être rattachés à une recharge.",
-        "bankTxAlreadyMatched": "Ce virement est déjà associé à un membre."
+        "submitFailed": "L'envoi on-chain a échoué. Consultez le journal des opérations pour plus de détails."
       },
       "sync": {
         "trigger": "Synchroniser avec Citizen Pay",

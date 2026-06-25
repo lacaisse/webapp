@@ -398,6 +398,11 @@ model PendingAnnotation {
 // (`Fund.tokenMinterSmartAccountAddress`), so these start at 1. `address` is
 // the cached derived address; balances + transfer history are read on-chain
 // via Alchemy. Archived rows stay for history but drop out of the list.
+enum FundTokenAccountKind {
+  STANDARD // ordinary minter-derived Safe — supports transfer/mint/burn
+  SOURCE // referenceable as a card source (has a `serial`); not transferable
+}
+
 model FundTokenAccount {
   id     String @id @default(cuid())
   fundId String
@@ -406,6 +411,16 @@ model FundTokenAccount {
   name      String // operator-facing label
   saltNonce Int // unique per fund; salt 0 is the minter, so these are ≥ 1
   address   String // counterfactual Safe address (deterministic across chains)
+
+  kind FundTokenAccountKind @default(STANDARD)
+
+  // Set only for SOURCE accounts: a text serial we can hand to CitizenPay so the
+  // account is referenceable as a card's pull-from source (CP keys sources by
+  // serial). Deliberately formatted to never collide with an NFC UUID — see
+  // services/token-account/serial.ts. Globally unique because CP's serial
+  // namespace is global; NULL for STANDARD accounts (Postgres NULLs are
+  // distinct, so any number of them coexist).
+  serial String? @unique
 
   archivedAt DateTime? // soft delete — hidden from the list, kept for history
   createdAt  DateTime  @default(now())

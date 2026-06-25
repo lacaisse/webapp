@@ -13,10 +13,11 @@ import {
 } from "@/services/card/admin-actions";
 
 // Typeahead for the activate-member dialog. Lists unattached cards
-// (memberId is null) in the current fund, filtered by serial number or
-// card number. Empty query surfaces the most-recently-imported cards so the
-// operator has something to scroll if nothing is in hand. Selection commits the
-// card's id; a chip replaces the input until cleared.
+// (memberId is null) in the current fund, filtered by serial number / UID,
+// card number, or source account address. Empty query surfaces cards in
+// card-number order so the operator has a predictable list to scroll if nothing
+// is in hand. Selection commits the card's id; a chip replaces the input until
+// cleared.
 
 const DEBOUNCE_MS = 200;
 
@@ -283,6 +284,7 @@ function Dropdown({
             </div>
             <div className="truncate font-mono text-xs text-muted-foreground">
               {card.number != null ? `#${card.number}` : labels.noNumber}
+              {card.account && <span className="ml-2">{card.account}</span>}
             </div>
           </div>
         </button>

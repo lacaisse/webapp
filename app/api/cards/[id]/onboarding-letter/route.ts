@@ -64,13 +64,13 @@ export async function GET(
   });
 }
 
-// A safe, descriptive download name: onboarding-letter-<number>-<lastname>.pdf,
+// A safe, descriptive download name: invitation-<number>-<lastname>.pdf,
 // stripped to ASCII word chars so no header-encoding surprises.
 function onboardingFileName(card: {
   number: number | null;
   member: { lastName: string } | null;
 }): string {
-  const parts = ["onboarding-letter"];
+  const parts = ["invitation"];
   if (card.number != null) parts.push(String(card.number));
   const last = card.member?.lastName
     ?.normalize("NFKD")

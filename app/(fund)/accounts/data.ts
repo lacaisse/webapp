@@ -19,6 +19,8 @@ export type TokenAccountRow = {
   name: string;
   saltNonce: number;
   address: string;
+  kind: "STANDARD" | "SOURCE";
+  serial: string | null; // set for SOURCE accounts (card-source reference)
   balance: string | null; // human token units, or null when unavailable
   createdAt: string;
 };
@@ -44,6 +46,8 @@ export const getTokenAccounts = cache(
       name: r.name,
       saltNonce: r.saltNonce,
       address: r.address,
+      kind: r.kind,
+      serial: r.serial,
       createdAt: r.createdAt.toISOString(),
     }));
 
