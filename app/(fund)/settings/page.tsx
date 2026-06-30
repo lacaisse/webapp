@@ -12,6 +12,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, resolveActiveTab } from "@/components/ui/tabs";
 import { prisma } from "@/services/db/prisma";
+import { requireFundRole } from "@/services/auth/dal";
 import { requireCurrentFund } from "@/services/fund/server";
 import {
   OnboardingFields,
@@ -43,13 +44,15 @@ const TABS = [
   { value: "fees" },
 ] as const;
 
-// Synchronous shell: header + tab bar stream first; the active tab's content
-// streams behind its own <Suspense>.
-export default function SettingsPage({
+// ADMIN-only. The guard awaits at the top (the (fund) layout only requires
+// OPERATOR), so the page suspends to the group skeleton until authorized
+// rather than leaking any tab content to a non-admin.
+export default async function SettingsPage({
   searchParams,
 }: {
   searchParams: Promise<{ tab?: string; connect?: string }>;
 }) {
+  await requireFundRole("ADMIN");
   return (
     <>
       <Suspense fallback={<SettingsHeaderSkeleton />}>

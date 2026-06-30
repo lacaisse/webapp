@@ -13,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { requireFundRole } from "@/services/auth/dal";
 import { requireCurrentFund } from "@/services/fund/server";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +33,7 @@ export default async function BankPage({
     page?: string;
   }>;
 }) {
+  await requireFundRole("ADMIN");
   const t = await getTranslations("fund.bank");
   const fund = await requireCurrentFund();
 

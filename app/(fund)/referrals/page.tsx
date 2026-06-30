@@ -20,6 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { prisma } from "@/services/db/prisma";
+import { requireFundRole } from "@/services/auth/dal";
 import { requireCurrentFund } from "@/services/fund/server";
 import { ReferralForm } from "@/app/(fund)/settings/settings-forms";
 
@@ -29,6 +30,7 @@ const REFERRALS_HIDDEN: boolean = true;
 
 export default async function ReferralsPage() {
   if (REFERRALS_HIDDEN) notFound();
+  await requireFundRole("ADMIN");
 
   const t = await getTranslations("fund.referrals");
   const format = await getFormatter();

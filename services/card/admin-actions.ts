@@ -71,6 +71,7 @@ export async function topUpCardAction(input: {
   amount: string;
 }): Promise<CardOpResult> {
   const t = await getTranslations();
+  // Money on/off a card is ADMIN-only; OPERATOR manages cards but not funds.
   const { fund, user } = await requireFundRole("ADMIN");
 
   const parsed = CardOpSchema.safeParse(input);
@@ -161,6 +162,7 @@ export async function withdrawFromCardAction(input: {
   amount: string;
 }): Promise<CardOpResult> {
   const t = await getTranslations();
+  // Money on/off a card is ADMIN-only; OPERATOR manages cards but not funds.
   const { fund, user } = await requireFundRole("ADMIN");
 
   const parsed = CardOpSchema.safeParse(input);
@@ -257,7 +259,7 @@ export async function setCardStatusAction(input: {
   reportedLost?: boolean;
 }): Promise<BlockCardResult> {
   const t = await getTranslations();
-  const { fund } = await requireFundRole("ADMIN");
+  const { fund } = await requireFundRole("OPERATOR");
 
   if (!["ACTIVE", "INACTIVE", "BLOCKED"].includes(input.status)) {
     return { error: t("cards.admin.errors.invalidStatus" as never) };
@@ -320,7 +322,7 @@ export async function setCardsStatusAction(input: {
   status: CardStatus;
 }): Promise<SetCardsStatusResult> {
   const t = await getTranslations();
-  const { fund } = await requireFundRole("ADMIN");
+  const { fund } = await requireFundRole("OPERATOR");
 
   if (!["ACTIVE", "INACTIVE", "BLOCKED"].includes(input.status)) {
     return { error: t("cards.admin.errors.invalidStatus" as never) };
@@ -395,7 +397,7 @@ export type CardSyncPreviewResult =
 
 export async function previewCardSyncAction(): Promise<CardSyncPreviewResult> {
   const t = await getTranslations();
-  const { fund } = await requireFundRole("ADMIN");
+  const { fund } = await requireFundRole("OPERATOR");
 
   try {
     const plan = await computeCardSyncPlan(fund);
@@ -424,7 +426,7 @@ export type CardSyncItemResult = { ok: true } | { error: string };
 export async function importOneCardAction(input: {
   serialNumber: string;
 }): Promise<CardSyncItemResult> {
-  const { fund } = await requireFundRole("ADMIN");
+  const { fund } = await requireFundRole("OPERATOR");
 
   // Already-exists is fine — concurrent sync runs, or a manual addCard
   // that landed between preview and execute. Treat as success.
@@ -469,7 +471,7 @@ export async function importOneCardAction(input: {
 export async function pushOneCardStatusAction(input: {
   cardId: string;
 }): Promise<CardSyncItemResult> {
-  const { fund } = await requireFundRole("ADMIN");
+  const { fund } = await requireFundRole("OPERATOR");
 
   const card = await prisma.card.findFirst({
     where: { id: input.cardId, fundId: fund.id },
@@ -492,7 +494,7 @@ export async function pushOneCardStatusAction(input: {
 export async function pushOneCardAction(input: {
   cardId: string;
 }): Promise<CardSyncItemResult> {
-  const { fund } = await requireFundRole("ADMIN");
+  const { fund } = await requireFundRole("OPERATOR");
 
   const card = await prisma.card.findFirst({
     where: { id: input.cardId, fundId: fund.id },
@@ -542,7 +544,7 @@ export async function pushOneCardAction(input: {
  * at the end (not after every per-item action) keeps the run quick.
  */
 export async function revalidateCardsAfterSyncAction(): Promise<void> {
-  await requireFundRole("ADMIN");
+  await requireFundRole("OPERATOR");
   revalidatePath("/cards");
 }
 
@@ -567,7 +569,7 @@ const UNATTACHED_LIMIT = 12;
 export async function searchUnattachedCardsAction(
   q: string,
 ): Promise<UnattachedCardHit[]> {
-  const { fund } = await requireFundRole("ADMIN");
+  const { fund } = await requireFundRole("OPERATOR");
   const term = q.trim();
   // An all-digits term may be a card number — match it exactly alongside the
   // serial / account substring matches.
@@ -614,7 +616,7 @@ export async function setCardNumberAction(input: {
   number: number | null;
 }): Promise<SetCardNumberResult> {
   const t = await getTranslations();
-  const { fund } = await requireFundRole("ADMIN");
+  const { fund } = await requireFundRole("OPERATOR");
 
   const card = await prisma.card.findFirst({
     where: { id: input.cardId, fundId: fund.id },
@@ -655,7 +657,7 @@ export async function setCardSourceAction(input: {
   source: { type: "card" | "account"; id: string } | null;
 }): Promise<SetCardSourceResult> {
   const t = await getTranslations();
-  const { fund } = await requireFundRole("ADMIN");
+  const { fund } = await requireFundRole("OPERATOR");
 
   const card = await prisma.card.findFirst({
     where: { id: input.cardId, fundId: fund.id },
@@ -741,7 +743,7 @@ export async function importCardNumbersAction(input: {
   numberColumn: string;
 }): Promise<ImportCardNumbersResult> {
   const t = await getTranslations();
-  const { fund } = await requireFundRole("ADMIN");
+  const { fund } = await requireFundRole("OPERATOR");
 
   const { headers, rows: csvRows } = parseCsv(input.csv);
   const si = headers.indexOf(input.serialColumn);
@@ -904,7 +906,7 @@ export async function unassignCardAction(input: {
   cardId: string;
 }): Promise<UnassignCardResult> {
   const t = await getTranslations();
-  const { fund } = await requireFundRole("ADMIN");
+  const { fund } = await requireFundRole("OPERATOR");
 
   const card = await prisma.card.findFirst({
     where: { id: input.cardId, fundId: fund.id },
@@ -975,7 +977,7 @@ export async function transferBetweenCardsAction(input: {
   amount: string;
 }): Promise<TransferBetweenCardsResult> {
   const t = await getTranslations();
-  const { fund, user } = await requireFundRole("ADMIN");
+  const { fund, user } = await requireFundRole("OPERATOR");
 
   const parsed = CardTransferSchema.safeParse(input);
   if (!parsed.success) {
@@ -1147,7 +1149,7 @@ export async function searchTransferTargetCardsAction(input: {
   excludeCardId: string;
   q: string;
 }): Promise<TransferTargetHit[]> {
-  const { fund } = await requireFundRole("ADMIN");
+  const { fund } = await requireFundRole("OPERATOR");
   const term = input.q.trim();
   const asNumber = /^\d+$/.test(term) ? Number(term) : null;
   const cards = await prisma.card.findMany({

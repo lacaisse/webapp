@@ -17,6 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { Payout, PayoutStatus } from "@/services/citizenpay/types";
+import { requireFundRole } from "@/services/auth/dal";
 import { requireCurrentFund } from "@/services/fund/server";
 import { cn } from "@/lib/utils";
 
@@ -48,6 +49,7 @@ export default async function PayoutDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requireFundRole("ADMIN");
   const { id } = await params;
 
   const t = await getTranslations("fund.payments.settlement");

@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
 import { getFormatter, getTranslations } from "next-intl/server";
 
+import { requireFundRole } from "@/services/auth/dal";
+import { isFundAdmin } from "@/services/auth/roles";
 import {
   Card,
   CardContent,
@@ -28,9 +31,13 @@ import {
   TiersCitizenPaySkeleton,
 } from "./skeleton";
 
-// Synchronous shell: each section streams in behind its own <Suspense>, so the
-// page paints its skeleton instantly and fills as each query resolves.
-export default function FundDashboardPage() {
+// The dashboard surfaces fund-wide financials → ADMIN-only. An OPERATOR who
+// lands here (it's the first nav item / default home) is bounced to /members,
+// a page they can actually use, rather than /unauthorized.
+export default async function FundDashboardPage() {
+  const { membership } = await requireFundRole("OPERATOR");
+  if (!isFundAdmin(membership.role)) redirect("/members");
+
   return (
     <>
       <Suspense fallback={<DashboardHeaderSkeleton />}>

@@ -40,7 +40,7 @@ export async function activateMemberAction(input: {
   sendCardEmail?: boolean;
 }): Promise<ActivateMemberResult> {
   const t = await getTranslations();
-  const { fund, user } = await requireFundRole("ADMIN");
+  const { fund, user } = await requireFundRole("OPERATOR");
 
   if (!input.cardId) {
     return { error: t("members.admin.errors.cardRequired" as never) };
@@ -289,7 +289,7 @@ export async function addCardAction(input: {
   holderName?: string;
 }): Promise<AddCardResult> {
   const t = await getTranslations();
-  const { fund } = await requireFundRole("ADMIN");
+  const { fund } = await requireFundRole("OPERATOR");
 
   const cardSerial = normalizeSerial(input.cardSerial);
   if (!cardSerial) {
@@ -375,7 +375,7 @@ export async function inviteMemberAction(input: {
   notify?: boolean;
 }): Promise<InviteMemberResult> {
   const t = await getTranslations();
-  const { fund } = await requireFundRole("ADMIN");
+  const { fund } = await requireFundRole("OPERATOR");
 
   const parsed = BuiltinSignupSchema.safeParse(input);
   if (!parsed.success) {

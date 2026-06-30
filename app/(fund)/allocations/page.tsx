@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { prisma } from "@/services/db/prisma";
+import { requireFundRole } from "@/services/auth/dal";
 import { requireCurrentFund } from "@/services/fund/server";
 import { fetchFundPeriods } from "@/app/(fund)/bank/data";
 import { AllocationPeriodPicker } from "./allocation-period-picker";
@@ -46,11 +47,12 @@ const DEPOSIT_FILTERS = [{ value: "all" }, { value: "unmatched" }] as const;
 // Synchronous shell: header + tab bar stream quickly; the active tab's data
 // table streams behind its own (keyed) <Suspense> so switching tabs re-shows
 // the skeleton instead of blocking.
-export default function AllocationsPage({
+export default async function AllocationsPage({
   searchParams,
 }: {
   searchParams: Promise<{ tab?: string; filter?: string }>;
 }) {
+  await requireFundRole("ADMIN");
   return (
     <>
       <Suspense fallback={<AllocationsHeaderSkeleton />}>

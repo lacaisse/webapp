@@ -36,6 +36,7 @@ import { formatTokenAmount, isZeroAddress } from "@/services/alchemy/format";
 import { listTransfersForAccount } from "@/services/alchemy/transfers";
 import { getCitizenPayClient } from "@/services/citizenpay/client";
 import { prisma } from "@/services/db/prisma";
+import { requireFundRole } from "@/services/auth/dal";
 import { requireCurrentFund } from "@/services/fund/server";
 
 import { AddressLabel, buildAddressDirectory } from "../../token/address-label";
@@ -74,6 +75,7 @@ async function MerchantDetail({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ cursor?: string }>;
 }) {
+  await requireFundRole("ADMIN");
   const t = await getTranslations("fund.merchants.detail");
   const format = await getFormatter();
   const fund = await requireCurrentFund();

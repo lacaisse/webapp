@@ -3,9 +3,10 @@ import { z } from "zod";
 
 // Roles a co-administrator can be invited as / assigned. VIEWER exists in the
 // FundRole enum but is intentionally not offered through the team UI yet.
+// OPERATOR is a restricted role — manages cards + members only.
 // Grant rules (enforced in the server action, not here): OWNER may grant
-// OWNER or ADMIN; ADMIN may grant ADMIN only.
-export const INVITABLE_ROLES = ["OWNER", "ADMIN"] as const;
+// OWNER, ADMIN or OPERATOR; ADMIN may grant ADMIN or OPERATOR.
+export const INVITABLE_ROLES = ["OWNER", "ADMIN", "OPERATOR"] as const;
 export type InvitableRole = (typeof INVITABLE_ROLES)[number];
 
 export const InviteFundMemberSchema = z.object({

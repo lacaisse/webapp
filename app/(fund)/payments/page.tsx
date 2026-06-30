@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
 
 import { Tabs, resolveActiveTab } from "@/components/ui/tabs";
+import { requireFundRole } from "@/services/auth/dal";
 import { requireCurrentFund } from "@/services/fund/server";
 import {
   CompletedPayoutsView,
@@ -25,6 +26,7 @@ export default async function PaymentsPage({
 }: {
   searchParams: Promise<{ tab?: string }>;
 }) {
+  await requireFundRole("ADMIN");
   const t = await getTranslations("fund.payments");
   const fund = await requireCurrentFund();
   const sp = await searchParams;

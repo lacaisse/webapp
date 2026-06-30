@@ -7,6 +7,7 @@ import { getTranslations } from "next-intl/server";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import { requireFundRole } from "@/services/auth/dal";
 import { requireCurrentFund } from "@/services/fund/server";
 
 import { AccountManage } from "./account-manage";
@@ -41,6 +42,7 @@ async function AccountDetail({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requireFundRole("ADMIN");
   const { id } = await params;
   const t = await getTranslations("fund.accounts");
   const fund = await requireCurrentFund();
