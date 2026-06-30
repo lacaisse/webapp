@@ -28,6 +28,7 @@ import { AttributeDialog } from "@/app/(fund)/allocations/bank-transaction-actio
 import { findAllocationPlans } from "@/services/allocation-periods/run";
 import { Prisma } from "@/services/db/generated/client";
 import { prisma } from "@/services/db/prisma";
+import { requireFundRole } from "@/services/auth/dal";
 import { requireCurrentFund } from "@/services/fund/server";
 
 import { AllocateMemberButton } from "./allocate-member-button";
@@ -73,6 +74,7 @@ async function AllocationPeriodDetail({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ tab?: string }>;
 }) {
+  await requireFundRole("ADMIN");
   const t = await getTranslations("fund.allocations.periodDetail");
   const format = await getFormatter();
   const fund = await requireCurrentFund();

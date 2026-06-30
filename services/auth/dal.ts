@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { cache } from "react";
 import { prisma } from "@/services/db/prisma";
 import { FundRole } from "@/services/db/generated/enums";
+import { hasMinFundRole } from "@/services/auth/roles";
 import { requireCurrentFund } from "@/services/fund/server";
 import { getAuthUrl, getHostType } from "@/services/host/server";
 import { auth } from "./better-auth";
@@ -59,16 +60,6 @@ export const requireAdmin = cache(async () => {
 // =============================================================================
 // Fund authorization
 // =============================================================================
-
-const FUND_ROLE_RANK: Record<FundRole, number> = {
-  VIEWER: 0,
-  ADMIN: 1,
-  OWNER: 2,
-};
-
-function hasMinFundRole(actual: FundRole, minimum: FundRole) {
-  return FUND_ROLE_RANK[actual] >= FUND_ROLE_RANK[minimum];
-}
 
 /**
  * Require the current user to be a member of the current fund (caisse) with

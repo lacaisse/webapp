@@ -58,7 +58,7 @@ These are non-obvious facts about the Next 16 / Prisma 7 stack that bit us durin
 
 ### Roles & multi-fund access
 - **`User.globalRole`** (`USER` | `ADMIN`) — platform-level. `requireAdmin()` reads this. Set via SQL or an admin tool. **Not** stored in Supabase metadata; lives in our Prisma User table.
-- **`FundMember.role`** (`OWNER` > `ADMIN` > `MEMBER` > `VIEWER`) — per-fund. Use `requireFundRole(minRole)` for any fund-scoped resource. Returns `{ user, fund, membership }`.
+- **`FundMember.role`** (`OWNER` > `ADMIN` > `OPERATOR` > `VIEWER`) — per-fund. Use `requireFundRole(minRole)` for any fund-scoped resource. Returns `{ user, fund, membership }`. The rank lives in `services/auth/roles.ts` (`FUND_ROLE_RANK` / `hasMinFundRole` / `isFundAdmin`) — a plain module so both the server DAL and client components can share it. `OPERATOR` is a restricted role that may **manage cards and members only**: card + member admin actions/pages are gated at `requireFundRole("OPERATOR")`, everything else stays `requireFundRole("ADMIN")` (which excludes OPERATOR by rank). Carve-out: `topUpCardAction` / `withdrawFromCardAction` (money on/off a card) stay ADMIN-only. The `(fund)` layout requires OPERATOR to enter; ADMIN-only pages self-guard and the sidebar hides links the role can't use.
 - **JIT sync**: `getCurrentUser()` upserts the Supabase auth user into `User` on first read each render. There is no DB trigger or webhook — Supabase auth.users is canonical for identity, our Prisma User is canonical for app-level data (role, name, memberships).
 - The `User.id` is a uuid that **mirrors `auth.users.id`** — no FK across schemas.
 

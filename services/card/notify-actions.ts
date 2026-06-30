@@ -25,7 +25,7 @@ export async function notifyCardAssignedAction(input: {
   cardId: string;
 }): Promise<NotifyCardResult> {
   const t = await getTranslations();
-  const { fund } = await requireFundRole("ADMIN");
+  const { fund } = await requireFundRole("OPERATOR");
 
   const card = await prisma.card.findFirst({
     where: { id: input.cardId, fundId: fund.id },

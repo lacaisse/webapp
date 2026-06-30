@@ -6,11 +6,12 @@ import { requireFundRole } from "@/services/auth/dal";
 import { getApexUrl } from "@/services/fund/server";
 import { getHostType } from "@/services/host/server";
 
-// Fund admin shell: sidebar + main content. Pages in this group are scoped to
-// a fund and require ADMIN (per the scoping doc — reporting and management
-// are admin-only). Off a fund host these routes don't exist — bounce to the
-// apex fund picker rather than preserving the path (which would just hit
-// this same layout again and loop).
+// Fund admin shell: sidebar + main content. Entry requires at least OPERATOR
+// (cards + members manager); each page self-guards beyond that — ADMIN-only
+// pages call requireFundRole("ADMIN"), and the sidebar hides links the role
+// can't use. Off a fund host these routes don't exist — bounce to the apex
+// fund picker rather than preserving the path (which would just hit this same
+// layout again and loop).
 
 export default async function FundLayout({
   children,
@@ -21,7 +22,7 @@ export default async function FundLayout({
     redirect(getApexUrl("/"));
   }
 
-  const { fund } = await requireFundRole("ADMIN");
+  const { fund, membership } = await requireFundRole("OPERATOR");
 
   return (
     <div className="flex flex-1">
@@ -29,6 +30,7 @@ export default async function FundLayout({
         fundName={fund.name}
         fundDomain={fund.domain}
         apexUrl={getApexUrl("/")}
+        role={membership.role}
       />
       <main className="flex-1 bg-muted/40">
         <div className="mx-auto w-full max-w-6xl space-y-6 px-6 py-8">

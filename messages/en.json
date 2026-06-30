@@ -1736,6 +1736,7 @@
     "roles": {
       "OWNER": "Owner",
       "ADMIN": "Admin",
+      "OPERATOR": "Operator",
       "VIEWER": "Viewer"
     },
     "admin": {

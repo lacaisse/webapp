@@ -34,7 +34,7 @@ export async function updateMemberProfileAction(
   input: unknown,
 ): Promise<UpdateMemberProfileResult> {
   const t = await getTranslations();
-  const { fund } = await requireFundRole("ADMIN");
+  const { fund } = await requireFundRole("OPERATOR");
 
   const parsed = EditMemberProfileSchema.safeParse(input);
   if (!parsed.success) {

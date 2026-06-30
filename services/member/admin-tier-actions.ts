@@ -14,7 +14,7 @@ export async function assignTierAction(input: {
   tierId: string | null;
 }): Promise<AssignTierResult> {
   const t = await getTranslations();
-  const { fund } = await requireFundRole("ADMIN");
+  const { fund } = await requireFundRole("OPERATOR");
 
   const member = await prisma.member.findFirst({
     where: { id: input.memberId, fundId: fund.id },

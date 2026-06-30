@@ -11,6 +11,7 @@ import { prisma } from "@/services/db/prisma";
 import { sendFundInvited } from "@/services/email/transactional";
 import { getFundUrl, requireCurrentFund } from "@/services/fund/server";
 import {
+  INVITABLE_ROLES,
   InviteFundMemberSchema,
   type InvitableRole,
   type InviteFundMemberInput,
@@ -29,10 +30,11 @@ export type InviteFundMemberResult =
 
 export type FundTeamResult = { ok: true } | { error: string };
 
-// OWNER may grant OWNER or ADMIN; ADMIN may grant ADMIN only.
+// Only OWNER may grant/assign OWNER. ADMIN and OPERATOR targets may be granted
+// by any ADMIN+ actor.
 function canGrant(actorRole: string, targetRole: InvitableRole): boolean {
   if (targetRole === "OWNER") return actorRole === "OWNER";
-  return true; // ADMIN target — any ADMIN+ actor
+  return true; // ADMIN / OPERATOR target — any ADMIN+ actor
 }
 
 export async function inviteFundMemberAction(
@@ -130,7 +132,7 @@ export async function changeFundMemberRoleAction(input: {
   const t = await getTranslations();
   const { fund, membership: actor } = await requireFundRole("ADMIN");
 
-  if (input.role !== "OWNER" && input.role !== "ADMIN") {
+  if (!INVITABLE_ROLES.includes(input.role)) {
     return { error: t("team.errors.roleInvalid" as never) };
   }
 

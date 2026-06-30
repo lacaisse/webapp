@@ -21,7 +21,7 @@ export async function changeMemberStatusAction(input: {
   status: MemberStatus;
 }): Promise<ChangeMemberStatusResult> {
   const t = await getTranslations();
-  const { fund } = await requireFundRole("ADMIN");
+  const { fund } = await requireFundRole("OPERATOR");
 
   const member = await prisma.member.findFirst({
     where: { id: input.memberId, fundId: fund.id },

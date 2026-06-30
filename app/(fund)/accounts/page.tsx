@@ -15,6 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { shortAddress } from "@/services/alchemy/format";
+import { requireFundRole } from "@/services/auth/dal";
 import { requireCurrentFund } from "@/services/fund/server";
 
 import { CreateAccountDialog } from "./create-account-dialog";
@@ -23,7 +24,8 @@ import { AccountsTableSkeleton } from "./skeleton";
 
 // Synchronous shell: the header (with its create CTA) and the balance table
 // (Alchemy-backed, slow) each stream behind their own <Suspense>.
-export default function AccountsPage() {
+export default async function AccountsPage() {
+  await requireFundRole("ADMIN");
   return (
     <div className="space-y-6">
       <Suspense fallback={<AccountsHeaderFallback />}>

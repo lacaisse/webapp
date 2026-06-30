@@ -5,6 +5,7 @@ import { getTranslations } from "next-intl/server";
 
 import { buttonVariants } from "@/components/ui/button";
 import { Tabs, resolveActiveTab } from "@/components/ui/tabs";
+import { requireFundRole } from "@/services/auth/dal";
 import { requireCurrentFund } from "@/services/fund/server";
 
 import { MerchantsTable } from "./merchants-table";
@@ -23,6 +24,7 @@ export default async function MerchantsPage({
 }: {
   searchParams: Promise<{ tab?: string }>;
 }) {
+  await requireFundRole("ADMIN");
   const t = await getTranslations("fund.merchants");
   const fund = await requireCurrentFund();
   const sp = await searchParams;

@@ -5,6 +5,7 @@ import { getTranslations } from "next-intl/server";
 
 import { Badge } from "@/components/ui/badge";
 import { Tabs, resolveActiveTab } from "@/components/ui/tabs";
+import { requireFundRole } from "@/services/auth/dal";
 import { requireCurrentFund } from "@/services/fund/server";
 
 import { HoldersTable } from "./holders-table";
@@ -40,6 +41,7 @@ export default async function TokenExplorerPage({
 }: {
   searchParams: Promise<{ tab?: string; cursor?: string; page?: string }>;
 }) {
+  await requireFundRole("ADMIN");
   const t = await getTranslations("fund.token");
   const fund = await requireCurrentFund();
   const sp = await searchParams;

@@ -21,41 +21,50 @@ import {
 } from "lucide-react";
 
 import { LocaleSwitcher } from "@/components/locale-switcher";
+import { hasMinFundRole } from "@/services/auth/roles";
+import type { FundRole } from "@/services/db/generated/enums";
 import { cn } from "@/lib/utils";
 
 type Item = {
   href: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
+  // Minimum fund role required to see (and use) this link. Cards + members are
+  // OPERATOR-visible; everything else is ADMIN-only.
+  minRole: FundRole;
 };
 
 export function FundSidebar({
   fundName,
   fundDomain,
   apexUrl,
+  role,
 }: {
   fundName: string;
   fundDomain: string;
   apexUrl: string;
+  role: FundRole;
 }) {
   const pathname = usePathname();
   const t = useTranslations("fund.nav");
 
-  const items: Item[] = [
-    { href: "/dashboard", label: t("dashboard"), icon: LayoutDashboard },
-    { href: "/members", label: t("members"), icon: Users },
-    { href: "/cards", label: t("cards"), icon: CreditCard },
-    { href: "/allocations", label: t("allocations"), icon: Wallet },
-    { href: "/token", label: t("token"), icon: Coins },
-    { href: "/accounts", label: t("accounts"), icon: Wallet2 },
-    { href: "/merchants", label: t("merchants"), icon: Store },
-    { href: "/payments", label: t("payments"), icon: Receipt },
-    { href: "/bank", label: t("bank"), icon: Landmark },
+  const allItems: Item[] = [
+    { href: "/dashboard", label: t("dashboard"), icon: LayoutDashboard, minRole: "ADMIN" },
+    { href: "/members", label: t("members"), icon: Users, minRole: "OPERATOR" },
+    { href: "/cards", label: t("cards"), icon: CreditCard, minRole: "OPERATOR" },
+    { href: "/allocations", label: t("allocations"), icon: Wallet, minRole: "ADMIN" },
+    { href: "/token", label: t("token"), icon: Coins, minRole: "ADMIN" },
+    { href: "/accounts", label: t("accounts"), icon: Wallet2, minRole: "ADMIN" },
+    { href: "/merchants", label: t("merchants"), icon: Store, minRole: "ADMIN" },
+    { href: "/payments", label: t("payments"), icon: Receipt, minRole: "ADMIN" },
+    { href: "/bank", label: t("bank"), icon: Landmark, minRole: "ADMIN" },
     // Referrals hidden for now — re-add this item to restore the nav link.
-    { href: "/emails", label: t("emails"), icon: Mail },
-    { href: "/team", label: t("team"), icon: UserCog },
-    { href: "/settings", label: t("settings"), icon: Settings },
+    { href: "/emails", label: t("emails"), icon: Mail, minRole: "ADMIN" },
+    { href: "/team", label: t("team"), icon: UserCog, minRole: "ADMIN" },
+    { href: "/settings", label: t("settings"), icon: Settings, minRole: "ADMIN" },
   ];
+
+  const items = allItems.filter((item) => hasMinFundRole(role, item.minRole));
 
   return (
     <aside className="flex w-60 shrink-0 flex-col border-r border-border bg-sidebar text-sidebar-foreground">

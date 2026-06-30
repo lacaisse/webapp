@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/table";
 import { EmailStatus } from "@/services/db/generated/enums";
 import { prisma } from "@/services/db/prisma";
+import { requireFundRole } from "@/services/auth/dal";
 import { requireCurrentFund } from "@/services/fund/server";
 import { EmailDetailDialog } from "./email-detail-dialog";
 
@@ -44,11 +45,12 @@ function statusFilterFor(tab: TabValue) {
 
 // Synchronous shell: header + tab bar stream first, the email table streams in
 // its own (keyed) <Suspense> so switching tabs re-shows the skeleton.
-export default function EmailsPage({
+export default async function EmailsPage({
   searchParams,
 }: {
   searchParams: Promise<{ tab?: string }>;
 }) {
+  await requireFundRole("ADMIN");
   return (
     <>
       <Suspense fallback={<EmailsHeaderSkeleton />}>

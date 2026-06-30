@@ -40,7 +40,9 @@ async function TeamHeader() {
   const t = await getTranslations("fund.team");
   const { membership } = await requireFundRole("ADMIN");
   const grantableRoles: InvitableRole[] =
-    membership.role === "OWNER" ? ["OWNER", "ADMIN"] : ["ADMIN"];
+    membership.role === "OWNER"
+      ? ["OWNER", "ADMIN", "OPERATOR"]
+      : ["ADMIN", "OPERATOR"];
 
   return (
     <header className="flex items-end justify-between gap-4">
@@ -89,7 +91,9 @@ async function TeamTables() {
   ]);
 
   const grantableRoles: InvitableRole[] =
-    membership.role === "OWNER" ? ["OWNER", "ADMIN"] : ["ADMIN"];
+    membership.role === "OWNER"
+      ? ["OWNER", "ADMIN", "OPERATOR"]
+      : ["ADMIN", "OPERATOR"];
   const ownerCount = staff.filter((s) => s.role === "OWNER").length;
 
   return (

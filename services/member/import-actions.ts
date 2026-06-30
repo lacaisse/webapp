@@ -47,7 +47,7 @@ export async function importMembersAction(input: {
   statusValueMap?: StatusValueMap;
 }): Promise<MemberImportResult> {
   const t = await getTranslations("members.admin.import");
-  const { fund } = await requireFundRole("ADMIN");
+  const { fund } = await requireFundRole("OPERATOR");
   const defaults = input.defaults ?? {};
 
   // Trust nothing from the client: rebuild the status map with lower-cased keys
