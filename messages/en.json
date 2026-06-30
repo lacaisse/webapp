@@ -612,47 +612,12 @@
       "title": "Allocations",
       "description": "Distribute tokens to members based on tiers and bank synchronisation.",
       "tabs": {
-        "transactions": "Transactions",
-        "history": "History",
         "tiers": "Tiers",
         "schedule": "Schedule"
       },
-      "filters": {
-        "all": "All",
-        "unmatched": "Unmatched"
-      },
-      "transactions": {
-        "date": "Date",
-        "counterpart": "Counterpart",
-        "reference": "Reference",
-        "member": "Member",
-        "period": "Period",
-        "amount": "Amount",
-        "unmatched": "Unmatched",
-        "empty": "No transactions yet."
-      },
-      "history": {
-        "date": "Date",
-        "member": "Member",
-        "tier": "Tier",
-        "source": "Source",
-        "period": "Period",
-        "amount": "Amount",
-        "status": "Status",
-        "empty": "No allocations yet.",
-        "sources": {
-          "bankSync": "Bank deposit",
-          "referral": "Referral reward",
-          "manual": "Manual"
-        }
-      },
       "reconcile": {
-        "none": "No period",
-        "closedOption": "{label} (closed)",
         "errors": {
           "opNotFound": "Allocation not found.",
-          "notManual": "This allocation is linked to a deposit — its period follows that deposit.",
-          "periodNotFound": "Period not found.",
           "depositNotFound": "Deposit not found.",
           "alreadyLinked": "This allocation is already linked to a deposit.",
           "memberMismatch": "That allocation belongs to a different member than this deposit."
@@ -860,8 +825,14 @@
             "noEmail": "No email",
             "optedOut": "Opted out",
             "sent": "Sent",
+            "sentCount": "Sent {count}×",
             "failed": "Failed",
             "notSent": "Not sent"
+          },
+          "detail": {
+            "auto": "Automatic",
+            "autoAndNudges": "Automatic + {count, plural, one {# nudge} other {# nudges}}",
+            "nudgesOnly": "{count, plural, one {# manual nudge} other {# manual nudges}}"
           },
           "allTrigger": "Remind all ({count})",
           "allConfirmTitle": "Remind all unpaid?",
