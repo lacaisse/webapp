@@ -9,71 +9,15 @@ import { prisma } from "@/services/db/prisma";
 
 // Reconcile MANUAL allocations after the fact. A "manual allocation" is a MINT
 // TokenOperation an admin created by hand (card recharge, member mint, /token)
-// that isn't tied to a bank deposit (no TokenOperationSource). These show up in
-// the allocations History with source "Manual" and no period.
+// that isn't tied to a bank deposit (no TokenOperationSource).
 //
-// Two ways to reconcile, both data-only (no on-chain effect — the mint already
-// happened):
-//   - setTokenOperationPeriodAction: tag a manual allocation to a period (from
-//     the History tab).
-//   - attachAllocationToDepositAction: link a manual allocation to a specific
-//     incoming deposit on a period (from the period's Deposits tab), which also
-//     pulls it into that deposit's period and flips the deposit to "allocated".
+// Reconcile is data-only (no on-chain effect — the mint already happened):
+// attachAllocationToDepositAction links a manual allocation to a specific
+// incoming deposit on a period (from the period's Deposits tab), which also
+// pulls it into that deposit's period and flips the deposit to "allocated".
+// (Deposits themselves are assigned to a period from the Bank page.)
 
 export type ManualAllocationResult = { ok: true } | { error: string };
-
-// Assign (or clear) the allocation period of a manual MINT. Refused for ops
-// already linked to a deposit — those take their period from the deposit, so
-// reassigning here would desync. Period-less / DISABLED funds have no periods,
-// so the picker simply isn't offered there.
-export async function setTokenOperationPeriodAction(input: {
-  tokenOperationId: string;
-  periodId: string | null;
-}): Promise<ManualAllocationResult> {
-  const t = await getTranslations();
-  const { fund } = await requireFundRole("ADMIN");
-
-  const op = await prisma.tokenOperation.findFirst({
-    where: { id: input.tokenOperationId, fundId: fund.id, type: "MINT" },
-    select: {
-      id: true,
-      allocationPeriodId: true,
-      _count: { select: { sources: true } },
-    },
-  });
-  if (!op) {
-    return { error: t("fund.allocations.reconcile.errors.opNotFound" as never) };
-  }
-  if (op._count.sources > 0) {
-    return { error: t("fund.allocations.reconcile.errors.notManual" as never) };
-  }
-
-  if (input.periodId) {
-    const period = await prisma.allocationPeriod.findFirst({
-      where: { id: input.periodId, fundId: fund.id },
-      select: { id: true },
-    });
-    if (!period) {
-      return {
-        error: t("fund.allocations.reconcile.errors.periodNotFound" as never),
-      };
-    }
-  }
-
-  await prisma.tokenOperation.update({
-    where: { id: op.id },
-    data: { allocationPeriodId: input.periodId },
-  });
-
-  revalidatePath("/allocations");
-  if (op.allocationPeriodId) {
-    revalidatePath(`/allocations/periods/${op.allocationPeriodId}`);
-  }
-  if (input.periodId && input.periodId !== op.allocationPeriodId) {
-    revalidatePath(`/allocations/periods/${input.periodId}`);
-  }
-  return { ok: true };
-}
 
 // A manual allocation the admin can attach to a deposit — the member's
 // unmatched manual MINTs, newest first. `periodLabel` is the op's current

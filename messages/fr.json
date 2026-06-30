@@ -490,6 +490,14 @@
           "sponsoredDescription": "{count} inscriptions avec le code de ce membre.",
           "sponsoredEmpty": "Aucun filleul pour le moment."
         },
+        "emailSettings": {
+          "title": "Paramètres e-mail",
+          "description": "Indique si ce membre reçoit les e-mails de rappel de cotisation automatiques.",
+          "optOutLabel": "Désinscrit des e-mails de rappel",
+          "subscribed": "Ce membre reçoit les rappels de cotisation automatiques.",
+          "optedOut": "Ce membre ne recevra pas de rappels de cotisation automatiques.",
+          "optedOutSince": "Désinscrit le {date} — ne recevra pas de rappels automatiques."
+        },
         "emails": {
           "title": "Emails",
           "date": "Date",
@@ -612,47 +620,12 @@
       "title": "Allocations",
       "description": "Distribuez les jetons aux membres selon les paliers et la synchronisation bancaire.",
       "tabs": {
-        "transactions": "Transactions",
-        "history": "Historique",
         "tiers": "Paliers",
         "schedule": "Planification"
       },
-      "filters": {
-        "all": "Toutes",
-        "unmatched": "Non attribuées"
-      },
-      "transactions": {
-        "date": "Date",
-        "counterpart": "Contrepartie",
-        "reference": "Référence",
-        "member": "Membre",
-        "period": "Période",
-        "amount": "Montant",
-        "unmatched": "Non attribuée",
-        "empty": "Aucune transaction pour le moment."
-      },
-      "history": {
-        "date": "Date",
-        "member": "Membre",
-        "tier": "Palier",
-        "source": "Source",
-        "period": "Période",
-        "amount": "Montant",
-        "status": "Statut",
-        "empty": "Aucune allocation pour le moment.",
-        "sources": {
-          "bankSync": "Dépôt bancaire",
-          "referral": "Récompense parrainage",
-          "manual": "Manuel"
-        }
-      },
       "reconcile": {
-        "none": "Aucune période",
-        "closedOption": "{label} (clôturée)",
         "errors": {
           "opNotFound": "Allocation introuvable.",
-          "notManual": "Cette allocation est liée à un dépôt — sa période suit celle du dépôt.",
-          "periodNotFound": "Période introuvable.",
           "depositNotFound": "Dépôt introuvable.",
           "alreadyLinked": "Cette allocation est déjà liée à un dépôt.",
           "memberMismatch": "Cette allocation appartient à un autre membre que ce dépôt."
@@ -845,8 +818,14 @@
             "noEmail": "Pas d'e-mail",
             "optedOut": "Désinscrit",
             "sent": "Envoyé",
+            "sentCount": "Envoyé {count}×",
             "failed": "Échec",
             "notSent": "Non envoyé"
+          },
+          "detail": {
+            "auto": "Automatique",
+            "autoAndNudges": "Automatique + {count, plural, one {# relance} other {# relances}}",
+            "nudgesOnly": "{count, plural, one {# relance manuelle} other {# relances manuelles}}"
           },
           "allTrigger": "Tout rappeler ({count})",
           "allConfirmTitle": "Rappeler tous les impayés ?",

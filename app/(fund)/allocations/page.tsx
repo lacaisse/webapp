@@ -26,23 +26,10 @@ import { Button } from "@/components/ui/button";
 import { prisma } from "@/services/db/prisma";
 import { requireFundRole } from "@/services/auth/dal";
 import { requireCurrentFund } from "@/services/fund/server";
-import { fetchFundPeriods } from "@/app/(fund)/bank/data";
-import { AllocationPeriodPicker } from "./allocation-period-picker";
-import { DepositsTable } from "./deposits-table";
 import { PeriodDialog } from "./period-dialog";
 import { ArchiveTierButton, TierDialog } from "./tier-dialog";
 
-const TABS = [
-  { value: "transactions" },
-  { value: "history" },
-  { value: "tiers" },
-  { value: "schedule" },
-] as const;
-
-// Deposits sub-filter, nested inside the "transactions" tab. "Unmatched" used
-// to be its own top-level tab, but it's just a filtered view of the same table
-// — surfacing it twice was the confusing part. It now lives here as a filter.
-const DEPOSIT_FILTERS = [{ value: "all" }, { value: "unmatched" }] as const;
+const TABS = [{ value: "schedule" }, { value: "tiers" }] as const;
 
 // Synchronous shell: header + tab bar stream quickly; the active tab's data
 // table streams behind its own (keyed) <Suspense> so switching tabs re-shows
@@ -50,7 +37,7 @@ const DEPOSIT_FILTERS = [{ value: "all" }, { value: "unmatched" }] as const;
 export default async function AllocationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; filter?: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }) {
   await requireFundRole("ADMIN");
   return (
@@ -78,13 +65,12 @@ async function AllocationsHeader() {
 async function AllocationsTabs({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; filter?: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }) {
   const t = await getTranslations("fund.allocations");
   const fund = await requireCurrentFund();
   const sp = await searchParams;
   const active = resolveActiveTab(sp.tab, TABS);
-  const filter = resolveActiveTab(sp.filter, DEPOSIT_FILTERS);
 
   return (
     <>
@@ -97,30 +83,10 @@ async function AllocationsTabs({
       />
 
       <Suspense key={active} fallback={<TableSkeleton columns={6} />}>
-        {active === "transactions" && (
-          <div className="space-y-3">
-            <Tabs
-              paramName="filter"
-              baseQuery={{ tab: "transactions" }}
-              active={filter}
-              items={DEPOSIT_FILTERS.map((f) => ({
-                value: f.value,
-                label: t(`filters.${f.value}`),
-              }))}
-            />
-            <Suspense key={filter} fallback={<TableSkeleton columns={7} />}>
-              <DepositsTable
-                fundId={fund.id}
-                onlyUnmatched={filter === "unmatched"}
-              />
-            </Suspense>
-          </div>
-        )}
-        {active === "history" && <HistoryTab fundId={fund.id} />}
-        {active === "tiers" && <TiersTab fundId={fund.id} />}
         {active === "schedule" && (
           <ScheduleTab fundId={fund.id} allocationMode={fund.allocationMode} />
         )}
+        {active === "tiers" && <TiersTab fundId={fund.id} />}
       </Suspense>
     </>
   );
@@ -145,93 +111,6 @@ function AllocationsTabsSkeleton() {
       </div>
       <TableSkeleton columns={6} />
     </>
-  );
-}
-
-async function HistoryTab({ fundId }: { fundId: string }) {
-  const t = await getTranslations("fund.allocations.history");
-  const format = await getFormatter();
-
-  const [ops, periods] = await Promise.all([
-    prisma.tokenOperation.findMany({
-      where: { fundId, type: "MINT" },
-      orderBy: { submittedAt: "desc" },
-      take: 200,
-      include: {
-        member: { select: { firstName: true, lastName: true } },
-        tier: { select: { name: true } },
-        allocationPeriod: { select: { label: true } },
-        referral: { select: { id: true } },
-        sources: { select: { id: true }, take: 1 },
-      },
-    }),
-    // Manual allocations can be tagged to a period inline; periods only exist
-    // for FIXED_PERIOD funds (empty otherwise → the picker isn't shown).
-    fetchFundPeriods(fundId),
-  ]);
-
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>{t("date")}</TableHead>
-          <TableHead>{t("member")}</TableHead>
-          <TableHead>{t("tier")}</TableHead>
-          <TableHead>{t("source")}</TableHead>
-          <TableHead>{t("period")}</TableHead>
-          <TableHead className="text-right">{t("amount")}</TableHead>
-          <TableHead>{t("status")}</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {ops.length === 0 ? (
-          <TableEmpty colSpan={7}>{t("empty")}</TableEmpty>
-        ) : (
-          ops.map((op) => {
-            const memberName = op.member
-              ? `${op.member.firstName} ${op.member.lastName}`.trim()
-              : "—";
-            // Manual = not a referral reward and not linked to a deposit. Only
-            // these can be re-tagged to a period from here.
-            const isManual = !op.referral && op.sources.length === 0;
-            const source = op.referral
-              ? t("sources.referral")
-              : op.sources.length > 0
-                ? t("sources.bankSync")
-                : t("sources.manual");
-            return (
-              <TableRow key={op.id}>
-                <TableCell className="text-sm text-muted-foreground">
-                  {format.dateTime(op.submittedAt, { dateStyle: "medium" })}
-                </TableCell>
-                <TableCell>{memberName}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">
-                  {op.tier?.name ?? "—"}
-                </TableCell>
-                <TableCell className="text-sm">{source}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">
-                  {isManual && periods.length > 0 ? (
-                    <AllocationPeriodPicker
-                      tokenOperationId={op.id}
-                      currentPeriodId={op.allocationPeriodId}
-                      periods={periods}
-                    />
-                  ) : (
-                    (op.allocationPeriod?.label ?? "—")
-                  )}
-                </TableCell>
-                <TableCell className="text-right font-medium">
-                  {op.amount.toString()}
-                </TableCell>
-                <TableCell>
-                  <OperationStatusBadge status={op.status} />
-                </TableCell>
-              </TableRow>
-            );
-          })
-        )}
-      </TableBody>
-    </Table>
   );
 }
 
@@ -419,16 +298,6 @@ async function ScheduleTab({
       </Table>
     </div>
   );
-}
-
-function OperationStatusBadge({
-  status,
-}: {
-  status: "PENDING" | "CONFIRMED" | "FAILED";
-}) {
-  if (status === "CONFIRMED") return <Badge variant="success">{status}</Badge>;
-  if (status === "FAILED") return <Badge variant="destructive">{status}</Badge>;
-  return <Badge variant="warning">{status}</Badge>;
 }
 
 function PeriodStatusBadge({

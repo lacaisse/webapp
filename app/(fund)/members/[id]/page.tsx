@@ -34,6 +34,7 @@ import { StatusChangeDialog } from "../status-change-dialog";
 import { MemberTierPicker } from "../tier-picker";
 import { EditProfileDialog } from "./edit-profile-dialog";
 import { MintDialog } from "./mint-dialog";
+import { ReminderOptOutToggle } from "./reminder-opt-out-toggle";
 
 // Synchronous shell so the route paints its skeleton instantly; the member
 // (params-dependent, uncached) streams in behind <Suspense>.
@@ -423,6 +424,25 @@ async function MemberDetail({
         <h2 className="font-heading text-lg font-medium">
           {t("emails.title")}
         </h2>
+        <Card size="sm">
+          <CardHeader>
+            <CardTitle>{t("emailSettings.title")}</CardTitle>
+            <CardDescription>{t("emailSettings.description")}</CardDescription>
+          </CardHeader>
+          <CardContent className="pb-3">
+            <ReminderOptOutToggle
+              memberId={member.id}
+              initialUnsubscribed={member.emailUnsubscribed}
+              unsubscribedSince={
+                member.emailUnsubscribedAt
+                  ? format.dateTime(member.emailUnsubscribedAt, {
+                      dateStyle: "medium",
+                    })
+                  : null
+              }
+            />
+          </CardContent>
+        </Card>
         <Table>
           <TableHeader>
             <TableRow>
