@@ -458,6 +458,41 @@ export async function inviteMemberAction(input: {
   return { error: t("members.admin.errors.generic" as never) };
 }
 
+export type SetReminderOptOutResult =
+  | { ok: true; unsubscribed: boolean }
+  | { error: string };
+
+// Admin-driven counterpart to the member's own opt-out link (the token-based
+// setReminderOptOutAction on the public /unsubscribe page). Lets an operator
+// flip a member's reminder subscription from the member detail page — same
+// Member.emailUnsubscribed flag the cron and "Remind all" filter on, so opting
+// a member out here also stops automatic payment reminders for them.
+export async function setMemberReminderOptOutAction(input: {
+  memberId: string;
+  unsubscribe: boolean;
+}): Promise<SetReminderOptOutResult> {
+  const t = await getTranslations();
+  const { fund } = await requireFundRole("OPERATOR");
+
+  const member = await prisma.member.findFirst({
+    where: { id: input.memberId, fundId: fund.id },
+    select: { id: true },
+  });
+  if (!member) return { error: t("members.admin.errors.notFound" as never) };
+
+  await prisma.member.update({
+    where: { id: member.id },
+    data: {
+      emailUnsubscribed: input.unsubscribe,
+      emailUnsubscribedAt: input.unsubscribe ? new Date() : null,
+    },
+  });
+
+  revalidatePath("/members");
+  revalidatePath(`/members/${member.id}`);
+  return { ok: true, unsubscribed: input.unsubscribe };
+}
+
 function isP2002For(e: unknown, field: string): boolean {
   if (!(e instanceof Error) || !("code" in e)) return false;
   if ((e as { code?: string }).code !== "P2002") return false;

@@ -490,6 +490,14 @@
           "sponsoredDescription": "{count} signups using this member's code.",
           "sponsoredEmpty": "No referrals yet."
         },
+        "emailSettings": {
+          "title": "Email settings",
+          "description": "Whether this member receives automatic payment reminder emails.",
+          "optOutLabel": "Opted out of reminder emails",
+          "subscribed": "This member receives automatic payment reminders.",
+          "optedOut": "This member won't receive automatic payment reminders.",
+          "optedOutSince": "Opted out on {date} — won't receive automatic payment reminders."
+        },
         "emails": {
           "title": "Emails",
           "date": "Date",
