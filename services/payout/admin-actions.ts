@@ -375,9 +375,11 @@ export async function fixOrderAction(input: {
       const client = getCitizenPayClient(fund);
       await client.recordOrderTxHash(input.payoutId, input.orderId, manualHash);
     } catch (e) {
+      // Coerce the request-derived id to a number before logging so it can't
+      // carry injected newlines into the log (CodeQL js/log-injection).
       console.error(
         "[payout] recordOrderTxHash (manual) failed",
-        input.orderId,
+        Number(input.orderId),
         e,
       );
       return { error: toMessage(e, t("recordFailed")) };
