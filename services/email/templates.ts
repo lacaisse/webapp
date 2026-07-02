@@ -4,7 +4,7 @@ import "server-only";
 import { getTranslations } from "next-intl/server";
 
 import { prisma } from "@/services/db/prisma";
-import { DEFAULT_LOCALE } from "@/services/i18n/config";
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from "@/services/i18n/config";
 import {
   EDITABLE_EMAIL_TEMPLATES,
   type EditableEmailType,
@@ -154,7 +154,11 @@ export async function resolveAllocationTemplate(args: {
 }): Promise<Rendered> {
   const override = await prisma.emailTemplate.findUnique({
     where: {
-      fundId_type: { fundId: args.fundId, type: "ALLOCATION_CONFIRMATION" },
+      fundId_type_locale: {
+        fundId: args.fundId,
+        type: "ALLOCATION_CONFIRMATION",
+        locale: args.locale,
+      },
     },
     select: { subject: true, bodyText: true, bodyHtml: true },
   });
@@ -318,7 +322,13 @@ export async function resolveCardAssignedTemplate(args: {
   };
 }): Promise<Rendered> {
   const override = await prisma.emailTemplate.findUnique({
-    where: { fundId_type: { fundId: args.fundId, type: "CARD_ASSIGNED" } },
+    where: {
+      fundId_type_locale: {
+        fundId: args.fundId,
+        type: "CARD_ASSIGNED",
+        locale: args.locale,
+      },
+    },
     select: { subject: true, bodyText: true, bodyHtml: true },
   });
 
@@ -361,7 +371,11 @@ export async function resolvePaymentReminderTemplate(args: {
 }): Promise<Rendered> {
   const override = await prisma.emailTemplate.findUnique({
     where: {
-      fundId_type: { fundId: args.fundId, type: "PAYMENT_REMINDER_FIRST" },
+      fundId_type_locale: {
+        fundId: args.fundId,
+        type: "PAYMENT_REMINDER_FIRST",
+        locale: args.locale,
+      },
     },
     select: { subject: true, bodyText: true, bodyHtml: true },
   });
@@ -385,29 +399,37 @@ export async function resolvePaymentReminderTemplate(args: {
   };
 }
 
-// For the settings editor: the saved override (if any) plus the built-in
-// default, both as HTML with {placeholders} left literal so the admin sees
-// which tokens are available. "Reset to default" drops the override and falls
-// back to the base. Generic over the editable template type.
-export async function getEmailTemplateForEditing(args: {
-  type: EditableEmailType;
-  fund: { id: string; defaultLocale: string };
-}): Promise<{
+// One editable locale's state: the saved override for that language (if any)
+// plus the built-in default for it, both as HTML with {placeholders} left
+// literal so the admin sees which tokens are available.
+export type EditableTemplateLocale = {
   override: { subject: string; bodyHtml: string } | null;
   base: { subject: string; bodyHtml: string };
-  variables: readonly string[];
-}> {
+};
+
+// For the template editor: a single language's saved override (if any) plus the
+// built-in default for that language. "Reset to default" drops the override and
+// falls back to the base. Generic over the editable template type.
+export async function getEmailTemplateForEditing(args: {
+  type: EditableEmailType;
+  fundId: string;
+  // The language being edited (SUPPORTED_LOCALES). Each language is independent.
+  locale: string;
+}): Promise<EditableTemplateLocale & { variables: readonly string[] }> {
   const config = EDITABLE_EMAIL_TEMPLATES[args.type];
 
   const stored = await prisma.emailTemplate.findUnique({
-    where: { fundId_type: { fundId: args.fund.id, type: args.type } },
+    where: {
+      fundId_type_locale: {
+        fundId: args.fundId,
+        type: args.type,
+        locale: args.locale,
+      },
+    },
     select: { subject: true, bodyText: true, bodyHtml: true },
   });
 
-  const locale =
-    args.fund.defaultLocale && args.fund.defaultLocale.length > 0
-      ? args.fund.defaultLocale
-      : DEFAULT_LOCALE;
+  const locale = args.locale.length > 0 ? args.locale : DEFAULT_LOCALE;
 
   // HTML-defaulted templates keep their {tokens} literal in the source constant,
   // so the editor shows them verbatim. Text-defaulted templates render the i18n
@@ -436,4 +458,29 @@ export async function getEmailTemplateForEditing(args: {
     : null;
 
   return { override, base, variables: config.variables };
+}
+
+// All editable locales for a template in one pass, keyed by locale — the shape
+// the per-language editor consumes. `variables` is shared across locales.
+export async function getEmailTemplatesForEditing(args: {
+  type: EditableEmailType;
+  fundId: string;
+}): Promise<{
+  byLocale: Record<string, EditableTemplateLocale>;
+  variables: readonly string[];
+}> {
+  const results = await Promise.all(
+    SUPPORTED_LOCALES.map(async (locale) => {
+      const { override, base } = await getEmailTemplateForEditing({
+        type: args.type,
+        fundId: args.fundId,
+        locale,
+      });
+      return [locale, { override, base }] as const;
+    }),
+  );
+  return {
+    byLocale: Object.fromEntries(results),
+    variables: EDITABLE_EMAIL_TEMPLATES[args.type].variables,
+  };
 }

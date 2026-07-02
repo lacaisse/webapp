@@ -1461,6 +1461,7 @@ model EmailTemplate {
   fund   Fund   @relation(fields: [fundId], references: [id], onDelete: Cascade)
 
   type     EmailType
+  locale   String // recipient language this override applies to (SUPPORTED_LOCALES); each language is edited independently
   subject  String
   bodyText String // plain-text body / text-MIME part (derived from bodyHtml when an HTML body is authored)
   bodyHtml String? // rich-HTML body, injected into the branded shell; null = use bodyText as plain text
@@ -1469,7 +1470,7 @@ model EmailTemplate {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([fundId, type])
+  @@unique([fundId, type, locale])
 }
 
 // Per-fund override of a printable document's wording (e.g. the card

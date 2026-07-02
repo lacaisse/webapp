@@ -1354,7 +1354,8 @@
         "all": "All",
         "queued": "Queued",
         "sent": "Sent",
-        "failed": "Failed"
+        "failed": "Failed",
+        "templates": "Templates"
       },
       "columns": {
         "queued": "Queued",

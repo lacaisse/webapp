@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { z } from "zod";
 
+import { SUPPORTED_LOCALES } from "@/services/i18n/config";
+
 // Registry of the emails whose wording admins can override per fund. Drives
 // both the settings editor UI and server-side validation. Keep keys aligned
 // with the EmailType enum (prisma) — only the types listed here are editable.
@@ -119,6 +121,10 @@ export const SaveEmailTemplateSchema = z.object({
   type: z.enum(
     EDITABLE_EMAIL_TYPES as [EditableEmailType, ...EditableEmailType[]],
   ),
+  // The language this override applies to. Each language is edited independently.
+  locale: z.enum(
+    SUPPORTED_LOCALES as unknown as [string, ...string[]],
+  ),
   subject: z
     .string()
     .trim()
@@ -138,6 +144,9 @@ export const PreviewEmailTemplateSchema = z.object({
   type: z.enum(
     EDITABLE_EMAIL_TYPES as [EditableEmailType, ...EditableEmailType[]],
   ),
+  // Accepted for symmetry with the save input; preview interpolates the
+  // client-supplied body directly, so the locale doesn't change the output.
+  locale: z.enum(SUPPORTED_LOCALES as unknown as [string, ...string[]]),
   subject: z.string(),
   bodyHtml: z.string(),
 });

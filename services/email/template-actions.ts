@@ -46,7 +46,7 @@ export async function saveEmailTemplateAction(
   if (!parsed.success) {
     return { error: t(parsed.error.issues[0].message as never) };
   }
-  const { type, subject, bodyHtml } = parsed.data;
+  const { type, locale, subject, bodyHtml } = parsed.data;
 
   const unknown = findUnknownPlaceholders(type, subject, bodyHtml);
   if (unknown.length > 0) {
@@ -59,24 +59,26 @@ export async function saveEmailTemplateAction(
 
   const bodyText = htmlToPlainText(bodyHtml);
   await prisma.emailTemplate.upsert({
-    where: { fundId_type: { fundId: fund.id, type } },
-    create: { fundId: fund.id, type, subject, bodyHtml, bodyText },
+    where: { fundId_type_locale: { fundId: fund.id, type, locale } },
+    create: { fundId: fund.id, type, locale, subject, bodyHtml, bodyText },
     update: { subject, bodyHtml, bodyText },
   });
 
-  revalidatePath("/settings");
+  revalidatePath("/emails");
   return { ok: true };
 }
 
-// Drop a fund's override so the built-in i18n default takes over again.
+// Drop a fund's override for one language so the built-in default takes over
+// again for that language only (other languages' overrides are untouched).
 export async function resetEmailTemplateAction(input: {
   type: SaveEmailTemplateInput["type"];
+  locale: string;
 }): Promise<TemplateActionResult> {
   const { fund } = await requireFundRole("ADMIN");
   await prisma.emailTemplate.deleteMany({
-    where: { fundId: fund.id, type: input.type },
+    where: { fundId: fund.id, type: input.type, locale: input.locale },
   });
-  revalidatePath("/settings");
+  revalidatePath("/emails");
   return { ok: true };
 }
 
@@ -123,6 +125,9 @@ export type SendTestEmailResult = { ok: true } | { error: string };
 export async function sendTestAllocationEmailAction(input: {
   memberId: string;
   toEmail: string;
+  // Language to render — the one currently being edited, so the test reflects
+  // exactly what a member in that language would receive.
+  locale: string;
 }): Promise<SendTestEmailResult> {
   const t = await getTranslations();
   const { fund } = await requireFundRole("ADMIN");
@@ -157,7 +162,7 @@ export async function sendTestAllocationEmailAction(input: {
   const rendered = await resolveAllocationTemplate({
     fundId: fund.id,
     account: member.primaryCard?.account ?? null,
-    locale: fund.defaultLocale,
+    locale: input.locale,
     vars: {
       firstName: member.firstName,
       lastName: member.lastName,
@@ -202,6 +207,8 @@ export async function sendTestAllocationEmailAction(input: {
 export async function sendTestCardAssignedEmailAction(input: {
   memberId: string;
   toEmail: string;
+  // Language to render (the one currently being edited).
+  locale: string;
 }): Promise<SendTestEmailResult> {
   const t = await getTranslations();
   const { fund } = await requireFundRole("ADMIN");
@@ -237,7 +244,7 @@ export async function sendTestCardAssignedEmailAction(input: {
 
   const rendered = await resolveCardAssignedTemplate({
     fundId: fund.id,
-    locale: fund.defaultLocale,
+    locale: input.locale,
     vars: {
       firstName: member.firstName,
       lastName: member.lastName,
@@ -291,6 +298,8 @@ export async function sendTestCardAssignedEmailAction(input: {
 export async function sendTestPaymentReminderEmailAction(input: {
   memberId: string;
   toEmail: string;
+  // Language to render (the one currently being edited).
+  locale: string;
 }): Promise<SendTestEmailResult> {
   const t = await getTranslations();
   const { fund } = await requireFundRole("ADMIN");
@@ -330,7 +339,7 @@ export async function sendTestPaymentReminderEmailAction(input: {
 
   const rendered = await resolvePaymentReminderTemplate({
     fundId: fund.id,
-    locale: fund.defaultLocale,
+    locale: input.locale,
     vars: {
       firstName: member.firstName,
       lastName: member.lastName,

@@ -20,12 +20,14 @@ import { prisma } from "@/services/db/prisma";
 import { requireFundRole } from "@/services/auth/dal";
 import { requireCurrentFund } from "@/services/fund/server";
 import { EmailDetailDialog } from "./email-detail-dialog";
+import { EmailTemplatesPanel } from "./email-templates-panel";
 
 const TABS = [
   { value: "all" },
   { value: "queued" },
   { value: "sent" },
   { value: "failed" },
+  { value: "templates" },
 ] as const;
 
 type TabValue = (typeof TABS)[number]["value"];
@@ -33,6 +35,7 @@ type TabValue = (typeof TABS)[number]["value"];
 function statusFilterFor(tab: TabValue) {
   switch (tab) {
     case "all":
+    case "templates":
       return undefined;
     case "queued":
       return EmailStatus.QUEUED;
@@ -91,9 +94,15 @@ async function EmailsContent({
           label: t(`tabs.${tab.value}`),
         }))}
       />
-      <Suspense key={active} fallback={<TableSkeleton columns={6} />}>
-        <EmailsTable status={statusFilterFor(active)} />
-      </Suspense>
+      {active === "templates" ? (
+        <Suspense key="templates" fallback={<TableSkeleton columns={6} />}>
+          <EmailTemplatesPanel />
+        </Suspense>
+      ) : (
+        <Suspense key={active} fallback={<TableSkeleton columns={6} />}>
+          <EmailsTable status={statusFilterFor(active)} />
+        </Suspense>
+      )}
     </>
   );
 }
@@ -194,7 +203,7 @@ function EmailsTabsSkeleton() {
   return (
     <>
       <div className="flex gap-2">
-        {Array.from({ length: 4 }).map((_, i) => (
+        {Array.from({ length: 5 }).map((_, i) => (
           <Skeleton key={i} className="h-8 w-20" />
         ))}
       </div>

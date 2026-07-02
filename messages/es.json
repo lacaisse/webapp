@@ -1184,7 +1184,8 @@
         "all": "Todos",
         "queued": "En cola",
         "sent": "Enviados",
-        "failed": "Fallidos"
+        "failed": "Fallidos",
+        "templates": "Plantillas"
       },
       "columns": {
         "queued": "En cola",
@@ -1385,6 +1386,66 @@
         "rateHint": "Porcentaje cobrado en cada pago (p. ej. 2.5 para 2.5%). Déjalo vacío para usar la tasa predeterminada de Citizen Pay.",
         "syncPending": "Guardado localmente, pero aún no confirmado por Citizen Pay. Guarda de nuevo para reintentar la sincronización.",
         "syncFailed": "Tasa guardada, pero la sincronización con Citizen Pay falló. Guarda de nuevo para reintentar."
+      },
+      "emailTemplates": {
+        "allocationTitle": "Correo de confirmación de asignación",
+        "allocationDescription": "El correo que reciben los miembros cuando una asignación llega a su tarjeta. Déjalo sin cambios para conservar el texto predeterminado, o personalízalo para este fondo.",
+        "cardAssignedTitle": "Correo de tarjeta en camino",
+        "cardAssignedDescription": "El correo que recibe un miembro cuando se le asigna su tarjeta y está en camino. Déjalo sin cambios para conservar el texto predeterminado, o personalízalo para este fondo.",
+        "paymentReminderTitle": "Correo de recordatorio de contribución",
+        "paymentReminderDescription": "El recordatorio mensual que se envía el día 1 a los miembros que aún no han contribuido en el período. Déjalo sin cambios para conservar el texto predeterminado, o personalízalo para este fondo.",
+        "subjectLabel": "Asunto",
+        "bodyLabel": "Cuerpo",
+        "variablesHint": "Puedes usar estos marcadores — se reemplazan con los datos de cada miembro al enviar el correo:",
+        "variables": {
+          "firstName": "El nombre del miembro",
+          "fundName": "El nombre de este fondo",
+          "amount": "El importe asignado",
+          "lastName": "El apellido del miembro",
+          "cardSerial": "El número de serie de la tarjeta del miembro",
+          "shopList": "Lista con viñetas de los comercios activos del fondo",
+          "address": "La dirección postal del miembro",
+          "cardLink": "Enlace a la página pública de la tarjeta del miembro",
+          "cardNumber": "El número de tarjeta del miembro",
+          "paymentReference": "La referencia que se debe incluir en la transferencia bancaria"
+        },
+        "usingDefault": "Usando la plantilla predeterminada.",
+        "usingOverride": "Usando una plantilla personalizada para este fondo.",
+        "reset": "Restablecer predeterminada",
+        "resetConfirmTitle": "¿Restablecer la plantilla predeterminada?",
+        "resetConfirmDescription": "Esto elimina tu texto personalizado y restaura el correo predeterminado. Esta acción no se puede deshacer.",
+        "resetConfirmCancel": "Cancelar",
+        "resetConfirmConfirm": "Restablecer",
+        "errors": {
+          "subjectRequired": "Introduce un asunto.",
+          "subjectTooLong": "El asunto es demasiado largo.",
+          "bodyRequired": "Introduce el cuerpo del mensaje.",
+          "bodyTooLong": "El cuerpo del mensaje es demasiado largo.",
+          "unknownVariable": "Marcador desconocido «{name}». Elimínalo o usa una de las variables indicadas."
+        },
+        "htmlLabel": "Cuerpo (HTML)",
+        "htmlHint": "Escribe el cuerpo en HTML — se incluye en el diseño con la marca de tu fondo (logotipo, pie de página). Usa los marcadores de abajo; se reemplazan por cada miembro al enviar el correo.",
+        "previewLabel": "Vista previa",
+        "previewSubject": "Asunto:",
+        "test": {
+          "title": "Enviar una prueba",
+          "description": "Elige un miembro para rellenar los datos del correo y envía una copia a cualquier dirección — con los datos reales de ese miembro.",
+          "memberLabel": "Usar los datos de este miembro",
+          "emailLabel": "Enviar a",
+          "emailPlaceholder": "tu@ejemplo.com",
+          "send": "Enviar prueba",
+          "sending": "Enviando…",
+          "sent": "Correo de prueba enviado.",
+          "noMembers": "Aún no hay miembros activos con un nivel de asignación — añade uno para enviar una prueba.",
+          "subjectPrefix": "[Prueba]",
+          "errors": {
+            "emailInvalid": "Introduce una dirección de correo válida.",
+            "memberNotFound": "No se encontró ese miembro.",
+            "noTier": "Ese miembro no tiene nivel de asignación, así que no hay importe que mostrar.",
+            "noCard": "Ese miembro aún no tiene tarjeta, así que no hay nada a lo que enlazar.",
+            "sendFailed": "No se pudo enviar el correo de prueba. Comprueba la dirección del remitente e inténtalo de nuevo."
+          }
+        }
       },
       "documentTemplates": {
         "onboardingLetterTitle": "Carta de bienvenida de la tarjeta",
