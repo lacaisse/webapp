@@ -14,6 +14,7 @@ import type { MemberStatus } from "@/services/db/generated/enums";
 import {
   DEFAULT_IMPORT_STATUS,
   MEMBER_IMPORT_FIELDS,
+  recognizeLocale,
   recognizeStatus,
   type MemberImportField,
   type MemberImportMapping,
@@ -158,6 +159,11 @@ export async function importMembersAction(input: {
     const tierName = valueFor("tier");
     const tierId = tierName ? tierByName.get(tierName.toLowerCase()) : undefined;
 
+    // Language: from a mapped column or a fixed default, resolved to a supported
+    // code. Unrecognized → left unset (emails fall back to the fund default).
+    const localeRaw = valueFor("locale");
+    const locale = localeRaw ? (recognizeLocale(localeRaw) ?? undefined) : undefined;
+
     const status = resolveStatus(valueFor("status"));
 
     try {
@@ -176,6 +182,7 @@ export async function importMembersAction(input: {
             ...optional,
             ...household,
             ...(tierId ? { tierId } : {}),
+            ...(locale ? { locale } : {}),
             ...(status ? { status } : {}),
           },
         });
@@ -190,6 +197,7 @@ export async function importMembersAction(input: {
           optional,
           household,
           tierId,
+          locale,
           status,
         });
         created++;
@@ -293,6 +301,7 @@ async function createMember(args: {
   optional: Record<string, string>;
   household: Record<string, number>;
   tierId: string | undefined;
+  locale: string | undefined;
   status: MemberStatus | undefined;
 }): Promise<string> {
   // Retry on the (fundId, paymentReference) unique collision — same pattern as
@@ -311,6 +320,7 @@ async function createMember(args: {
           ...args.optional,
           ...args.household,
           ...(args.tierId ? { tierId: args.tierId } : {}),
+          ...(args.locale ? { locale: args.locale } : {}),
         },
         select: { id: true },
       });

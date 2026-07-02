@@ -112,7 +112,7 @@ async function remindFund(
       firstName: true,
       lastName: true,
       paymentReference: true,
-      tier: { select: { minContribution: true } },
+      tier: { select: { allocationAmount: true } },
       primaryCard: { select: { serialNumber: true } },
     },
   });
@@ -152,7 +152,7 @@ type ReminderMember = {
   firstName: string;
   lastName: string;
   paymentReference: string | null;
-  tier: { minContribution: { toString(): string } } | null;
+  tier: { allocationAmount: { toString(): string } } | null;
   primaryCard: { serialNumber: string } | null;
 };
 
@@ -216,7 +216,7 @@ async function remindOne(
     fund: branding,
     firstName: member.firstName,
     lastName: member.lastName,
-    amount: member.tier ? member.tier.minContribution.toString() : "",
+    amount: member.tier ? member.tier.allocationAmount.toString() : "",
     paymentReference: member.paymentReference ?? "",
     cardLink,
   });

@@ -5,6 +5,7 @@ import { getTranslations } from "next-intl/server";
 
 import { prisma } from "@/services/db/prisma";
 import { getFundUrl } from "@/services/fund/server";
+import { DEFAULT_LOCALE, isSupportedLocale } from "@/services/i18n/config";
 import { buildUnsubscribeToken } from "@/services/member/unsubscribe";
 import { renderBrandedEmail } from "./template";
 import {
@@ -22,6 +23,13 @@ import { sendEmail } from "./resend";
 // Each function takes a `fund: FundBranding` arg so the rendered email
 // carries the tenant's own brand (name in the header, primary color on the
 // CTA, optional logo). The text body remains the plain-text version.
+//
+// Language: senders never pass a locale. `dispatchTemplate` resolves it once
+// from the queued Email row — the member's own `Member.locale` (captured at
+// signup) for member emails, falling back to the fund's default locale then
+// the platform default — and threads it into every `render(locale)` callback
+// and the opt-out footer. So a member always gets email in their language,
+// regardless of who (admin / cron) triggered the send. See resolveEmailLocale.
 
 export type FundBranding = {
   name: string;
@@ -44,8 +52,11 @@ export async function sendMemberEmailVerification(args: {
   await dispatchTemplate({
     emailId: args.emailId,
     fund: args.fund,
-    render: async () => {
-      const t = await getTranslations("members.signup.emailTemplates.verify");
+    render: async (locale) => {
+      const t = await getTranslations({
+        locale,
+        namespace: "members.signup.emailTemplates.verify",
+      });
       return {
         subject: t("subject", { fundName: args.fund.name }),
         text: t("textBody", {
@@ -71,8 +82,11 @@ export async function sendMemberActivated(args: {
   await dispatchTemplate({
     emailId: args.emailId,
     fund: args.fund,
-    render: async () => {
-      const t = await getTranslations("members.admin.email.activated");
+    render: async (locale) => {
+      const t = await getTranslations({
+        locale,
+        namespace: "members.admin.email.activated",
+      });
       return {
         subject: t("subject", { fundName: args.fund.name }),
         text: t("textBody", {
@@ -105,10 +119,11 @@ export async function sendAllocationConfirmation(args: {
     // Prefer the fund's editable override (services/email/templates.ts),
     // falling back to the i18n default. {placeholder} tokens are interpolated
     // inside the resolver.
-    render: () =>
+    render: (locale) =>
       resolveAllocationTemplate({
         fundId: args.fundId,
         account: args.account,
+        locale,
         vars: {
           firstName: args.firstName,
           lastName: args.lastName,
@@ -137,9 +152,10 @@ export async function sendCardAssigned(args: {
     emailId: args.emailId,
     fund: args.fund,
     // Prefer the fund's editable override, falling back to the i18n default.
-    render: () =>
+    render: (locale) =>
       resolveCardAssignedTemplate({
         fundId: args.fundId,
+        locale,
         vars: {
           firstName: args.firstName,
           lastName: args.lastName,
@@ -163,10 +179,11 @@ export async function sendReferralBonusAwarded(args: {
   await dispatchTemplate({
     emailId: args.emailId,
     fund: args.fund,
-    render: async () => {
-      const t = await getTranslations(
-        "members.admin.email.referralBonusAwarded",
-      );
+    render: async (locale) => {
+      const t = await getTranslations({
+        locale,
+        namespace: "members.admin.email.referralBonusAwarded",
+      });
       return {
         subject: t("subject", { fundName: args.fund.name }),
         text: t("textBody", {
@@ -191,8 +208,11 @@ export async function sendPaymentConfirmation(args: {
   await dispatchTemplate({
     emailId: args.emailId,
     fund: args.fund,
-    render: async () => {
-      const t = await getTranslations("members.email.paymentConfirmation");
+    render: async (locale) => {
+      const t = await getTranslations({
+        locale,
+        namespace: "members.email.paymentConfirmation",
+      });
       return {
         subject: t("subject", { fundName: args.fund.name }),
         text: t("textBody", {
@@ -214,7 +234,7 @@ export async function sendPaymentReminder(args: {
   fund: FundBranding;
   firstName: string;
   lastName: string;
-  // The member's expected monthly contribution (tier minimum), already
+  // The member's expected monthly contribution (tier target amount), already
   // stringified. "" when the member has no tier assigned.
   amount: string;
   // Bank-transfer communication bank-sync matches on.
@@ -226,9 +246,10 @@ export async function sendPaymentReminder(args: {
     emailId: args.emailId,
     fund: args.fund,
     // Prefer the fund's editable override, falling back to the HTML default.
-    render: () =>
+    render: (locale) =>
       resolvePaymentReminderTemplate({
         fundId: args.fundId,
+        locale,
         vars: {
           firstName: args.firstName,
           lastName: args.lastName,
@@ -252,8 +273,11 @@ export async function sendMemberWelcome(args: {
   await dispatchTemplate({
     emailId: args.emailId,
     fund: args.fund,
-    render: async () => {
-      const t = await getTranslations("members.signup.emailTemplates.welcome");
+    render: async (locale) => {
+      const t = await getTranslations({
+        locale,
+        namespace: "members.signup.emailTemplates.welcome",
+      });
       return {
         subject: t("subject", { fundName: args.fund.name }),
         text: t("textBody", {
@@ -277,8 +301,11 @@ export async function sendMemberInvited(args: {
   await dispatchTemplate({
     emailId: args.emailId,
     fund: args.fund,
-    render: async () => {
-      const t = await getTranslations("members.admin.email.invited");
+    render: async (locale) => {
+      const t = await getTranslations({
+        locale,
+        namespace: "members.admin.email.invited",
+      });
       return {
         subject: t("subject", { fundName: args.fund.name }),
         text: t("textBody", {
@@ -302,9 +329,12 @@ export async function sendFundInvited(args: {
   await dispatchTemplate({
     emailId: args.emailId,
     fund: args.fund,
-    render: async () => {
-      const t = await getTranslations("team.admin.email.invited");
-      const roleLabel = await getTranslations("team.roles");
+    render: async (locale) => {
+      const t = await getTranslations({
+        locale,
+        namespace: "team.admin.email.invited",
+      });
+      const roleLabel = await getTranslations({ locale, namespace: "team.roles" });
       return {
         subject: t("subject", { fundName: args.fund.name }),
         // The bare-URL paragraph renders as the primary CTA button.
@@ -330,8 +360,11 @@ export async function sendMerchantEmailVerification(args: {
   await dispatchTemplate({
     emailId: args.emailId,
     fund: args.fund,
-    render: async () => {
-      const t = await getTranslations("merchants.signup.email.verify");
+    render: async (locale) => {
+      const t = await getTranslations({
+        locale,
+        namespace: "merchants.signup.email.verify",
+      });
       return {
         subject: t("subject", { fundName: args.fund.name }),
         text: t("textBody", {
@@ -356,8 +389,11 @@ export async function sendMerchantApproved(args: {
   await dispatchTemplate({
     emailId: args.emailId,
     fund: args.fund,
-    render: async () => {
-      const t = await getTranslations("merchants.admin.email.approved");
+    render: async (locale) => {
+      const t = await getTranslations({
+        locale,
+        namespace: "merchants.admin.email.approved",
+      });
       // Two body variants: with the CP onboarding URL (the prod path) and
       // without (env not set in dev → fall back to "admin will be in touch").
       const text = args.citizenPayOnboardingUrl
@@ -392,8 +428,11 @@ export async function sendMerchantRejected(args: {
   await dispatchTemplate({
     emailId: args.emailId,
     fund: args.fund,
-    render: async () => {
-      const t = await getTranslations("merchants.admin.email.rejected");
+    render: async (locale) => {
+      const t = await getTranslations({
+        locale,
+        namespace: "merchants.admin.email.rejected",
+      });
       return {
         subject: t("subject", { fundName: args.fund.name }),
         text: t("textBody", {
@@ -416,8 +455,11 @@ export async function sendMerchantWelcome(args: {
   await dispatchTemplate({
     emailId: args.emailId,
     fund: args.fund,
-    render: async () => {
-      const t = await getTranslations("merchants.signup.email.welcome");
+    render: async (locale) => {
+      const t = await getTranslations({
+        locale,
+        namespace: "merchants.signup.email.welcome",
+      });
       return {
         subject: t("subject", { fundName: args.fund.name }),
         text: t("textBody", {
@@ -439,19 +481,17 @@ type RenderedTemplate = {
   html?: string;
 };
 
-// The opt-out footer for a queued email (issue #40). Resolved centrally here —
-// from the Email row's memberId + fund domain — so every member-facing send
-// carries the deregistration link without each sender threading it through.
-// Returns undefined for merchant / team emails (no member) so they get no link.
+// The opt-out footer for a queued email (issue #40). Built from the Email row
+// already loaded by dispatchTemplate (memberId + fund domain) so every
+// member-facing send carries the deregistration link without each sender
+// threading it through. Returns undefined for merchant / team emails (no
+// member) so they get no link. `locale` matches the rest of the email.
 async function buildUnsubscribeFooter(
-  emailId: string,
+  row: { memberId: string | null; fund: { domain: string } | null },
+  locale: string,
 ): Promise<{ url: string; label: string } | undefined> {
-  const row = await prisma.email.findUnique({
-    where: { id: emailId },
-    select: { memberId: true, fund: { select: { domain: true } } },
-  });
-  if (!row?.memberId || !row.fund) return undefined;
-  const t = await getTranslations("members.email.footer");
+  if (!row.memberId || !row.fund) return undefined;
+  const t = await getTranslations({ locale, namespace: "members.email.footer" });
   const token = buildUnsubscribeToken(row.memberId);
   return {
     url: `${getFundUrl(row.fund.domain)}/unsubscribe?token=${encodeURIComponent(token)}`,
@@ -459,17 +499,45 @@ async function buildUnsubscribeFooter(
   };
 }
 
+// The language every member-facing email is rendered in. A member's own
+// `Member.locale` (captured at signup) wins so the email matches the language
+// they registered in; merchant / team emails have no member and fall back to
+// the fund's default locale, then the platform default. Anything unsupported
+// (null, a legacy value) is ignored in favour of the next fallback.
+function resolveEmailLocale(row: {
+  member: { locale: string | null } | null;
+  fund: { defaultLocale: string } | null;
+}): string {
+  const candidates = [row.member?.locale, row.fund?.defaultLocale];
+  for (const c of candidates) {
+    if (c && isSupportedLocale(c)) return c;
+  }
+  return DEFAULT_LOCALE;
+}
+
 async function dispatchTemplate(args: {
   emailId: string;
   to: string;
   fund: FundBranding;
-  render: () => Promise<RenderedTemplate>;
+  render: (locale: string) => Promise<RenderedTemplate>;
 }): Promise<void> {
   let rendered: RenderedTemplate | null = null;
   let html: string | null = null;
   try {
-    rendered = await args.render();
-    const unsubscribe = await buildUnsubscribeFooter(args.emailId);
+    // One lookup drives both the recipient's language and the opt-out footer.
+    const row = await prisma.email.findUnique({
+      where: { id: args.emailId },
+      select: {
+        memberId: true,
+        member: { select: { locale: true } },
+        fund: { select: { domain: true, defaultLocale: true } },
+      },
+    });
+    const locale = resolveEmailLocale(row ?? { member: null, fund: null });
+    rendered = await args.render(locale);
+    const unsubscribe = row
+      ? await buildUnsubscribeFooter(row, locale)
+      : undefined;
     html = await renderBrandedEmail({
       fundName: args.fund.name,
       primaryColor: args.fund.primaryColor,

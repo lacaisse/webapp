@@ -503,6 +503,13 @@ model Member {
   lastName  String
   phone     String?
 
+  // Preferred language, captured from the request locale at self-signup so
+  // every email we send them is in the language they registered in. Null for
+  // admin-created / imported members (preference unknown) — the email layer
+  // then falls back to the fund's default locale. A supported-locale code
+  // (e.g. "fr", "en"); see services/i18n/config.ts.
+  locale String?
+
   // Optional auth link — set only when the member self-onboards via login.
   // Most members are created by admins from paper forms and never log in.
   userId String? @db.Uuid

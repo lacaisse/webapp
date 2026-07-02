@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 "use server";
 
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { prisma } from "@/services/db/prisma";
 import {
   sendMemberEmailVerification,
@@ -42,6 +42,11 @@ export async function signupMemberAction(input: {
   }
 
   const fund = await requireCurrentFund();
+
+  // The member's preferred language = the locale they're registering in, so
+  // every follow-up email matches it. Falls back to the fund default in the
+  // email layer if this is ever null.
+  const locale = await getLocale();
 
   // Filter application data to keys that exist on the fund's onboarding form,
   // and enforce the `required` flag for each. Anything unknown is dropped
@@ -136,6 +141,7 @@ export async function signupMemberAction(input: {
             email: parsed.data.email,
             firstName: parsed.data.firstName,
             lastName: parsed.data.lastName,
+            locale,
             status: "NEW",
             paymentReference,
             emailUnsubscribed: parsed.data.remindersOptOut ?? false,

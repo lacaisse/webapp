@@ -5,6 +5,10 @@
 // and types ("use server" modules may only export async functions).
 
 import type { MemberStatus } from "@/services/db/generated/enums";
+import {
+  isSupportedLocale,
+  type SupportedLocale,
+} from "@/services/i18n/config";
 
 // The built-in member fields a CSV column can be mapped to. `serial` and
 // `cardNumber` are special — they link an EXISTING card (by serial / by the
@@ -24,6 +28,7 @@ export const MEMBER_IMPORT_FIELDS = [
   { key: "householdAdults", required: false },
   { key: "householdChildren", required: false },
   { key: "tier", required: false },
+  { key: "locale", required: false },
   { key: "status", required: false },
   { key: "notes", required: false },
   // serial before cardNumber: the auto-guess assigns headers in field order,
@@ -67,6 +72,27 @@ export function recognizeStatus(raw: string): MemberStatus | null {
     return "STOPPED";
   if (/^(rejected|rejet[ée]?|refus[ée]|geweigerd|denied|declined)$/.test(v))
     return "REJECTED";
+  return null;
+}
+
+// Recognize a raw language value from external data, case-insensitively, across
+// ISO codes and EN/FR/NL/ES names. Returns null when nothing matches — the row
+// is then left without an explicit locale (emails fall back to the fund
+// default), same as an unmatched tier name. Mirrors recognizeStatus.
+export function recognizeLocale(raw: string): SupportedLocale | null {
+  const v = raw.trim().toLowerCase();
+  if (!v) return null;
+  // Exact supported code (e.g. "fr", "en") always wins.
+  if (isSupportedLocale(v)) return v;
+  if (/^(fr|fre|fra|french|fran[çc]ais|frans|franc[eé]s)$/.test(v)) return "fr";
+  if (/^(en|eng|english|anglais|engels|ingl[eé]s)$/.test(v)) return "en";
+  if (
+    /^(nl|dut|nld|dutch|n[ée]erlandais|nederlands|flemish|flamand|vlaams)$/.test(
+      v,
+    )
+  )
+    return "nl";
+  if (/^(es|spa|spanish|espagnol|spaans|espa[ñn]ol)$/.test(v)) return "es";
   return null;
 }
 
