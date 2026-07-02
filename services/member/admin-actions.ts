@@ -265,6 +265,7 @@ export async function activateMemberAction(input: {
             address: member.address,
             postalCode: member.postalCode,
             city: member.city,
+            paymentReference: member.paymentReference,
           },
         },
       });

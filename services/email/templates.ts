@@ -224,6 +224,8 @@ const CARD_ASSIGNED_DEFAULTS: Record<
     <a href="{cardLink}" style="background-color: hsl(25, 95%, 53%); color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">Voir ma carte {fundName}</a>
   </div>
   <p style="color: #6b7280; font-size: 14px;">Numéro de carte : {cardNumber}</p>
+  <p>Vous pouvez dès à présent effectuer votre cotisation par virement bancaire, en indiquant bien la communication suivante afin que votre paiement soit reconnu automatiquement :</p>
+  <div style="background-color: #f1eee8; padding: 12px 16px; border-radius: 8px; margin: 20px 0; font-family: monospace; font-size: 16px; word-break: break-word;">{paymentReference}</div>
   <p>À bientôt,<br>L'équipe {fundName}</p>
 </div>`,
   },
@@ -241,6 +243,8 @@ const CARD_ASSIGNED_DEFAULTS: Record<
     <a href="{cardLink}" style="background-color: hsl(25, 95%, 53%); color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">View my {fundName} card</a>
   </div>
   <p style="color: #6b7280; font-size: 14px;">Card number: {cardNumber}</p>
+  <p>You can already make your contribution by bank transfer — please include the following reference so your payment is recognised automatically:</p>
+  <div style="background-color: #f1eee8; padding: 12px 16px; border-radius: 8px; margin: 20px 0; font-family: monospace; font-size: 16px; word-break: break-word;">{paymentReference}</div>
   <p>See you soon,<br>The {fundName} team</p>
 </div>`,
   },
@@ -307,7 +311,8 @@ function htmlTemplateDefault(
 // shape as the allocation template, but every variable is a plain scalar the
 // caller resolves up-front (the notify action / test send): {address} is the
 // member's formatted postal address, {cardLink} the public tap URL, {cardNumber}
-// the per-fund card number. The built-in default is authored as rich HTML.
+// the per-fund card number, {paymentReference} the bank-transfer communication.
+// The built-in default is authored as rich HTML.
 export async function resolveCardAssignedTemplate(args: {
   fundId: string;
   // Recipient's language for the built-in default (overrides are single-locale).
@@ -319,6 +324,7 @@ export async function resolveCardAssignedTemplate(args: {
     address: string;
     cardLink: string;
     cardNumber: string;
+    paymentReference: string;
   };
 }): Promise<Rendered> {
   const override = await prisma.emailTemplate.findUnique({

@@ -42,6 +42,7 @@ export async function notifyCardAssignedAction(input: {
           address: true,
           postalCode: true,
           city: true,
+          paymentReference: true,
         },
       },
     },

@@ -30,6 +30,7 @@ export type CardForNotify = {
     address: string | null;
     postalCode: string | null;
     city: string | null;
+    paymentReference: string | null;
   };
 };
 
@@ -100,6 +101,7 @@ export async function dispatchCardAssignedEmail(args: {
     address: formatMemberAddress(card.member),
     cardLink: buildCardLink(card.serialNumber, await resolveTreasurySlug(fund)),
     cardNumber: card.number != null ? String(card.number) : "",
+    paymentReference: card.member.paymentReference ?? "",
   });
 
   // sendCardAssigned swallows errors and marks the row FAILED — read back the

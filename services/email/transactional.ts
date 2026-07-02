@@ -143,10 +143,11 @@ export async function sendCardAssigned(args: {
   firstName: string;
   lastName: string;
   // Pre-resolved scalars (see services/email/templates.ts): formatted postal
-  // address, public tap URL, per-fund card number.
+  // address, public tap URL, per-fund card number, bank-transfer reference.
   address: string;
   cardLink: string;
   cardNumber: string;
+  paymentReference: string;
 }): Promise<void> {
   await dispatchTemplate({
     emailId: args.emailId,
@@ -163,6 +164,7 @@ export async function sendCardAssigned(args: {
           address: args.address,
           cardLink: args.cardLink,
           cardNumber: args.cardNumber,
+          paymentReference: args.paymentReference,
         },
       }),
     to: args.toEmail,

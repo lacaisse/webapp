@@ -201,9 +201,9 @@ export async function sendTestAllocationEmailAction(input: {
 }
 
 // Send a one-off test of the CARD_ASSIGNED email, populated from a real
-// member's primary card so {address}, {cardLink} and {cardNumber} render with
-// live data. Transient (no Email row / idempotency) — same as the allocation
-// test. Honours the fund's custom sender.
+// member's primary card so {address}, {cardLink}, {cardNumber} and
+// {paymentReference} render with live data. Transient (no Email row /
+// idempotency) — same as the allocation test. Honours the fund's custom sender.
 export async function sendTestCardAssignedEmailAction(input: {
   memberId: string;
   toEmail: string;
@@ -228,6 +228,7 @@ export async function sendTestCardAssignedEmailAction(input: {
       address: true,
       postalCode: true,
       city: true,
+      paymentReference: true,
       primaryCard: { select: { serialNumber: true, number: true } },
     },
   });
@@ -258,6 +259,7 @@ export async function sendTestCardAssignedEmailAction(input: {
         member.primaryCard.number != null
           ? String(member.primaryCard.number)
           : "",
+      paymentReference: member.paymentReference ?? "",
     },
   });
 

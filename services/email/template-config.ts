@@ -41,7 +41,8 @@ export const EDITABLE_EMAIL_TEMPLATES = {
     defaultIsHtml: true,
     // All plain scalars, resolved by the caller (notify action / test send):
     // {address} is the member's formatted postal address, {cardLink} the public
-    // tap URL, {cardNumber} the per-fund card number. See templates.ts.
+    // tap URL, {cardNumber} the per-fund card number, {paymentReference} the
+    // bank-transfer communication (Member.paymentReference). See templates.ts.
     variables: [
       "firstName",
       "lastName",
@@ -49,6 +50,7 @@ export const EDITABLE_EMAIL_TEMPLATES = {
       "address",
       "cardLink",
       "cardNumber",
+      "paymentReference",
     ],
   },
   PAYMENT_REMINDER_FIRST: {
@@ -95,6 +97,7 @@ export const PREVIEW_SAMPLE_VALUES: Record<
     address: "Rue de l'Exemple 12, 1000 Bruxelles",
     cardLink: "https://tap.citizenpay.xyz/card/04A2B7C9D1?network=demo",
     cardNumber: "42",
+    paymentReference: "ABCD2345",
   },
   PAYMENT_REMINDER_FIRST: {
     firstName: "Alex",
