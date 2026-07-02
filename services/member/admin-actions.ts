@@ -300,8 +300,12 @@ export async function addCardAction(input: {
     where: { id: input.memberId, fundId: fund.id },
     select: {
       id: true,
+      email: true,
       firstName: true,
       lastName: true,
+      address: true,
+      postalCode: true,
+      city: true,
       status: true,
       primaryCardId: true,
     },
@@ -343,7 +347,7 @@ export async function addCardAction(input: {
     console.error("[citizenpay] registerCard failed during addCard", e);
   }
 
-  await prisma.card.create({
+  const card = await prisma.card.create({
     data: {
       fundId: fund.id,
       memberId: member.id,
@@ -355,6 +359,33 @@ export async function addCardAction(input: {
       issuedAt: new Date(),
     },
   });
+
+  // Same CARD_ASSIGNED ("your card is on its way") email as activation —
+  // dependant cards need it too, gated only by the fund-wide member-email
+  // pause. A send failure never fails the add-card flow (#69).
+  if (!fund.confirmationEmailsPausedAt) {
+    try {
+      await dispatchCardAssignedEmail({
+        fund,
+        card: {
+          id: card.id,
+          serialNumber: card.serialNumber,
+          number: card.number,
+          memberId: member.id,
+          member: {
+            email: member.email,
+            firstName: member.firstName,
+            lastName: member.lastName,
+            address: member.address,
+            postalCode: member.postalCode,
+            city: member.city,
+          },
+        },
+      });
+    } catch (e) {
+      console.error("[addCard] card-assigned email dispatch failed", card.id, e);
+    }
+  }
 
   revalidatePath("/members");
   return { ok: true };
