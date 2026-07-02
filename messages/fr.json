@@ -1354,7 +1354,8 @@
         "all": "Tous",
         "queued": "En file",
         "sent": "Envoyés",
-        "failed": "Échoués"
+        "failed": "Échoués",
+        "templates": "Modèles"
       },
       "columns": {
         "queued": "Mis en file",
