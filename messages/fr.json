@@ -1168,6 +1168,22 @@
           "successMinted": "Commande ajoutée et net émis vers le commerce.",
           "mintFailed": "Commande ajoutée, mais l’émission automatique a échoué. Réconciliez-la depuis l’onglet Problèmes."
         },
+        "addOrders": {
+          "trigger": "Ajouter des commandes existantes",
+          "title": "Ajouter des commandes existantes",
+          "description": "Ajoutez des commandes déjà existantes mais non incluses dans ce versement — choisissez une période, puis sélectionnez celles à ajouter.",
+          "from": "Du",
+          "to": "Au",
+          "rangeHint": "Filtre sur la date de création de la commande. Seules les commandes payables et non affectées peuvent être ajoutées.",
+          "preview": "Prévisualiser",
+          "windowSummary": "{count, plural, =1 {# commande disponible} other {# commandes disponibles}}",
+          "net": "Net",
+          "loadMore": "Afficher plus",
+          "empty": "Aucune commande à ajouter pour cette période.",
+          "confirm": "{count, plural, =0 {Ajouter les commandes} =1 {Ajouter # commande} other {Ajouter # commandes}}",
+          "success": "{count, plural, =1 {# commande ajoutée au versement.} other {# commandes ajoutées au versement.}}",
+          "rejectedTitle": "Certaines commandes n’ont pas pu être ajoutées et ont été ignorées. La liste a été actualisée — vérifiez et réessayez."
+        },
         "deduction": {
           "trigger": "Ajouter une déduction",
           "edit": "Modifier la déduction",
@@ -1282,6 +1298,9 @@
           "archiveFailed": "Impossible d’archiver la commande. Réessayez bientôt.",
           "payerFailed": "Impossible de charger le compte du payeur.",
           "createOrderFailed": "Impossible d'ajouter la commande. Réessayez bientôt.",
+          "addOrdersFailed": "Impossible d'ajouter les commandes. Réessayez bientôt.",
+          "addOrdersRejected": "Certaines commandes sélectionnées ne pouvaient plus être ajoutées.",
+          "noOrdersSelected": "Sélectionnez au moins une commande à ajouter.",
           "amountInvalid": "Saisissez un montant valide.",
           "feeInvalid": "Saisissez des frais valides.",
           "amountPositive": "Le montant doit être supérieur à zéro.",

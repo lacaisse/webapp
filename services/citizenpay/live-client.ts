@@ -28,6 +28,8 @@ import {
 } from "./api";
 import type { CitizenPayClient } from "./client-interface";
 import type {
+  AddableOrdersPage,
+  AddOrdersResult,
   ArchivedPayout,
   BankBalance,
   BankingStatus,
@@ -708,6 +710,42 @@ export class LiveCitizenPayClient implements CitizenPayClient {
     });
     return {
       order: payoutOrderFromWire(res.order),
+      payout: {
+        payoutId: res.payout.payoutId,
+        total: centsToDecimal(res.payout.total),
+        fees: centsToDecimal(res.payout.fees),
+        net: centsToDecimal(res.payout.net),
+      },
+    };
+  }
+
+  async getAddableOrders(
+    payoutId: string,
+    query: { from: string; to: string; limit?: number; offset?: number },
+  ): Promise<AddableOrdersPage> {
+    const res = await apiPayouts.addableOrders(this.creds, payoutId, query);
+    const orders = (res.orders ?? []).map(payoutOrderFromWire);
+    return {
+      orders,
+      summary: {
+        orderCount: res.summary.orderCount,
+        total: centsToDecimal(res.summary.total),
+        fees: centsToDecimal(res.summary.fees),
+        net: centsToDecimal(res.summary.net),
+      },
+      total: res.total,
+      limit: res.limit,
+      offset: res.offset,
+    };
+  }
+
+  async addOrdersToPayout(
+    payoutId: string,
+    orderIds: number[],
+  ): Promise<AddOrdersResult> {
+    const res = await apiPayouts.addOrders(this.creds, payoutId, { orderIds });
+    return {
+      assigned: res.assigned,
       payout: {
         payoutId: res.payout.payoutId,
         total: centsToDecimal(res.payout.total),

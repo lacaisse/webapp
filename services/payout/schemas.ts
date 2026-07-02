@@ -54,6 +54,34 @@ export const CreatePayoutOrderSchema = z
 
 export type CreatePayoutOrderFormInput = z.infer<typeof CreatePayoutOrderSchema>;
 
+// Previewing existing orders addable to a pending payout over a `[from, to]`
+// window on the order's creation date. Same date-only inputs as the create
+// dialog (widened to RFC3339 in the action). The range is inclusive on CP's
+// side, but we still require from < to for a meaningful window.
+export const AddableOrdersRangeSchema = z
+  .object({
+    payoutId: z.string().min(1, "fund.payments.settlement.errors.addOrdersFailed"),
+    from: z.string().regex(DATE, "fund.payments.settlement.errors.rangeInvalid"),
+    to: z.string().regex(DATE, "fund.payments.settlement.errors.rangeInvalid"),
+  })
+  .refine((d) => d.from < d.to, {
+    message: "fund.payments.settlement.errors.rangeOrder",
+    path: ["to"],
+  });
+
+export type AddableOrdersRangeInput = z.infer<typeof AddableOrdersRangeSchema>;
+
+// Adding the selected existing orders to a pending payout. `orderIds` is the
+// (non-empty) set the operator kept checked in the preview.
+export const AddOrdersSchema = z.object({
+  payoutId: z.string().min(1, "fund.payments.settlement.errors.addOrdersFailed"),
+  orderIds: z
+    .array(z.number().int().positive())
+    .min(1, "fund.payments.settlement.errors.noOrdersSelected"),
+});
+
+export type AddOrdersInput = z.infer<typeof AddOrdersSchema>;
+
 // Setting a payout's manual deduction. `amount` is a EUR decimal string (up to
 // 2dp); "0" clears the deduction. `comment` is an optional short note. The
 // upper bound (≤ total − fees) is enforced in the action, which has the
