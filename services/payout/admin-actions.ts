@@ -36,6 +36,7 @@ import {
   PayoutRangeSchema,
   SetManualDeductionSchema,
   toRfc3339,
+  TX_HASH,
 } from "./schemas";
 
 // Resolve a batch of order settlement hashes via the bundler. Called
@@ -357,9 +358,35 @@ export async function fixOrderAction(input: {
   placeAccount: string | null; // mint destination
   total: string; // EUR decimal — burned from the payer
   net: string; // EUR decimal (total − fee) — minted to the place
+  // When set, the order is already settled on-chain: skip the burn/mint and
+  // just record this operator-supplied hash on the order. No place account or
+  // payer balance is needed in this mode.
+  txHash?: string | null;
 }): Promise<FixOrderResult> {
   const t = await getTranslations("fund.payments.settlement.errors");
   const { fund } = await requireFundRole("ADMIN");
+
+  // Manual reconciliation: record an existing settlement hash without moving
+  // any tokens. Re-validate the shape the client checked (don't trust it).
+  const manualHash = input.txHash?.trim();
+  if (manualHash) {
+    if (!TX_HASH.test(manualHash)) return { error: t("txHashInvalid") };
+    try {
+      const client = getCitizenPayClient(fund);
+      await client.recordOrderTxHash(input.payoutId, input.orderId, manualHash);
+    } catch (e) {
+      // Coerce the request-derived id to a number before logging so it can't
+      // carry injected newlines into the log (CodeQL js/log-injection).
+      console.error(
+        "[payout] recordOrderTxHash (manual) failed",
+        Number(input.orderId),
+        e,
+      );
+      return { error: toMessage(e, t("recordFailed")) };
+    }
+    revalidatePath(`/payments/payouts/${input.payoutId}`);
+    return { ok: true, txHash: manualHash };
+  }
 
   if (!input.placeAccount) return { error: t("noPlaceAccount") };
 
@@ -402,6 +429,35 @@ export async function fixOrderAction(input: {
 
   revalidatePath(`/payments/payouts/${input.payoutId}`);
   return { ok: true, txHash: mint.txHash };
+}
+
+// Sanity-check a hash the operator wants to record by hand, before they commit
+// to it. Resolves the receipt via the bundler: "success" means it's mined and
+// didn't revert (safe to record silently); anything else ("reverted",
+// "pending", or "unavailable" when the chain isn't configured / the lookup
+// failed) is surfaced as a warning the operator must explicitly override.
+export type OrderTxHashCheck = {
+  status: TxReceiptStatus | "unavailable";
+};
+
+export async function checkOrderTxHashAction(input: {
+  txHash: string;
+}): Promise<OrderTxHashCheck> {
+  const { fund } = await requireFundRole("ADMIN");
+  const hash = input.txHash.trim();
+  if (!TX_HASH.test(hash) || fund.tokenChainId == null) {
+    return { status: "unavailable" };
+  }
+  try {
+    const map = await resolveOrderReceipts({
+      chainId: fund.tokenChainId,
+      hashes: [hash],
+    });
+    return { status: map.get(hash)?.status ?? "pending" };
+  } catch (e) {
+    console.error("[payout] checkOrderTxHash failed", hash, e);
+    return { status: "unavailable" };
+  }
 }
 
 export type ArchiveOrderResult =

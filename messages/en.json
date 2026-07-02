@@ -1262,7 +1262,15 @@
             "payerNoHistory": "No transfers found for this account.",
             "bankMatch": "Backing bank transfer",
             "bankMatchUnknown": "Unknown sender",
-            "bankMatchNone": "No transfer found matching {ref} yet."
+            "bankMatchNone": "No transfer found matching {ref} yet.",
+            "manualToggle": "Record an existing transaction instead",
+            "manualLabel": "Settlement transaction hash",
+            "manualHint": "The order is marked settled with this hash — no tokens are moved. Enter a 0x-prefixed transaction hash.",
+            "manualConfirm": "Record",
+            "manualConfirmAnyway": "Record anyway",
+            "manualWarnReverted": "This transaction reverted on-chain — it did not settle anything. Record it anyway?",
+            "manualWarnPending": "No receipt found for this transaction — it may not be mined yet, or it's unknown to the node. Record it anyway?",
+            "manualWarnUnavailable": "Couldn't verify this transaction on-chain. Double-check the hash before recording it."
           },
           "archive": {
             "button": "Archive",
@@ -1295,6 +1303,7 @@
           "rangeOrder": "The end date must be after the start date.",
           "noPlaceAccount": "This place has no on-chain account to mint to.",
           "recordFailed": "Minted on-chain but couldn't record it on the payout.",
+          "txHashInvalid": "Enter a valid transaction hash (0x followed by 64 hex characters).",
           "archiveFailed": "Couldn't archive the order. Try again shortly.",
           "payerFailed": "Couldn't load the payer's account.",
           "createOrderFailed": "Couldn't add the order. Try again shortly.",
