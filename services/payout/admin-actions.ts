@@ -112,6 +112,13 @@ function toMessage(e: unknown, generic: string): string {
   return generic;
 }
 
+// Serialise a value for a log line with CR/LF stripped, so user-provided
+// fields (payout id, dates, order ids) can't inject extra log entries
+// (CodeQL js/log-injection).
+function logSafe(value: unknown): string {
+  return JSON.stringify(value).replace(/[\r\n]+/g, " ");
+}
+
 export type PreviewPayoutResult =
   | { error: string }
   | {
@@ -573,7 +580,7 @@ export async function previewAddableOrdersAction(input: {
       offset: page.offset,
     };
   } catch (e) {
-    console.error("[payout] previewAddableOrders failed", input, e);
+    console.error("[payout] previewAddableOrders failed", logSafe(input), e);
     return { error: toMessage(e, t("addOrdersFailed")) };
   }
 }
@@ -634,7 +641,7 @@ export async function addOrdersAction(input: {
     if (rejected.length > 0) {
       return { error: t("addOrdersRejected"), rejected };
     }
-    console.error("[payout] addOrders failed", input, e);
+    console.error("[payout] addOrders failed", logSafe(input), e);
     return { error: toMessage(e, t("addOrdersFailed")) };
   }
 }
