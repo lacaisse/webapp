@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { parseCsv } from "@/services/csv/parse";
 import type { MemberStatus } from "@/services/db/generated/enums";
+import { SUPPORTED_LOCALES } from "@/services/i18n/config";
 import { importMembersAction } from "@/services/member/import-actions";
 import {
   MEMBER_IMPORT_FIELDS,
@@ -42,6 +43,7 @@ const FIELD_PATTERNS: Record<MemberImportField, RegExp> = {
   householdAdults: /adult|adulte|volwassen/i,
   householdChildren: /child|enfant|kind|ni[ñn]o/i,
   tier: /tier|palier|classe|class|niveau|schijf|nivel/i,
+  locale: /lang|langue|taal|idioma|locale/i,
   status: /status|statut|[ée]tat|toestand|estado/i,
   notes: /note|remarq|opmerking|nota/i,
   // serial claims explicit serial-ish headers first (field order); any other
@@ -80,6 +82,12 @@ export function MemberImportDialog({
 }) {
   const t = useTranslations("members.admin.import");
   const tStatus = useTranslations("members.admin.status.values");
+  const tLocale = useTranslations("locale");
+  // Supported languages for the manual "fixed value" language picker.
+  const languages = SUPPORTED_LOCALES.map((loc) => ({
+    value: loc,
+    label: tLocale(loc),
+  }));
   const [open, setOpen] = useState(false);
   const [csv, setCsv] = useState("");
   const [headers, setHeaders] = useState<string[]>([]);
@@ -250,6 +258,7 @@ export function MemberImportDialog({
                         <FixedValueInput
                           field={f.key}
                           tiers={tiers}
+                          languages={languages}
                           statuses={MEMBER_STATUSES.map((s) => ({
                             value: s,
                             label: tStatus(s),
@@ -344,11 +353,13 @@ export function MemberImportDialog({
 }
 
 // Fixed-value control shown when a non-required field has no column mapped.
-// Tier is a dropdown of the fund's tier names; household counts are numeric;
-// everything else is free text. The value is sent in `defaults`.
+// Tier and language are dropdowns (fund tier names / supported languages);
+// household counts are numeric; everything else is free text. The value is
+// sent in `defaults`.
 function FixedValueInput({
   field,
   tiers,
+  languages,
   statuses,
   value,
   onChange,
@@ -357,6 +368,7 @@ function FixedValueInput({
 }: {
   field: MemberImportField;
   tiers: string[];
+  languages: { value: string; label: string }[];
   statuses: { value: string; label: string }[];
   value: string;
   onChange: (v: string) => void;
@@ -381,6 +393,23 @@ function FixedValueInput({
         {tiers.map((name) => (
           <option key={name} value={name}>
             {name}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
+  if (field === "locale") {
+    return (
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={cls}
+      >
+        <option value="">{tierNone}</option>
+        {languages.map((l) => (
+          <option key={l.value} value={l.value}>
+            {l.label}
           </option>
         ))}
       </select>

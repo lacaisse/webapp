@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import "server-only";
 
-import { getLocale, getTranslations } from "next-intl/server";
+import { getTranslations } from "next-intl/server";
 
 import { prisma } from "@/services/db/prisma";
 import { DEFAULT_LOCALE } from "@/services/i18n/config";
@@ -143,6 +143,8 @@ type Rendered = { subject: string; text: string; html?: string };
 export async function resolveAllocationTemplate(args: {
   fundId: string;
   account: string | null;
+  // Recipient's language for the built-in default (overrides are single-locale).
+  locale: string;
   vars: {
     firstName: string;
     lastName: string;
@@ -181,9 +183,10 @@ export async function resolveAllocationTemplate(args: {
   }
 
   // Built-in default references only firstName/fundName/amount.
-  const t = await getTranslations(
-    EDITABLE_EMAIL_TEMPLATES.ALLOCATION_CONFIRMATION.i18nKey,
-  );
+  const t = await getTranslations({
+    locale: args.locale,
+    namespace: EDITABLE_EMAIL_TEMPLATES.ALLOCATION_CONFIRMATION.i18nKey,
+  });
   return {
     subject: t("subject", { fundName: args.vars.fundName }),
     text: t("textBody", {
@@ -303,6 +306,8 @@ function htmlTemplateDefault(
 // the per-fund card number. The built-in default is authored as rich HTML.
 export async function resolveCardAssignedTemplate(args: {
   fundId: string;
+  // Recipient's language for the built-in default (overrides are single-locale).
+  locale: string;
   vars: {
     firstName: string;
     lastName: string;
@@ -327,7 +332,7 @@ export async function resolveCardAssignedTemplate(args: {
     };
   }
 
-  const def = htmlTemplateDefault("CARD_ASSIGNED", await getLocale());
+  const def = htmlTemplateDefault("CARD_ASSIGNED", args.locale);
   const html = interpolate(def.bodyHtml, args.vars);
   return {
     subject: interpolate(def.subject, args.vars),
@@ -343,6 +348,8 @@ export async function resolveCardAssignedTemplate(args: {
 // account URL. The built-in default is authored as rich HTML.
 export async function resolvePaymentReminderTemplate(args: {
   fundId: string;
+  // Recipient's language for the built-in default (overrides are single-locale).
+  locale: string;
   vars: {
     firstName: string;
     lastName: string;
@@ -369,7 +376,7 @@ export async function resolvePaymentReminderTemplate(args: {
     };
   }
 
-  const def = htmlTemplateDefault("PAYMENT_REMINDER_FIRST", await getLocale());
+  const def = htmlTemplateDefault("PAYMENT_REMINDER_FIRST", args.locale);
   const html = interpolate(def.bodyHtml, args.vars);
   return {
     subject: interpolate(def.subject, args.vars),

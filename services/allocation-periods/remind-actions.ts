@@ -41,7 +41,7 @@ const MEMBER_SELECT = {
   firstName: true,
   lastName: true,
   paymentReference: true,
-  tier: { select: { minContribution: true } },
+  tier: { select: { allocationAmount: true } },
   primaryCard: { select: { serialNumber: true } },
 } satisfies Prisma.MemberSelect;
 
@@ -213,7 +213,7 @@ async function remindOne(
     },
     firstName: member.firstName,
     lastName: member.lastName,
-    amount: member.tier ? member.tier.minContribution.toString() : "",
+    amount: member.tier ? member.tier.allocationAmount.toString() : "",
     paymentReference: member.paymentReference ?? "",
     cardLink,
   });

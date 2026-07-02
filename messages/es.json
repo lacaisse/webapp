@@ -1723,6 +1723,7 @@
           "householdAdults": "Adultos en el hogar",
           "householdChildren": "Niños en el hogar",
           "tier": "Nivel (por nombre)",
+          "locale": "Idioma",
           "notes": "Notas",
           "serial": "Serial de tarjeta"
         },

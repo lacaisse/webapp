@@ -157,6 +157,7 @@ export async function sendTestAllocationEmailAction(input: {
   const rendered = await resolveAllocationTemplate({
     fundId: fund.id,
     account: member.primaryCard?.account ?? null,
+    locale: fund.defaultLocale,
     vars: {
       firstName: member.firstName,
       lastName: member.lastName,
@@ -236,6 +237,7 @@ export async function sendTestCardAssignedEmailAction(input: {
 
   const rendered = await resolveCardAssignedTemplate({
     fundId: fund.id,
+    locale: fund.defaultLocale,
     vars: {
       firstName: member.firstName,
       lastName: member.lastName,
@@ -306,7 +308,7 @@ export async function sendTestPaymentReminderEmailAction(input: {
       firstName: true,
       lastName: true,
       paymentReference: true,
-      tier: { select: { minContribution: true } },
+      tier: { select: { allocationAmount: true } },
       primaryCard: { select: { serialNumber: true } },
     },
   });
@@ -328,11 +330,12 @@ export async function sendTestPaymentReminderEmailAction(input: {
 
   const rendered = await resolvePaymentReminderTemplate({
     fundId: fund.id,
+    locale: fund.defaultLocale,
     vars: {
       firstName: member.firstName,
       lastName: member.lastName,
       fundName: fund.name,
-      amount: member.tier.minContribution.toString(),
+      amount: member.tier.allocationAmount.toString(),
       paymentReference: member.paymentReference ?? "",
       cardLink: buildCardLink(
         member.primaryCard.serialNumber,

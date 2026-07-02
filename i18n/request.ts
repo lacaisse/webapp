@@ -8,12 +8,16 @@ import {
 } from "@/services/i18n/config";
 
 // Locale resolution order:
-//   1. `locale` cookie set by the user (manual pick — always wins)
-//   2. `Accept-Language` negotiation against SUPPORTED_LOCALES
-//   3. DEFAULT_LOCALE (English)
+//   1. An explicit locale passed to `getTranslations({ locale })` / `getFormatter`
+//      etc. (next-intl surfaces it as `requestLocale`). This is how server-side
+//      senders render a member-facing email in the *recipient's* language rather
+//      than the ambient request locale — see services/email/transactional.ts.
+//   2. `locale` cookie set by the user (manual pick — always wins over browser)
+//   3. `Accept-Language` negotiation against SUPPORTED_LOCALES
+//   4. DEFAULT_LOCALE (English)
 //
-// Step 1 must come first or we'd overwrite the user's explicit choice with
-// a browser default every request.
+// In a normal page render nothing overrides the locale, so `requestLocale` is
+// undefined and we fall through to the cookie — preserving prior behaviour.
 
 type Messages = Record<string, unknown>;
 
@@ -41,16 +45,24 @@ function mergeMessages(base: Messages, override: Messages): Messages {
   return out;
 }
 
-export default getRequestConfig(async () => {
-  const cookieStore = await cookies();
-  const cookieLocale = cookieStore.get("locale")?.value;
+export default getRequestConfig(async ({ requestLocale }) => {
+  // An explicit locale passed to `getTranslations({ locale })` wins (see the
+  // resolution order above). Otherwise fall back to the cookie, then the
+  // browser's Accept-Language.
+  const requested = await requestLocale;
 
   let locale: string;
-  if (cookieLocale && isSupportedLocale(cookieLocale)) {
-    locale = cookieLocale;
+  if (requested && isSupportedLocale(requested)) {
+    locale = requested;
   } else {
-    const h = await headers();
-    locale = negotiateLocale(h.get("accept-language"));
+    const cookieStore = await cookies();
+    const cookieLocale = cookieStore.get("locale")?.value;
+    if (cookieLocale && isSupportedLocale(cookieLocale)) {
+      locale = cookieLocale;
+    } else {
+      const h = await headers();
+      locale = negotiateLocale(h.get("accept-language"));
+    }
   }
 
   const fallback = (await import(`@/messages/${DEFAULT_LOCALE}.json`))
