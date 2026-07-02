@@ -25,6 +25,11 @@ export function toRfc3339(date: string): string {
   return `${date}T00:00:00Z`;
 }
 
+// A settlement transaction hash the operator records by hand instead of
+// minting on-chain: a 0x-prefixed 32-byte hex string. Shared so the Fix dialog
+// can gate its confirm button on the same shape the action re-validates.
+export const TX_HASH = /^0x[0-9a-fA-F]{64}$/;
+
 // Manually adding an order to a pending payout. Amounts arrive as decimal
 // strings from <input type="number"> (e.g. "28.32") — up to 2dp. The action
 // passes them straight to the client, which converts to cents. `description`
