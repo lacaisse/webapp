@@ -11,10 +11,12 @@ import { requireFundRole } from "@/services/auth/dal";
 import { CitizenPayApiError } from "@/services/citizenpay/api";
 import { getCitizenPayClient } from "@/services/citizenpay/client";
 import type {
+  AddableOrdersSummary,
   ArchivedPayout,
   PayoutDeduction,
   PayoutOrder,
   PayoutStatus,
+  RejectedOrder,
 } from "@/services/citizenpay/types";
 import { Prisma } from "@/services/db/generated/client";
 import { prisma } from "@/services/db/prisma";
@@ -28,6 +30,8 @@ import { resolveOrEnqueueAnnotation } from "@/services/transaction-annotation/pe
 
 import { resolveOrderReceipts, type TxReceiptStatus } from "./receipts";
 import {
+  AddableOrdersRangeSchema,
+  AddOrdersSchema,
   CreatePayoutOrderSchema,
   PayoutRangeSchema,
   SetManualDeductionSchema,
@@ -106,6 +110,13 @@ export type FeeTransferActionResult =
 function toMessage(e: unknown, generic: string): string {
   if (e instanceof CitizenPayApiError && e.message) return e.message;
   return generic;
+}
+
+// Serialise a value for a log line with CR/LF stripped, so user-provided
+// fields (payout id, dates, order ids) can't inject extra log entries
+// (CodeQL js/log-injection).
+function logSafe(value: unknown): string {
+  return JSON.stringify(value).replace(/[\r\n]+/g, " ");
 }
 
 export type PreviewPayoutResult =
@@ -511,6 +522,128 @@ export async function createPayoutOrderAction(input: {
 
   revalidatePath(`/payments/payouts/${parsed.data.payoutId}`);
   return { ok: true, order, payout, txHash: mint.txHash };
+}
+
+// =============================================================================
+// Add existing orders — pull already-existing orders into a pending payout
+// =============================================================================
+// Some orders miss a payout's original range (they arrived late, or fell just
+// outside the window). This is a preview → deselect → submit flow: preview the
+// eligible orders over a date range, then add the ones the operator keeps. Both
+// steps only work while the payout is pending (CP returns 409 otherwise).
+// Backed by the addable-orders / add-orders CP endpoints.
+
+// One page of addable orders per request. 50 is CP's per-page cap; the operator
+// pages with "load more" (offset) rather than us shipping the whole window.
+const ADDABLE_ORDERS_PAGE_SIZE = 50;
+
+export type PreviewAddableOrdersResult =
+  | { error: string }
+  | {
+      ok: true;
+      orders: PayoutOrder[];
+      summary: AddableOrdersSummary;
+      total: number;
+      limit: number;
+      offset: number;
+    };
+
+export async function previewAddableOrdersAction(input: {
+  payoutId: string;
+  from: string;
+  to: string;
+  offset?: number;
+}): Promise<PreviewAddableOrdersResult> {
+  const t = await getTranslations("fund.payments.settlement.errors");
+  const { fund } = await requireFundRole("ADMIN");
+
+  const parsed = AddableOrdersRangeSchema.safeParse(input);
+  if (!parsed.success) {
+    const key = parsed.error.issues[0]?.message ?? "addOrdersFailed";
+    return { error: t(key.split(".").pop() as never) };
+  }
+
+  try {
+    const client = getCitizenPayClient(fund);
+    const page = await client.getAddableOrders(parsed.data.payoutId, {
+      from: toRfc3339(parsed.data.from),
+      to: toRfc3339(parsed.data.to),
+      limit: ADDABLE_ORDERS_PAGE_SIZE,
+      offset: Math.max(0, input.offset ?? 0),
+    });
+    return {
+      ok: true,
+      orders: page.orders,
+      summary: page.summary,
+      total: page.total,
+      limit: page.limit,
+      offset: page.offset,
+    };
+  } catch (e) {
+    console.error("[payout] previewAddableOrders failed", logSafe(input), e);
+    return { error: toMessage(e, t("addOrdersFailed")) };
+  }
+}
+
+export type AddOrdersResult =
+  | { error: string }
+  // 422 — one or more selected orders went stale (cancelled / claimed by
+  // another payout). Nothing was added; `rejected` says which and why so the
+  // UI can drop those rows and re-preview.
+  | { error: string; rejected: RejectedOrder[] }
+  | { ok: true; assigned: number; payout: ArchivedPayout };
+
+// Pull the CP-supplied `rejected` list off a 422 body so the UI can show which
+// ids failed. Defensive — CP's shape is `{ error, rejected: [{ id, reason }] }`
+// but we tolerate a missing/misshapen list rather than throwing while erroring.
+function rejectedFromError(e: unknown): RejectedOrder[] {
+  if (!(e instanceof CitizenPayApiError) || e.status !== 422) return [];
+  const body = e.body;
+  if (!body || typeof body !== "object" || !("rejected" in body)) return [];
+  const raw = (body as { rejected: unknown }).rejected;
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((r) => {
+    if (!r || typeof r !== "object") return [];
+    const id = (r as { id?: unknown }).id;
+    const reason = (r as { reason?: unknown }).reason;
+    return typeof id === "number"
+      ? [{ id, reason: typeof reason === "string" ? reason : "" }]
+      : [];
+  });
+}
+
+export async function addOrdersAction(input: {
+  payoutId: string;
+  orderIds: number[];
+}): Promise<AddOrdersResult> {
+  const t = await getTranslations("fund.payments.settlement.errors");
+  const { fund } = await requireFundRole("ADMIN");
+
+  const parsed = AddOrdersSchema.safeParse(input);
+  if (!parsed.success) {
+    const key = parsed.error.issues[0]?.message ?? "addOrdersFailed";
+    return { error: t(key.split(".").pop() as never) };
+  }
+
+  try {
+    const client = getCitizenPayClient(fund);
+    const res = await client.addOrdersToPayout(
+      parsed.data.payoutId,
+      parsed.data.orderIds,
+    );
+    revalidatePath("/payments");
+    revalidatePath(`/payments/payouts/${parsed.data.payoutId}`);
+    return { ok: true, assigned: res.assigned, payout: res.payout };
+  } catch (e) {
+    // 422 is the stale-selection case (all-or-nothing): surface the per-order
+    // reasons so the caller can drop them and re-preview.
+    const rejected = rejectedFromError(e);
+    if (rejected.length > 0) {
+      return { error: t("addOrdersRejected"), rejected };
+    }
+    console.error("[payout] addOrders failed", logSafe(input), e);
+    return { error: toMessage(e, t("addOrdersFailed")) };
+  }
 }
 
 // Incoming bank transactions the operator can turn into a manual order. Read

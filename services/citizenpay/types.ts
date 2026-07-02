@@ -367,6 +367,40 @@ export type CreatedPayoutOrder = {
   payout: ArchivedPayout;
 };
 
+// Aggregate over the WHOLE addable-orders window (not just the current page),
+// so the UI can show a running total before the operator deselects any rows.
+export type AddableOrdersSummary = {
+  orderCount: number;
+  total: string; // Decimal string, EUR
+  fees: string; // Decimal string, EUR
+  net: string; // Decimal string, EUR
+};
+
+// Existing orders eligible to be added to a pending payout over a required
+// [from, to] window on the order's creation date. Paginated (limit/offset);
+// `total` is the count across the whole window, `summary` aggregates it.
+export type AddableOrdersPage = {
+  orders: PayoutOrder[];
+  summary: AddableOrdersSummary;
+  total: number;
+  limit: number;
+  offset: number;
+};
+
+// One order CP refused to add (add-orders is all-or-nothing; a 422 lists every
+// rejected id so the UI can drop those rows and re-preview).
+export type RejectedOrder = {
+  id: number;
+  reason: string;
+};
+
+// Result of adding selected orders to a pending payout: how many were assigned
+// plus the payout's recomputed totals (same shape as an archive recompute).
+export type AddOrdersResult = {
+  assigned: number;
+  payout: ArchivedPayout;
+};
+
 // Input for setting a payout's manual deduction. `amount` is a EUR Decimal
 // string (the adapter converts to cents); "0" clears the deduction. `comment`
 // is a short free-text note explaining the adjustment.

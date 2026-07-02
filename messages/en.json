@@ -1168,6 +1168,22 @@
           "successMinted": "Order added and net minted to the place.",
           "mintFailed": "Order added, but automatic minting failed. Reconcile it from the Issues tab."
         },
+        "addOrders": {
+          "trigger": "Add existing orders",
+          "title": "Add existing orders",
+          "description": "Pull in orders that already exist but weren't included in this payout — pick a date range, then choose which to add.",
+          "from": "From",
+          "to": "To",
+          "rangeHint": "Windows on the order's creation date. Only unassigned, payable orders can be added.",
+          "preview": "Preview",
+          "windowSummary": "{count, plural, =1 {# order available} other {# orders available}}",
+          "net": "Net",
+          "loadMore": "Show more",
+          "empty": "No orders can be added for this range.",
+          "confirm": "{count, plural, =0 {Add orders} =1 {Add # order} other {Add # orders}}",
+          "success": "{count, plural, =1 {# order added to the payout.} other {# orders added to the payout.}}",
+          "rejectedTitle": "Some orders couldn't be added and were skipped. The list has been refreshed — review and try again."
+        },
         "deduction": {
           "trigger": "Add deduction",
           "edit": "Edit deduction",
@@ -1282,6 +1298,9 @@
           "archiveFailed": "Couldn't archive the order. Try again shortly.",
           "payerFailed": "Couldn't load the payer's account.",
           "createOrderFailed": "Couldn't add the order. Try again shortly.",
+          "addOrdersFailed": "Couldn't add the orders. Try again shortly.",
+          "addOrdersRejected": "Some of the selected orders could no longer be added.",
+          "noOrdersSelected": "Select at least one order to add.",
           "amountInvalid": "Enter a valid amount.",
           "feeInvalid": "Enter a valid fee.",
           "amountPositive": "The amount must be greater than zero.",

@@ -21,6 +21,7 @@ import { requireFundRole } from "@/services/auth/dal";
 import { requireCurrentFund } from "@/services/fund/server";
 import { cn } from "@/lib/utils";
 
+import { AddOrdersDialog } from "./add-orders-dialog";
 import { CreateOrderDialog } from "./create-order-dialog";
 import { ManualDeductionDialog } from "./manual-deduction-dialog";
 import { OrdersExplorer } from "./orders-explorer";
@@ -197,8 +198,14 @@ export default async function PayoutDetailPage({
           <h2 className="font-heading text-lg font-medium">
             {t("orders.title")}
           </h2>
-          {/* Manual order creation is only meaningful before settlement runs. */}
-          {liveStatus === "pending" && <CreateOrderDialog payoutId={id} />}
+          {/* Adding orders (existing or manual) is only meaningful before
+              settlement runs. */}
+          {liveStatus === "pending" && (
+            <div className="flex items-center gap-2">
+              <AddOrdersDialog payoutId={id} />
+              <CreateOrderDialog payoutId={id} />
+            </div>
+          )}
         </div>
         <Suspense fallback={<OrdersSkeleton />}>
           <OrdersPanel

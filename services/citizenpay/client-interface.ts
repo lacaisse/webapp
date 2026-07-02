@@ -4,6 +4,8 @@
 // can implement it without an import cycle through the factory.
 
 import type {
+  AddableOrdersPage,
+  AddOrdersResult,
   ArchivedPayout,
   BankBalance,
   BankingStatus,
@@ -298,6 +300,33 @@ export interface CitizenPayClient {
     payoutId: string,
     input: CreatePayoutOrderInput,
   ): Promise<CreatedPayoutOrder>;
+
+  /**
+   * Preview existing unassigned orders that could be pulled into a pending
+   * payout — for orders that arrived late or fell outside the original range.
+   * `from`/`to` are RFC3339 timestamps windowing the order's creation date.
+   * Paginated (limit max 50); the `summary` aggregates the whole window so the
+   * UI can show a running total before the operator deselects rows. Backed by
+   * `GET /v2/treasury/payouts/{id}/addable-orders`. Throws (400) on a bad range,
+   * (409) when the payout isn't pending.
+   */
+  getAddableOrders(
+    payoutId: string,
+    query: { from: string; to: string; limit?: number; offset?: number },
+  ): Promise<AddableOrdersPage>;
+
+  /**
+   * Add the selected existing orders to a pending payout. All-or-nothing: if
+   * any id can't be added, CP applies nothing and throws a CitizenPayApiError
+   * (status 422) whose `body.rejected` lists each `{ id, reason }`. Returns how
+   * many were assigned + the payout's recomputed totals. Backed by
+   * `POST /v2/treasury/payouts/{id}/add-orders`. Throws (409) when the payout is
+   * no longer pending.
+   */
+  addOrdersToPayout(
+    payoutId: string,
+    orderIds: number[],
+  ): Promise<AddOrdersResult>;
 
   /**
    * Archive an order out of a pending payout (unlink + recompute totals).
