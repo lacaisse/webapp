@@ -1,0 +1,242 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+"use client";
+
+import { Loader2, Trash2, Wand2, X } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { useState, useTransition } from "react";
+
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  archiveOrdersAction,
+  autoMatchPayerTransfersAction,
+} from "@/services/payout/admin-actions";
+import type { AutoMatchStatus } from "@/services/payout/match";
+
+// Orders processed per server round-trip. Small batches keep the progress bar
+// moving and bound each request; the action also caches transfers per payer.
+const CHUNK = 8;
+
+// The order fields the bulk actions need. Kept minimal so the parent can pass a
+// slice of its PayoutOrder rows.
+export type BulkOrder = {
+  id: number;
+  account: string | null;
+  total: string;
+  completedAt: string | null;
+};
+
+// Non-zero status counts, rendered as a per-order summary after a run.
+type Summary = Partial<Record<AutoMatchStatus, number>> & {
+  archived?: number;
+  archiveFailed?: number;
+};
+
+export function BulkIssueActions({
+  payoutId,
+  orders,
+  onReconciled,
+  onClear,
+}: {
+  payoutId: string;
+  orders: BulkOrder[];
+  // Fired per order once it's fixed/archived, so the parent can optimistically
+  // mark the row "Reconciling…" until the server revalidation lands.
+  onReconciled: (orderId: number) => void;
+  onClear: () => void;
+}) {
+  const t = useTranslations("fund.payments.settlement.reconcile.bulk");
+  const tRoot = useTranslations();
+
+  const [matching, startMatch] = useTransition();
+  const [archiving, startArchive] = useTransition();
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(
+    null,
+  );
+  const [summary, setSummary] = useState<Summary | null>(null);
+  const [archiveOpen, setArchiveOpen] = useState(false);
+
+  const busy = matching || archiving;
+
+  const onAutoMatch = () => {
+    setSummary(null);
+    setProgress({ done: 0, total: orders.length });
+    startMatch(async () => {
+      const counts: Summary = {};
+      for (let i = 0; i < orders.length; i += CHUNK) {
+        const batch = orders.slice(i, i + CHUNK);
+        let results: { orderId: number; status: AutoMatchStatus }[] = [];
+        try {
+          const res = await autoMatchPayerTransfersAction({
+            payoutId,
+            orders: batch.map((o) => ({
+              orderId: o.id,
+              account: o.account,
+              total: o.total,
+              completedAt: o.completedAt,
+            })),
+          });
+          results = res.results;
+        } catch {
+          // A failed batch counts as errors rather than stalling the run.
+          results = batch.map((o) => ({ orderId: o.id, status: "error" as const }));
+        }
+        for (const r of results) {
+          counts[r.status] = (counts[r.status] ?? 0) + 1;
+          if (r.status === "fixed") onReconciled(r.orderId);
+        }
+        setProgress({ done: Math.min(i + batch.length, orders.length), total: orders.length });
+      }
+      setProgress(null);
+      setSummary(counts);
+    });
+  };
+
+  const onArchive = () => {
+    setSummary(null);
+    startArchive(async () => {
+      const res = await archiveOrdersAction({
+        payoutId,
+        orderIds: orders.map((o) => o.id),
+      });
+      let archived = 0;
+      let archiveFailed = 0;
+      for (const r of res.results) {
+        if (r.ok) {
+          archived += 1;
+          onReconciled(r.orderId);
+        } else {
+          archiveFailed += 1;
+        }
+      }
+      setArchiveOpen(false);
+      setSummary({ archived, archiveFailed });
+    });
+  };
+
+  const summaryEntries = summary
+    ? (Object.entries(summary) as [keyof Summary, number][]).filter(
+        ([, n]) => n > 0,
+      )
+    : [];
+
+  return (
+    <div className="space-y-2 rounded-lg border border-border bg-muted/40 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-sm font-medium">
+          {t("selectedCount", { n: orders.length })}
+        </span>
+        <div className="flex items-center gap-1.5">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onAutoMatch}
+            disabled={busy}
+          >
+            {matching ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Wand2 className="size-4" />
+            )}
+            {t("autoMatch")}
+          </Button>
+
+          <Dialog open={archiveOpen} onOpenChange={setArchiveOpen}>
+            <DialogTrigger
+              render={
+                <Button variant="ghost" size="sm" disabled={busy}>
+                  <Trash2 className="size-4" />
+                  {t("archive")}
+                </Button>
+              }
+            />
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{t("archiveTitle")}</DialogTitle>
+                <DialogDescription>
+                  {t("archiveDescription", { n: orders.length })}
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setArchiveOpen(false)}
+                  disabled={archiving}
+                >
+                  {tRoot("common.cancel")}
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={onArchive}
+                  disabled={archiving}
+                >
+                  {archiving && <Loader2 className="size-4 animate-spin" />}
+                  {t("archiveConfirm")}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onClear}
+            disabled={busy}
+            aria-label={t("clear")}
+          >
+            <X className="size-4" />
+            {t("clear")}
+          </Button>
+        </div>
+      </div>
+
+      {progress && (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>{t("running")}</span>
+            <span className="tabular-nums">
+              {progress.done} / {progress.total}
+            </span>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full rounded-full bg-primary transition-all duration-300"
+              style={{
+                width: `${
+                  progress.total > 0
+                    ? Math.round((progress.done / progress.total) * 100)
+                    : 0
+                }%`,
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {summary && summaryEntries.length > 0 && (
+        <Alert>
+          <AlertDescription>
+            <ul className="space-y-0.5 text-sm">
+              {summaryEntries.map(([key, n]) => (
+                <li key={key}>{t(`summary.${key}` as never, { n } as never)}</li>
+              ))}
+            </ul>
+          </AlertDescription>
+        </Alert>
+      )}
+    </div>
+  );
+}

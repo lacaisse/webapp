@@ -28,6 +28,12 @@ import {
 import { ANNOTATION_TRIGGERS } from "@/services/transaction-annotation/annotate";
 import { resolveOrEnqueueAnnotation } from "@/services/transaction-annotation/pending";
 
+import {
+  matchPayerTransfer,
+  type ArchiveOrdersItemResult,
+  type AutoMatchResult,
+  type MatchTransfer,
+} from "./match";
 import { resolveOrderReceipts, type TxReceiptStatus } from "./receipts";
 import {
   AddableOrdersRangeSchema,
@@ -480,6 +486,134 @@ export async function archiveOrderAction(input: {
     console.error("[payout] archiveOrder failed", input.orderId, e);
     return { error: toMessage(e, t("archiveFailed")) };
   }
+}
+
+// =============================================================================
+// Bulk reconciliation — clear many Issues-tab orders at once
+// =============================================================================
+// The Issues tab can hold a large number of unconfirmed orders. Rather than
+// open the per-order Fix/Archive dialog for each, the operator selects a batch
+// and applies one action. Both actions are best-effort: every order is
+// attempted and reported per-order; one failure never aborts the rest. Only
+// meaningful while the payout is pending (same gate as the per-order actions).
+
+// Archive a batch of orders. Mirrors archiveOrderAction per order, revalidating
+// once at the end instead of per call.
+export type ArchiveOrdersResult = { results: ArchiveOrdersItemResult[] };
+
+export async function archiveOrdersAction(input: {
+  payoutId: string;
+  orderIds: number[];
+}): Promise<ArchiveOrdersResult> {
+  const t = await getTranslations("fund.payments.settlement.errors");
+  const { fund } = await requireFundRole("ADMIN");
+  const client = getCitizenPayClient(fund);
+
+  const results: ArchiveOrdersItemResult[] = [];
+  for (const orderId of input.orderIds) {
+    try {
+      await client.archiveOrder(input.payoutId, orderId);
+      results.push({ orderId, ok: true });
+    } catch (e) {
+      console.error("[payout] archiveOrders: archive failed", Number(orderId), e);
+      results.push({ orderId, ok: false, error: toMessage(e, t("archiveFailed")) });
+    }
+  }
+
+  revalidatePath(`/payments/payouts/${input.payoutId}`);
+  return { results };
+}
+
+// Auto-match a batch of orders against their payers' on-chain transfers and
+// record the settling hash where exactly one matches (amount = order total,
+// same UTC calendar day). No tokens are minted or burned — this only records an
+// already-existing on-chain hash, the bulk form of the per-order manual pick.
+// Bank-paid orders (no payer account) come back "noaccount" and stay in Issues.
+export type AutoMatchOrdersResult = { results: AutoMatchResult[] };
+
+export async function autoMatchPayerTransfersAction(input: {
+  payoutId: string;
+  orders: {
+    orderId: number;
+    account: string | null;
+    total: string;
+    completedAt: string | null;
+  }[];
+}): Promise<AutoMatchOrdersResult> {
+  const { fund } = await requireFundRole("ADMIN");
+
+  // No token config → we can't read on-chain transfers at all.
+  if (!fund.tokenAddress || fund.tokenChainId == null) {
+    return {
+      results: input.orders.map((o) => ({
+        orderId: o.orderId,
+        status: "unavailable" as const,
+      })),
+    };
+  }
+  const tokenAddress = fund.tokenAddress;
+  const chainId = fund.tokenChainId;
+  const client = getCitizenPayClient(fund);
+
+  // Load each distinct payer's transfers at most once — a payer with several
+  // orders in the same payout shouldn't trigger a fetch per order.
+  const transfersByAccount = new Map<string, MatchTransfer[]>();
+  async function loadTransfers(account: string): Promise<MatchTransfer[]> {
+    const cached = transfersByAccount.get(account);
+    if (cached) return cached;
+    const { transfers } = await listTransfersForAccount({
+      chainId,
+      contractAddress: tokenAddress,
+      account,
+      pageSize: 100,
+    });
+    const normalised: MatchTransfer[] = transfers.map((tx) => ({
+      hash: tx.hash,
+      amount: formatTokenAmount(tx.rawValue, fund.tokenDecimals),
+      date: tx.blockTimestamp,
+      direction: tx.from.toLowerCase() === account ? "out" : "in",
+    }));
+    transfersByAccount.set(account, normalised);
+    return normalised;
+  }
+
+  const results: AutoMatchResult[] = [];
+  for (const order of input.orders) {
+    if (!order.account) {
+      results.push({ orderId: order.orderId, status: "noaccount" });
+      continue;
+    }
+    const account = order.account.toLowerCase();
+    try {
+      const transfers = await loadTransfers(account);
+      const match = matchPayerTransfer(
+        { total: order.total, completedAt: order.completedAt },
+        transfers,
+      );
+      if (match.status !== "fixed") {
+        results.push({ orderId: order.orderId, status: match.status });
+        continue;
+      }
+      // Exactly one settling transfer — record its hash, same path as the
+      // per-order manual fix. Nothing moves on-chain.
+      await client.recordOrderTxHash(input.payoutId, order.orderId, match.txHash!);
+      results.push({
+        orderId: order.orderId,
+        status: "fixed",
+        txHash: match.txHash,
+      });
+    } catch (e) {
+      console.error(
+        "[payout] autoMatchPayerTransfers failed",
+        Number(order.orderId),
+        e,
+      );
+      results.push({ orderId: order.orderId, status: "error" });
+    }
+  }
+
+  revalidatePath(`/payments/payouts/${input.payoutId}`);
+  return { results };
 }
 
 // =============================================================================

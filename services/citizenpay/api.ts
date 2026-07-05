@@ -888,7 +888,7 @@ export const payouts = {
     return request(
       creds,
       "POST",
-      `/v2/treasury/payouts/${encodeURIComponent(payoutId)}/orders/${orderId}/tx-hash`,
+      `/v2/treasury/payouts/${encodeURIComponent(payoutId)}/orders/${encodeURIComponent(String(orderId))}/tx-hash`,
       { body: { txHash }, timeoutMs: 30_000 },
     );
   },
@@ -978,7 +978,7 @@ export const payouts = {
     return request(
       creds,
       "POST",
-      `/v2/treasury/payouts/${encodeURIComponent(payoutId)}/orders/${orderId}/archive`,
+      `/v2/treasury/payouts/${encodeURIComponent(payoutId)}/orders/${encodeURIComponent(String(orderId))}/archive`,
       { timeoutMs: 30_000 },
     );
   },
