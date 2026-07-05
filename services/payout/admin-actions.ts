@@ -6,7 +6,11 @@ import { refresh, revalidatePath } from "next/cache";
 
 import { getBalances } from "@/services/alchemy/balances";
 import { formatTokenAmount } from "@/services/alchemy/format";
-import { listTransfersForAccount } from "@/services/alchemy/transfers";
+import {
+  estimateBlockRange,
+  listIncomingTransfersInRange,
+  listTransfersForAccount,
+} from "@/services/alchemy/transfers";
 import { requireFundRole } from "@/services/auth/dal";
 import { CitizenPayApiError } from "@/services/citizenpay/api";
 import { getCitizenPayClient } from "@/services/citizenpay/client";
@@ -727,63 +731,66 @@ export async function planPlaceMintMatchesAction(input: {
   }
   const place = placeAccount.toLowerCase();
 
-  // Walk the place's transfers only as far back as the earliest order (minus a
-  // day, since we match on the calendar day); transfers arrive newest-first, so
-  // we stop once a page predates it. Anchor on createdAt, falling back to
-  // completedAt (the CP orders endpoint doesn't always return created_at).
+  // Load the place's incoming transfers for the payout's date window only. The
+  // place can be very active, so walking newest-first from head never reaches an
+  // old payout; instead we bound the query to the block range covering the
+  // orders' days. Anchor on createdAt, falling back to completedAt (the CP orders
+  // endpoint doesn't always return created_at).
   const orderTimes = input.orders
     .map((o) => {
       const anchor = o.createdAt ?? o.completedAt;
       return anchor ? Date.parse(anchor) : NaN;
     })
     .filter((t) => !Number.isNaN(t));
-  const stopBefore =
-    (orderTimes.length ? Math.min(...orderTimes) : Date.now()) -
-    PLACE_MINT_LOOKBACK_MS;
+  const minTime = orderTimes.length ? Math.min(...orderTimes) : Date.now();
+  const maxTime = orderTimes.length ? Math.max(...orderTimes) : Date.now();
 
   const incoming: MatchTransfer[] = [];
-  let cursor: string | null = null;
-  let pages = 0;
   let truncated = false;
   try {
+    // Cover the full days of the earliest/latest order, with a lookback margin.
+    const range = await estimateBlockRange({
+      chainId,
+      fromMs: minTime - PLACE_MINT_LOOKBACK_MS,
+      toMs: maxTime + PLACE_MINT_LOOKBACK_MS,
+    });
+    if (!range) throw new Error("could not estimate block range");
+
+    let cursor: string | null = null;
+    let pages = 0;
     do {
-      const { transfers, nextPageKey } = await listTransfersForAccount({
+      const { transfers, nextPageKey } = await listIncomingTransfersInRange({
         chainId,
         contractAddress: tokenAddress,
-        account: place,
+        toAccount: place,
+        fromBlock: range.fromBlock,
+        toBlock: range.toBlock,
         pageSize: PLACE_MINT_PAGE_SIZE,
         cursor,
       });
-      let oldestInPage = Infinity;
       for (const tx of transfers) {
-        const ts = tx.blockTimestamp ? Date.parse(tx.blockTimestamp) : NaN;
-        if (!Number.isNaN(ts)) oldestInPage = Math.min(oldestInPage, ts);
-        // Incoming only (mints have from = 0x0, to = place). Prefer Alchemy's
-        // decimal `value` (computed with the token's real on-chain decimals) so
-        // a mis-cached fund.tokenDecimals can't scale the amount wrong; fall
-        // back to formatting the raw value only when Alchemy didn't resolve it.
-        if (tx.to.toLowerCase() === place) {
-          incoming.push({
-            hash: tx.hash,
-            amount:
-              tx.value != null
-                ? String(tx.value)
-                : formatTokenAmount(tx.rawValue, fund.tokenDecimals),
-            date: tx.blockTimestamp,
-            direction: "in",
-          });
-        }
+        // Prefer Alchemy's decimal `value` (computed with the token's real
+        // on-chain decimals) so a mis-cached fund.tokenDecimals can't scale the
+        // amount wrong; fall back to formatting the raw value only if absent.
+        incoming.push({
+          hash: tx.hash,
+          amount:
+            tx.value != null
+              ? String(tx.value)
+              : formatTokenAmount(tx.rawValue, fund.tokenDecimals),
+          date: tx.blockTimestamp,
+          direction: "in",
+        });
       }
       cursor = nextPageKey;
       pages += 1;
-      if (oldestInPage <= stopBefore) break; // covered the orders' date range
       if (pages >= PLACE_MINT_MAX_PAGES) {
         truncated = cursor != null;
         break;
       }
     } while (cursor != null);
   } catch (e) {
-    console.error("[payout] planPlaceMintMatches: transfer walk failed", e);
+    console.error("[payout] planPlaceMintMatches: transfer load failed", e);
     // Match on whatever we gathered rather than failing the whole batch.
     truncated = true;
   }
