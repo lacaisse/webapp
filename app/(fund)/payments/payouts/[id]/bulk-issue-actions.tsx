@@ -128,6 +128,7 @@ export function BulkIssueActions({
               orderId: o.id,
               net: o.net,
               createdAt: o.createdAt,
+              completedAt: o.completedAt,
             })),
           });
         } catch {

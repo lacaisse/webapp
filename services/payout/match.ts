@@ -91,16 +91,17 @@ export function matchPayerTransfer(
 // those mints were submitted through a different bundler, our bundler can't
 // resolve the recorded UserOp hash, so the order shows as unconfirmed. But the
 // mint exists on-chain: we match each order to an incoming transfer on the place
-// account by exact net amount + nearest timestamp, consuming each transfer once
-// (many orders share an amount, and one mint can only back one order), then
+// account by exact net amount on the same calendar day, consuming each transfer
+// once (many orders share an amount, and one mint can only back one order), then
 // record the real tx hash — which also self-heals verification.
 
 export type PlaceMintOrder = {
   orderId: number;
   net: string; // token-unit decimal (total − fees) minted to the place
-  // Submission time (ISO 8601) — the mint lands within seconds of it, and it's
-  // always present (unlike completedAt).
+  // Anchor for the day match. Prefer createdAt (submission time); fall back to
+  // completedAt since the CP orders endpoint doesn't always return created_at.
   createdAt: string | null;
+  completedAt: string | null;
 };
 
 export type PlaceMintResult = {
@@ -108,29 +109,38 @@ export type PlaceMintResult = {
   unmatched: number[];
 };
 
-// Greedy nearest-timestamp assignment. For each order, pick the closest unused
-// incoming transfer whose amount equals the order net (± epsilon) and whose time
-// is within `windowMs` of the order's submission (createdAt). Deterministic:
-// orders are processed in input order and transfers matched by pool index (so two
-// orders never share a transfer, even when several mints share a hash in one tx).
+// Greedy same-day assignment. For each order, among unused incoming transfers
+// whose amount equals the order net (± epsilon) AND that landed on the same UTC
+// calendar day as the order, pick the one nearest in time (a tiebreak when the
+// place received several same-amount mints that day). Each transfer is consumed
+// once, so two orders never share a mint. Deterministic: orders processed in
+// input order, transfers matched by pool index (safe even if several mints share
+// a hash within one tx). We match on the day rather than an exact minute window
+// because the recorded settlement time and the on-chain block time can drift.
 export function assignPlaceMints(
   orders: PlaceMintOrder[],
   transfers: MatchTransfer[],
-  windowMs: number,
 ): PlaceMintResult {
   const pool = transfers
     .filter((t) => t.direction === "in" && t.date != null)
-    .map((t) => ({ hash: t.hash, amount: Number(t.amount), time: Date.parse(t.date as string) }))
-    .filter((t) => !Number.isNaN(t.time));
+    .map((t) => ({
+      hash: t.hash,
+      amount: Number(t.amount),
+      time: Date.parse(t.date as string),
+      day: utcDay(t.date),
+    }))
+    .filter((t) => !Number.isNaN(t.time) && t.day != null);
 
   const used = new Set<number>();
   const matched: { orderId: number; txHash: string }[] = [];
   const unmatched: number[] = [];
 
   for (const order of orders) {
-    const orderTime = order.createdAt ? Date.parse(order.createdAt) : NaN;
+    const anchor = order.createdAt ?? order.completedAt;
+    const anchorDay = utcDay(anchor);
+    const anchorTime = anchor ? Date.parse(anchor) : NaN;
     const net = Number(order.net);
-    if (Number.isNaN(orderTime) || Number.isNaN(net)) {
+    if (anchorDay == null || Number.isNaN(net)) {
       unmatched.push(order.orderId);
       continue;
     }
@@ -139,9 +149,9 @@ export function assignPlaceMints(
     for (let i = 0; i < pool.length; i++) {
       if (used.has(i)) continue;
       const c = pool[i];
+      if (c.day !== anchorDay) continue;
       if (Math.abs(c.amount - net) >= AMOUNT_EPSILON) continue;
-      const delta = Math.abs(c.time - orderTime);
-      if (delta > windowMs) continue;
+      const delta = Number.isNaN(anchorTime) ? 0 : Math.abs(c.time - anchorTime);
       if (delta < bestDelta) {
         bestDelta = delta;
         bestIdx = i;

@@ -634,9 +634,9 @@ export async function autoMatchPayerTransfersAction(input: {
 //   2. recordOrderHashesAction    — client records the pairs in small batches.
 
 // How close (ms) a mint's block time must be to the order's completion to count
-// as its settlement. Tight enough to avoid grabbing unrelated same-amount income,
-// loose enough for block-time / clock skew.
-const PLACE_MINT_WINDOW_MS = 30 * 60 * 1000;
+// as its settlement. Orders and mints are matched on the same calendar day; we
+// walk the place's transfers back a day past the earliest order to be safe.
+const PLACE_MINT_LOOKBACK_MS = 24 * 60 * 60 * 1000;
 // Bound the transfer walk so a very active place can't run the plan unbounded.
 const PLACE_MINT_MAX_PAGES = 50;
 const PLACE_MINT_PAGE_SIZE = 100;
@@ -654,7 +654,12 @@ export type PlanPlaceMintsResult =
 
 export async function planPlaceMintMatchesAction(input: {
   payoutId: string;
-  orders: { orderId: number; net: string; createdAt: string | null }[];
+  orders: {
+    orderId: number;
+    net: string;
+    createdAt: string | null;
+    completedAt: string | null;
+  }[];
 }): Promise<PlanPlaceMintsResult> {
   const { fund } = await requireFundRole("ADMIN");
 
@@ -677,14 +682,19 @@ export async function planPlaceMintMatchesAction(input: {
   if (!placeAccount) return { status: "unavailable" };
   const place = placeAccount.toLowerCase();
 
-  // Walk the place's transfers only as far back as the earliest order (minus the
-  // window); transfers arrive newest-first, so we stop once a page predates it.
+  // Walk the place's transfers only as far back as the earliest order (minus a
+  // day, since we match on the calendar day); transfers arrive newest-first, so
+  // we stop once a page predates it. Anchor on createdAt, falling back to
+  // completedAt (the CP orders endpoint doesn't always return created_at).
   const orderTimes = input.orders
-    .map((o) => (o.createdAt ? Date.parse(o.createdAt) : NaN))
+    .map((o) => {
+      const anchor = o.createdAt ?? o.completedAt;
+      return anchor ? Date.parse(anchor) : NaN;
+    })
     .filter((t) => !Number.isNaN(t));
   const stopBefore =
     (orderTimes.length ? Math.min(...orderTimes) : Date.now()) -
-    PLACE_MINT_WINDOW_MS;
+    PLACE_MINT_LOOKBACK_MS;
 
   const incoming: MatchTransfer[] = [];
   let cursor: string | null = null;
@@ -727,11 +737,7 @@ export async function planPlaceMintMatchesAction(input: {
     truncated = true;
   }
 
-  const { matched, unmatched } = assignPlaceMints(
-    input.orders,
-    incoming,
-    PLACE_MINT_WINDOW_MS,
-  );
+  const { matched, unmatched } = assignPlaceMints(input.orders, incoming);
   return { status: "ok", matched, unmatched, truncated };
 }
 
