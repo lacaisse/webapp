@@ -134,6 +134,11 @@ export function BulkIssueActions({
         } catch {
           plan = null;
         }
+        // Temporary: surface the plan diagnostic to the browser console so a
+        // "nothing matched" run can be inspected directly. Remove once confirmed.
+        if (plan && "debug" in plan) {
+          console.log("[auto-match debug]", plan.debug);
+        }
         if (!plan || plan.status !== "ok") {
           add("unavailable", terminalOrders.length);
           bump(terminalOrders.length);
