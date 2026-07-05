@@ -212,6 +212,7 @@ export function OrdersExplorer({
             completedAt: o.completedAt,
             createdAt: o.createdAt,
           }))}
+          placeAccount={placeAccount}
           onReconciled={onBulkReconciled}
           onClear={() => setSelected(new Set())}
         />

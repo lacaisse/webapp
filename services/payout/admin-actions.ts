@@ -674,6 +674,9 @@ export type PlanPlaceMintsResult =
 
 export async function planPlaceMintMatchesAction(input: {
   payoutId: string;
+  // The place account resolved on page render; used as a reliable fallback when
+  // the per-call CP re-fetch below returns nothing (it's occasionally empty).
+  placeAccount?: string | null;
   orders: {
     orderId: number;
     net: string;
@@ -712,6 +715,11 @@ export async function planPlaceMintMatchesAction(input: {
     placeAccount = page.placeAccountAddress ?? null;
   } catch (e) {
     console.error("[payout] planPlaceMintMatches: resolve place failed", e);
+  }
+  // Fall back to the account the page already resolved (the per-call read above
+  // is occasionally empty). Both originate server-side from the same CP source.
+  if (!placeAccount && input.placeAccount) {
+    placeAccount = input.placeAccount;
   }
   if (!placeAccount) {
     return {
