@@ -641,8 +641,23 @@ const PLACE_MINT_LOOKBACK_MS = 24 * 60 * 60 * 1000;
 const PLACE_MINT_MAX_PAGES = 50;
 const PLACE_MINT_PAGE_SIZE = 100;
 
+// Temporary diagnostic surfaced to the client so a "nothing matched" run can be
+// inspected from the browser console without digging Vercel logs. Remove once
+// terminal auto-match is confirmed working.
+export type PlanPlaceMintsDebug = {
+  placeAccount: string | null;
+  hasTokenConfig: boolean;
+  tokenDecimals: number | null;
+  orders: number;
+  incoming: number;
+  matched: number;
+  truncated: boolean;
+  sampleNets: string[];
+  sampleAmounts: { amount: string; date: string | null }[];
+};
+
 export type PlanPlaceMintsResult =
-  | { status: "unavailable" }
+  | { status: "unavailable"; debug: PlanPlaceMintsDebug }
   | {
       status: "ok";
       matched: { orderId: number; txHash: string }[];
@@ -650,6 +665,7 @@ export type PlanPlaceMintsResult =
       // The transfer walk hit its page cap before covering the whole range, so
       // some orders may be unmatched only because their mint wasn't loaded.
       truncated: boolean;
+      debug: PlanPlaceMintsDebug;
     };
 
 export async function planPlaceMintMatchesAction(input: {
@@ -662,9 +678,23 @@ export async function planPlaceMintMatchesAction(input: {
   }[];
 }): Promise<PlanPlaceMintsResult> {
   const { fund } = await requireFundRole("ADMIN");
+  const sampleNets = input.orders.slice(0, 5).map((o) => o.net);
 
   if (!fund.tokenAddress || fund.tokenChainId == null) {
-    return { status: "unavailable" };
+    return {
+      status: "unavailable",
+      debug: {
+        placeAccount: null,
+        hasTokenConfig: false,
+        tokenDecimals: fund.tokenDecimals,
+        orders: input.orders.length,
+        incoming: 0,
+        matched: 0,
+        truncated: false,
+        sampleNets,
+        sampleAmounts: [],
+      },
+    };
   }
   const tokenAddress = fund.tokenAddress;
   const chainId = fund.tokenChainId;
@@ -679,7 +709,22 @@ export async function planPlaceMintMatchesAction(input: {
   } catch (e) {
     console.error("[payout] planPlaceMintMatches: resolve place failed", e);
   }
-  if (!placeAccount) return { status: "unavailable" };
+  if (!placeAccount) {
+    return {
+      status: "unavailable",
+      debug: {
+        placeAccount: null,
+        hasTokenConfig: true,
+        tokenDecimals: fund.tokenDecimals,
+        orders: input.orders.length,
+        incoming: 0,
+        matched: 0,
+        truncated: false,
+        sampleNets,
+        sampleAmounts: [],
+      },
+    };
+  }
   const place = placeAccount.toLowerCase();
 
   // Walk the place's transfers only as far back as the earliest order (minus a
@@ -744,23 +789,19 @@ export async function planPlaceMintMatchesAction(input: {
   }
 
   const { matched, unmatched } = assignPlaceMints(input.orders, incoming);
-  // Diagnostic: surface the resolved place account, cached token decimals, and a
-  // few order-net vs on-chain-amount samples so a "nothing matched" run can be
-  // told apart (wrong place account / mis-cached decimals / unit mismatch).
-  console.log(
-    "[payout] planPlaceMint diag",
-    logSafe({
-      place,
-      tokenDecimals: fund.tokenDecimals,
-      orders: input.orders.length,
-      incoming: incoming.length,
-      matched: matched.length,
-      truncated,
-      sampleNets: input.orders.slice(0, 5).map((o) => o.net),
-      sampleAmounts: incoming.slice(0, 5).map((t) => ({ amount: t.amount, date: t.date })),
-    }),
-  );
-  return { status: "ok", matched, unmatched, truncated };
+  const debug: PlanPlaceMintsDebug = {
+    placeAccount: place,
+    hasTokenConfig: true,
+    tokenDecimals: fund.tokenDecimals,
+    orders: input.orders.length,
+    incoming: incoming.length,
+    matched: matched.length,
+    truncated,
+    sampleNets,
+    sampleAmounts: incoming.slice(0, 5).map((t) => ({ amount: t.amount, date: t.date })),
+  };
+  console.log("[payout] planPlaceMint diag", logSafe(debug));
+  return { status: "ok", matched, unmatched, truncated, debug };
 }
 
 // Bulk-record already-resolved (orderId, txHash) pairs. Best-effort, per-order
