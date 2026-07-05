@@ -1270,7 +1270,8 @@
             "manualConfirmAnyway": "Record anyway",
             "manualWarnReverted": "This transaction reverted on-chain — it did not settle anything. Record it anyway?",
             "manualWarnPending": "No receipt found for this transaction — it may not be mined yet, or it's unknown to the node. Record it anyway?",
-            "manualWarnUnavailable": "Couldn't verify this transaction on-chain. Double-check the hash before recording it."
+            "manualWarnUnavailable": "Couldn't verify this transaction on-chain. Double-check the hash before recording it.",
+            "payerPickHint": "Use this transaction's hash"
           },
           "archive": {
             "button": "Archive",

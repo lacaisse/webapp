@@ -933,7 +933,8 @@
             "payerNoHistory": "Geen transacties gevonden voor dit account.",
             "bankMatch": "Dekkende overboeking",
             "bankMatchUnknown": "Onbekende afzender",
-            "bankMatchNone": "Nog geen overboeking gevonden die overeenkomt met {ref}."
+            "bankMatchNone": "Nog geen overboeking gevonden die overeenkomt met {ref}.",
+            "payerPickHint": "Gebruik de hash van deze transactie"
           },
           "archive": {
             "button": "Archiveren",

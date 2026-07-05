@@ -281,28 +281,62 @@ function FixDialog({
             </div>
             {payer && payer.transfers.length > 0 && (
               <ul className="space-y-0.5 border-t border-border pt-2">
-                {payer.transfers.map((tx) => (
-                  <li
-                    key={tx.hash}
-                    className="flex items-center justify-between gap-2 text-xs"
-                  >
-                    <span className="text-muted-foreground">
-                      {tx.date
-                        ? format.dateTime(new Date(tx.date), {
-                            dateStyle: "medium",
-                          })
-                        : "—"}
-                    </span>
-                    <span className="inline-flex items-center gap-1 tabular-nums">
-                      {tx.direction === "in" ? (
-                        <ArrowDownLeft className="size-3 text-success" />
-                      ) : (
-                        <ArrowUpRight className="size-3 text-muted-foreground" />
-                      )}
-                      {fmt(tx.amount)}
-                    </span>
-                  </li>
-                ))}
+                {payer.transfers.map((tx) => {
+                  // Only outgoing transfers can settle a burn, so only those
+                  // are pickable: clicking one flips to manual mode, prefills
+                  // the hash, and clears any prior check. Incoming transfers
+                  // stay as plain, non-interactive rows.
+                  const row = (
+                    <>
+                      <span className="text-muted-foreground">
+                        {tx.date
+                          ? format.dateTime(new Date(tx.date), {
+                              dateStyle: "medium",
+                            })
+                          : "—"}
+                      </span>
+                      <span className="inline-flex items-center gap-1 tabular-nums">
+                        {tx.direction === "in" ? (
+                          <ArrowDownLeft className="size-3 text-success" />
+                        ) : (
+                          <ArrowUpRight className="size-3 text-muted-foreground" />
+                        )}
+                        {fmt(tx.amount)}
+                      </span>
+                    </>
+                  );
+                  if (tx.direction === "in") {
+                    return (
+                      <li
+                        key={tx.hash}
+                        className="flex items-center justify-between gap-2 px-1 py-0.5 text-xs"
+                      >
+                        {row}
+                      </li>
+                    );
+                  }
+                  const picked = manual && manualHash.trim() === tx.hash;
+                  return (
+                    <li key={tx.hash}>
+                      <button
+                        type="button"
+                        title={t("payerPickHint")}
+                        aria-pressed={picked}
+                        onClick={() => {
+                          setManual(true);
+                          setManualHash(tx.hash);
+                          setWarn(null);
+                        }}
+                        className={cn(
+                          "flex w-full items-center justify-between gap-2 rounded px-1 py-0.5 text-left text-xs transition-colors hover:bg-accent",
+                          picked && "bg-accent",
+                        )}
+                      >
+                        {row}
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             )}
             {payer && payer.transfers.length === 0 && !payerPending && (
