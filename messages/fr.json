@@ -1270,7 +1270,8 @@
             "manualConfirmAnyway": "Enregistrer quand même",
             "manualWarnReverted": "Cette transaction a échoué on-chain — elle n’a rien réglé. L’enregistrer quand même ?",
             "manualWarnPending": "Aucun reçu trouvé pour cette transaction — elle n’est peut-être pas encore minée, ou inconnue du nœud. L’enregistrer quand même ?",
-            "manualWarnUnavailable": "Impossible de vérifier cette transaction on-chain. Vérifiez le hash avant de l’enregistrer."
+            "manualWarnUnavailable": "Impossible de vérifier cette transaction on-chain. Vérifiez le hash avant de l’enregistrer.",
+            "payerPickHint": "Utiliser le hash de cette transaction"
           },
           "archive": {
             "button": "Archiver",

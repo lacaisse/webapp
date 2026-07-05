@@ -1076,7 +1076,8 @@
             "payerNoHistory": "No se encontraron transferencias para esta cuenta.",
             "bankMatch": "Transferencia bancaria de respaldo",
             "bankMatchUnknown": "Remitente desconocido",
-            "bankMatchNone": "Aún no se encontró ninguna transferencia que coincida con {ref}."
+            "bankMatchNone": "Aún no se encontró ninguna transferencia que coincida con {ref}.",
+            "payerPickHint": "Usar el hash de esta transacción"
           },
           "archive": {
             "button": "Archivar",
