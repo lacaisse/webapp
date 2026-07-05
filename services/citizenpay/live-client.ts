@@ -208,6 +208,7 @@ function payoutOrderFromWire(w: PayoutOrderWire): PayoutOrder {
     txHash: w.txHash ?? w.tx_hash ?? null,
     account: w.account || null,
     completedAt: w.completed_at ?? w.date ?? null,
+    createdAt: w.created_at ?? null,
   };
 }
 

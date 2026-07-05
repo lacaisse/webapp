@@ -29,6 +29,7 @@ import { ANNOTATION_TRIGGERS } from "@/services/transaction-annotation/annotate"
 import { resolveOrEnqueueAnnotation } from "@/services/transaction-annotation/pending";
 
 import {
+  assignPlaceMints,
   matchPayerTransfer,
   type ArchiveOrdersItemResult,
   type AutoMatchResult,
@@ -609,6 +610,162 @@ export async function autoMatchPayerTransfersAction(input: {
         e,
       );
       results.push({ orderId: order.orderId, status: "error" });
+    }
+  }
+
+  revalidatePath(`/payments/payouts/${input.payoutId}`);
+  return { results };
+}
+
+// -----------------------------------------------------------------------------
+// Terminal orders — auto-match the place's incoming mints
+// -----------------------------------------------------------------------------
+// Terminal orders have no payer account; they settle by minting the order `net`
+// to the place. When those mints were submitted through a different bundler, our
+// bundler can't resolve the recorded UserOp hash, so the order shows unconfirmed
+// even though the tokens landed. We find the real mint on the place account
+// (exact net + nearest timestamp, consumed once) and record its real tx hash —
+// which also self-heals verification (a real tx resolves via the chain RPC).
+//
+// Split into two calls because consume-once assignment must be global (one
+// matching pass over all selected orders), while recording ~hundreds of hashes
+// can't fit one action's execution budget:
+//   1. planPlaceMintMatchesAction — one pass, returns { orderId, txHash } pairs.
+//   2. recordOrderHashesAction    — client records the pairs in small batches.
+
+// How close (ms) a mint's block time must be to the order's completion to count
+// as its settlement. Tight enough to avoid grabbing unrelated same-amount income,
+// loose enough for block-time / clock skew.
+const PLACE_MINT_WINDOW_MS = 30 * 60 * 1000;
+// Bound the transfer walk so a very active place can't run the plan unbounded.
+const PLACE_MINT_MAX_PAGES = 50;
+const PLACE_MINT_PAGE_SIZE = 100;
+
+export type PlanPlaceMintsResult =
+  | { status: "unavailable" }
+  | {
+      status: "ok";
+      matched: { orderId: number; txHash: string }[];
+      unmatched: number[];
+      // The transfer walk hit its page cap before covering the whole range, so
+      // some orders may be unmatched only because their mint wasn't loaded.
+      truncated: boolean;
+    };
+
+export async function planPlaceMintMatchesAction(input: {
+  payoutId: string;
+  orders: { orderId: number; net: string; createdAt: string | null }[];
+}): Promise<PlanPlaceMintsResult> {
+  const { fund } = await requireFundRole("ADMIN");
+
+  if (!fund.tokenAddress || fund.tokenChainId == null) {
+    return { status: "unavailable" };
+  }
+  const tokenAddress = fund.tokenAddress;
+  const chainId = fund.tokenChainId;
+  const client = getCitizenPayClient(fund);
+
+  // The mint destination is the place account — it rides on the orders-page
+  // envelope (same read burnPayoutAction / fixOrderAction use).
+  let placeAccount: string | null = null;
+  try {
+    const page = await client.getPayoutOrders(input.payoutId, { limit: 1 });
+    placeAccount = page.placeAccountAddress ?? null;
+  } catch (e) {
+    console.error("[payout] planPlaceMintMatches: resolve place failed", e);
+  }
+  if (!placeAccount) return { status: "unavailable" };
+  const place = placeAccount.toLowerCase();
+
+  // Walk the place's transfers only as far back as the earliest order (minus the
+  // window); transfers arrive newest-first, so we stop once a page predates it.
+  const orderTimes = input.orders
+    .map((o) => (o.createdAt ? Date.parse(o.createdAt) : NaN))
+    .filter((t) => !Number.isNaN(t));
+  const stopBefore =
+    (orderTimes.length ? Math.min(...orderTimes) : Date.now()) -
+    PLACE_MINT_WINDOW_MS;
+
+  const incoming: MatchTransfer[] = [];
+  let cursor: string | null = null;
+  let pages = 0;
+  let truncated = false;
+  try {
+    do {
+      const { transfers, nextPageKey } = await listTransfersForAccount({
+        chainId,
+        contractAddress: tokenAddress,
+        account: place,
+        pageSize: PLACE_MINT_PAGE_SIZE,
+        cursor,
+      });
+      let oldestInPage = Infinity;
+      for (const tx of transfers) {
+        const ts = tx.blockTimestamp ? Date.parse(tx.blockTimestamp) : NaN;
+        if (!Number.isNaN(ts)) oldestInPage = Math.min(oldestInPage, ts);
+        // Incoming only (mints have from = 0x0, to = place).
+        if (tx.to.toLowerCase() === place) {
+          incoming.push({
+            hash: tx.hash,
+            amount: formatTokenAmount(tx.rawValue, fund.tokenDecimals),
+            date: tx.blockTimestamp,
+            direction: "in",
+          });
+        }
+      }
+      cursor = nextPageKey;
+      pages += 1;
+      if (oldestInPage <= stopBefore) break; // covered the orders' date range
+      if (pages >= PLACE_MINT_MAX_PAGES) {
+        truncated = cursor != null;
+        break;
+      }
+    } while (cursor != null);
+  } catch (e) {
+    console.error("[payout] planPlaceMintMatches: transfer walk failed", e);
+    // Match on whatever we gathered rather than failing the whole batch.
+    truncated = true;
+  }
+
+  const { matched, unmatched } = assignPlaceMints(
+    input.orders,
+    incoming,
+    PLACE_MINT_WINDOW_MS,
+  );
+  return { status: "ok", matched, unmatched, truncated };
+}
+
+// Bulk-record already-resolved (orderId, txHash) pairs. Best-effort, per-order
+// results, one revalidate at the end. Used by the client to record the pairs
+// planPlaceMintMatchesAction resolved, in small batches. The hash is re-checked
+// server-side (don't trust the client) before it hits CP.
+export type RecordOrderHashesResult = { results: ArchiveOrdersItemResult[] };
+
+export async function recordOrderHashesAction(input: {
+  payoutId: string;
+  entries: { orderId: number; txHash: string }[];
+}): Promise<RecordOrderHashesResult> {
+  const t = await getTranslations("fund.payments.settlement.errors");
+  const { fund } = await requireFundRole("ADMIN");
+  const client = getCitizenPayClient(fund);
+
+  const results: ArchiveOrdersItemResult[] = [];
+  for (const entry of input.entries) {
+    const hash = entry.txHash.trim();
+    if (!TX_HASH.test(hash)) {
+      results.push({ orderId: entry.orderId, ok: false, error: t("txHashInvalid") });
+      continue;
+    }
+    try {
+      await client.recordOrderTxHash(input.payoutId, entry.orderId, hash);
+      results.push({ orderId: entry.orderId, ok: true });
+    } catch (e) {
+      console.error("[payout] recordOrderHashes failed", Number(entry.orderId), e);
+      results.push({
+        orderId: entry.orderId,
+        ok: false,
+        error: toMessage(e, t("recordFailed")),
+      });
     }
   }
 

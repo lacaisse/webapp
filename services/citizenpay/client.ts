@@ -310,6 +310,7 @@ class MockCitizenPayClient implements CitizenPayClient {
         txHash: `0x${randomBytes(32).toString("hex")}`,
         account: `0x${randomBytes(20).toString("hex")}`,
         completedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
       },
       {
         id: 44791,
@@ -325,6 +326,7 @@ class MockCitizenPayClient implements CitizenPayClient {
         txHash: null,
         account: `0x${randomBytes(20).toString("hex")}`,
         completedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
       },
       {
         id: 44792,
@@ -340,6 +342,7 @@ class MockCitizenPayClient implements CitizenPayClient {
         txHash: null,
         account: null,
         completedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
       },
     ];
     return {
@@ -382,6 +385,7 @@ class MockCitizenPayClient implements CitizenPayClient {
         txHash: null,
         account: null,
         completedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
       },
       payout: { payoutId, total: total.toFixed(2), fees: fees.toFixed(2), net },
     };
@@ -408,6 +412,7 @@ class MockCitizenPayClient implements CitizenPayClient {
         txHash: `0x${randomBytes(32).toString("hex")}`,
         account: `0x${randomBytes(20).toString("hex")}`,
         completedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
       },
       {
         id: 45211,
@@ -422,6 +427,7 @@ class MockCitizenPayClient implements CitizenPayClient {
         txHash: `0x${randomBytes(32).toString("hex")}`,
         account: `0x${randomBytes(20).toString("hex")}`,
         completedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
       },
     ];
     return {

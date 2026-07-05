@@ -331,6 +331,9 @@ export type PayoutOrder = {
   // non-empty ⇒ burn from this account + mint to the place.
   account: string | null;
   completedAt: string | null;
+  // Submission time — always present (unlike completedAt). Used as the anchor
+  // when matching an order to its on-chain settlement transfer.
+  createdAt: string | null;
 };
 
 export type PayoutOrdersPage = {

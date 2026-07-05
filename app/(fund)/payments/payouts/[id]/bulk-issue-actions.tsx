@@ -19,6 +19,8 @@ import {
 import {
   archiveOrdersAction,
   autoMatchPayerTransfersAction,
+  planPlaceMintMatchesAction,
+  recordOrderHashesAction,
 } from "@/services/payout/admin-actions";
 import type { AutoMatchStatus } from "@/services/payout/match";
 
@@ -32,13 +34,17 @@ export type BulkOrder = {
   id: number;
   account: string | null;
   total: string;
+  net: string;
   completedAt: string | null;
+  createdAt: string | null;
 };
 
 // Non-zero status counts, rendered as a per-order summary after a run.
 type Summary = Partial<Record<AutoMatchStatus, number>> & {
   archived?: number;
   archiveFailed?: number;
+  // Terminal orders left unchecked because the place transfer walk was capped.
+  truncated?: number;
 };
 
 export function BulkIssueActions({
@@ -67,13 +73,28 @@ export function BulkIssueActions({
 
   const busy = matching || archiving;
 
+  // Auto-match routes per order type: orders with a payer account match the
+  // payer's outgoing transfer; terminal orders (no account) match the place's
+  // incoming mint. Both record a real settlement hash — nothing moves on-chain.
   const onAutoMatch = () => {
     setSummary(null);
-    setProgress({ done: 0, total: orders.length });
+    const payerOrders = orders.filter((o) => o.account != null);
+    const terminalOrders = orders.filter((o) => o.account == null);
+    const total = orders.length;
+    setProgress({ done: 0, total });
     startMatch(async () => {
       const counts: Summary = {};
-      for (let i = 0; i < orders.length; i += CHUNK) {
-        const batch = orders.slice(i, i + CHUNK);
+      const add = (key: keyof Summary, n = 1) =>
+        (counts[key] = (counts[key] ?? 0) + n);
+      let done = 0;
+      const bump = (n: number) => {
+        done += n;
+        setProgress({ done: Math.min(done, total), total });
+      };
+
+      // 1. Payer-account orders — per-order payer-transfer match, in batches.
+      for (let i = 0; i < payerOrders.length; i += CHUNK) {
+        const batch = payerOrders.slice(i, i + CHUNK);
         let results: { orderId: number; status: AutoMatchStatus }[] = [];
         try {
           const res = await autoMatchPayerTransfersAction({
@@ -87,15 +108,61 @@ export function BulkIssueActions({
           });
           results = res.results;
         } catch {
-          // A failed batch counts as errors rather than stalling the run.
           results = batch.map((o) => ({ orderId: o.id, status: "error" as const }));
         }
         for (const r of results) {
-          counts[r.status] = (counts[r.status] ?? 0) + 1;
+          add(r.status);
           if (r.status === "fixed") onReconciled(r.orderId);
         }
-        setProgress({ done: Math.min(i + batch.length, orders.length), total: orders.length });
+        bump(batch.length);
       }
+
+      // 2. Terminal orders — plan the place-mint matches in one pass (consume-once
+      // is global), then record the resolved pairs in batches.
+      if (terminalOrders.length > 0) {
+        let plan;
+        try {
+          plan = await planPlaceMintMatchesAction({
+            payoutId,
+            orders: terminalOrders.map((o) => ({
+              orderId: o.id,
+              net: o.net,
+              createdAt: o.createdAt,
+            })),
+          });
+        } catch {
+          plan = null;
+        }
+        if (!plan || plan.status !== "ok") {
+          add("unavailable", terminalOrders.length);
+          bump(terminalOrders.length);
+        } else {
+          // Unmatched: attribute to "truncated" when the walk was capped (their
+          // mint may just not have been loaded), otherwise a genuine no-match.
+          add(plan.truncated ? "truncated" : "nomatch", plan.unmatched.length);
+          bump(plan.unmatched.length);
+          for (let i = 0; i < plan.matched.length; i += CHUNK) {
+            const batch = plan.matched.slice(i, i + CHUNK);
+            let results: { orderId: number; ok: boolean }[] = [];
+            try {
+              const res = await recordOrderHashesAction({ payoutId, entries: batch });
+              results = res.results;
+            } catch {
+              results = batch.map((e) => ({ orderId: e.orderId, ok: false }));
+            }
+            for (const r of results) {
+              if (r.ok) {
+                add("fixed");
+                onReconciled(r.orderId);
+              } else {
+                add("error");
+              }
+            }
+            bump(batch.length);
+          }
+        }
+      }
+
       setProgress(null);
       setSummary(counts);
     });
