@@ -1236,6 +1236,8 @@
           "range": "Showing {from}–{to}",
           "prev": "Previous",
           "next": "Next",
+          "selectAll": "Select all issues",
+          "selectRow": "Select order",
           "receipt": {
             "success": "Confirmed",
             "reverted": "Reverted",
@@ -1278,6 +1280,26 @@
             "title": "Archive this order?",
             "description": "The order is removed from the payout and its totals are recomputed. It won't be included in any future payout.",
             "confirm": "Archive order"
+          },
+          "bulk": {
+            "selectedCount": "{n} selected",
+            "autoMatch": "Auto-match & fix",
+            "archive": "Archive",
+            "clear": "Clear",
+            "running": "Working…",
+            "archiveTitle": "Archive selected orders?",
+            "archiveDescription": "{n} orders will be removed from this payout and their totals recomputed. They won't be included in any future payout.",
+            "archiveConfirm": "Archive orders",
+            "summary": {
+              "fixed": "{n} fixed from a matching payer transfer.",
+              "nomatch": "{n} left — no matching payer transfer found.",
+              "ambiguous": "{n} left — several transfers matched; fix these by hand.",
+              "noaccount": "{n} skipped — paid by bank transfer, fix these by hand.",
+              "error": "{n} failed — couldn't be recorded. Try again shortly.",
+              "unavailable": "{n} skipped — on-chain transfers are unavailable for this fund.",
+              "archived": "{n} archived.",
+              "archiveFailed": "{n} couldn't be archived. Try again shortly."
+            }
           }
         },
         "details": "Details",

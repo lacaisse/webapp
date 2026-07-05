@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
   TableBody,
@@ -19,6 +20,7 @@ import type { PayoutOrder } from "@/services/citizenpay/types";
 import { checkPayoutReceiptsAction } from "@/services/payout/admin-actions";
 import { cn } from "@/lib/utils";
 
+import { BulkIssueActions } from "./bulk-issue-actions";
 import { OrderReconcileActions } from "./order-reconcile-actions";
 
 type OrderStatus = "checking" | "confirmed" | "unconfirmed";
@@ -71,6 +73,25 @@ export function OrdersExplorer({
   const [reconciled, setReconciled] = useState<Set<number>>(new Set());
   const markReconciled = (id: number) =>
     setReconciled((prev) => new Set(prev).add(id));
+
+  // Bulk selection on the Issues tab. Cleared on tab switch; a reconciled row
+  // drops out of the selection so the bulk-bar count reflects what's left.
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const changeTab = (next: "orders" | "issues") => {
+    setTab(next);
+    setSelected(new Set());
+  };
+  const toggleSelected = (id: number, on: boolean) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  const onBulkReconciled = (id: number) => {
+    markReconciled(id);
+    toggleSelected(id, false);
+  };
 
   const [statuses, setStatuses] = useState<Record<number, OrderStatus>>(() => {
     const initial: Record<number, OrderStatus> = {};
@@ -126,7 +147,19 @@ export function OrdersExplorer({
   const isIssues = tab === "issues";
   const active = isIssues ? issues : confirmed;
   const showActions = isIssues && reconcilable;
-  const colCount = showActions ? 6 : 5;
+  // The checkbox column rides alongside the actions column (Issues + pending).
+  const selectable = showActions;
+  const colCount = 5 + (showActions ? 1 : 0) + (selectable ? 1 : 0);
+
+  // Issues that can still be bulk-acted on (not already being reconciled).
+  const selectableIds = isIssues
+    ? issues.filter((o) => !reconciled.has(o.id)).map((o) => o.id)
+    : [];
+  const allSelected =
+    selectableIds.length > 0 && selectableIds.every((id) => selected.has(id));
+  const selectedOrders = issues.filter((o) => selected.has(o.id));
+  const toggleAll = () =>
+    setSelected(allSelected ? new Set() : new Set(selectableIds));
 
   const euro = (v: string) =>
     format.number(Number(v), { style: "currency", currency: "EUR" });
@@ -160,17 +193,41 @@ export function OrdersExplorer({
         role="tablist"
         className="inline-flex items-center gap-0.5 rounded-lg bg-muted p-0.5 text-sm"
       >
-        <TabButton active={!isIssues} onClick={() => setTab("orders")}>
+        <TabButton active={!isIssues} onClick={() => changeTab("orders")}>
           {t("orders.tabConfirmed")} ({confirmed.length})
         </TabButton>
-        <TabButton active={isIssues} onClick={() => setTab("issues")}>
+        <TabButton active={isIssues} onClick={() => changeTab("issues")}>
           {t("orders.tabIssues")} ({issues.length})
         </TabButton>
       </div>
 
+      {selectable && selectedOrders.length > 0 && (
+        <BulkIssueActions
+          payoutId={payoutId}
+          orders={selectedOrders.map((o) => ({
+            id: o.id,
+            account: o.account,
+            total: o.total,
+            completedAt: o.completedAt,
+          }))}
+          onReconciled={onBulkReconciled}
+          onClear={() => setSelected(new Set())}
+        />
+      )}
+
       <Table>
         <TableHeader>
           <TableRow>
+            {selectable && (
+              <TableHead className="w-8">
+                <Checkbox
+                  checked={allSelected}
+                  disabled={selectableIds.length === 0}
+                  onCheckedChange={toggleAll}
+                  aria-label={t("orders.selectAll")}
+                />
+              </TableHead>
+            )}
             <TableHead>{t("orders.id")}</TableHead>
             <TableHead>{t("orders.date")}</TableHead>
             <TableHead>{t("orders.orderStatus")}</TableHead>
@@ -194,6 +251,18 @@ export function OrdersExplorer({
               return (
                 <Fragment key={o.id}>
                   <TableRow className={hasDetail ? "border-b-0" : undefined}>
+                    {selectable && (
+                      <TableCell className="w-8">
+                        <Checkbox
+                          checked={selected.has(o.id)}
+                          disabled={reconciled.has(o.id)}
+                          onCheckedChange={(value) =>
+                            toggleSelected(o.id, value === true)
+                          }
+                          aria-label={t("orders.selectRow")}
+                        />
+                      </TableCell>
+                    )}
                     <TableCell className="font-mono text-xs">{o.id}</TableCell>
                     <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                       {o.completedAt

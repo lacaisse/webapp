@@ -1236,6 +1236,8 @@
           "range": "Affichage {from}–{to}",
           "prev": "Précédent",
           "next": "Suivant",
+          "selectAll": "Tout sélectionner",
+          "selectRow": "Sélectionner la commande",
           "receipt": {
             "success": "Confirmé",
             "reverted": "Échec",
@@ -1278,6 +1280,26 @@
             "title": "Archiver cette commande ?",
             "description": "La commande est retirée du virement et les totaux sont recalculés. Elle ne sera incluse dans aucun virement futur.",
             "confirm": "Archiver la commande"
+          },
+          "bulk": {
+            "selectedCount": "{n} sélectionnée(s)",
+            "autoMatch": "Rapprocher et corriger",
+            "archive": "Archiver",
+            "clear": "Effacer",
+            "running": "En cours…",
+            "archiveTitle": "Archiver les commandes sélectionnées ?",
+            "archiveDescription": "{n} commandes seront retirées de ce virement et leurs totaux recalculés. Elles ne seront incluses dans aucun virement futur.",
+            "archiveConfirm": "Archiver les commandes",
+            "summary": {
+              "fixed": "{n} corrigée(s) à partir d’un virement du payeur correspondant.",
+              "nomatch": "{n} restante(s) — aucun virement du payeur correspondant.",
+              "ambiguous": "{n} restante(s) — plusieurs virements correspondent ; à corriger à la main.",
+              "noaccount": "{n} ignorée(s) — payées par virement bancaire, à corriger à la main.",
+              "error": "{n} en échec — impossible d’enregistrer. Réessayez bientôt.",
+              "unavailable": "{n} ignorée(s) — les transactions on-chain sont indisponibles pour cette caisse.",
+              "archived": "{n} archivée(s).",
+              "archiveFailed": "{n} n’ont pas pu être archivées. Réessayez bientôt."
+            }
           }
         },
         "details": "Détails",
