@@ -713,11 +713,17 @@ export async function planPlaceMintMatchesAction(input: {
       for (const tx of transfers) {
         const ts = tx.blockTimestamp ? Date.parse(tx.blockTimestamp) : NaN;
         if (!Number.isNaN(ts)) oldestInPage = Math.min(oldestInPage, ts);
-        // Incoming only (mints have from = 0x0, to = place).
+        // Incoming only (mints have from = 0x0, to = place). Prefer Alchemy's
+        // decimal `value` (computed with the token's real on-chain decimals) so
+        // a mis-cached fund.tokenDecimals can't scale the amount wrong; fall
+        // back to formatting the raw value only when Alchemy didn't resolve it.
         if (tx.to.toLowerCase() === place) {
           incoming.push({
             hash: tx.hash,
-            amount: formatTokenAmount(tx.rawValue, fund.tokenDecimals),
+            amount:
+              tx.value != null
+                ? String(tx.value)
+                : formatTokenAmount(tx.rawValue, fund.tokenDecimals),
             date: tx.blockTimestamp,
             direction: "in",
           });
@@ -738,6 +744,22 @@ export async function planPlaceMintMatchesAction(input: {
   }
 
   const { matched, unmatched } = assignPlaceMints(input.orders, incoming);
+  // Diagnostic: surface the resolved place account, cached token decimals, and a
+  // few order-net vs on-chain-amount samples so a "nothing matched" run can be
+  // told apart (wrong place account / mis-cached decimals / unit mismatch).
+  console.log(
+    "[payout] planPlaceMint diag",
+    logSafe({
+      place,
+      tokenDecimals: fund.tokenDecimals,
+      orders: input.orders.length,
+      incoming: incoming.length,
+      matched: matched.length,
+      truncated,
+      sampleNets: input.orders.slice(0, 5).map((o) => o.net),
+      sampleAmounts: incoming.slice(0, 5).map((t) => ({ amount: t.amount, date: t.date })),
+    }),
+  );
   return { status: "ok", matched, unmatched, truncated };
 }
 

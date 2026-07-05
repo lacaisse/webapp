@@ -23,6 +23,10 @@ export type AlchemyTransfer = {
   from: string;
   to: string;
   rawValue: string; // hex string, before decimals
+  // Decimal amount Alchemy computed using the token's own on-chain decimals —
+  // independent of any cached decimals we hold. Null when Alchemy can't resolve
+  // it. Prefer this over formatting rawValue with a (possibly stale) decimals.
+  value: number | null;
   blockTimestamp: string | null; // ISO from metadata, optional
 };
 
@@ -33,6 +37,7 @@ type RpcTransferResponse = {
     hash: string;
     from: string;
     to: string;
+    value?: number | null;
     rawContract?: { value?: string };
     metadata?: { blockTimestamp?: string };
   }>;
@@ -196,6 +201,7 @@ async function fetchTransfersPage(
     from: t.from,
     to: t.to,
     rawValue: t.rawContract?.value ?? "0x0",
+    value: typeof t.value === "number" ? t.value : null,
     blockTimestamp: t.metadata?.blockTimestamp ?? null,
   }));
 
