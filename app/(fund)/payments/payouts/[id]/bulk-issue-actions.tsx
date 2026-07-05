@@ -50,11 +50,15 @@ type Summary = Partial<Record<AutoMatchStatus, number>> & {
 export function BulkIssueActions({
   payoutId,
   orders,
+  placeAccount,
   onReconciled,
   onClear,
 }: {
   payoutId: string;
   orders: BulkOrder[];
+  // The place's on-chain account, already resolved server-side on page render.
+  // Passed so the plan action doesn't depend on a flaky per-call re-fetch.
+  placeAccount: string | null;
   // Fired per order once it's fixed/archived, so the parent can optimistically
   // mark the row "Reconciling…" until the server revalidation lands.
   onReconciled: (orderId: number) => void;
@@ -124,6 +128,7 @@ export function BulkIssueActions({
         try {
           plan = await planPlaceMintMatchesAction({
             payoutId,
+            placeAccount,
             orders: terminalOrders.map((o) => ({
               orderId: o.id,
               net: o.net,
