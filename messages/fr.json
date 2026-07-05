@@ -1297,6 +1297,7 @@
               "noaccount": "{n} ignorée(s) — payées par virement bancaire, à corriger à la main.",
               "error": "{n} en échec — impossible d’enregistrer. Réessayez bientôt.",
               "unavailable": "{n} ignorée(s) — les transactions on-chain sont indisponibles pour cette caisse.",
+              "truncated": "{n} non vérifiée(s) — trop de transactions à parcourir ; réduisez la sélection ou réessayez.",
               "archived": "{n} archivée(s).",
               "archiveFailed": "{n} n’ont pas pu être archivées. Réessayez bientôt."
             }

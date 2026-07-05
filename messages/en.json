@@ -1297,6 +1297,7 @@
               "noaccount": "{n} skipped — paid by bank transfer, fix these by hand.",
               "error": "{n} failed — couldn't be recorded. Try again shortly.",
               "unavailable": "{n} skipped — on-chain transfers are unavailable for this fund.",
+              "truncated": "{n} not checked — too many transfers to scan; narrow the selection or retry.",
               "archived": "{n} archived.",
               "archiveFailed": "{n} couldn't be archived. Try again shortly."
             }

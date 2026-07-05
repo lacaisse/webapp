@@ -208,7 +208,9 @@ export function OrdersExplorer({
             id: o.id,
             account: o.account,
             total: o.total,
+            net: o.net,
             completedAt: o.completedAt,
+            createdAt: o.createdAt,
           }))}
           onReconciled={onBulkReconciled}
           onClear={() => setSelected(new Set())}
