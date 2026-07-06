@@ -344,3 +344,33 @@ export async function listIncomingTransfersInRange(opts: {
   await hydrateMissingTimestamps(network, transfers);
   return { transfers, nextPageKey: pageKey ?? null };
 }
+
+// The outgoing counterpart of listIncomingTransfersInRange: one page of ERC-20
+// transfers OUT of `fromAccount` within a fixed block range, oldest-first. The
+// right shape for "find the burns leaving this account during a past window"
+// (e.g. `refund` orders settled by burning the place's tokens).
+export async function listOutgoingTransfersInRange(opts: {
+  chainId: number;
+  contractAddress: string;
+  fromAccount: string;
+  fromBlock: number;
+  toBlock: number;
+  pageSize: number;
+  cursor?: string | null;
+}): Promise<ListTransfersResult> {
+  const network = alchemyNetwork(opts.chainId);
+  if (!network) {
+    throw new Error(`Alchemy: unsupported chain id ${opts.chainId}`);
+  }
+  const { transfers, pageKey } = await fetchTransfersPage(network, {
+    contractAddress: opts.contractAddress,
+    pageSize: opts.pageSize,
+    pageKey: opts.cursor,
+    fromAddress: opts.fromAccount,
+    fromBlock: "0x" + Math.max(0, opts.fromBlock).toString(16),
+    toBlock: "0x" + Math.max(opts.fromBlock, opts.toBlock).toString(16),
+    order: "asc",
+  });
+  await hydrateMissingTimestamps(network, transfers);
+  return { transfers, nextPageKey: pageKey ?? null };
+}

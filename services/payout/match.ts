@@ -104,25 +104,44 @@ export type PlaceMintOrder = {
   completedAt: string | null;
 };
 
+// A `refund` order settles by burning the order's `total` (fees included) from
+// the place account — the on-chain mirror of a place-mint, but outgoing. (A
+// `refunded` order, by contrast, is just the original order re-tagged; it still
+// settled as an incoming mint of `net`, so it matches as a PlaceMintOrder.)
+export type PlaceBurnOrder = {
+  orderId: number;
+  total: string; // token-unit decimal (fees included) burned from the place
+  createdAt: string | null;
+  completedAt: string | null;
+};
+
 export type PlaceMintResult = {
   matched: { orderId: number; txHash: string }[];
   unmatched: number[];
 };
 
-// Greedy same-day assignment. For each order, among unused incoming transfers
-// whose amount equals the order net (± epsilon) AND that landed on the same UTC
-// calendar day as the order, pick the one nearest in time (a tiebreak when the
-// place received several same-amount mints that day). Each transfer is consumed
-// once, so two orders never share a mint. Deterministic: orders processed in
-// input order, transfers matched by pool index (safe even if several mints share
-// a hash within one tx). We match on the day rather than an exact minute window
-// because the recorded settlement time and the on-chain block time can drift.
-export function assignPlaceMints(
-  orders: PlaceMintOrder[],
+// Greedy same-day assignment, shared by place mints (incoming `net`) and place
+// burns (outgoing `total`). For each order, among unused transfers in the given
+// direction whose amount equals the order amount (± epsilon) AND that landed on
+// the same UTC calendar day as the order, pick the one nearest in time (a
+// tiebreak when the place saw several same-amount transfers that day). Each
+// transfer is consumed once, so two orders never share one. Deterministic:
+// orders processed in input order, transfers matched by pool index (safe even if
+// several transfers share a hash within one tx). We match on the day rather than
+// an exact minute window because the recorded settlement time and the on-chain
+// block time can drift.
+function assignPlaceTransfers(
+  orders: {
+    orderId: number;
+    amount: string;
+    createdAt: string | null;
+    completedAt: string | null;
+  }[],
   transfers: MatchTransfer[],
+  direction: "in" | "out",
 ): PlaceMintResult {
   const pool = transfers
-    .filter((t) => t.direction === "in" && t.date != null)
+    .filter((t) => t.direction === direction && t.date != null)
     .map((t) => ({
       hash: t.hash,
       amount: Number(t.amount),
@@ -139,8 +158,8 @@ export function assignPlaceMints(
     const anchor = order.createdAt ?? order.completedAt;
     const anchorDay = utcDay(anchor);
     const anchorTime = anchor ? Date.parse(anchor) : NaN;
-    const net = Number(order.net);
-    if (anchorDay == null || Number.isNaN(net)) {
+    const amount = Number(order.amount);
+    if (anchorDay == null || Number.isNaN(amount)) {
       unmatched.push(order.orderId);
       continue;
     }
@@ -150,7 +169,7 @@ export function assignPlaceMints(
       if (used.has(i)) continue;
       const c = pool[i];
       if (c.day !== anchorDay) continue;
-      if (Math.abs(c.amount - net) >= AMOUNT_EPSILON) continue;
+      if (Math.abs(c.amount - amount) >= AMOUNT_EPSILON) continue;
       const delta = Number.isNaN(anchorTime) ? 0 : Math.abs(c.time - anchorTime);
       if (delta < bestDelta) {
         bestDelta = delta;
@@ -166,4 +185,41 @@ export function assignPlaceMints(
   }
 
   return { matched, unmatched };
+}
+
+// Match place mints: each order's `net` against an incoming transfer to the
+// place, same UTC day, consumed once. Used by paid terminal orders (no payer)
+// and `refunded` orders (the original order still credited the place).
+export function assignPlaceMints(
+  orders: PlaceMintOrder[],
+  transfers: MatchTransfer[],
+): PlaceMintResult {
+  return assignPlaceTransfers(
+    orders.map((o) => ({
+      orderId: o.orderId,
+      amount: o.net,
+      createdAt: o.createdAt,
+      completedAt: o.completedAt,
+    })),
+    transfers,
+    "in",
+  );
+}
+
+// Match place burns: each `refund` order's `total` (fees included) against an
+// outgoing transfer from the place, same UTC day, consumed once.
+export function assignPlaceBurns(
+  orders: PlaceBurnOrder[],
+  transfers: MatchTransfer[],
+): PlaceMintResult {
+  return assignPlaceTransfers(
+    orders.map((o) => ({
+      orderId: o.orderId,
+      amount: o.total,
+      createdAt: o.createdAt,
+      completedAt: o.completedAt,
+    })),
+    transfers,
+    "out",
+  );
 }

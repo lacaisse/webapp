@@ -25,6 +25,12 @@ import { OrderReconcileActions } from "./order-reconcile-actions";
 
 type OrderStatus = "checking" | "confirmed" | "unconfirmed";
 
+// Order statuses whose settlement is a real on-chain tx we can verify/auto-match:
+// `paid` (payment or mint), `refunded` (original order, still an incoming mint),
+// `refund` (a burn from the place). Other statuses have no hash to check and stay
+// in Issues until reconciled by hand.
+const CONFIRMABLE_STATUSES = new Set(["paid", "refund", "refunded"]);
+
 // CP order status → badge variant. `paid` is the happy path; refunds get a
 // warning tint, anything else stays neutral.
 function orderStatusVariant(
@@ -63,7 +69,11 @@ export function OrdersExplorer({
   // (settlement started), the orders are locked in — nothing to re-check.
   const toCheck = useMemo(
     () =>
-      settled ? [] : orders.filter((o) => o.status === "paid" && !!o.txHash),
+      settled
+        ? []
+        : orders.filter(
+            (o) => CONFIRMABLE_STATUSES.has(o.status) && !!o.txHash,
+          ),
     [orders, settled],
   );
 
@@ -98,7 +108,7 @@ export function OrdersExplorer({
     for (const o of orders) {
       initial[o.id] = settled
         ? "confirmed"
-        : o.status === "paid" && o.txHash
+        : CONFIRMABLE_STATUSES.has(o.status) && o.txHash
           ? "checking"
           : "unconfirmed";
     }
@@ -206,6 +216,7 @@ export function OrdersExplorer({
           payoutId={payoutId}
           orders={selectedOrders.map((o) => ({
             id: o.id,
+            status: o.status,
             account: o.account,
             total: o.total,
             net: o.net,
