@@ -9,7 +9,9 @@ import { formatTokenAmount } from "@/services/alchemy/format";
 import {
   estimateBlockRange,
   listIncomingTransfersInRange,
+  listOutgoingTransfersInRange,
   listTransfersForAccount,
+  type ListTransfersResult,
 } from "@/services/alchemy/transfers";
 import { requireFundRole } from "@/services/auth/dal";
 import { CitizenPayApiError } from "@/services/citizenpay/api";
@@ -33,6 +35,7 @@ import { ANNOTATION_TRIGGERS } from "@/services/transaction-annotation/annotate"
 import { resolveOrEnqueueAnnotation } from "@/services/transaction-annotation/pending";
 
 import {
+  assignPlaceBurns,
   assignPlaceMints,
   matchPayerTransfer,
   type ArchiveOrdersItemResult,
@@ -672,49 +675,44 @@ export type PlanPlaceMintsResult =
       debug: PlanPlaceMintsDebug;
     };
 
-export async function planPlaceMintMatchesAction(input: {
-  payoutId: string;
-  // The place account resolved on page render; used as a reliable fallback when
-  // the per-call CP re-fetch below returns nothing (it's occasionally empty).
-  placeAccount?: string | null;
-  orders: {
-    orderId: number;
-    net: string;
-    createdAt: string | null;
-    completedAt: string | null;
-  }[];
-}): Promise<PlanPlaceMintsResult> {
-  const { fund } = await requireFundRole("ADMIN");
-  const sampleNets = input.orders.slice(0, 5).map((o) => o.net);
+// Shared place-side transfer load for both plan actions. Resolves the place
+// account (CP re-fetch + the page-resolved fallback), bounds the query to the
+// block range covering the orders' days (anchoring on createdAt, falling back to
+// completedAt), and walks one direction of the place's transfers in that window.
+// `in` gathers mints (paid terminal + `refunded` orders); `out` gathers burns
+// (`refund` orders). Returns hasTokenConfig / place so the caller can render the
+// "unavailable" diagnostic without duplicating the guards.
+type FundForPlan = Awaited<ReturnType<typeof requireFundRole>>["fund"];
 
+async function loadPlaceTransfersForPlan(
+  fund: FundForPlan,
+  input: {
+    payoutId: string;
+    placeAccount?: string | null;
+    anchors: (string | null)[];
+    direction: "in" | "out";
+  },
+): Promise<{
+  place: string | null;
+  hasTokenConfig: boolean;
+  transfers: MatchTransfer[];
+  truncated: boolean;
+}> {
   if (!fund.tokenAddress || fund.tokenChainId == null) {
-    return {
-      status: "unavailable",
-      debug: {
-        placeAccount: null,
-        hasTokenConfig: false,
-        tokenDecimals: fund.tokenDecimals,
-        orders: input.orders.length,
-        incoming: 0,
-        matched: 0,
-        truncated: false,
-        sampleNets,
-        sampleAmounts: [],
-      },
-    };
+    return { place: null, hasTokenConfig: false, transfers: [], truncated: false };
   }
   const tokenAddress = fund.tokenAddress;
   const chainId = fund.tokenChainId;
   const client = getCitizenPayClient(fund);
 
-  // The mint destination is the place account — it rides on the orders-page
-  // envelope (same read burnPayoutAction / fixOrderAction use).
+  // The place account rides on the orders-page envelope (same read
+  // burnPayoutAction / fixOrderAction use).
   let placeAccount: string | null = null;
   try {
     const page = await client.getPayoutOrders(input.payoutId, { limit: 1 });
     placeAccount = page.placeAccountAddress ?? null;
   } catch (e) {
-    console.error("[payout] planPlaceMintMatches: resolve place failed", e);
+    console.error("[payout] planPlaceMatches: resolve place failed", e);
   }
   // Fall back to the account the page already resolved (the per-call read above
   // is occasionally empty). Both originate server-side from the same CP source.
@@ -722,38 +720,17 @@ export async function planPlaceMintMatchesAction(input: {
     placeAccount = input.placeAccount;
   }
   if (!placeAccount) {
-    return {
-      status: "unavailable",
-      debug: {
-        placeAccount: null,
-        hasTokenConfig: true,
-        tokenDecimals: fund.tokenDecimals,
-        orders: input.orders.length,
-        incoming: 0,
-        matched: 0,
-        truncated: false,
-        sampleNets,
-        sampleAmounts: [],
-      },
-    };
+    return { place: null, hasTokenConfig: true, transfers: [], truncated: false };
   }
   const place = placeAccount.toLowerCase();
 
-  // Load the place's incoming transfers for the payout's date window only. The
-  // place can be very active, so walking newest-first from head never reaches an
-  // old payout; instead we bound the query to the block range covering the
-  // orders' days. Anchor on createdAt, falling back to completedAt (the CP orders
-  // endpoint doesn't always return created_at).
-  const orderTimes = input.orders
-    .map((o) => {
-      const anchor = o.createdAt ?? o.completedAt;
-      return anchor ? Date.parse(anchor) : NaN;
-    })
+  const orderTimes = input.anchors
+    .map((a) => (a ? Date.parse(a) : NaN))
     .filter((t) => !Number.isNaN(t));
   const minTime = orderTimes.length ? Math.min(...orderTimes) : Date.now();
   const maxTime = orderTimes.length ? Math.max(...orderTimes) : Date.now();
 
-  const incoming: MatchTransfer[] = [];
+  const transfers: MatchTransfer[] = [];
   let truncated = false;
   try {
     // Cover the full days of the earliest/latest order, with a lookback margin.
@@ -767,27 +744,38 @@ export async function planPlaceMintMatchesAction(input: {
     let cursor: string | null = null;
     let pages = 0;
     do {
-      const { transfers, nextPageKey } = await listIncomingTransfersInRange({
-        chainId,
-        contractAddress: tokenAddress,
-        toAccount: place,
-        fromBlock: range.fromBlock,
-        toBlock: range.toBlock,
-        pageSize: PLACE_MINT_PAGE_SIZE,
-        cursor,
-      });
-      for (const tx of transfers) {
+      const { transfers: page, nextPageKey }: ListTransfersResult =
+        input.direction === "in"
+          ? await listIncomingTransfersInRange({
+              chainId,
+              contractAddress: tokenAddress,
+              toAccount: place,
+              fromBlock: range.fromBlock,
+              toBlock: range.toBlock,
+              pageSize: PLACE_MINT_PAGE_SIZE,
+              cursor,
+            })
+          : await listOutgoingTransfersInRange({
+              chainId,
+              contractAddress: tokenAddress,
+              fromAccount: place,
+              fromBlock: range.fromBlock,
+              toBlock: range.toBlock,
+              pageSize: PLACE_MINT_PAGE_SIZE,
+              cursor,
+            });
+      for (const tx of page) {
         // Prefer Alchemy's decimal `value` (computed with the token's real
         // on-chain decimals) so a mis-cached fund.tokenDecimals can't scale the
         // amount wrong; fall back to formatting the raw value only if absent.
-        incoming.push({
+        transfers.push({
           hash: tx.hash,
           amount:
             tx.value != null
               ? String(tx.value)
               : formatTokenAmount(tx.rawValue, fund.tokenDecimals),
           date: tx.blockTimestamp,
-          direction: "in",
+          direction: input.direction,
         });
       }
       cursor = nextPageKey;
@@ -798,25 +786,129 @@ export async function planPlaceMintMatchesAction(input: {
       }
     } while (cursor != null);
   } catch (e) {
-    console.error("[payout] planPlaceMintMatches: transfer load failed", e);
+    console.error("[payout] planPlaceMatches: transfer load failed", e);
     // Match on whatever we gathered rather than failing the whole batch.
     truncated = true;
   }
 
-  const { matched, unmatched } = assignPlaceMints(input.orders, incoming);
+  return { place, hasTokenConfig: true, transfers, truncated };
+}
+
+// Terminal (paid, no-payer) and `refunded` orders: match each order's `net`
+// against an incoming mint on the place account.
+export async function planPlaceMintMatchesAction(input: {
+  payoutId: string;
+  // The place account resolved on page render; used as a reliable fallback when
+  // the per-call CP re-fetch returns nothing (it's occasionally empty).
+  placeAccount?: string | null;
+  orders: {
+    orderId: number;
+    net: string;
+    createdAt: string | null;
+    completedAt: string | null;
+  }[];
+}): Promise<PlanPlaceMintsResult> {
+  const { fund } = await requireFundRole("ADMIN");
+  const sampleNets = input.orders.slice(0, 5).map((o) => o.net);
+
+  const load = await loadPlaceTransfersForPlan(fund, {
+    payoutId: input.payoutId,
+    placeAccount: input.placeAccount,
+    anchors: input.orders.map((o) => o.createdAt ?? o.completedAt),
+    direction: "in",
+  });
+  if (!load.hasTokenConfig || load.place == null) {
+    return {
+      status: "unavailable",
+      debug: {
+        placeAccount: load.place,
+        hasTokenConfig: load.hasTokenConfig,
+        tokenDecimals: fund.tokenDecimals,
+        orders: input.orders.length,
+        incoming: 0,
+        matched: 0,
+        truncated: false,
+        sampleNets,
+        sampleAmounts: [],
+      },
+    };
+  }
+
+  const { matched, unmatched } = assignPlaceMints(input.orders, load.transfers);
   const debug: PlanPlaceMintsDebug = {
-    placeAccount: place,
+    placeAccount: load.place,
     hasTokenConfig: true,
     tokenDecimals: fund.tokenDecimals,
     orders: input.orders.length,
-    incoming: incoming.length,
+    incoming: load.transfers.length,
     matched: matched.length,
-    truncated,
+    truncated: load.truncated,
     sampleNets,
-    sampleAmounts: incoming.slice(0, 5).map((t) => ({ amount: t.amount, date: t.date })),
+    sampleAmounts: load.transfers
+      .slice(0, 5)
+      .map((t) => ({ amount: t.amount, date: t.date })),
   };
   console.log("[payout] planPlaceMint diag", logSafe(debug));
-  return { status: "ok", matched, unmatched, truncated, debug };
+  return { status: "ok", matched, unmatched, truncated: load.truncated, debug };
+}
+
+// `refund` orders: match each order's `total` (fees included) against an
+// outgoing burn from the place account. Mirror of planPlaceMintMatchesAction,
+// walking outgoing transfers instead of incoming. Results feed the same
+// recordOrderHashesAction as the mint plan.
+export async function planPlaceBurnMatchesAction(input: {
+  payoutId: string;
+  placeAccount?: string | null;
+  orders: {
+    orderId: number;
+    total: string;
+    createdAt: string | null;
+    completedAt: string | null;
+  }[];
+}): Promise<PlanPlaceMintsResult> {
+  const { fund } = await requireFundRole("ADMIN");
+  const sampleNets = input.orders.slice(0, 5).map((o) => o.total);
+
+  const load = await loadPlaceTransfersForPlan(fund, {
+    payoutId: input.payoutId,
+    placeAccount: input.placeAccount,
+    anchors: input.orders.map((o) => o.createdAt ?? o.completedAt),
+    direction: "out",
+  });
+  if (!load.hasTokenConfig || load.place == null) {
+    return {
+      status: "unavailable",
+      debug: {
+        placeAccount: load.place,
+        hasTokenConfig: load.hasTokenConfig,
+        tokenDecimals: fund.tokenDecimals,
+        orders: input.orders.length,
+        incoming: 0,
+        matched: 0,
+        truncated: false,
+        sampleNets,
+        sampleAmounts: [],
+      },
+    };
+  }
+
+  const { matched, unmatched } = assignPlaceBurns(input.orders, load.transfers);
+  const debug: PlanPlaceMintsDebug = {
+    placeAccount: load.place,
+    hasTokenConfig: true,
+    tokenDecimals: fund.tokenDecimals,
+    orders: input.orders.length,
+    // `incoming` counts the loaded pool regardless of direction (here: burns).
+    incoming: load.transfers.length,
+    matched: matched.length,
+    truncated: load.truncated,
+    sampleNets,
+    sampleAmounts: load.transfers
+      .slice(0, 5)
+      .map((t) => ({ amount: t.amount, date: t.date })),
+  };
+  console.log("[payout] planPlaceBurn diag", logSafe(debug));
+  return { status: "ok", matched, unmatched, truncated: load.truncated, debug };
 }
 
 // Bulk-record already-resolved (orderId, txHash) pairs. Best-effort, per-order

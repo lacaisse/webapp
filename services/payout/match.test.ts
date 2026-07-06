@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  assignPlaceBurns,
   assignPlaceMints,
   matchPayerTransfer,
   utcDay,
@@ -219,5 +220,83 @@ describe("assignPlaceMints", () => {
     );
     expect(res.unmatched).toEqual([1]);
     expect(res.matched).toEqual([]);
+  });
+});
+
+function burn(overrides: Partial<MatchTransfer>): MatchTransfer {
+  return {
+    hash: "0xburn",
+    amount: "10.00",
+    date: "2026-06-30T20:56:40Z",
+    direction: "out",
+    ...overrides,
+  };
+}
+
+function pbOrder(o: {
+  orderId: number;
+  total: string;
+  createdAt?: string | null;
+  completedAt?: string | null;
+}) {
+  return {
+    orderId: o.orderId,
+    total: o.total,
+    createdAt: o.createdAt ?? null,
+    completedAt: o.completedAt ?? null,
+  };
+}
+
+describe("assignPlaceBurns", () => {
+  it("matches a refund order to a same-total outgoing burn on the same day", () => {
+    const res = assignPlaceBurns(
+      [pbOrder({ orderId: 1, total: "10.00", createdAt: "2026-06-30T20:56:39Z" })],
+      [burn({ hash: "0xb1" })],
+    );
+    expect(res.matched).toEqual([{ orderId: 1, txHash: "0xb1" }]);
+    expect(res.unmatched).toEqual([]);
+  });
+
+  it("matches on total (fees included), not net", () => {
+    // A refund order's burn is the fee-inclusive total, so an outgoing transfer
+    // of 34.70 backs an order whose total is 34.70 (its net would be lower).
+    const res = assignPlaceBurns(
+      [pbOrder({ orderId: 1, total: "34.70", createdAt: "2026-06-18T10:00:00Z" })],
+      [burn({ hash: "0xfee", amount: "34.70", date: "2026-06-18T10:05:00Z" })],
+    );
+    expect(res.matched).toEqual([{ orderId: 1, txHash: "0xfee" }]);
+  });
+
+  it("ignores incoming transfers (a burn is outgoing)", () => {
+    const res = assignPlaceBurns(
+      [pbOrder({ orderId: 1, total: "10.00", createdAt: "2026-06-30T20:56:00Z" })],
+      [burn({ direction: "in" })],
+    );
+    expect(res.unmatched).toEqual([1]);
+  });
+
+  it("consumes each burn once — two equal refunds get two distinct burns", () => {
+    const res = assignPlaceBurns(
+      [
+        pbOrder({ orderId: 1, total: "10.00", createdAt: "2026-06-30T20:56:00Z" }),
+        pbOrder({ orderId: 2, total: "10.00", createdAt: "2026-06-30T21:03:00Z" }),
+      ],
+      [
+        burn({ hash: "0xa", date: "2026-06-30T20:56:10Z" }),
+        burn({ hash: "0xb", date: "2026-06-30T21:03:05Z" }),
+      ],
+    );
+    expect(res.matched).toEqual([
+      { orderId: 1, txHash: "0xa" },
+      { orderId: 2, txHash: "0xb" },
+    ]);
+  });
+
+  it("does not match a burn on a different calendar day", () => {
+    const res = assignPlaceBurns(
+      [pbOrder({ orderId: 1, total: "10.00", createdAt: "2026-06-30T23:59:00Z" })],
+      [burn({ date: "2026-07-01T00:05:00Z" })],
+    );
+    expect(res.unmatched).toEqual([1]);
   });
 });
