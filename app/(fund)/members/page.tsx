@@ -153,7 +153,7 @@ async function MembersContent({
   const q = sp.q?.trim() || null;
 
   const status = statusFilterFor(active);
-  const [members, tiers] = await Promise.all([
+  const [members, tiers, statusCounts] = await Promise.all([
     prisma.member.findMany({
       where: {
         fundId: fund.id,
@@ -184,7 +184,30 @@ async function MembersContent({
       orderBy: [{ position: "asc" }, { createdAt: "asc" }],
       select: { id: true, name: true },
     }),
+    // Per-status counts for the tab badges (issue #104). Respects the active
+    // search query so counts match what each tab would actually show, but
+    // not the tab's own status filter — every tab needs every status's count.
+    prisma.member.groupBy({
+      by: ["status"],
+      where: {
+        fundId: fund.id,
+        ...(q ? memberSearchWhere(q) : {}),
+      },
+      _count: true,
+    }),
   ]);
+
+  const countByStatus = new Map(
+    statusCounts.map((row) => [row.status, row._count]),
+  );
+  const totalMemberCount = statusCounts.reduce(
+    (sum, row) => sum + row._count,
+    0,
+  );
+  const countForTab = (tab: TabValue) => {
+    if (tab === "all") return totalMemberCount;
+    return countByStatus.get(statusFilterFor(tab) as MemberStatus) ?? 0;
+  };
 
   return (
     <>
@@ -193,7 +216,7 @@ async function MembersContent({
           active={active}
           items={TABS.map((tab) => ({
             value: tab.value,
-            label: t(`tabs.${tab.value}`),
+            label: `${t(`tabs.${tab.value}`)} (${format.number(countForTab(tab.value))})`,
           }))}
         />
         <TableSearch placeholder={t("searchPlaceholder")} />
