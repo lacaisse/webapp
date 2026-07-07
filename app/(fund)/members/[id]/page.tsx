@@ -24,6 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { contributionApplies } from "@/services/member/contribution";
 import { prisma } from "@/services/db/prisma";
 import { requireCurrentFund } from "@/services/fund/server";
 
@@ -64,7 +65,14 @@ async function MemberDetail({
   const member = await prisma.member.findFirst({
     where: { id, fundId: fund.id },
     include: {
-      tier: { select: { id: true, name: true } },
+      tier: {
+        select: {
+          id: true,
+          name: true,
+          allocationAmount: true,
+          minContribution: true,
+        },
+      },
       primaryCard: {
         select: { id: true, serialNumber: true, account: true, status: true },
       },
@@ -101,6 +109,12 @@ async function MemberDetail({
     }),
   ]);
 
+  // The commitment amount only applies to FIXED_PERIOD funds with tiers.
+  const showContribution = contributionApplies(
+    fund.allocationMode,
+    tiers.length,
+  );
+
   const fullName = `${member.firstName} ${member.lastName}`.trim();
   const emailVerified = member.emailVerifiedAt !== null;
   const appData =
@@ -130,8 +144,12 @@ async function MemberDetail({
               iban: member.iban,
               householdAdults: member.householdAdults,
               householdChildren: member.householdChildren,
+              contributionAmount: member.contributionAmount?.toString() ?? null,
               notes: member.notes,
+              tierTarget: member.tier?.allocationAmount.toString() ?? null,
+              tierMin: member.tier?.minContribution.toString() ?? null,
             }}
+            showContribution={showContribution}
           />
           {!member.primaryCardId &&
             (member.status === "NEW" || member.status === "ACTIVE") && (
@@ -219,6 +237,22 @@ async function MemberDetail({
                   tiers={tiers}
                 />
               </dd>
+              {showContribution && (
+                <DtDd label={t("banking.committed")}>
+                  {member.contributionAmount ? (
+                    member.contributionAmount.toString()
+                  ) : member.tier ? (
+                    <span>
+                      {member.tier.allocationAmount.toString()}{" "}
+                      <span className="text-xs text-muted-foreground">
+                        {t("banking.committedDefault")}
+                      </span>
+                    </span>
+                  ) : (
+                    "—"
+                  )}
+                </DtDd>
+              )}
               <DtDd label={t("banking.iban")} mono>
                 {member.iban ?? "—"}
               </DtDd>

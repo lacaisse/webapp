@@ -28,6 +28,9 @@ export const MEMBER_IMPORT_FIELDS = [
   { key: "householdAdults", required: false },
   { key: "householdChildren", required: false },
   { key: "tier", required: false },
+  // Committed contribution amount (issue #82). Only meaningful for FIXED_PERIOD
+  // funds with tiers; ignored (never stored) otherwise. See contribution.ts.
+  { key: "contributionAmount", required: false },
   { key: "locale", required: false },
   { key: "status", required: false },
   { key: "notes", required: false },

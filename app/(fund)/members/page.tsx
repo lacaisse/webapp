@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { MemberStatus } from "@/services/db/generated/enums";
 import { prisma } from "@/services/db/prisma";
 import { requireCurrentFund } from "@/services/fund/server";
+import { contributionApplies } from "@/services/member/contribution";
 import { AddCardDialog } from "./add-card-dialog";
 import { InviteMemberDialog } from "./invite-member-dialog";
 import { MemberImportDialog } from "./member-import-dialog";
@@ -132,6 +133,10 @@ async function MembersHeader() {
         <MemberImportDialog
           triggerLabel={t("import.button")}
           tiers={tiers.map((tier) => tier.name)}
+          showContribution={contributionApplies(
+            fund.allocationMode,
+            tiers.length,
+          )}
         />
         <InviteMemberDialog triggerLabel={t("invite")} />
       </div>
@@ -196,6 +201,13 @@ async function MembersContent({
       _count: true,
     }),
   ]);
+
+  // The committed-contribution line only applies to FIXED_PERIOD funds with
+  // tiers (issue #82).
+  const showContribution = contributionApplies(
+    fund.allocationMode,
+    tiers.length,
+  );
 
   const countByStatus = new Map(
     statusCounts.map((row) => [row.status, row._count]),
@@ -276,6 +288,14 @@ async function MembersContent({
                             : t("contribution.none")}
                         </dd>
                       </div>
+                      {showContribution && m.contributionAmount && (
+                        <div className="flex gap-1">
+                          <dt>{t("contribution.committed")}:</dt>
+                          <dd className="tabular-nums text-foreground">
+                            {m.contributionAmount.toString()}
+                          </dd>
+                        </div>
+                      )}
                       <div className="flex gap-1">
                         <dt>{t("contribution.lastReceived")}:</dt>
                         <dd className="tabular-nums text-foreground">

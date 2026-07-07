@@ -9,6 +9,17 @@ import { z } from "zod";
 
 export const NAME_MIN_LENGTH = 1;
 
+// A euro amount as a string: whole number with up to 2 decimals. Empty string
+// is allowed and means "unset" (the caller normalises it to null). Mirrors the
+// tier DecimalString pattern in services/allocation-tiers/admin-actions.ts.
+const OptionalMoney = (errorKey: string) =>
+  z
+    .union([
+      z.literal(""),
+      z.string().trim().regex(/^\d+(\.\d{1,2})?$/, { error: errorKey }),
+    ])
+    .optional();
+
 export const BuiltinSignupSchema = z.object({
   firstName: z.string().min(NAME_MIN_LENGTH, {
     error: "members.signup.errors.firstNameRequired",
@@ -21,6 +32,11 @@ export const BuiltinSignupSchema = z.object({
   // Persists to Member.emailUnsubscribed; the member can flip it later via the
   // deregistration link. Defaults to opted-in.
   remindersOptOut: z.boolean().optional(),
+  // The amount the member commits to contribute (issue #82). Optional at
+  // signup — there's no tier yet to floor it against, so it's a free amount
+  // here; an admin can adjust once a tier is assigned. Empty → null (use the
+  // tier target). See services/member/contribution.ts.
+  contributionAmount: OptionalMoney("members.signup.errors.amountInvalid"),
 });
 
 // Admin-side edit of a member's core record from the detail view. Identity
@@ -57,6 +73,10 @@ export const EditMemberProfileSchema = z.object({
     .int({ error: "members.admin.edit.errors.householdInvalid" })
     .min(0, { error: "members.admin.edit.errors.householdInvalid" })
     .max(50, { error: "members.admin.edit.errors.householdInvalid" }),
+  // Committed contribution amount (issue #82). Empty → null (use the tier
+  // target). The tier-minimum floor is enforced server-side in the action,
+  // where the member's current tier is known. See contribution.ts.
+  contributionAmount: OptionalMoney("members.admin.edit.errors.amountInvalid"),
 });
 
 export type EditMemberProfileInput = z.infer<typeof EditMemberProfileSchema>;

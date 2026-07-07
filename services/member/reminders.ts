@@ -5,6 +5,7 @@ import type { FundBranding } from "@/services/email/transactional";
 import { prisma } from "@/services/db/prisma";
 import { sendPaymentReminder } from "@/services/email/transactional";
 import { buildCardLink } from "@/services/email/templates";
+import { resolveRequestedContribution } from "./contribution";
 import { REMINDER_ELIGIBLE_STATUS } from "./eligibility";
 
 // Monthly payment-request reminder (issue #39). Driven by the
@@ -112,6 +113,7 @@ async function remindFund(
       firstName: true,
       lastName: true,
       paymentReference: true,
+      contributionAmount: true,
       tier: { select: { allocationAmount: true } },
       primaryCard: { select: { serialNumber: true } },
     },
@@ -152,6 +154,7 @@ type ReminderMember = {
   firstName: string;
   lastName: string;
   paymentReference: string | null;
+  contributionAmount: { toString(): string } | null;
   tier: { allocationAmount: { toString(): string } } | null;
   primaryCard: { serialNumber: string } | null;
 };
@@ -216,7 +219,10 @@ async function remindOne(
     fund: branding,
     firstName: member.firstName,
     lastName: member.lastName,
-    amount: member.tier ? member.tier.allocationAmount.toString() : "",
+    amount: resolveRequestedContribution(
+      member.contributionAmount,
+      member.tier?.allocationAmount,
+    ),
     paymentReference: member.paymentReference ?? "",
     cardLink,
   });

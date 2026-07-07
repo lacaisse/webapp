@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { requireFundRole } from "@/services/auth/dal";
 import { prisma } from "@/services/db/prisma";
 
+import { contributionApplies, isBelowTierMinimum } from "./contribution";
 import { EditMemberProfileSchema } from "./schema";
 
 export type EditMemberProfileField =
@@ -20,7 +21,8 @@ export type EditMemberProfileField =
   | "iban"
   | "notes"
   | "householdAdults"
-  | "householdChildren";
+  | "householdChildren"
+  | "contributionAmount";
 
 export type UpdateMemberProfileResult =
   | { ok: true }
@@ -55,13 +57,40 @@ export async function updateMemberProfileAction(
 
   const member = await prisma.member.findFirst({
     where: { id: memberId, fundId: fund.id },
-    select: { id: true },
+    select: { id: true, tier: { select: { minContribution: true } } },
   });
   if (!member) return { error: t("members.admin.errors.notFound" as never) };
 
   // Normalise optional text: trimmed empty string → null so we don't store
   // empty strings that read as "set" downstream.
   const orNull = (v: string | undefined) => (v && v.length > 0 ? v : null);
+
+  // Committed contribution (issue #82): only applies to FIXED_PERIOD funds with
+  // tiers — drop any value otherwise. When it applies: empty → null (use the
+  // tier target), and a set value is floored against the member's current tier
+  // minimum (the schema can't do this since the tier lives outside the form).
+  // Tier-less members have no floor. See services/member/contribution.ts.
+  const tierCount = await prisma.allocationTier.count({
+    where: { fundId: fund.id, archivedAt: null },
+  });
+  const applies = contributionApplies(fund.allocationMode, tierCount);
+  const contributionAmount = applies
+    ? orNull(parsed.data.contributionAmount)
+    : null;
+  if (
+    contributionAmount !== null &&
+    isBelowTierMinimum(
+      Number(contributionAmount),
+      member.tier ? Number(member.tier.minContribution) : null,
+    )
+  ) {
+    return {
+      error: t("members.admin.edit.errors.amountBelowMin" as never, {
+        min: member.tier!.minContribution.toString(),
+      } as never),
+      field: "contributionAmount",
+    };
+  }
 
   try {
     await prisma.member.update({
@@ -78,6 +107,7 @@ export async function updateMemberProfileAction(
         notes: orNull(parsed.data.notes),
         householdAdults: parsed.data.householdAdults,
         householdChildren: parsed.data.householdChildren,
+        contributionAmount,
       },
     });
   } catch (e) {

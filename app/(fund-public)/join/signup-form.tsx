@@ -24,9 +24,12 @@ import {
 export function SignupForm({
   fields,
   referralCode,
+  showContribution,
 }: {
   fields: OnboardingFieldDef[];
   referralCode: string | null;
+  // Only FIXED_PERIOD funds with tiers ask for a commitment amount.
+  showContribution: boolean;
 }) {
   const t = useTranslations("members.signup");
   const tRoot = useTranslations();
@@ -38,6 +41,7 @@ export function SignupForm({
       firstName: "",
       lastName: "",
       email: "",
+      contributionAmount: "",
       remindersOptOut: false,
       extras: Object.fromEntries(
         fields.map((f) => [f.key, defaultValueFor(f)]),
@@ -115,6 +119,28 @@ export function SignupForm({
           </p>
         )}
       </div>
+
+      {showContribution && (
+        <div className="space-y-2">
+          <Label htmlFor="contributionAmount">{t("contributionAmount")}</Label>
+          <Input
+            id="contributionAmount"
+            type="number"
+            min={0}
+            step="0.01"
+            inputMode="decimal"
+            {...form.register("contributionAmount")}
+          />
+          <p className="text-xs text-muted-foreground">
+            {t("contributionAmountHint")}
+          </p>
+          {errors.contributionAmount && (
+            <p className="text-sm text-destructive">
+              {translateError(errors.contributionAmount.message)}
+            </p>
+          )}
+        </div>
+      )}
 
       {fields.map((field) => (
         <Controller

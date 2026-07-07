@@ -9,6 +9,7 @@ import { Prisma } from "@/services/db/generated/client";
 import { prisma } from "@/services/db/prisma";
 import { buildCardLink } from "@/services/email/templates";
 import { sendPaymentReminder } from "@/services/email/transactional";
+import { resolveRequestedContribution } from "@/services/member/contribution";
 import { REMINDER_ELIGIBLE_STATUS } from "@/services/member/eligibility";
 
 // Manual "remind the unpaid members" action, driven from the period detail
@@ -41,6 +42,7 @@ const MEMBER_SELECT = {
   firstName: true,
   lastName: true,
   paymentReference: true,
+  contributionAmount: true,
   tier: { select: { allocationAmount: true } },
   primaryCard: { select: { serialNumber: true } },
 } satisfies Prisma.MemberSelect;
@@ -213,7 +215,10 @@ async function remindOne(
     },
     firstName: member.firstName,
     lastName: member.lastName,
-    amount: member.tier ? member.tier.allocationAmount.toString() : "",
+    amount: resolveRequestedContribution(
+      member.contributionAmount,
+      member.tier?.allocationAmount,
+    ),
     paymentReference: member.paymentReference ?? "",
     cardLink,
   });
