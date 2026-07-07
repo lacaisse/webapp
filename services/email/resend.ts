@@ -3,9 +3,9 @@ import "server-only";
 import { Resend } from "resend";
 
 // Direct transactional sends (fund invites, welcome flow, etc.). Auth emails
-// — verification, password reset, magic-link OTP — are sent by Supabase via
-// SMTP routed through Resend at the dashboard level, NOT through this module.
-// Configuring Resend SMTP in Supabase = no code involvement here.
+// — e.g. password reset — are sent by us too: Better Auth callbacks in
+// services/auth/better-auth.ts (sendResetPassword) call sendEmail() here.
+// There's no external SMTP layer; every send flows through this module.
 
 let cached: Resend | undefined;
 
