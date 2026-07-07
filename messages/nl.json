@@ -1284,7 +1284,8 @@
           "address": "Het postadres van het lid",
           "cardLink": "Link naar de openbare kaartpagina van het lid",
           "cardNumber": "Het kaartnummer van het lid",
-          "paymentReference": "De mededeling die bij de overschrijving moet worden vermeld"
+          "paymentReference": "De mededeling die bij de overschrijving moet worden vermeld",
+          "payLink": "Link naar de betaalpagina van het lid (met de mededeling, IBAN en QR-code)"
         },
         "usingDefault": "Standaardsjabloon in gebruik.",
         "usingOverride": "Aangepast sjabloon voor dit fonds in gebruik.",

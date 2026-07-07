@@ -237,10 +237,9 @@ export async function sendPaymentReminder(args: {
   // The member's expected monthly contribution (tier target amount), already
   // stringified. "" when the member has no tier assigned.
   amount: string;
-  // Bank-transfer communication bank-sync matches on.
-  paymentReference: string;
-  // Public account / tap URL ({cardLink}); "" when the member has no card.
-  cardLink: string;
+  // Public payment page ({payLink}, buildPayLink) carrying the reference, IBAN
+  // and QR; "" when the member has no card.
+  payLink: string;
 }): Promise<void> {
   await dispatchTemplate({
     emailId: args.emailId,
@@ -255,8 +254,7 @@ export async function sendPaymentReminder(args: {
           lastName: args.lastName,
           fundName: args.fund.name,
           amount: args.amount,
-          paymentReference: args.paymentReference,
-          cardLink: args.cardLink,
+          payLink: args.payLink,
         },
       }),
     to: args.toEmail,

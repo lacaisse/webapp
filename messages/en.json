@@ -1648,7 +1648,8 @@
           "address": "The member's postal address",
           "cardLink": "Link to the member's public card page",
           "cardNumber": "The member's card number",
-          "paymentReference": "The reference to include on the bank transfer"
+          "paymentReference": "The reference to include on the bank transfer",
+          "payLink": "Link to the member's payment page (with the reference, IBAN and QR code)"
         },
         "usingDefault": "Using the default template.",
         "usingOverride": "Using a custom template for this fund.",

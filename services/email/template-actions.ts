@@ -20,6 +20,7 @@ import {
 } from "./template-config";
 import {
   buildCardLink,
+  buildPayLink,
   buildShopList,
   formatMemberAddress,
   htmlToPlainText,
@@ -291,9 +292,9 @@ export async function sendTestCardAssignedEmailAction(input: {
 }
 
 // Send a one-off test of the PAYMENT_REMINDER_FIRST email, populated from a
-// real member so {amount} (tier minimum), {paymentReference} and {cardLink}
-// render with live data. Requires a tier (for the amount) and a primary card
-// (for the link), matching what the real reminder cron needs. Transient — no
+// real member so {amount} (tier minimum) and {payLink} render with live data.
+// Requires a tier (for the amount) and a primary card (for the link), matching
+// what the real reminder cron needs. Transient — no
 // Email row / idempotency. Honours the fund's custom sender.
 export async function sendTestPaymentReminderEmailAction(input: {
   memberId: string;
@@ -344,12 +345,8 @@ export async function sendTestPaymentReminderEmailAction(input: {
       lastName: member.lastName,
       fundName: fund.name,
       amount: member.tier.allocationAmount.toString(),
-      // The bank-transfer reference is the card UID (bank-sync's match key).
-      paymentReference: member.primaryCard.serialNumber,
-      cardLink: buildCardLink(
-        member.primaryCard.serialNumber,
-        await resolveTreasurySlug(fund),
-      ),
+      // The public payment page carries the reference (card UID), IBAN and QR.
+      payLink: buildPayLink(fund.domain, member.primaryCard.serialNumber),
     },
   });
 

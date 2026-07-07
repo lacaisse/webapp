@@ -4,7 +4,7 @@ import "server-only";
 import type { FundBranding } from "@/services/email/transactional";
 import { prisma } from "@/services/db/prisma";
 import { sendPaymentReminder } from "@/services/email/transactional";
-import { buildCardLink } from "@/services/email/templates";
+import { buildPayLink } from "@/services/email/templates";
 import { resolveRequestedContribution } from "./contribution";
 import { REMINDER_ELIGIBLE_STATUS } from "./eligibility";
 
@@ -33,8 +33,8 @@ const FUND_SELECT = {
   primaryColor: true,
   logoUrl: true,
   senderEmail: true,
-  // Cached treasury slug for the public card/account link in the email body.
-  citizenPayTreasurySlug: true,
+  // Canonical hostname — used to build the public payment-page link ({payLink}).
+  domain: true,
 } as const;
 
 export type FundReminderStats = {
@@ -76,7 +76,7 @@ type ReminderFund = {
   primaryColor: string | null;
   logoUrl: string | null;
   senderEmail: string | null;
-  citizenPayTreasurySlug: string | null;
+  domain: string;
 };
 
 async function remindFund(
@@ -205,9 +205,10 @@ async function remindOne(
     emailId = existing.id;
   }
 
-  // Use the cached treasury slug directly (no live CP fetch in the batch path).
-  const cardLink = member.primaryCard
-    ? buildCardLink(member.primaryCard.serialNumber, fund.citizenPayTreasurySlug)
+  // The public payment page (on the fund's own domain) presents the reference,
+  // IBAN and QR — the reminder just links there. "" when the member has no card.
+  const payLink = member.primaryCard
+    ? buildPayLink(fund.domain, member.primaryCard.serialNumber)
     : "";
 
   await sendPaymentReminder({
@@ -221,10 +222,7 @@ async function remindOne(
       member.contributionAmount,
       member.tier?.allocationAmount,
     ),
-    // The bank-transfer reference is the card UID — the only value bank-sync
-    // matches an incoming deposit on (see services/bank-sync/matching/match.ts).
-    paymentReference: member.primaryCard?.serialNumber ?? "",
-    cardLink,
+    payLink,
   });
 
   const after = await prisma.email.findUnique({

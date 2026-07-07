@@ -4,6 +4,7 @@ import "server-only";
 import { getTranslations } from "next-intl/server";
 
 import { prisma } from "@/services/db/prisma";
+import { getFundUrl } from "@/services/fund/server";
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from "@/services/i18n/config";
 import {
   EDITABLE_EMAIL_TEMPLATES,
@@ -26,6 +27,16 @@ export function buildCardLink(
 ): string {
   const base = `${TAP_BASE_URL}/card/${encodeURIComponent(serialNumber)}`;
   return slug ? `${base}?network=${encodeURIComponent(slug)}` : base;
+}
+
+// The member-facing public payment page for a card, on the fund's own domain
+// (app/(fund-public)/pay/[serial]). It already presents the full bank-transfer
+// details — beneficiary, IBAN, reference and a scannable EPC QR — so the
+// payment reminder links here ({payLink}) instead of restating the reference.
+// `fundDomain` is the canonical `Fund.domain`; getFundUrl maps it to the
+// routable host for the current environment.
+export function buildPayLink(fundDomain: string, serialNumber: string): string {
+  return `${getFundUrl(fundDomain)}/pay/${encodeURIComponent(serialNumber)}`;
 }
 
 // One-line postal address from a member's address parts, skipping blanks.
@@ -249,9 +260,10 @@ const CARD_ASSIGNED_DEFAULTS: Record<
 // The PAYMENT_REMINDER_FIRST ("monthly payment request") default. Adapted from
 // La CLASS's template (issue #39) but tenant-neutral: no fund-specific copy,
 // and — since this platform reconciles contributions by bank transfer matched
-// on the member's reference, not an online checkout — it shows the bank-transfer
-// {paymentReference} instead of a "pay now" button. Colours are kept neutral
-// (the brand colour is only applied to text-mode CTAs, not HTML bodies).
+// on the member's reference, not an online checkout — it points the member at
+// their public payment page ({payLink}, app/(fund-public)/pay/[serial]) rather
+// than restating the reference inline. That page already shows the beneficiary,
+// IBAN, reference and EPC QR, so the email stays short and always in sync.
 const PAYMENT_REMINDER_DEFAULTS: Record<
   string,
   { subject: string; bodyHtml: string }
@@ -265,9 +277,10 @@ const PAYMENT_REMINDER_DEFAULTS: Record<
     <h3 style="margin-top: 0;">Détails de votre cotisation</h3>
     <p style="margin: 8px 0;"><strong>Cotisation mensuelle :</strong> {amount} €</p>
   </div>
-  <p>Pour effectuer votre cotisation, faites un virement bancaire en indiquant bien la communication suivante, afin que votre paiement soit reconnu automatiquement :</p>
-  <div style="background-color: #f1eee8; padding: 12px 16px; border-radius: 8px; margin: 20px 0; font-family: monospace; font-size: 16px; word-break: break-word;">{paymentReference}</div>
-  <p>Vous pouvez retrouver les informations de votre compte {fundName} <a href="{cardLink}" style="color: #2563eb;">à cette adresse</a>.</p>
+  <p>Pour effectuer votre cotisation, rendez-vous sur votre page de paiement : vous y trouverez le bénéficiaire, l'IBAN, la référence à indiquer et un QR code à scanner depuis votre application bancaire.</p>
+  <p style="text-align: center; margin: 28px 0;">
+    <a href="{payLink}" style="background-color: hsl(25, 95%, 53%); color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">Effectuer ma cotisation</a>
+  </p>
   <p>Merci pour votre soutien, et à bientôt,<br><strong>L'équipe {fundName}</strong></p>
 </div>`,
   },
@@ -280,9 +293,10 @@ const PAYMENT_REMINDER_DEFAULTS: Record<
     <h3 style="margin-top: 0;">Your contribution</h3>
     <p style="margin: 8px 0;"><strong>Monthly contribution:</strong> {amount} €</p>
   </div>
-  <p>To make your contribution, send a bank transfer with the following reference so your payment is recognised automatically:</p>
-  <div style="background-color: #f1eee8; padding: 12px 16px; border-radius: 8px; margin: 20px 0; font-family: monospace; font-size: 16px; word-break: break-word;">{paymentReference}</div>
-  <p>You can find your {fundName} account details <a href="{cardLink}" style="color: #2563eb;">at this link</a>.</p>
+  <p>To make your contribution, head to your payment page: you'll find the beneficiary, IBAN, the reference to include, and a QR code you can scan from your banking app.</p>
+  <p style="text-align: center; margin: 28px 0;">
+    <a href="{payLink}" style="background-color: hsl(25, 95%, 53%); color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">Make my contribution</a>
+  </p>
   <p>Thanks for your support, and see you soon,<br><strong>The {fundName} team</strong></p>
 </div>`,
   },
@@ -354,8 +368,8 @@ export async function resolveCardAssignedTemplate(args: {
 // The PAYMENT_REMINDER_FIRST email. Same override-or-default shape as
 // CARD_ASSIGNED — every variable is a plain scalar the caller resolves up front
 // (the reminder cron / test send): {amount} the member's monthly contribution,
-// {paymentReference} the bank-transfer communication, {cardLink} the public
-// account URL. The built-in default is authored as rich HTML.
+// {payLink} the public payment page (buildPayLink) that carries the reference,
+// IBAN and QR. The built-in default is authored as rich HTML.
 export async function resolvePaymentReminderTemplate(args: {
   fundId: string;
   // Recipient's language for the built-in default (overrides are single-locale).
@@ -365,8 +379,7 @@ export async function resolvePaymentReminderTemplate(args: {
     lastName: string;
     fundName: string;
     amount: string;
-    paymentReference: string;
-    cardLink: string;
+    payLink: string;
   };
 }): Promise<Rendered> {
   const override = await prisma.emailTemplate.findUnique({
