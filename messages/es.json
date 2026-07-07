@@ -1648,7 +1648,8 @@
           "address": "La dirección postal del miembro",
           "cardLink": "Enlace a la página pública de la tarjeta del miembro",
           "cardNumber": "El número de tarjeta del miembro",
-          "paymentReference": "La referencia que se debe incluir en la transferencia bancaria"
+          "paymentReference": "La referencia que se debe incluir en la transferencia bancaria",
+          "paymentLink": "Enlace a la página de pago pública del miembro"
         },
         "usingDefault": "Usando la plantilla predeterminada.",
         "usingOverride": "Usando una plantilla personalizada para este fondo.",

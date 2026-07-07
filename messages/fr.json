@@ -1648,7 +1648,8 @@
           "address": "L'adresse postale du membre",
           "cardLink": "Lien vers la page publique de la carte du membre",
           "cardNumber": "Le numéro de carte du membre",
-          "paymentReference": "La communication à indiquer sur le virement bancaire"
+          "paymentReference": "La communication à indiquer sur le virement bancaire",
+          "paymentLink": "Lien vers la page de paiement publique du membre"
         },
         "usingDefault": "Modèle par défaut utilisé.",
         "usingOverride": "Modèle personnalisé utilisé pour cette caisse.",

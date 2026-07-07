@@ -1648,7 +1648,8 @@
           "address": "Het postadres van het lid",
           "cardLink": "Link naar de openbare kaartpagina van het lid",
           "cardNumber": "Het kaartnummer van het lid",
-          "paymentReference": "De mededeling die bij de overschrijving moet worden vermeld"
+          "paymentReference": "De mededeling die bij de overschrijving moet worden vermeld",
+          "paymentLink": "Link naar de openbare betaalpagina van het lid"
         },
         "usingDefault": "Standaardsjabloon in gebruik.",
         "usingOverride": "Aangepast sjabloon voor dit fonds in gebruik.",

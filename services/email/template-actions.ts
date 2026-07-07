@@ -8,6 +8,8 @@ import { z } from "zod";
 import { requireFundRole } from "@/services/auth/dal";
 import { resolveTreasurySlug } from "@/services/citizenpay/treasury-slug";
 import { prisma } from "@/services/db/prisma";
+import { resolveRequestedContribution } from "@/services/member/contribution";
+import { buildPaymentPageUrl } from "@/services/payment/pay-link";
 import { sendEmail } from "./resend";
 import { renderBrandedEmail } from "./template";
 import {
@@ -291,10 +293,11 @@ export async function sendTestCardAssignedEmailAction(input: {
 }
 
 // Send a one-off test of the PAYMENT_REMINDER_FIRST email, populated from a
-// real member so {amount} (tier minimum), {paymentReference} and {cardLink}
-// render with live data. Requires a tier (for the amount) and a primary card
-// (for the link), matching what the real reminder cron needs. Transient — no
-// Email row / idempotency. Honours the fund's custom sender.
+// real member so {amount} (committed contribution or tier target),
+// {paymentReference}, {cardLink} and {paymentLink} render with live data.
+// Requires a tier (for the amount) and a primary card (for the links), matching
+// what the real reminder cron needs. Transient — no Email row / idempotency.
+// Honours the fund's custom sender.
 export async function sendTestPaymentReminderEmailAction(input: {
   memberId: string;
   toEmail: string;
@@ -316,6 +319,7 @@ export async function sendTestPaymentReminderEmailAction(input: {
     select: {
       firstName: true,
       lastName: true,
+      contributionAmount: true,
       tier: { select: { allocationAmount: true } },
       primaryCard: { select: { serialNumber: true } },
     },
@@ -343,12 +347,19 @@ export async function sendTestPaymentReminderEmailAction(input: {
       firstName: member.firstName,
       lastName: member.lastName,
       fundName: fund.name,
-      amount: member.tier.allocationAmount.toString(),
+      amount: resolveRequestedContribution(
+        member.contributionAmount,
+        member.tier.allocationAmount,
+      ),
       // The bank-transfer reference is the card UID (bank-sync's match key).
       paymentReference: member.primaryCard.serialNumber,
       cardLink: buildCardLink(
         member.primaryCard.serialNumber,
         await resolveTreasurySlug(fund),
+      ),
+      paymentLink: buildPaymentPageUrl(
+        fund.domain,
+        member.primaryCard.serialNumber,
       ),
     },
   });

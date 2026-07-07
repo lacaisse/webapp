@@ -267,6 +267,10 @@ const PAYMENT_REMINDER_DEFAULTS: Record<
   </div>
   <p>Pour effectuer votre cotisation, faites un virement bancaire en indiquant bien la communication suivante, afin que votre paiement soit reconnu automatiquement :</p>
   <div style="background-color: #f1eee8; padding: 12px 16px; border-radius: 8px; margin: 20px 0; font-family: monospace; font-size: 16px; word-break: break-word;">{paymentReference}</div>
+  <p>Retrouvez le montant à payer, l'IBAN et un QR code de virement sur votre page de paiement :</p>
+  <div style="text-align: center; margin: 30px 0;">
+    <a href="{paymentLink}" style="background-color: #111827; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">Payer ma cotisation</a>
+  </div>
   <p>Vous pouvez retrouver les informations de votre compte {fundName} <a href="{cardLink}" style="color: #2563eb;">à cette adresse</a>.</p>
   <p>Merci pour votre soutien, et à bientôt,<br><strong>L'équipe {fundName}</strong></p>
 </div>`,
@@ -282,6 +286,10 @@ const PAYMENT_REMINDER_DEFAULTS: Record<
   </div>
   <p>To make your contribution, send a bank transfer with the following reference so your payment is recognised automatically:</p>
   <div style="background-color: #f1eee8; padding: 12px 16px; border-radius: 8px; margin: 20px 0; font-family: monospace; font-size: 16px; word-break: break-word;">{paymentReference}</div>
+  <p>Find the amount to pay, the IBAN and a transfer QR code on your payment page:</p>
+  <div style="text-align: center; margin: 30px 0;">
+    <a href="{paymentLink}" style="background-color: #111827; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">Pay my contribution</a>
+  </div>
   <p>You can find your {fundName} account details <a href="{cardLink}" style="color: #2563eb;">at this link</a>.</p>
   <p>Thanks for your support, and see you soon,<br><strong>The {fundName} team</strong></p>
 </div>`,
@@ -355,7 +363,8 @@ export async function resolveCardAssignedTemplate(args: {
 // CARD_ASSIGNED — every variable is a plain scalar the caller resolves up front
 // (the reminder cron / test send): {amount} the member's monthly contribution,
 // {paymentReference} the bank-transfer communication, {cardLink} the public
-// account URL. The built-in default is authored as rich HTML.
+// account URL, {paymentLink} the public /pay/<serial> page. The built-in
+// default is authored as rich HTML.
 export async function resolvePaymentReminderTemplate(args: {
   fundId: string;
   // Recipient's language for the built-in default (overrides are single-locale).
@@ -367,6 +376,7 @@ export async function resolvePaymentReminderTemplate(args: {
     amount: string;
     paymentReference: string;
     cardLink: string;
+    paymentLink: string;
   };
 }): Promise<Rendered> {
   const override = await prisma.emailTemplate.findUnique({
