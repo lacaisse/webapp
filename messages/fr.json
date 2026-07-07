@@ -2013,6 +2013,35 @@
         "saving": "Enregistrement…",
         "stoppedWarning": "Marquer comme Arrêté enregistre une date de départ. Utilisez En pause pour une pause temporaire."
       },
+      "bulk": {
+        "selectAll": "Sélectionner tous les membres",
+        "selectRow": "Sélectionner le membre",
+        "selected": "{count} sélectionné(s)",
+        "clearSelection": "Effacer",
+        "edit": "Modifier la sélection",
+        "dialogTitle": "Modifier les membres sélectionnés",
+        "dialogDescription": "Appliquer une modification aux {count} membre(s) sélectionné(s).",
+        "propertyLabel": "Propriété",
+        "property": {
+          "locale": "Langue",
+          "status": "Statut",
+          "tier": "Palier"
+        },
+        "valueLabel": "Nouvelle valeur",
+        "tierNone": "— Aucun palier —",
+        "statusHint": "Les membres dont le statut actuel ne permet pas la transition sont ignorés.",
+        "stoppedWarning": "Marquer comme Arrêté enregistre une date de départ. Utilisez En pause pour une pause temporaire.",
+        "resultSkipped": "{updated} mis à jour, {skipped} ignoré(s) (changement de statut non autorisé depuis leur statut actuel).",
+        "done": "Terminé",
+        "cancel": "Annuler",
+        "apply": "Appliquer",
+        "applying": "Application…",
+        "errors": {
+          "noSelection": "Sélectionnez d'abord au moins un membre.",
+          "tooMany": "Trop de membres sélectionnés à la fois.",
+          "invalidValue": "Cette valeur n'est pas valide."
+        }
+      },
       "import": {
         "title": "Importer des membres",
         "description": "Importez ou collez un CSV avec en-têtes, puis associez chaque colonne à un champ membre.",
@@ -2081,6 +2110,9 @@
         "emailLabel": "E-mail",
         "phoneLabel": "Téléphone",
         "ibanLabel": "IBAN",
+        "localeLabel": "Langue des e-mails",
+        "localeDefault": "Défaut de la caisse",
+        "localeHint": "La langue dans laquelle les e-mails de ce membre sont envoyés.",
         "addressLabel": "Adresse",
         "postalCodeLabel": "Code postal",
         "cityLabel": "Ville",
@@ -2097,7 +2129,8 @@
           "tooLong": "Cette valeur est trop longue.",
           "householdInvalid": "Saisissez un nombre entier supérieur ou égal à 0.",
           "amountInvalid": "Saisissez un montant valide (jusqu'à 2 décimales).",
-          "amountBelowMin": "Le montant ne peut pas être inférieur au minimum du palier ({min})."
+          "amountBelowMin": "Le montant ne peut pas être inférieur au minimum du palier ({min}).",
+          "localeInvalid": "Choisissez une langue prise en charge."
         }
       }
     }

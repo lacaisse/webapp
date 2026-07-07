@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { z } from "zod";
 
+import { isSupportedLocale } from "@/services/i18n/config";
+
 // Built-in signup fields per the choice in design: only firstName / lastName
 // / email are hardcoded in the form. Custom fields (any per-fund extras)
 // live in OnboardingField rows; their values are validated server-side
@@ -58,6 +60,16 @@ export const EditMemberProfileSchema = z.object({
   }),
   email: z.string().trim().email({ error: "members.signup.errors.emailInvalid" }),
   phone: OptionalText,
+  // Preferred email language. Empty → null (fall back to the fund default). A
+  // non-empty value must be one of SUPPORTED_LOCALES; the select constrains
+  // this client-side, the refine guards a tampered request. See
+  // services/email/transactional.ts, which reads Member.locale first.
+  locale: z
+    .string()
+    .optional()
+    .refine((v) => !v || isSupportedLocale(v), {
+      error: "members.admin.edit.errors.localeInvalid",
+    }),
   address: OptionalText,
   postalCode: OptionalText,
   city: OptionalText,

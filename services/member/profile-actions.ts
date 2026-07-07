@@ -15,6 +15,7 @@ export type EditMemberProfileField =
   | "lastName"
   | "email"
   | "phone"
+  | "locale"
   | "address"
   | "postalCode"
   | "city"
@@ -100,6 +101,7 @@ export async function updateMemberProfileAction(
         lastName: parsed.data.lastName,
         email: parsed.data.email,
         phone: orNull(parsed.data.phone),
+        locale: orNull(parsed.data.locale),
         address: orNull(parsed.data.address),
         postalCode: orNull(parsed.data.postalCode),
         city: orNull(parsed.data.city),

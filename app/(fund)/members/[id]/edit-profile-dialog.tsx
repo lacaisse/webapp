@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SUPPORTED_LOCALES } from "@/services/i18n/config";
 import {
   type EditMemberProfileField,
   updateMemberProfileAction,
@@ -28,6 +29,8 @@ type Values = {
   lastName: string;
   email: string;
   phone: string;
+  // "" means "no explicit preference" (falls back to the fund default locale).
+  locale: string;
   address: string;
   postalCode: string;
   city: string;
@@ -49,6 +52,7 @@ export function EditProfileDialog({
     lastName: string;
     email: string;
     phone: string | null;
+    locale: string | null;
     address: string | null;
     postalCode: string | null;
     city: string | null;
@@ -66,6 +70,7 @@ export function EditProfileDialog({
   showContribution: boolean;
 }) {
   const t = useTranslations("members.admin.edit");
+  const tLocale = useTranslations("locale");
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -78,6 +83,7 @@ export function EditProfileDialog({
     lastName: member.lastName,
     email: member.email,
     phone: member.phone ?? "",
+    locale: member.locale ?? "",
     address: member.address ?? "",
     postalCode: member.postalCode ?? "",
     city: member.city ?? "",
@@ -182,6 +188,24 @@ export function EditProfileDialog({
             onChange={set("iban")}
             invalid={errorField === "iban"}
           />
+          <div className="space-y-2">
+            <Label htmlFor="edit-locale">{t("localeLabel")}</Label>
+            <select
+              id="edit-locale"
+              value={values.locale}
+              onChange={(e) => set("locale")(e.target.value)}
+              aria-invalid={errorField === "locale"}
+              className="h-9 w-full rounded-md bg-background px-2 text-sm ring-1 ring-foreground/15 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <option value="">{t("localeDefault")}</option>
+              {SUPPORTED_LOCALES.map((loc) => (
+                <option key={loc} value={loc}>
+                  {tLocale(loc)}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-muted-foreground">{t("localeHint")}</p>
+          </div>
           <div className="sm:col-span-2">
             <Field
               id="edit-address"
