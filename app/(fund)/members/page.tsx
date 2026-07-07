@@ -153,12 +153,13 @@ async function MembersContent({
   const q = sp.q?.trim() || null;
 
   const status = statusFilterFor(active);
-  const [members, tiers] = await Promise.all([
+  const searchWhere = q ? memberSearchWhere(q) : {};
+  const [members, tiers, statusCounts] = await Promise.all([
     prisma.member.findMany({
       where: {
         fundId: fund.id,
         ...(status ? { status } : {}),
-        ...(q ? memberSearchWhere(q) : {}),
+        ...searchWhere,
       },
       orderBy: { createdAt: "desc" },
       include: {
@@ -184,7 +185,22 @@ async function MembersContent({
       orderBy: [{ position: "asc" }, { createdAt: "asc" }],
       select: { id: true, name: true },
     }),
+    prisma.member.groupBy({
+      by: ["status"],
+      where: { fundId: fund.id, ...searchWhere },
+      _count: true,
+    }),
   ]);
+
+  // Per-tab member count (issue #104), respecting the active search query so
+  // the numbers track what's actually filtered, not the fund's raw totals.
+  const countByStatus = new Map(
+    statusCounts.map((row) => [row.status, row._count]),
+  );
+  const countFor = (tab: TabValue): number =>
+    tab === "all"
+      ? statusCounts.reduce((sum, row) => sum + row._count, 0)
+      : (countByStatus.get(statusFilterFor(tab) as MemberStatus) ?? 0);
 
   return (
     <>
@@ -193,7 +209,10 @@ async function MembersContent({
           active={active}
           items={TABS.map((tab) => ({
             value: tab.value,
-            label: t(`tabs.${tab.value}`),
+            label: t("tabWithCount", {
+              label: t(`tabs.${tab.value}`),
+              count: countFor(tab.value),
+            }),
           }))}
         />
         <TableSearch placeholder={t("searchPlaceholder")} />

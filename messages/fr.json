@@ -411,6 +411,7 @@
         "stopped": "Arrêtés",
         "rejected": "Refusés"
       },
+      "tabWithCount": "{label} ({count})",
       "columns": {
         "name": "Nom",
         "email": "Email",

@@ -411,6 +411,7 @@
         "stopped": "Stopped",
         "rejected": "Rejected"
       },
+      "tabWithCount": "{label} ({count})",
       "columns": {
         "name": "Name",
         "email": "Email",
