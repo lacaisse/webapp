@@ -2761,5 +2761,31 @@
       "monthMismatch": "La fecha de corte debe estar dentro del mes del período.",
       "notFixedPeriod": "Los períodos solo se aplican cuando la asignación está en modo de período fijo."
     }
+  },
+  "cotisation": {
+    "title": "Pago de la cuota mensual",
+    "greeting": "Hola {name}, realiza tu cuota mensual utilizando los datos que aparecen a continuación",
+    "back": "Volver al sitio web",
+    "manual": {
+      "title": "Pagar por transferencia",
+      "beneficiary": "Nombre del beneficiario",
+      "iban": "IBAN",
+      "reference": "Referencia de pago",
+      "amount": "Importe",
+      "referenceNotice": "Importante: incluye la referencia de pago {reference} en tu transferencia. Nos ayuda a identificar correctamente tu pago."
+    },
+    "qr": {
+      "title": "Escanear para pagar",
+      "hint": "Escanea con tu aplicación bancaria"
+    },
+    "instructions": {
+      "title": "Instrucciones de pago",
+      "qrTitle": "Opción 1: Escanear el código QR",
+      "qrBody": "Abre tu aplicación bancaria y utiliza el escáner de QR para rellenar automáticamente todos los datos del pago.",
+      "manualTitle": "Opción 2: Transferencia manual",
+      "manualBody": "Usa los botones de copia de arriba para copiar cada campo y pegarlo en tu aplicación bancaria. Asegúrate de incluir la referencia de pago.",
+      "help": "Si tienes alguna pregunta o problema con tu pago, ponte en contacto con {fundName}."
+    },
+    "notConnected": "Los datos bancarios aún no están disponibles. Inténtalo de nuevo más tarde o ponte en contacto con {fundName}."
   }
 }

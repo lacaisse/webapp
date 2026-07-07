@@ -3161,5 +3161,31 @@
       "monthMismatch": "La date limite doit se situer dans le mois de la période.",
       "notFixedPeriod": "Les périodes ne s'appliquent que lorsque l'allocation est en mode période fixe."
     }
+  },
+  "cotisation": {
+    "title": "Paiement de la cotisation mensuelle",
+    "greeting": "Bonjour {name}, veuillez effectuer votre cotisation mensuelle en utilisant les informations ci-dessous",
+    "back": "Retour au site web",
+    "manual": {
+      "title": "Payer par virement",
+      "beneficiary": "Nom du bénéficiaire",
+      "iban": "IBAN",
+      "reference": "Référence de paiement",
+      "amount": "Montant",
+      "referenceNotice": "Important : veuillez inclure la référence de paiement {reference} lors de votre virement. Cela nous aide à identifier correctement votre paiement."
+    },
+    "qr": {
+      "title": "Scanner pour payer",
+      "hint": "Scannez avec votre application bancaire"
+    },
+    "instructions": {
+      "title": "Instructions de paiement",
+      "qrTitle": "Option 1 : Scanner le code QR",
+      "qrBody": "Ouvrez votre application bancaire et utilisez le scanner QR pour remplir automatiquement tous les détails du paiement.",
+      "manualTitle": "Option 2 : Virement manuel",
+      "manualBody": "Utilisez les boutons de copie ci-dessus pour copier chaque champ et les coller dans votre application bancaire. Assurez-vous d'inclure la référence de paiement.",
+      "help": "Si vous avez des questions ou des problèmes avec votre paiement, veuillez contacter {fundName}."
+    },
+    "notConnected": "Les coordonnées bancaires ne sont pas encore disponibles. Veuillez réessayer plus tard ou contacter {fundName}."
   }
 }

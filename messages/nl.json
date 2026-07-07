@@ -2761,5 +2761,31 @@
       "monthMismatch": "De afkapdatum moet binnen de maand van de periode vallen.",
       "notFixedPeriod": "Periodes gelden alleen wanneer allocatie op vaste periode staat."
     }
+  },
+  "cotisation": {
+    "title": "Betaling van de maandelijkse bijdrage",
+    "greeting": "Hallo {name}, gelieve uw maandelijkse bijdrage te betalen met behulp van onderstaande gegevens",
+    "back": "Terug naar de website",
+    "manual": {
+      "title": "Betalen via overschrijving",
+      "beneficiary": "Naam begunstigde",
+      "iban": "IBAN",
+      "reference": "Betalingsreferentie",
+      "amount": "Bedrag",
+      "referenceNotice": "Belangrijk: vermeld de betalingsreferentie {reference} bij uw overschrijving. Zo kunnen wij uw betaling correct herkennen."
+    },
+    "qr": {
+      "title": "Scan om te betalen",
+      "hint": "Scan met uw bankapp"
+    },
+    "instructions": {
+      "title": "Betalingsinstructies",
+      "qrTitle": "Optie 1: Scan de QR-code",
+      "qrBody": "Open uw bankapp en gebruik de QR-scanner om alle betalingsgegevens automatisch in te vullen.",
+      "manualTitle": "Optie 2: Handmatige overschrijving",
+      "manualBody": "Gebruik de kopieerknoppen hierboven om elk veld te kopiëren en in uw bankapp te plakken. Vergeet niet de betalingsreferentie te vermelden.",
+      "help": "Als u vragen of problemen heeft met uw betaling, neem dan contact op met {fundName}."
+    },
+    "notConnected": "De bankgegevens zijn nog niet beschikbaar. Probeer het later opnieuw of neem contact op met {fundName}."
   }
 }

@@ -3161,5 +3161,31 @@
       "monthMismatch": "The cutoff date must fall within the period's own month.",
       "notFixedPeriod": "Periods only apply when allocation is set to fixed period."
     }
+  },
+  "cotisation": {
+    "title": "Monthly contribution payment",
+    "greeting": "Hello {name}, please make your monthly contribution using the details below",
+    "back": "Back to website",
+    "manual": {
+      "title": "Pay by bank transfer",
+      "beneficiary": "Beneficiary name",
+      "iban": "IBAN",
+      "reference": "Payment reference",
+      "amount": "Amount",
+      "referenceNotice": "Important: please include the payment reference {reference} with your transfer. It helps us correctly identify your payment."
+    },
+    "qr": {
+      "title": "Scan to pay",
+      "hint": "Scan with your banking app"
+    },
+    "instructions": {
+      "title": "Payment instructions",
+      "qrTitle": "Option 1: Scan the QR code",
+      "qrBody": "Open your banking app and use the QR scanner to automatically fill in all the payment details.",
+      "manualTitle": "Option 2: Manual transfer",
+      "manualBody": "Use the copy buttons above to copy each field and paste it into your banking app. Make sure to include the payment reference.",
+      "help": "If you have any questions or problems with your payment, please contact {fundName}."
+    },
+    "notConnected": "Bank details are not available yet. Please try again later or contact {fundName}."
   }
 }
