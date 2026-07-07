@@ -23,8 +23,8 @@ This is an admin dashboard. Follow industry best practices for a Next.js admin a
 - **Always confirm destructive actions** (delete, archive, irreversible changes) with an in-app confirmation step before firing the server action.
 
 ## Stack
-- **Auth**: Supabase Auth.
-- **Database**: Postgres on Supabase, accessed via **Prisma** (not the Supabase JS client). Supabase JS is only for auth/storage/realtime — not for queries.
+- **Auth**: **Better Auth** (`better-auth` + `@better-auth/passkey`), self-hosted on our Postgres via the Prisma adapter. Centralized login on `auth.<APP_DOMAIN>` with a cross-host session handoff (see the Auth sections below).
+- **Database**: Postgres on Supabase, accessed via **Prisma**. Supabase is only the database host — the Supabase JS client is not used anywhere (auth is Better Auth, queries are Prisma).
 - **UI**: shadcn/ui — `style: "base-nova"`, neutral base, `iconLibrary: "lucide"`. ⚠️ The `base-nova` variant is built on **`@base-ui/react` (v1.3)**, **not Radix** — when adding components or reading docs, use Base UI primitives. Utilities: `lucide-react`, `class-variance-authority`, `clsx`, `tailwind-merge`, `tw-animate-css`.
 - **Forms**: `react-hook-form` + `zod` (schemas shared between client validation and server action input parsing).
 - **Hosting & cron**: Vercel.
@@ -35,7 +35,7 @@ This is an admin dashboard. Follow industry best practices for a Next.js admin a
 These are non-obvious facts about the Next 16 / Prisma 7 stack that bit us during scaffolding.
 
 ### Next 16
-- **`middleware.ts` is now `proxy.ts`**, function `proxy()`. Same `NextRequest`/`NextResponse` API. Runs on Node.js runtime (good for Supabase compat). See `proxy.ts` at the project root.
+- **`middleware.ts` is now `proxy.ts`**, function `proxy()`. Same `NextRequest`/`NextResponse` API. Runs on Node.js runtime (needed for the Prisma fund lookup). See `proxy.ts` at the project root.
 - **`cookies()` is async** — always `await cookies()`. Same for `headers()`.
 - Use **`refresh()` from `next/cache`** for client-router refresh after a Server Action — but it is **server-action-only**: calling it from a Client Component throws `refresh is only available in a Server Component` at runtime. Put it inside the action, or use `useRouter().refresh()` when the refresh must happen client-side (e.g. only on certain results, or mid-loop).
 
@@ -46,10 +46,22 @@ These are non-obvious facts about the Next 16 / Prisma 7 stack that bit us durin
 - `.env` is **no longer auto-loaded** — `prisma.config.ts` does `import "dotenv/config"` to load it.
 - **Supavisor pooler compatibility**: `@prisma/adapter-pg` disables prepared statement caching by default, so `DATABASE_URL` can point at Supabase's transaction-mode pooler (port 6543) without extra config.
 
-### Auth (Supabase + DAL)
-- The DAL (`services/auth/dal.ts`) wraps `getCurrentUser`, `requireUser`, `requireAdmin`, `requireFundRole` in React's `cache()` so a single render pass only hits Supabase/Prisma once.
-- `proxy.ts` calls `supabase.auth.getUser()` on every request — this is the only way to refresh tokens. Do not move code between `createServerClient` and `getUser()` in that file.
-- For elevated operations (passkey session bridge, setting `app_metadata`), use `services/auth/admin.ts` — it builds a client from `SUPABASE_SERVICE_ROLE_KEY`. Server-only.
+### Auth (Better Auth + DAL)
+- **Better Auth replaced Supabase Auth.** The server instance lives in `services/auth/better-auth.ts`: Prisma adapter on our own Postgres, email+password enabled, passkey plugin, and `nextCookies()` **last** in the plugin list (it auto-writes cookies on Server Action responses). Signing secret comes from `BETTER_AUTH_SECRET`; `baseURL` is the auth host (`auth.<APP_DOMAIN>`).
+- **Better Auth owns the `User` table directly**, plus `Session`, `Account`, `Verification`, and `Passkey` — the schema shapes are dictated by the adapter/plugins, don't rename fields or change types. Ids are Postgres-side `gen_random_uuid()` (via `advanced.database.generateId: "uuid"` + `@default(dbgenerated(...))`).
+- The DAL (`services/auth/dal.ts`) wraps `getCurrentUser`, `requireUser`, `requireAdmin` in React's `cache()`; `requireFundRole(minRole)` composes them. `getCurrentUser` calls `auth.api.getSession({ headers })` then fetches the full Prisma `User` (the session's user shape lacks `globalRole` and relations).
+- Sessions are **DB-backed and looked up on demand** — `proxy.ts` does no session work at all (nothing to refresh, unlike the old Supabase token dance).
+- `requireUser` redirects anonymous users via `loginUrlForCurrentRequest()` (private helper in `dal.ts`): on the auth host it's a local `/login`; on apex/fund hosts it's `getAuthUrl("/login?return_to=<absolute current URL>")`, rebuilt from the `x-pathname` / `x-search` headers that proxy.ts forwards.
+- The catch-all handler `app/api/auth/[...all]/route.ts` mounts Better Auth on **every** host. Server actions call `auth.api.*` directly (no Origin header → Better Auth's CSRF origin check is skipped); browser-driven flows (the passkey ceremony) POST to `/api/auth/*` on the current origin and **are** checked — `trustedOrigins` in `better-auth.ts` lists the apex + `*.<APP_DOMAIN>` and dynamically trusts paid custom domains via the proxy-validated `x-fund-domain` header. An "Invalid origin" error means a host class is missing there.
+- Client side: `services/auth/client.ts` exports `authClient` (`createAuthClient` + `passkeyClient`), `baseURL` omitted so requests target the current origin's `/api/auth`. Use `signIn`, `signUp`, `signOut`, `passkey`, `useSession` from `"use client"` components. Login/signup/reset forms live in `app/(auth-host)/` and their server actions in `app/(auth-host)/actions.ts`.
+
+### Auth hosts & cross-host session handoff
+- Login UI lives on a dedicated **auth host** `auth.<APP_DOMAIN>` (route group `app/(auth-host)/`). `proxy.ts` classifies every request as `auth` | `apex` | `fund` and forwards `x-host-type`; read it via `services/host/server.ts` (`getHostType`, `getAuthUrl`). **Never re-parse the Host header.**
+- **Each host owns its own session cookie** — host-only (no `Domain` attribute), no `crossSubDomainCookies`. That's deliberate: it survives third-party-cookie blocking and spans paid custom domains, which cookie-sharing can't.
+- **Google-style handoff**: after authenticating on the auth host, actions call `buildPostAuthRedirect` (`services/auth/redirects.ts`). It validates `return_to` (apex or a registered `Fund.domain`; the auth host is never a valid target), mints a single-use 30s `AuthExchange` code bound to (userId, targetHost) (`services/auth/exchange.ts`), and redirects the browser to `<target>/auth/exchange?code=…`. Never `redirect()` straight to a non-auth origin after signing someone in — always go through this helper.
+- The target host's `app/auth/exchange/route.ts` consumes the code (atomic `updateMany`, host-bound so a code minted for fundA can't replay on fundB), mints a fresh session via `auth.$context.internalAdapter.createSession`, and writes the signed cookie **on the redirect response itself** — cookies staged via `cookies()` don't survive into a freshly constructed `NextResponse`. It also HMAC-signs the cookie value itself and must NOT pre-URL-encode it (see comments in the route).
+- Logout (`app/auth/logout/route.ts`) invalidates **all** the user's session rows, not just the local one — every other host's stale cookie then fails its DB lookup on next use. Expired `AuthExchange` rows are swept by `app/api/cron/auth-exchange-cleanup`.
+- Signups are waitlist-only: `signupAction` rejects submissions without a `returnTo` (invite flows carry one); fresh signups land on the apex with `?welcome=passkey` for the one-tap passkey nudge.
 
 ### Domain language: "fund" / "caisse"
 - The core unit is a **Fund** in code, **"caisse"** in French UI strings, **"fund"** in English UI strings. The Prisma model is `Fund`, the join model is `FundMember`, the per-fund role is `FundRole`. Service folder is `services/fund/`.
@@ -57,22 +69,22 @@ These are non-obvious facts about the Next 16 / Prisma 7 stack that bit us durin
 - The create-fund form takes a "subdomain" input from the user (just the prefix, e.g. `acme`) and the server constructs `<subdomain>.<APP_DOMAIN>` before persisting. Custom-domain UX is TBD.
 
 ### Roles & multi-fund access
-- **`User.globalRole`** (`USER` | `ADMIN`) — platform-level. `requireAdmin()` reads this. Set via SQL or an admin tool. **Not** stored in Supabase metadata; lives in our Prisma User table.
+- **`User.globalRole`** (`USER` | `ADMIN`) — platform-level. `requireAdmin()` reads this. Set via SQL or an admin tool. Lives on our Prisma `User` row alongside the Better Auth columns.
 - **`FundMember.role`** (`OWNER` > `ADMIN` > `OPERATOR` > `VIEWER`) — per-fund. Use `requireFundRole(minRole)` for any fund-scoped resource. Returns `{ user, fund, membership }`. The rank lives in `services/auth/roles.ts` (`FUND_ROLE_RANK` / `hasMinFundRole` / `isFundAdmin`) — a plain module so both the server DAL and client components can share it. `OPERATOR` is a restricted role that may **manage cards and members only**: card + member admin actions/pages are gated at `requireFundRole("OPERATOR")`, everything else stays `requireFundRole("ADMIN")` (which excludes OPERATOR by rank). Carve-out: `topUpCardAction` / `withdrawFromCardAction` (money on/off a card) stay ADMIN-only. The `(fund)` layout requires OPERATOR to enter; ADMIN-only pages self-guard and the sidebar hides links the role can't use.
-- **JIT sync**: `getCurrentUser()` upserts the Supabase auth user into `User` on first read each render. There is no DB trigger or webhook — Supabase auth.users is canonical for identity, our Prisma User is canonical for app-level data (role, name, memberships).
-- The `User.id` is a uuid that **mirrors `auth.users.id`** — no FK across schemas.
+- **No JIT sync, no second identity store**: Better Auth writes the `User` row itself at sign-up. There is no DB trigger, webhook, or upsert-on-read — one table is canonical for both identity and app-level data (role, name, memberships).
+- `User.id` is a uuid generated by Postgres (`gen_random_uuid()`); the auth tables (`Session`, `Account`, `Passkey`) FK onto it with cascade delete.
 
 ### Fund routing (host = identity)
 - Production: `<sub>.lacaisse.eu` (free) or any custom domain (paid). Dev: `<sub>.localhost:3000` (modern browsers resolve `*.localhost` to 127.0.0.1 — no `/etc/hosts` setup needed).
-- `proxy.ts` does ONE lookup: `Fund.findUnique({ where: { domain: host } })`. There's no subdomain extraction; the host IS the fund identity. Reserved infra subdomains (`www`, `api`, `admin`, `app`) short-circuit before the DB hit.
-- proxy.ts always **strips inbound** `x-fund-domain` / `x-fund-id` so a client can't spoof the fund context. Sets them on a successful lookup.
-- App code reads the fund via `services/fund/server.ts` (`getCurrentFund`, `getCurrentFundDomain`, `requireCurrentFund`, `getFundUrl`, `getApexUrl`). **Never re-parse the host.**
+- `proxy.ts` classifies the host as `auth` (`auth.<APP_DOMAIN>`), `apex` (the apex itself or a reserved infra subdomain: `www`, `api`, `admin`, `app`), or `fund` — the latter via ONE lookup: `Fund.findUnique({ where: { domain: host } })`. There's no subdomain extraction; the host IS the fund identity. Auth/apex/reserved hosts short-circuit before the DB hit.
+- proxy.ts always **strips inbound** `x-fund-domain` / `x-fund-id` / `x-host-type` / `x-pathname` / `x-search` so a client can't spoof the fund context or host classification. Sets `x-host-type` (and the fund headers on a match), plus `x-pathname` / `x-search` so DAL helpers can build a `return_to`.
+- App code reads the fund via `services/fund/server.ts` (`getCurrentFund`, `getCurrentFundDomain`, `requireCurrentFund`, `getFundUrl`, `getApexUrl`) and the host kind via `services/host/server.ts` (`getHostType`, `getAuthUrl`). **Never re-parse the host.**
 - `APP_DOMAIN` env var configures the apex (`localhost` in dev, `lacaisse.eu` in prod). `NEXT_PUBLIC_APP_DOMAIN` is the client-visible mirror (the create-fund form uses it for the suffix display).
-- **Apex page logic**: `app/page.tsx` checks `getCurrentFundDomain()` first. If a domain header is set → require the fund (notFound on miss). If no domain → render the user's fund picker.
+- **Apex page logic**: `app/page.tsx` branches on `getHostType()`. Auth host → redirect (signed-in to apex, anonymous to `/login`). Fund host → redirect to `/dashboard` (the `(fund)` layout takes it from there). Apex → marketing landing for anonymous visitors, fund picker for signed-in users.
 - **Cross-host redirects**: `redirect("/some-path")` stays on the current host. Use `redirect(getApexUrl("/some-path"))` when redirecting from a fund subdomain back to apex (e.g. `/account/*` pages).
 
 ### Forms (RHF + Zod + Server Actions)
-- Pattern: client component uses `useForm` + `zodResolver`, calls a server action from inside `handleSubmit` via `useTransition`. Server action re-validates with the same Zod schema (don't trust the client). See `app/(auth)/login/login-form.tsx`.
+- Pattern: client component uses `useForm` + `zodResolver`, calls a server action from inside `handleSubmit` via `useTransition`. Server action re-validates with the same Zod schema (don't trust the client). See `app/(auth-host)/login/login-form.tsx`.
 - The server action returns `{ error: string } | { ok: true; ... }` on failure/info, or **doesn't return** (calls `redirect()`) on success.
 - Schemas live in a non-`"use server"` file so they can be imported by both client and server.
 - ⚠️ **`"use server"` files can only export async functions.** Exporting constants, types, schemas, or anything else gets silently transformed into a server-reference proxy. Build passes, runtime explodes the moment a client tries to use it (`X.map is not a function`, etc.). Co-locate non-action exports in a sibling `config.ts` / `schema.ts` and import from there.
@@ -86,14 +98,14 @@ These are non-obvious facts about the Next 16 / Prisma 7 stack that bit us durin
 - Locale switcher: `components/locale-switcher.tsx`, embedded in the auth layout footer.
 
 ### Passkeys (WebAuthn)
-- **Supabase has no native WebAuthn** — we self-implement with `@simplewebauthn/{server,browser}`. Credentials live in `WebAuthnCredential` (Prisma).
-- **rpID** = `APP_DOMAIN` (the apex), so a passkey registered on `acme.lacaisse.eu` works on every fund subdomain. See `services/auth/webauthn.ts`.
-- **Session bridge**: after passkey verify, the route handler calls `auth.admin.generateLink({ type: 'magiclink', email })`, grabs `properties.email_otp`, and immediately calls `supabase.auth.verifyOtp({ ..., type: 'email' })` on the SSR client — which writes the Supabase session cookies. Requires `SUPABASE_SERVICE_ROLE_KEY`.
-- **Challenges** are stored in HttpOnly `wa_reg_challenge` / `wa_auth_challenge` cookies (5 min TTL, SameSite=Strict). Cleared after one use.
-- **Uint8Array typing trick**: simplewebauthn defines `Uint8Array_ = ReturnType<Uint8Array['slice']>` to dodge TS 5.7+ ArrayBuffer typing. Pass `bytes.slice()` rather than raw `bytes` when in doubt.
+- Handled entirely by the **`@better-auth/passkey` plugin** (registered in `services/auth/better-auth.ts`). The old self-implemented `@simplewebauthn` flow — `WebAuthnCredential` model, challenge cookies, magic-link session bridge — is gone; the plugin owns challenges, verification, and session creation.
+- Credentials live in the **`Passkey`** Prisma model. Field shapes are fixed by the plugin — e.g. `transports` is a comma-separated string, not a Postgres array.
+- **rpID** = `APP_DOMAIN` (the apex), so a passkey registered on `acme.lacaisse.eu` works on every fund subdomain and the apex. `origin` is left unset — the plugin accepts any request origin within rpID scope.
+- Client API: `signIn.passkey()` for discoverable-credential login (see `app/(auth-host)/login/login-form.tsx`), `authClient.passkey.addPasskey()` / `deletePasskey()` for management. The ceremony POSTs to `/api/auth/passkey/*` on the **current origin** — if a host is missing from `trustedOrigins` in `better-auth.ts`, the ceremony fails with "Invalid origin".
+- Post-signup nudge: fresh signups land on the apex with `?welcome=passkey`; `app/page.tsx` offers one-tap passkey setup when the user has none.
 
 ### Email (Resend, two layers)
-- **Supabase Auth emails** (signup verification, password reset, the magic-link OTP that the passkey bridge consumes) are sent by **Supabase**, not us. We point them at Resend by configuring custom SMTP in the Supabase dashboard (`smtp.resend.com:587`, username `resend`, password = a Resend API key with sending scope). No code change required to switch providers — change the dashboard, redeploy nothing.
+- **Auth-flow emails are sent by us now** (no more Supabase SMTP hop). Better Auth callbacks in `services/auth/better-auth.ts` do the sending — `sendResetPassword` builds a localized message via `getTranslations("auth.emails.resetPassword")` and hands it to `services/email/resend.ts`. Email verification is currently **off** (`requireEmailVerification: false`); when product wants it, flip the flag and add a `sendVerificationEmail` callback in the same style.
 - **Our direct transactional sends** (fund invites, welcome flow, anything we trigger from a server action) go through `services/email/resend.ts` (`sendEmail({ to, subject, text/html, replyTo })`). Uses `RESEND_API_KEY` + `EMAIL_FROM` from env. Throws on Resend errors so the caller decides whether to surface or log+continue.
 - Don't reach for the Resend SDK directly from a route or action — always go through `services/email/`. Same swap-out story as the rest of the service modules.
 - React Email isn't set up yet. When we need branded templates, install `@react-email/components` and add a `services/email/templates/` directory; render to HTML via `render()` and pass to `sendEmail({ html })`.
@@ -108,7 +120,7 @@ These are non-obvious facts about the Next 16 / Prisma 7 stack that bit us durin
 - One service entry point: `services/citizenpay/connect.ts::initiateKeyIssue`. The route picks "initial" vs "rotated" for the `key_name` (visible in CP's audit log) based on whether `citizenPayApiKeyId` is already set on the fund.
 - **CSRF model**: CP generates its own opaque `state` server-side and we have no way to validate it on its own. We mint a *fund state* (random, 30-min TTL, single-use) into `CitizenPayConnectAttempt` and **encode it as a URL path segment** in the `redirect_uri` we hand to CP: `https://<fund>.lacaisse.eu/api/citizenpay/callback/<fundState>`. Path-segment (not query) because CP unconditionally appends `?state=…&pickup=…&treasury_id=…` and a query-encoded fund state would collide with a second `?`.
 - **Allowlist** (CP-side, out of band): CP rejects any `redirect_uri` whose host isn't in their `TREASURY_REGISTER_ALLOWED_DOMAINS`. We need `*.lacaisse.eu` registered for prod and `localhost` for dev. If CP returns an "allowlist" error in step 1, ask CP ops to add the host before debugging anything on our side.
-- The callback at `app/api/citizenpay/callback/[fundState]/route.ts` is intentionally **public** (the user is mid-redirect; the session bridge may not have survived). Auth is the fund-state row + CP's pickup token — hitting it without a valid fund state can't do anything.
+- The callback at `app/api/citizenpay/callback/[fundState]/route.ts` is intentionally **public** (the user is mid-redirect; the fund host's session cookie may not have survived the round-trip). Auth is the fund-state row + CP's pickup token — hitting it without a valid fund state can't do anything.
 - Cleanup: `app/api/cron/auth-exchange-cleanup` sweeps expired `CitizenPayConnectAttempt` rows on the same schedule as `AuthExchange`.
 
 ### CitizenPay (Treasury API v2)
