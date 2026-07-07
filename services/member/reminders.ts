@@ -5,6 +5,7 @@ import type { FundBranding } from "@/services/email/transactional";
 import { prisma } from "@/services/db/prisma";
 import { sendPaymentReminder } from "@/services/email/transactional";
 import { buildCardLink } from "@/services/email/templates";
+import { buildPaymentPageUrl } from "@/services/payment/pay-link";
 import { resolveRequestedContribution } from "./contribution";
 import { REMINDER_ELIGIBLE_STATUS } from "./eligibility";
 
@@ -33,6 +34,8 @@ const FUND_SELECT = {
   primaryColor: true,
   logoUrl: true,
   senderEmail: true,
+  // Canonical host — used to build the public /pay/<serial> {paymentLink}.
+  domain: true,
   // Cached treasury slug for the public card/account link in the email body.
   citizenPayTreasurySlug: true,
 } as const;
@@ -76,6 +79,7 @@ type ReminderFund = {
   primaryColor: string | null;
   logoUrl: string | null;
   senderEmail: string | null;
+  domain: string;
   citizenPayTreasurySlug: string | null;
 };
 
@@ -209,6 +213,10 @@ async function remindOne(
   const cardLink = member.primaryCard
     ? buildCardLink(member.primaryCard.serialNumber, fund.citizenPayTreasurySlug)
     : "";
+  // Public "how to pay this contribution" page, keyed on the card UID.
+  const paymentLink = member.primaryCard
+    ? buildPaymentPageUrl(fund.domain, member.primaryCard.serialNumber)
+    : "";
 
   await sendPaymentReminder({
     emailId,
@@ -225,6 +233,7 @@ async function remindOne(
     // matches an incoming deposit on (see services/bank-sync/matching/match.ts).
     paymentReference: member.primaryCard?.serialNumber ?? "",
     cardLink,
+    paymentLink,
   });
 
   const after = await prisma.email.findUnique({

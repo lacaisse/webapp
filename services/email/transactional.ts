@@ -241,6 +241,8 @@ export async function sendPaymentReminder(args: {
   paymentReference: string;
   // Public account / tap URL ({cardLink}); "" when the member has no card.
   cardLink: string;
+  // Public /pay/<serial> page URL ({paymentLink}); "" when the member has no card.
+  paymentLink: string;
 }): Promise<void> {
   await dispatchTemplate({
     emailId: args.emailId,
@@ -257,6 +259,7 @@ export async function sendPaymentReminder(args: {
           amount: args.amount,
           paymentReference: args.paymentReference,
           cardLink: args.cardLink,
+          paymentLink: args.paymentLink,
         },
       }),
     to: args.toEmail,
