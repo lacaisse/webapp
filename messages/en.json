@@ -549,6 +549,8 @@
           "title": "Card information",
           "description": "Serial, wallet, and lifecycle events.",
           "serial": "Serial",
+          "tapLink": "Card interface",
+          "tapLinkLabel": "Open on CitizenPay",
           "holder": "Holder",
           "member": "Member",
           "account": "Wallet",

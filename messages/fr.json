@@ -549,6 +549,8 @@
           "title": "Informations de la carte",
           "description": "Numéro, portefeuille et événements du cycle de vie.",
           "serial": "Numéro de série",
+          "tapLink": "Interface de la carte",
+          "tapLinkLabel": "Ouvrir sur CitizenPay",
           "holder": "Porteur",
           "member": "Membre",
           "account": "Portefeuille",
