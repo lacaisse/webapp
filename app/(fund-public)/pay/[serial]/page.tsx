@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import QRCode from "qrcode";
 
 import { CopyButton } from "@/components/copy-button";
+import { LocaleSwitcher } from "@/components/locale-switcher";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Card,
@@ -88,13 +89,18 @@ export default async function CotisationPaymentPage({
 
   return (
     <div className="w-full max-w-2xl space-y-6">
-      <Link
-        href="/"
-        className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="size-4" />
-        {t("back")}
-      </Link>
+      <div className="flex items-center justify-between gap-4">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="size-4" />
+          {t("back")}
+        </Link>
+        {/* The visitor arrives from an email link with no locale cookie, so
+            give them a way to switch language on the page itself. */}
+        <LocaleSwitcher />
+      </div>
 
       <Card>
         <CardHeader className="text-center">

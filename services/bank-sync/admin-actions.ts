@@ -14,9 +14,10 @@ import { mintTierAllocation } from "./allocate";
 import { scoreNameMatch } from "./matching/name";
 
 // Manual admin action: link an unmatched BankTransaction to a member when
-// bank-sync couldn't auto-match (typo in payment reference, transfer from
-// a different account, etc.). The lookup accepts either the member's
-// paymentReference (uppercase) or email — whichever the admin has at hand.
+// bank-sync couldn't auto-match (typo in reference, transfer from a different
+// account, etc.). The lookup accepts the member's card UID (serialNumber — the
+// bank-transfer reference members are told to use), their email, or the legacy
+// paymentReference — whichever the admin has at hand.
 //
 // No retroactive minting in v1 — the row is just linked. If admins want to
 // trigger a mint for the linked deposit, they'll need to do so manually via
@@ -50,13 +51,19 @@ export async function linkBankTransactionAction(input: {
     return { error: t("fund.payments.admin.errors.notIncoming" as never) };
   }
 
-  // Look up by paymentReference (case-insensitive uppercase) OR email.
+  // Look up by card UID (serialNumber, case-insensitive), email, or the legacy
+  // paymentReference (case-insensitive uppercase).
   const member = await prisma.member.findFirst({
     where: {
       fundId: fund.id,
       OR: [
-        { paymentReference: identifier.toUpperCase() },
+        {
+          cards: {
+            some: { serialNumber: { equals: identifier, mode: "insensitive" } },
+          },
+        },
         { email: identifier.toLowerCase() },
+        { paymentReference: identifier.toUpperCase() },
       ],
     },
     select: { id: true },

@@ -1353,9 +1353,9 @@
           "unlinkButton": "Délier",
           "title": "Lier ce dépôt à un membre",
           "description": "Saisissez la référence de paiement ou l'email du membre. Le dépôt comptera dans son allocation.",
-          "identifierLabel": "Référence de paiement ou email",
-          "identifierPlaceholder": "ABCDEFGH ou membre@exemple.com",
-          "identifierHint": "Insensible à la casse. Les références de paiement font 8 caractères depuis notre alphabet généré.",
+          "identifierLabel": "Référence de carte ou email",
+          "identifierPlaceholder": "04A2B7C9D1 ou membre@exemple.com",
+          "identifierHint": "Insensible à la casse. La référence de carte est l'UID (numéro de série) de la carte, indiqué sur l'invitation du membre.",
           "identifierRequired": "Saisissez une référence ou un email.",
           "cancel": "Annuler",
           "confirm": "Lier",
@@ -1710,7 +1710,7 @@
           "first_name": "Le prénom du membre",
           "last_name": "Le nom du membre",
           "card_number": "Le numéro de carte du membre",
-          "payment_reference": "La référence de paiement du membre"
+          "payment_reference": "La référence de paiement du membre (l'UID de sa carte)"
         },
         "errors": {
           "bodyRequired": "Saisissez le corps du courrier.",
@@ -1881,7 +1881,7 @@
         },
         "welcome": {
           "subject": "Bienvenue chez {fundName}",
-          "textBody": "Bonjour {firstName},\n\nBienvenue chez {fundName}. Votre demande est en cours d'examen — un administrateur vous contactera bientôt.\n\nLorsque vous serez prêt à contribuer, indiquez cette référence sur votre virement bancaire :\n  {paymentReference}\n\nMerci,\nL'équipe {fundName}"
+          "textBody": "Bonjour {firstName},\n\nBienvenue chez {fundName}. Votre demande est en cours d'examen — un administrateur vous contactera bientôt.\n\nVous recevrez votre référence de paiement en même temps que votre carte.\n\nMerci,\nL'équipe {fundName}"
         }
       },
       "thanks": {
@@ -1971,7 +1971,7 @@
         },
         "invited": {
           "subject": "Vous êtes invité chez {fundName}",
-          "textBody": "Bonjour {firstName},\n\nUn administrateur de {fundName} vient de vous ajouter comme membre. Vous recevrez votre carte lors de votre prochain contact avec l'équipe.\n\nLorsque vous serez prêt à contribuer, indiquez cette référence sur votre virement bancaire pour que nous puissions créditer votre carte automatiquement :\n\n  {paymentReference}\n\nL'équipe {fundName}"
+          "textBody": "Bonjour {firstName},\n\nUn administrateur de {fundName} vient de vous ajouter comme membre. Vous recevrez votre carte lors de votre prochain contact avec l'équipe, ainsi que la référence à indiquer sur vos virements de cotisation.\n\nL'équipe {fundName}"
         },
         "referralBonusAwarded": {
           "subject": "Votre bonus de parrainage a été ajouté — {fundName}",

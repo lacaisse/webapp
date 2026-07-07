@@ -1353,9 +1353,9 @@
           "unlinkButton": "Unlink",
           "title": "Link this deposit to a member",
           "description": "Enter the member's payment reference or email. The deposit will count toward their allocation.",
-          "identifierLabel": "Payment reference or email",
-          "identifierPlaceholder": "ABCDEFGH or member@example.com",
-          "identifierHint": "Case-insensitive. Payment references are 8 characters from our generated alphabet.",
+          "identifierLabel": "Card reference or email",
+          "identifierPlaceholder": "04A2B7C9D1 or member@example.com",
+          "identifierHint": "Case-insensitive. The card reference is the card's UID (serial number), printed on the member's invitation.",
           "identifierRequired": "Enter a reference or email.",
           "cancel": "Cancel",
           "confirm": "Link",
@@ -1710,7 +1710,7 @@
           "first_name": "The member's first name",
           "last_name": "The member's last name",
           "card_number": "The member's card number",
-          "payment_reference": "The member's payment reference"
+          "payment_reference": "The member's payment reference (their card UID)"
         },
         "errors": {
           "bodyRequired": "Enter the letter body.",
@@ -1881,7 +1881,7 @@
         },
         "welcome": {
           "subject": "Welcome to {fundName}",
-          "textBody": "Hi {firstName},\n\nWelcome to {fundName}. Your application is under review — an admin will reach out soon.\n\nWhen you're ready to contribute, include this reference on your bank transfer:\n  {paymentReference}\n\nThanks,\nThe {fundName} team"
+          "textBody": "Hi {firstName},\n\nWelcome to {fundName}. Your application is under review — an admin will reach out soon.\n\nYou'll receive your payment reference together with your card.\n\nThanks,\nThe {fundName} team"
         }
       },
       "thanks": {
@@ -1971,7 +1971,7 @@
         },
         "invited": {
           "subject": "You've been invited to {fundName}",
-          "textBody": "Hi {firstName},\n\nAn admin at {fundName} has just added you as a member. You'll receive your card the next time you connect with the team.\n\nWhen you're ready to contribute, include this reference on your bank transfer so we can credit your card automatically:\n\n  {paymentReference}\n\nThe {fundName} team"
+          "textBody": "Hi {firstName},\n\nAn admin at {fundName} has just added you as a member. You'll receive your card the next time you connect with the team, along with the reference to put on your contribution transfers.\n\nThe {fundName} team"
         },
         "referralBonusAwarded": {
           "subject": "Your referral bonus has been added — {fundName}",

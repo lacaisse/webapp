@@ -243,7 +243,6 @@ export async function signupMemberAction(input: {
         toEmail: txResult.member.email,
         fund: fundBranding,
         firstName: txResult.member.firstName,
-        paymentReference: txResult.member.paymentReference,
       });
     }
 
