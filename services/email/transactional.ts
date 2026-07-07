@@ -268,7 +268,6 @@ export async function sendMemberWelcome(args: {
   toEmail: string;
   fund: FundBranding;
   firstName: string;
-  paymentReference: string;
 }): Promise<void> {
   await dispatchTemplate({
     emailId: args.emailId,
@@ -283,7 +282,6 @@ export async function sendMemberWelcome(args: {
         text: t("textBody", {
           firstName: args.firstName,
           fundName: args.fund.name,
-          paymentReference: args.paymentReference,
         }),
       };
     },
@@ -296,7 +294,6 @@ export async function sendMemberInvited(args: {
   toEmail: string;
   fund: FundBranding;
   firstName: string;
-  paymentReference: string;
 }): Promise<void> {
   await dispatchTemplate({
     emailId: args.emailId,
@@ -311,7 +308,6 @@ export async function sendMemberInvited(args: {
         text: t("textBody", {
           firstName: args.firstName,
           fundName: args.fund.name,
-          paymentReference: args.paymentReference,
         }),
       };
     },

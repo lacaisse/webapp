@@ -1003,9 +1003,9 @@
           "unlinkButton": "Ontkoppelen",
           "title": "Deze storting aan een lid koppelen",
           "description": "Voer de betalingsreferentie of het e-mailadres van het lid in. De storting telt mee voor hun allocatie.",
-          "identifierLabel": "Betalingsreferentie of e-mail",
-          "identifierPlaceholder": "ABCDEFGH of lid@voorbeeld.com",
-          "identifierHint": "Hoofdletterongevoelig. Betalingsreferenties zijn 8 tekens uit ons gegenereerde alfabet.",
+          "identifierLabel": "Kaartreferentie of e-mail",
+          "identifierPlaceholder": "04A2B7C9D1 of lid@voorbeeld.com",
+          "identifierHint": "Hoofdletterongevoelig. De kaartreferentie is de UID (serienummer) van de kaart, vermeld op de uitnodiging van het lid.",
           "identifierRequired": "Voer een referentie of e-mail in.",
           "cancel": "Annuleren",
           "confirm": "Koppelen",
@@ -1346,7 +1346,7 @@
           "first_name": "De voornaam van het lid",
           "last_name": "De achternaam van het lid",
           "card_number": "Het kaartnummer van het lid",
-          "payment_reference": "De betalingsreferentie van het lid"
+          "payment_reference": "De betalingsreferentie van het lid (de UID van hun kaart)"
         },
         "errors": {
           "bodyRequired": "Voer de brieftekst in.",
@@ -1633,7 +1633,7 @@
         },
         "welcome": {
           "subject": "Welkom bij {fundName}",
-          "textBody": "Hallo {firstName},\n\nWelkom bij {fundName}. Uw aanvraag wordt beoordeeld — een beheerder neemt binnenkort contact op.\n\nWanneer u klaar bent om bij te dragen, vermeld dan deze referentie op uw bankoverschrijving:\n  {paymentReference}\n\nBedankt,\nHet {fundName}-team"
+          "textBody": "Hallo {firstName},\n\nWelkom bij {fundName}. Uw aanvraag wordt beoordeeld — een beheerder neemt binnenkort contact op.\n\nU ontvangt uw betalingsreferentie samen met uw kaart.\n\nBedankt,\nHet {fundName}-team"
         }
       }
     },
@@ -1695,7 +1695,7 @@
         },
         "invited": {
           "subject": "U bent uitgenodigd bij {fundName}",
-          "textBody": "Hallo {firstName},\n\nEen beheerder van {fundName} heeft u zojuist als lid toegevoegd. U ontvangt uw kaart bij uw volgende contact met het team.\n\nWanneer u klaar bent om bij te dragen, vermeld dan deze referentie op uw bankoverschrijving zodat we uw kaart automatisch kunnen crediteren:\n\n  {paymentReference}\n\nHet {fundName}-team"
+          "textBody": "Hallo {firstName},\n\nEen beheerder van {fundName} heeft u zojuist als lid toegevoegd. U ontvangt uw kaart bij uw volgende contact met het team, samen met de referentie die u op uw bijdrageoverschrijvingen moet vermelden.\n\nHet {fundName}-team"
         },
         "referralBonusAwarded": {
           "subject": "Uw doorverwijzingsbonus is toegevoegd — {fundName}",

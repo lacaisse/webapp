@@ -316,7 +316,6 @@ export async function sendTestPaymentReminderEmailAction(input: {
     select: {
       firstName: true,
       lastName: true,
-      paymentReference: true,
       tier: { select: { allocationAmount: true } },
       primaryCard: { select: { serialNumber: true } },
     },
@@ -345,7 +344,8 @@ export async function sendTestPaymentReminderEmailAction(input: {
       lastName: member.lastName,
       fundName: fund.name,
       amount: member.tier.allocationAmount.toString(),
-      paymentReference: member.paymentReference ?? "",
+      // The bank-transfer reference is the card UID (bank-sync's match key).
+      paymentReference: member.primaryCard.serialNumber,
       cardLink: buildCardLink(
         member.primaryCard.serialNumber,
         await resolveTreasurySlug(fund),
