@@ -1127,9 +1127,9 @@
           "unlinkButton": "Desvincular",
           "title": "Vincular este depósito a un miembro",
           "description": "Introduce la referencia de pago o el correo electrónico del miembro. El depósito se contabilizará en su asignación.",
-          "identifierLabel": "Referencia de pago o correo electrónico",
-          "identifierPlaceholder": "ABCDEFGH o miembro@ejemplo.com",
-          "identifierHint": "No distingue mayúsculas de minúsculas. Las referencias de pago tienen 8 caracteres de nuestro alfabeto generado.",
+          "identifierLabel": "Referencia de tarjeta o correo electrónico",
+          "identifierPlaceholder": "04A2B7C9D1 o miembro@ejemplo.com",
+          "identifierHint": "No distingue mayúsculas de minúsculas. La referencia de tarjeta es el UID (número de serie) de la tarjeta, indicado en la invitación del miembro.",
           "identifierRequired": "Introduce una referencia o un correo electrónico.",
           "cancel": "Cancelar",
           "confirm": "Vincular",
@@ -1470,7 +1470,7 @@
           "first_name": "El nombre del miembro",
           "last_name": "El apellido del miembro",
           "card_number": "El número de tarjeta del miembro",
-          "payment_reference": "La referencia de pago del miembro"
+          "payment_reference": "La referencia de pago del miembro (el UID de su tarjeta)"
         },
         "errors": {
           "bodyRequired": "Introduce el cuerpo de la carta.",
@@ -1632,7 +1632,7 @@
         },
         "welcome": {
           "subject": "Bienvenido a {fundName}",
-          "textBody": "Hola {firstName}:\n\nBienvenido a {fundName}. Tu solicitud está en revisión — un administrador se pondrá en contacto contigo pronto.\n\nCuando quieras contribuir, incluye esta referencia en tu transferencia bancaria:\n  {paymentReference}\n\nGracias,\nEl equipo de {fundName}"
+          "textBody": "Hola {firstName}:\n\nBienvenido a {fundName}. Tu solicitud está en revisión — un administrador se pondrá en contacto contigo pronto.\n\nRecibirás tu referencia de pago junto con tu tarjeta.\n\nGracias,\nEl equipo de {fundName}"
         }
       },
       "thanks": {
@@ -1719,7 +1719,7 @@
         },
         "invited": {
           "subject": "Te han invitado a {fundName}",
-          "textBody": "Hola {firstName}:\n\nUn administrador de {fundName} acaba de añadirte como miembro. Recibirás tu tarjeta la próxima vez que te reúnas con el equipo.\n\nCuando quieras contribuir, incluye esta referencia en tu transferencia bancaria para que podamos acreditar tu tarjeta automáticamente:\n\n  {paymentReference}\n\nEl equipo de {fundName}"
+          "textBody": "Hola {firstName}:\n\nUn administrador de {fundName} acaba de añadirte como miembro. Recibirás tu tarjeta la próxima vez que te reúnas con el equipo, junto con la referencia que debes indicar en tus transferencias de contribución.\n\nEl equipo de {fundName}"
         },
         "referralBonusAwarded": {
           "subject": "Se ha añadido tu bono por recomendación — {fundName}",

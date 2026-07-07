@@ -112,7 +112,6 @@ async function remindFund(
       email: true,
       firstName: true,
       lastName: true,
-      paymentReference: true,
       contributionAmount: true,
       tier: { select: { allocationAmount: true } },
       primaryCard: { select: { serialNumber: true } },
@@ -153,7 +152,6 @@ type ReminderMember = {
   email: string;
   firstName: string;
   lastName: string;
-  paymentReference: string | null;
   contributionAmount: { toString(): string } | null;
   tier: { allocationAmount: { toString(): string } } | null;
   primaryCard: { serialNumber: string } | null;
@@ -223,7 +221,9 @@ async function remindOne(
       member.contributionAmount,
       member.tier?.allocationAmount,
     ),
-    paymentReference: member.paymentReference ?? "",
+    // The bank-transfer reference is the card UID — the only value bank-sync
+    // matches an incoming deposit on (see services/bank-sync/matching/match.ts).
+    paymentReference: member.primaryCard?.serialNumber ?? "",
     cardLink,
   });
 
