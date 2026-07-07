@@ -12,6 +12,7 @@ import {
   verificationExpiry,
 } from "@/services/email/verification";
 import { getFundUrl, requireCurrentFund } from "@/services/fund/server";
+import { contributionApplies } from "./contribution";
 import { generatePaymentReference } from "./payment-reference";
 import {
   BuiltinSignupSchema,
@@ -47,6 +48,15 @@ export async function signupMemberAction(input: {
   // every follow-up email matches it. Falls back to the fund default in the
   // email layer if this is ever null.
   const locale = await getLocale();
+
+  // Commitment amount only applies to FIXED_PERIOD funds with tiers — ignore a
+  // submitted value otherwise (the field isn't shown, but don't trust that).
+  const tierCount = await prisma.allocationTier.count({
+    where: { fundId: fund.id, archivedAt: null },
+  });
+  const contributionAmount = contributionApplies(fund.allocationMode, tierCount)
+    ? parsed.data.contributionAmount || null
+    : null;
 
   // Filter application data to keys that exist on the fund's onboarding form,
   // and enforce the `required` flag for each. Anything unknown is dropped
@@ -148,6 +158,9 @@ export async function signupMemberAction(input: {
             emailUnsubscribedAt: parsed.data.remindersOptOut
               ? new Date()
               : null,
+            // Empty → null (use the tier target once a tier is assigned).
+            // Gated on FIXED_PERIOD + tiers above.
+            contributionAmount,
             emailVerifiedAt: requireVerify ? null : new Date(),
             applicationData:
               Object.keys(filtered).length > 0 ? filtered : undefined,

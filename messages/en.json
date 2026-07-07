@@ -421,6 +421,7 @@
       },
       "contribution": {
         "target": "Target",
+        "committed": "Committed",
         "lastReceived": "Last received",
         "none": "—"
       },
@@ -443,6 +444,8 @@
           "title": "Membership",
           "description": "Tier, banking, and referral identifiers.",
           "tier": "Tier",
+          "committed": "Committed contribution",
+          "committedDefault": "(tier target)",
           "iban": "IBAN",
           "referralCode": "Referral code",
           "primaryCard": "Primary card"
@@ -1856,6 +1859,8 @@
       "firstName": "First name",
       "lastName": "Last name",
       "email": "Email",
+      "contributionAmount": "Amount you'd like to contribute (optional)",
+      "contributionAmountHint": "Leave blank to use the amount suggested by your tier. You can agree on a different amount with an admin.",
       "remindersOptOut": "I don't want to receive payment reminder emails.",
       "submit": "Apply",
       "submitting": "Submitting…",
@@ -1864,6 +1869,7 @@
         "lastNameRequired": "Last name is required.",
         "emailInvalid": "Enter a valid email address.",
         "emailTaken": "An application with this email already exists for this fund.",
+        "amountInvalid": "Enter a valid amount (up to 2 decimals).",
         "fieldRequired": "{label} is required.",
         "generic": "Something went wrong. Please try again."
       },
@@ -2010,6 +2016,13 @@
       "import": {
         "title": "Import members",
         "description": "Upload or paste a CSV with headers, then map each column to a member field.",
+        "mode": {
+          "label": "Import mode",
+          "upsert": "Add and update",
+          "updateOnly": "Update existing only (backfill)",
+          "upsertHint": "Creates new members and updates existing ones (matched by email).",
+          "updateOnlyHint": "Only updates the mapped columns on existing members (matched by email). No members are created; unmatched rows are skipped."
+        },
         "fileLabel": "CSV file",
         "pasteLabel": "Or paste rows",
         "mapHeading": "Map columns",
@@ -2034,6 +2047,7 @@
           "householdAdults": "Adults in household",
           "householdChildren": "Children in household",
           "tier": "Tier (by name)",
+          "contributionAmount": "Committed contribution",
           "locale": "Language",
           "notes": "Notes",
           "serial": "Card serial",
@@ -2042,12 +2056,14 @@
         },
         "errors": {
           "missingRequiredMapping": "Map the required fields (first name, last name, email).",
+          "missingMatchKey": "Map the email column to identify which members to update.",
           "columnMissing": "A mapped column is missing from the CSV.",
           "empty": "No data rows found in the CSV."
         },
         "skip": {
           "missingName": "Missing first or last name.",
           "invalidEmail": "Invalid email.",
+          "noMatch": "No existing member with this email.",
           "error": "Could not import this row."
         },
         "fixedValuePlaceholder": "Set for all rows",
@@ -2070,13 +2086,18 @@
         "cityLabel": "City",
         "householdAdultsLabel": "Adults in household",
         "householdChildrenLabel": "Children in household",
+        "contributionAmountLabel": "Committed contribution",
+        "contributionAmountHint": "What we ask this member to contribute. Leave blank to use the tier target ({target}). Minimum: {min}.",
+        "contributionAmountHintNoTier": "What we ask this member to contribute. Leave blank to use the tier target once a tier is assigned.",
         "notesLabel": "Notes",
         "cancel": "Cancel",
         "confirm": "Save changes",
         "saving": "Saving…",
         "errors": {
           "tooLong": "This value is too long.",
-          "householdInvalid": "Enter a whole number of 0 or more."
+          "householdInvalid": "Enter a whole number of 0 or more.",
+          "amountInvalid": "Enter a valid amount (up to 2 decimals).",
+          "amountBelowMin": "The amount can't be below the tier minimum ({min})."
         }
       }
     }

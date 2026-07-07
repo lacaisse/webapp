@@ -34,12 +34,14 @@ type Values = {
   iban: string;
   householdAdults: string;
   householdChildren: string;
+  contributionAmount: string;
   notes: string;
 };
 
 export function EditProfileDialog({
   memberId,
   member,
+  showContribution,
 }: {
   memberId: string;
   member: {
@@ -53,8 +55,15 @@ export function EditProfileDialog({
     iban: string | null;
     householdAdults: number;
     householdChildren: number;
+    contributionAmount: string | null;
     notes: string | null;
+    // The member's tier target/min, for the committed-amount hint. Null when
+    // the member has no tier yet.
+    tierTarget: string | null;
+    tierMin: string | null;
   };
+  // Only FIXED_PERIOD funds with tiers show the commitment-amount field.
+  showContribution: boolean;
 }) {
   const t = useTranslations("members.admin.edit");
   const [open, setOpen] = useState(false);
@@ -75,6 +84,7 @@ export function EditProfileDialog({
     iban: member.iban ?? "",
     householdAdults: String(member.householdAdults),
     householdChildren: String(member.householdChildren),
+    contributionAmount: member.contributionAmount ?? "",
     notes: member.notes ?? "",
   });
 
@@ -216,6 +226,28 @@ export function EditProfileDialog({
             onChange={set("householdChildren")}
             invalid={errorField === "householdChildren"}
           />
+          {showContribution && (
+            <div className="sm:col-span-2">
+              <Field
+                id="edit-contributionAmount"
+                label={t("contributionAmountLabel")}
+                hint={
+                  member.tierTarget
+                    ? t("contributionAmountHint", {
+                        target: member.tierTarget,
+                        min: member.tierMin ?? member.tierTarget,
+                      })
+                    : t("contributionAmountHintNoTier")
+                }
+                type="number"
+                min={0}
+                step="0.01"
+                value={values.contributionAmount}
+                onChange={set("contributionAmount")}
+                invalid={errorField === "contributionAmount"}
+              />
+            </div>
+          )}
           <div className="space-y-2 sm:col-span-2">
             <Label htmlFor="edit-notes">{t("notesLabel")}</Label>
             <textarea
@@ -262,6 +294,7 @@ function Field({
   invalid,
   type,
   min,
+  step,
   autoComplete,
 }: {
   id: string;
@@ -273,6 +306,7 @@ function Field({
   invalid?: boolean;
   type?: string;
   min?: number;
+  step?: string;
   autoComplete?: string;
 }) {
   return (
@@ -289,6 +323,7 @@ function Field({
         id={id}
         type={type}
         min={min}
+        step={step}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         aria-invalid={invalid}

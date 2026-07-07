@@ -536,6 +536,17 @@ model Member {
   tierId String?
   tier   AllocationTier? @relation(fields: [tierId], references: [id], onDelete: SetNull)
 
+  // The amount this member has committed to contribute — what we ASK them for
+  // in payment-reminder emails (issue #82). NULL means "use the tier target":
+  // the requested amount then resolves to the tier's allocationAmount, so it
+  // auto-tracks tier changes until an admin/member sets an explicit value. A
+  // member may commit to a different amount, floored at the tier's
+  // minContribution. This does NOT change how many tokens are minted (always
+  // the tier's allocationAmount) nor the minimum-hit check (always the tier's
+  // minContribution) — it only drives the requested contribution shown to the
+  // member. See services/member/contribution.ts.
+  contributionAmount Decimal? @db.Decimal(10, 2)
+
   // Responses to per-fund custom onboarding fields. Built-in fields
   // (firstName/lastName/email for members) are written to their typed
   // columns; everything else lives here, keyed by OnboardingField.key.

@@ -421,6 +421,7 @@
       },
       "contribution": {
         "target": "Cible",
+        "committed": "Convenu",
         "lastReceived": "Dernier reçu",
         "none": "—"
       },
@@ -443,6 +444,8 @@
           "title": "Adhésion",
           "description": "Palier, coordonnées bancaires et identifiants.",
           "tier": "Palier",
+          "committed": "Contribution convenue",
+          "committedDefault": "(cible du palier)",
           "iban": "IBAN",
           "referralCode": "Code de parrainage",
           "primaryCard": "Carte principale"
@@ -1856,6 +1859,8 @@
       "firstName": "Prénom",
       "lastName": "Nom",
       "email": "Email",
+      "contributionAmount": "Montant que vous souhaitez contribuer (optionnel)",
+      "contributionAmountHint": "Laissez vide pour utiliser le montant proposé par votre palier. Vous pourrez convenir d'un autre montant avec un administrateur.",
       "remindersOptOut": "Je ne souhaite pas recevoir les rappels de paiement par email.",
       "submit": "Envoyer",
       "submitting": "Envoi…",
@@ -1864,6 +1869,7 @@
         "lastNameRequired": "Le nom est requis.",
         "emailInvalid": "Saisissez une adresse email valide.",
         "emailTaken": "Une demande avec cet email existe déjà pour cette caisse.",
+        "amountInvalid": "Saisissez un montant valide (jusqu'à 2 décimales).",
         "fieldRequired": "{label} est requis.",
         "generic": "Une erreur s'est produite. Réessayez."
       },
@@ -2010,6 +2016,13 @@
       "import": {
         "title": "Importer des membres",
         "description": "Importez ou collez un CSV avec en-têtes, puis associez chaque colonne à un champ membre.",
+        "mode": {
+          "label": "Mode d'import",
+          "upsert": "Ajouter et mettre à jour",
+          "updateOnly": "Mettre à jour uniquement (backfill)",
+          "upsertHint": "Crée les nouveaux membres et met à jour les membres existants (correspondance par e-mail).",
+          "updateOnlyHint": "Met à jour uniquement les colonnes associées des membres existants (correspondance par e-mail). Aucun membre n'est créé ; les lignes sans correspondance sont ignorées."
+        },
         "fileLabel": "Fichier CSV",
         "pasteLabel": "Ou collez les lignes",
         "mapHeading": "Associer les colonnes",
@@ -2034,6 +2047,7 @@
           "householdAdults": "Adultes du foyer",
           "householdChildren": "Enfants du foyer",
           "tier": "Palier (par nom)",
+          "contributionAmount": "Contribution convenue",
           "locale": "Langue",
           "notes": "Notes",
           "serial": "Serial de carte",
@@ -2042,12 +2056,14 @@
         },
         "errors": {
           "missingRequiredMapping": "Associez les champs requis (prénom, nom, e-mail).",
+          "missingMatchKey": "Associez la colonne e-mail pour identifier les membres à mettre à jour.",
           "columnMissing": "Une colonne associée est absente du CSV.",
           "empty": "Aucune ligne de données dans le CSV."
         },
         "skip": {
           "missingName": "Prénom ou nom manquant.",
           "invalidEmail": "E-mail invalide.",
+          "noMatch": "Aucun membre existant avec cet e-mail.",
           "error": "Impossible d'importer cette ligne."
         },
         "fixedValuePlaceholder": "Définir pour toutes les lignes",
@@ -2070,13 +2086,18 @@
         "cityLabel": "Ville",
         "householdAdultsLabel": "Adultes dans le foyer",
         "householdChildrenLabel": "Enfants dans le foyer",
+        "contributionAmountLabel": "Contribution convenue",
+        "contributionAmountHint": "Ce que nous demandons à ce membre de contribuer. Laissez vide pour utiliser la cible du palier ({target}). Minimum : {min}.",
+        "contributionAmountHintNoTier": "Ce que nous demandons à ce membre de contribuer. Laissez vide pour utiliser la cible du palier une fois celui-ci attribué.",
         "notesLabel": "Notes",
         "cancel": "Annuler",
         "confirm": "Enregistrer",
         "saving": "Enregistrement…",
         "errors": {
           "tooLong": "Cette valeur est trop longue.",
-          "householdInvalid": "Saisissez un nombre entier supérieur ou égal à 0."
+          "householdInvalid": "Saisissez un nombre entier supérieur ou égal à 0.",
+          "amountInvalid": "Saisissez un montant valide (jusqu'à 2 décimales).",
+          "amountBelowMin": "Le montant ne peut pas être inférieur au minimum du palier ({min})."
         }
       }
     }

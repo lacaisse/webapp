@@ -43,6 +43,7 @@ const FIELD_PATTERNS: Record<MemberImportField, RegExp> = {
   householdAdults: /adult|adulte|volwassen/i,
   householdChildren: /child|enfant|kind|ni[ñn]o/i,
   tier: /tier|palier|classe|class|niveau|schijf|nivel/i,
+  contributionAmount: /contribut|cotisation|montant|engage|commit|pledge|bijdrage|aporta/i,
   locale: /lang|langue|taal|idioma|locale/i,
   status: /status|statut|[ée]tat|toestand|estado/i,
   notes: /note|remarq|opmerking|nota/i,
@@ -76,9 +77,12 @@ function guessMapping(headers: string[]): Mapping {
 export function MemberImportDialog({
   triggerLabel,
   tiers,
+  showContribution,
 }: {
   triggerLabel: string;
   tiers: string[];
+  // Only FIXED_PERIOD funds with tiers can import a commitment amount.
+  showContribution: boolean;
 }) {
   const t = useTranslations("members.admin.import");
   const tStatus = useTranslations("members.admin.status.values");
@@ -96,6 +100,9 @@ export function MemberImportDialog({
   const [defaults, setDefaults] = useState<Mapping>(EMPTY_MAPPING);
   // Admin overrides for raw status values (the interactive mapping step).
   const [statusMap, setStatusMap] = useState<StatusValueMap>({});
+  // Backfill mode: match existing members by email and update only the mapped
+  // columns (never create). Relaxes the required-mapping to just email.
+  const [updateOnly, setUpdateOnly] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<
     Extract<MemberImportResult, { ok: true }> | null
@@ -116,9 +123,12 @@ export function MemberImportDialog({
     file.text().then(applyCsv);
   };
 
-  const requiredOk = MEMBER_IMPORT_FIELDS.filter((f) => f.required).every(
-    (f) => mapping[f.key] !== "",
-  );
+  // Update-only backfill only needs the email match key; a full import needs
+  // the name columns too. Drives both the submit gate and the field asterisks.
+  const requiredKeys: MemberImportField[] = updateOnly
+    ? ["email"]
+    : MEMBER_IMPORT_FIELDS.filter((f) => f.required).map((f) => f.key);
+  const requiredOk = requiredKeys.every((key) => mapping[key] !== "");
 
   // Distinct raw values in the mapped status column — drives the interactive
   // mapping step below. Empty when no status column is mapped.
@@ -163,6 +173,7 @@ export function MemberImportDialog({
         mapping: cleaned,
         defaults: cleanedDefaults,
         statusValueMap,
+        updateOnly,
       });
       if ("error" in res) {
         setError(res.error);
@@ -182,6 +193,7 @@ export function MemberImportDialog({
           setHeaders([]);
           setDefaults(EMPTY_MAPPING);
           setStatusMap({});
+          setUpdateOnly(false);
           setError(null);
           setResult(null);
         }
@@ -204,6 +216,21 @@ export function MemberImportDialog({
           <ResultView result={result} t={t} />
         ) : (
           <div className="space-y-3">
+            <div className="space-y-1">
+              <Label htmlFor="import-mode">{t("mode.label")}</Label>
+              <select
+                id="import-mode"
+                value={updateOnly ? "update" : "upsert"}
+                onChange={(e) => setUpdateOnly(e.target.value === "update")}
+                className="h-8 w-full rounded-md bg-background px-2 text-sm ring-1 ring-foreground/15 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <option value="upsert">{t("mode.upsert")}</option>
+                <option value="update">{t("mode.updateOnly")}</option>
+              </select>
+              <p className="text-xs text-muted-foreground">
+                {updateOnly ? t("mode.updateOnlyHint") : t("mode.upsertHint")}
+              </p>
+            </div>
             <div className="space-y-1">
               <Label htmlFor="member-csv-file">{t("fileLabel")}</Label>
               <input
@@ -231,11 +258,13 @@ export function MemberImportDialog({
                   {t("mapHeading")}
                 </p>
                 <div className="grid grid-cols-2 gap-x-3 gap-y-2">
-                  {MEMBER_IMPORT_FIELDS.map((f) => (
+                  {MEMBER_IMPORT_FIELDS.filter(
+                    (f) => showContribution || f.key !== "contributionAmount",
+                  ).map((f) => (
                     <div key={f.key} className="space-y-1">
                       <Label htmlFor={`map-${f.key}`} className="text-xs">
                         {t(`fields.${f.key}`)}
-                        {f.required && (
+                        {requiredKeys.includes(f.key) && (
                           <span className="ml-0.5 text-destructive">*</span>
                         )}
                       </Label>
@@ -435,11 +464,13 @@ function FixedValueInput({
 
   const numeric =
     field === "householdAdults" || field === "householdChildren";
+  const money = field === "contributionAmount";
   return (
     <Input
-      type={numeric ? "number" : "text"}
-      min={numeric ? 0 : undefined}
-      inputMode={numeric ? "numeric" : undefined}
+      type={numeric || money ? "number" : "text"}
+      min={numeric || money ? 0 : undefined}
+      step={money ? "0.01" : undefined}
+      inputMode={money ? "decimal" : numeric ? "numeric" : undefined}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
