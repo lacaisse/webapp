@@ -7,9 +7,10 @@ import { revalidatePath } from "next/cache";
 import { requireFundRole } from "@/services/auth/dal";
 import { Prisma } from "@/services/db/generated/client";
 import { prisma } from "@/services/db/prisma";
-import { buildPayLink } from "@/services/email/templates";
+import { buildCardLink } from "@/services/email/templates";
 import { sendPaymentReminder } from "@/services/email/transactional";
 import { resolveRequestedContribution } from "@/services/member/contribution";
+import { buildPaymentPageUrl } from "@/services/payment/pay-link";
 import { REMINDER_ELIGIBLE_STATUS } from "@/services/member/eligibility";
 
 // Manual "remind the unpaid members" action, driven from the period detail
@@ -33,8 +34,9 @@ const FUND_SELECT = {
   primaryColor: true,
   logoUrl: true,
   senderEmail: true,
-  // Canonical hostname — used to build the public payment-page link ({payLink}).
+  // Canonical host — used to build the public /pay/<serial> {paymentLink}.
   domain: true,
+  citizenPayTreasurySlug: true,
 } satisfies Prisma.FundSelect;
 
 const MEMBER_SELECT = {
@@ -199,10 +201,12 @@ async function remindOne(
     emailId = existing.id;
   }
 
-  // The public payment page (on the fund's own domain) presents the reference,
-  // IBAN and QR — the reminder just links there. "" when the member has no card.
-  const payLink = member.primaryCard
-    ? buildPayLink(fund.domain, member.primaryCard.serialNumber)
+  const cardLink = member.primaryCard
+    ? buildCardLink(member.primaryCard.serialNumber, fund.citizenPayTreasurySlug)
+    : "";
+  // Public "how to pay this contribution" page, keyed on the card UID.
+  const paymentLink = member.primaryCard
+    ? buildPaymentPageUrl(fund.domain, member.primaryCard.serialNumber)
     : "";
 
   await sendPaymentReminder({
@@ -221,7 +225,11 @@ async function remindOne(
       member.contributionAmount,
       member.tier?.allocationAmount,
     ),
-    payLink,
+    // The bank-transfer reference is the card UID — the only value bank-sync
+    // matches an incoming deposit on (see services/bank-sync/matching/match.ts).
+    paymentReference: member.primaryCard?.serialNumber ?? "",
+    cardLink,
+    paymentLink,
   });
 
   const after = await prisma.email.findUnique({

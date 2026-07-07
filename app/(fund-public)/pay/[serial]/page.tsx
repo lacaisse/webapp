@@ -18,6 +18,7 @@ import {
 import { getBankingStatus } from "@/app/(fund)/bank/data";
 import { prisma } from "@/services/db/prisma";
 import { requireCurrentFund } from "@/services/fund/server";
+import { resolveRequestedContribution } from "@/services/member/contribution";
 import { buildEpcQrPayload } from "@/services/payment/epc-qr";
 
 // Public, no-auth per-member payment page (see AGENTS.md "(fund-public)"). A
@@ -49,6 +50,7 @@ export default async function CotisationPaymentPage({
         select: {
           firstName: true,
           lastName: true,
+          contributionAmount: true,
           tier: { select: { allocationAmount: true } },
         },
       },
@@ -205,14 +207,19 @@ export default async function CotisationPaymentPage({
   );
 }
 
-// The amount the member should pay. Falls back to the tier's target
-// allocation amount ("montant cible"). TODO(#82): prefer the member's own
-// chosen contribution amount once that field lands.
+// The amount the member should pay: their committed contribution amount when
+// set, otherwise the tier's target allocation amount ("montant cible"). Shares
+// the same resolution the reminder email uses so the page and the email that
+// links to it always request the same figure. Null when neither is known.
 function resolveContributionAmount(member: {
-  tier: { allocationAmount: unknown } | null;
+  contributionAmount: { toString(): string } | null;
+  tier: { allocationAmount: { toString(): string } } | null;
 }): number | null {
-  if (!member.tier) return null;
-  return Number(member.tier.allocationAmount);
+  const requested = resolveRequestedContribution(
+    member.contributionAmount,
+    member.tier?.allocationAmount,
+  );
+  return requested === "" ? null : Number(requested);
 }
 
 function DetailRow({

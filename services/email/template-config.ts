@@ -58,15 +58,18 @@ export const EDITABLE_EMAIL_TEMPLATES = {
     hasCta: false,
     defaultIsHtml: true,
     // Plain scalars resolved by the caller (cron / test send): {amount} is the
-    // member's monthly contribution (tier minimum), {payLink} the public payment
-    // page (app/(fund-public)/pay/[serial]) that shows the reference bank-sync
-    // matches on (the card UID) plus the IBAN and EPC QR. See templates.ts.
+    // member's monthly contribution, {paymentReference} the bank transfer
+    // communication that bank-sync matches on (the card UID), {cardLink} the
+    // public account/tap URL, {paymentLink} the public /pay/<serial> page that
+    // shows the member how to pay this contribution. See templates.ts.
     variables: [
       "firstName",
       "lastName",
       "fundName",
       "amount",
-      "payLink",
+      "paymentReference",
+      "cardLink",
+      "paymentLink",
     ],
   },
 } as const;
@@ -100,8 +103,10 @@ export const PREVIEW_SAMPLE_VALUES: Record<
     lastName: "Dupont",
     fundName: "Your fund",
     amount: "25",
-    // The payment page carries the reference (card UID); mirror the sample serial.
-    payLink: "https://your-fund.lacaisse.eu/pay/04A2B7C9D1",
+    // The reference is the card UID (serialNumber); mirror the sample serial.
+    paymentReference: "04A2B7C9D1",
+    cardLink: "https://tap.citizenpay.xyz/card/04A2B7C9D1?network=demo",
+    paymentLink: "https://demo.lacaisse.eu/pay/04A2B7C9D1",
   },
 };
 

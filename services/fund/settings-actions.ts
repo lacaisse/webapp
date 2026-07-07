@@ -48,8 +48,9 @@ export async function updateOnboardingSettingsAction(
 // actions). While paused those sends are skipped, not queued — resuming
 // never emails retroactively. Signup-flow emails (verification, welcome)
 // stay functional regardless — the member is actively signing up and needs
-// them — and password emails are auth-level (Supabase → Resend SMTP),
-// outside this flag entirely. Merchant and team emails are unaffected.
+// them — and password emails are auth-level (Better Auth's sendResetPassword
+// callback → services/email/resend.ts), outside this flag entirely. Merchant
+// and team emails are unaffected.
 export async function setConfirmationEmailsPausedAction(input: {
   paused: boolean;
 }): Promise<SettingsResult> {
@@ -71,8 +72,8 @@ export async function setConfirmationEmailsPausedAction(input: {
 // --- Member sender address -----------------------------------------------
 // Custom From for member-facing transactional emails. Stored as a bare
 // address; the display name is the fund name at send time. Blank clears it
-// (falls back to the platform EMAIL_FROM). Merchant/team and Supabase auth
-// emails are unaffected.
+// (falls back to the platform EMAIL_FROM). Merchant/team and Better Auth
+// (e.g. password reset) emails are unaffected.
 
 const MemberSenderSchema = z.object({
   senderEmail: z
