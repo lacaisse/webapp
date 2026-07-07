@@ -34,7 +34,9 @@
       "createAccount": "Crear una cuenta",
       "passkeyButton": "Iniciar sesión con una clave de acceso",
       "passkeyWaiting": "Esperando la clave de acceso…",
-      "passkeyEmailRequired": "Introduzca su correo electrónico para iniciar sesión con una clave de acceso."
+      "passkeyEmailRequired": "Introduzca su correo electrónico para iniciar sesión con una clave de acceso.",
+      "waitlistPrompt": "¿Aún no tiene una cuenta?",
+      "joinWaitlist": "Unirse a la lista de espera"
     },
     "forgotPassword": {
       "title": "Restablecer su contraseña",
@@ -71,6 +73,7 @@
       "passwordsDontMatch": "Las contraseñas no coinciden.",
       "invalidCredentials": "Credenciales no válidas.",
       "invalidInput": "Entrada no válida.",
+      "signupsClosed": "Por el momento, el registro es solo con invitación. Únase a la lista de espera para solicitar acceso.",
       "passkeyStartFailed": "No se pudo iniciar el acceso con clave de acceso.",
       "passkeyVerifyFailed": "No se pudo verificar la respuesta de la clave de acceso.",
       "signInFailed": "Error al iniciar sesión.",
@@ -156,6 +159,7 @@
         "REFERRAL_REWARD": "Recompensa por referido",
         "BANK_SYNC": "Depósito bancario (auto)",
         "PERIOD_CLOSE": "Cierre de período",
+        "ALLOCATION_RUN": "Ejecución de asignación",
         "CARD_TRANSFER": "Transferencia de tarjeta"
       },
       "edit": "Anotar",
@@ -176,14 +180,17 @@
       "empty": "Aún no hay cuentas. Crea una para empezar.",
       "defaultName": "Cuenta principal",
       "defaultBadge": "Predeterminada",
+      "sourceBadge": "Fuente",
       "table": {
         "name": "Nombre",
         "address": "Dirección",
+        "serial": "N.º de serie",
         "balance": "Saldo"
       },
       "detail": {
         "back": "Todas las cuentas",
-        "balance": "Saldo"
+        "balance": "Saldo",
+        "serial": "Número de serie"
       },
       "create": {
         "trigger": "Nueva cuenta",
@@ -191,6 +198,8 @@
         "description": "Una nueva cuenta en cadena derivada de la clave del fondo.",
         "name": "Nombre",
         "namePlaceholder": "p. ej. Reserva, Comisiones, Eventos",
+        "sourceLabel": "Cuenta fuente de tarjetas",
+        "sourceHint": "Asigna a la cuenta un número de serie para que pueda alimentar tarjetas como fuente. Estas cuentas no pueden transferir hacia fuera.",
         "confirm": "Crear cuenta"
       },
       "rename": {
@@ -249,10 +258,12 @@
         "notConnected": "Conecta primero este fondo a Citizen Pay.",
         "deriveFailed": "No se pudo derivar la dirección de la cuenta. Vuelve a intentarlo en breve.",
         "createFailed": "No se pudo crear la cuenta. Vuelve a intentarlo en breve.",
+        "registerFailed": "No se pudo registrar la cuenta fuente en Citizen Pay. Vuelve a intentarlo en breve.",
         "amountInvalid": "El importe debe ser un número válido.",
         "amountPositive": "El importe debe ser mayor que cero.",
         "addressInvalid": "Introduce una dirección 0x válida (40 caracteres hexadecimales).",
         "transferFailed": "La transferencia en cadena falló. Vuelve a intentarlo en breve.",
+        "cannotTransferSource": "Las cuentas fuente de tarjetas no pueden transferir hacia fuera.",
         "transfersFailed": "No se pudieron cargar las transacciones. Vuelve a intentarlo en breve."
       }
     },
@@ -306,7 +317,9 @@
         "emptyRange": "No hay transacciones en este intervalo.",
         "prev": "Anterior",
         "next": "Siguiente",
-        "total": "{count, plural, =1 {# transacción} other {# transacciones}}"
+        "total": "{count, plural, =1 {# transacción} other {# transacciones}}",
+        "period": "Período",
+        "periodLocked": "Ya se usó en una emisión: el período ya no se puede cambiar."
       },
       "fullSync": {
         "trigger": "Sincronización completa",
@@ -315,11 +328,11 @@
         "confirmCancel": "Cancelar",
         "confirmRun": "Ejecutar sincronización completa",
         "running": "Sincronizando…",
-        "progress": "{ingested, plural, =1 {# transacción} other {# transacciones}} sincronizadas · {matched} asociadas · {minted} emitidas",
+        "progress": "{ingested, plural, =1 {# transacción sincronizada} other {# transacciones sincronizadas}} · {matched} asociadas · {skipped} omitidas",
         "pages": "{pages, plural, =1 {# página} other {# páginas}}",
         "stop": "Detener",
         "completeTitle": "Sincronización completa finalizada",
-        "completeSummary": "{ingested, plural, =1 {# transacción} other {# transacciones}} sincronizadas · {matched} asociadas · {minted} emitidas",
+        "completeSummary": "{ingested, plural, =1 {# transacción sincronizada} other {# transacciones sincronizadas}} · {matched} asociadas · {skipped} omitidas",
         "errorTitle": "Sincronización interrumpida",
         "error": "No se pudo completar la sincronización bancaria. Inténtelo de nuevo.",
         "resume": "Reanudar",
@@ -336,6 +349,16 @@
         "custom": "Personalizado",
         "from": "Desde",
         "to": "Hasta"
+      },
+      "periodAssign": {
+        "none": "Sin período",
+        "closedOption": "{label} (cerrado)",
+        "errors": {
+          "notFound": "Transacción no encontrada.",
+          "notIncoming": "Solo las transacciones entrantes se pueden asignar a un período.",
+          "periodNotFound": "Período no encontrado.",
+          "locked": "Este depósito ya se usó en una emisión: su período ya no se puede cambiar."
+        }
       }
     },
     "dashboard": {
@@ -381,9 +404,12 @@
       "searchPlaceholder": "Buscar por nombre o número de tarjeta…",
       "tabs": {
         "all": "Todos",
-        "pending": "Pendientes",
+        "new": "Nuevos",
         "active": "Activos",
-        "inactive": "Inactivos"
+        "inactive": "Inactivos",
+        "paused": "En pausa",
+        "stopped": "Dados de baja",
+        "rejected": "Rechazados"
       },
       "columns": {
         "name": "Nombre",
@@ -395,6 +421,7 @@
       },
       "contribution": {
         "target": "Objetivo",
+        "committed": "Acordada",
         "lastReceived": "Último recibido",
         "none": "—"
       },
@@ -410,14 +437,16 @@
           "household": "Hogar",
           "householdValue": "{adults} adultos · {children} niños",
           "joined": "Se unió",
-          "left": "Se dio de baja"
+          "left": "Se dio de baja",
+          "notes": "Notas"
         },
         "banking": {
           "title": "Membresía",
           "description": "Nivel, datos bancarios e identificadores de referidos.",
           "tier": "Nivel",
+          "committed": "Aportación acordada",
+          "committedDefault": "(objetivo del nivel)",
           "iban": "IBAN",
-          "reference": "Referencia de pago",
           "referralCode": "Código de referido",
           "primaryCard": "Tarjeta principal"
         },
@@ -464,6 +493,14 @@
           "sponsoredDescription": "{count} inscripciones usando el código de este miembro.",
           "sponsoredEmpty": "Aún no hay referidos."
         },
+        "emailSettings": {
+          "title": "Configuración de correo",
+          "description": "Indica si este miembro recibe los correos automáticos de recordatorio de pago.",
+          "optOutLabel": "Dado de baja de los correos de recordatorio",
+          "subscribed": "Este miembro recibe los recordatorios de pago automáticos.",
+          "optedOut": "Este miembro no recibirá recordatorios de pago automáticos.",
+          "optedOutSince": "Dado de baja el {date}: no recibirá recordatorios automáticos."
+        },
         "emails": {
           "title": "Correos electrónicos",
           "date": "Fecha",
@@ -493,7 +530,8 @@
         "status": "Estado",
         "balance": "Saldo",
         "issued": "Emitida",
-        "number": "N.º tarjeta"
+        "number": "N.º tarjeta",
+        "source": "Fuente"
       },
       "primary": "Tarjeta principal",
       "badges": {
@@ -514,6 +552,8 @@
           "title": "Información de la tarjeta",
           "description": "Número de serie, billetera y eventos del ciclo de vida.",
           "serial": "Número de serie",
+          "tapLink": "Interfaz de la tarjeta",
+          "tapLinkLabel": "Abrir en CitizenPay",
           "holder": "Titular",
           "member": "Miembro",
           "account": "Billetera",
@@ -521,7 +561,8 @@
           "blocked": "Bloqueada",
           "reportedLost": "Reportada como perdida",
           "lastTransaction": "Última transacción",
-          "number": "Número de tarjeta"
+          "number": "Número de tarjeta",
+          "source": "Tarjeta fuente"
         },
         "transfers": {
           "title": "Transferencias",
@@ -541,6 +582,17 @@
           "newer": "Más recientes",
           "older": "Más antiguas",
           "error": "No se pudieron cargar las transferencias en cadena."
+        },
+        "source": {
+          "none": "Sin fuente",
+          "placeholder": "Buscar por número, serie o nombre…",
+          "empty": "Sin resultados.",
+          "typeCard": "Tarjeta",
+          "typeAccount": "Cuenta",
+          "unresolved": "Actual: {serial}",
+          "clear": "Quitar la fuente",
+          "open": "Abrir la lista",
+          "hint": "Si el saldo de esta tarjeta no alcanza para un pago, el importe que falta se toma de su fuente (otra tarjeta o una cuenta fuente)."
         },
         "onboardingLetter": {
           "rowLabel": "Carta de bienvenida",
@@ -573,23 +625,15 @@
       "title": "Asignaciones",
       "description": "Distribuye tokens a los miembros según los niveles y la sincronización bancaria.",
       "tabs": {
-        "history": "Historial",
         "tiers": "Niveles",
         "schedule": "Calendario"
       },
-      "history": {
-        "date": "Fecha",
-        "member": "Miembro",
-        "tier": "Nivel",
-        "source": "Origen",
-        "period": "Periodo",
-        "amount": "Importe",
-        "status": "Estado",
-        "empty": "Aún no hay asignaciones.",
-        "sources": {
-          "bankSync": "Depósito bancario",
-          "referral": "Recompensa por referido",
-          "manual": "Manual"
+      "reconcile": {
+        "errors": {
+          "opNotFound": "Asignación no encontrada.",
+          "depositNotFound": "Depósito no encontrado.",
+          "alreadyLinked": "Esta asignación ya está vinculada a un depósito.",
+          "memberMismatch": "Esa asignación pertenece a un miembro distinto del de este depósito."
         }
       },
       "tiers": {
@@ -623,26 +667,18 @@
           "archiving": "Archivando…"
         }
       },
-      "schedule": {
-        "title": "Calendario de asignaciones",
-        "description": "Lotes de periodo fijo. Los fondos de pago directo no tienen periodos.",
-        "payAndGoDescription": "Este fondo funciona en modo de pago directo. Los tokens se asignan de inmediato cuando se detecta un depósito; no hay periodos.",
-        "label": "Periodo",
-        "startsAt": "Comienza el",
-        "cutoffDate": "Fecha límite",
-        "status": "Estado",
-        "closedAt": "Cerrado el",
-        "empty": "Aún no hay periodos.",
-        "newPeriod": "Nuevo período",
-        "edit": "Editar",
-        "actions": "Acciones",
-        "disabledDescription": "La asignación está desactivada para este fondo. Los ingresos se registran y se asignan a los miembros, pero no se emiten tokens."
-      },
       "periodDetail": {
         "back": "Todos los periodos",
         "range": "{starts} → {cutoff}",
         "closedAt": "Cerrado el {date}",
         "notes": "Notas",
+        "tabs": {
+          "ready": "Listos",
+          "deposits": "Depósitos",
+          "mints": "Emisiones",
+          "missing": "Faltantes",
+          "belowMin": "Bajo el mín."
+        },
         "kpi": {
           "deposits": "Depósitos recaudados",
           "depositsHint": "{count} transacciones bancarias",
@@ -663,7 +699,48 @@
           "member": "Miembro",
           "reference": "Referencia",
           "amount": "Importe",
+          "allocation": "Asignación",
+          "allocated": "Asignada",
+          "allocationPending": "En curso",
+          "allocationFailed": "Fallida",
+          "notAllocated": "Sin asignar",
           "empty": "Aún no hay depósitos en este periodo."
+        },
+        "ready": {
+          "title": "{count, plural, =0 {Listos para asignar} one {Listo para asignar (#)} other {Listos para asignar (#)}}",
+          "hint": "Miembros cuyos depósitos alcanzan el mínimo de su nivel y que aún no han recibido la asignación de este período, incluidos los pagos tardíos atribuidos después del cierre.",
+          "member": "Miembro",
+          "tier": "Nivel",
+          "deposited": "Depositado",
+          "allocation": "Asignación",
+          "empty": "Nada pendiente: todos los depósitos elegibles ya se han asignado."
+        },
+        "allocateMember": {
+          "button": "Asignar",
+          "title": "¿Ejecutar esta asignación?",
+          "description": "Emitir {amount} tokens para {name} por el período {period}. La emisión se realiza en la blockchain y no se puede deshacer. No se envía ningún correo al miembro.",
+          "cancel": "Cancelar",
+          "confirm": "Emitir la asignación",
+          "minting": "Emitiendo…"
+        },
+        "run": {
+          "trigger": "Asignar todo ({count})",
+          "confirmTitle": "¿Ejecutar la asignación de tokens?",
+          "confirmDescription": "Esto emite la asignación de nivel para {count, plural, one {# miembro} other {# miembros}} ({total} tokens en total), en pequeños lotes. Los miembros por debajo del mínimo de su nivel se dejan para revisión. Puedes parar después de cada lote; reanudar nunca asigna dos veces al mismo miembro. No se envía ningún correo a los miembros.",
+          "confirmCancel": "Cancelar",
+          "confirmRun": "Ejecutar la asignación",
+          "running": "Asignando…",
+          "progress": "{minted} de {total} emitidos · {submitted} enviados",
+          "stop": "Detener",
+          "resume": "Reanudar",
+          "completeTitle": "Asignación completada",
+          "completeSummary": "{minted} asignaciones emitidas: {submitted} confirmadas en la cadena, {failed} fallidas, {skipped} miembros omitidos (bajo el mínimo). Los miembros con fallos permanecen en la lista de «listos para asignar»: ejecuta de nuevo para reintentar. No se envía ningún correo a los miembros por estas asignaciones.",
+          "errorTitle": "Asignación interrumpida",
+          "errors": {
+            "notEligible": "Este miembro no puede recibir asignación en este período: no hay depósitos suficientes o la asignación ya se ejecutó.",
+            "alreadyAllocated": "Este miembro ya recibió su asignación para este período.",
+            "submitFailed": "No se pudo enviar la emisión a CitizenPay: la operación queda marcada como fallida. El miembro permanece en la lista de «listos para asignar»; vuelve a intentarlo."
+          }
         },
         "mints": {
           "title": "Emisiones",
@@ -673,7 +750,115 @@
           "amount": "Importe",
           "status": "Estado",
           "empty": "Aún no hay emisiones agrupadas."
+        },
+        "missing": {
+          "title": "{count, plural, =0 {Depósitos faltantes} one {Depósito faltante (#)} other {Depósitos faltantes (#)}}",
+          "hint": "Miembros activos con nivel de los que se esperaba aportación este período, sin ningún depósito asociado.",
+          "member": "Miembro",
+          "tier": "Nivel",
+          "empty": "Todos los miembros esperados han depositado.",
+          "minimum": "Mínimo"
+        },
+        "belowMin": {
+          "title": "{count, plural, one {Depósito bajo el mínimo (#)} other {Depósitos bajo el mínimo (#)}}",
+          "hint": "Han depositado, pero el total queda por debajo del mínimo de su nivel: no se generó ninguna asignación.",
+          "member": "Miembro",
+          "tier": "Nivel",
+          "deposited": "Depositado",
+          "minimum": "Mínimo",
+          "empty": "No hay depósitos bajo el mínimo."
+        },
+        "removeDeposit": {
+          "button": "Quitar del período",
+          "title": "¿Quitar este depósito del período?",
+          "description": "El depósito de {label} permanece en el historial bancario pero dejará de contar en este período (totales y aportaciones).",
+          "cancel": "Cancelar",
+          "confirm": "Quitar",
+          "removing": "Quitando…"
+        },
+        "attachAllocation": {
+          "button": "Vincular una asignación",
+          "title": "Vincular una asignación existente",
+          "description": "Vincula una asignación manual ya realizada para {member} a este depósito de {amount}.",
+          "loading": "Cargando asignaciones…",
+          "empty": "No hay asignaciones manuales que vincular para este miembro.",
+          "inPeriod": "en {period}"
+        },
+        "notify": {
+          "column": "Notificación",
+          "send": "Notificar",
+          "retry": "Reintentar",
+          "sending": "Enviando…",
+          "cancel": "Cancelar",
+          "confirmSend": "Enviar el correo",
+          "confirmTitle": "¿Enviar el correo de asignación?",
+          "confirmDescription": "¿Enviar la confirmación de asignación a {name} por {amount}?",
+          "status": {
+            "sent": "Enviado",
+            "failed": "Fallido",
+            "notSent": "No enviado"
+          },
+          "allTrigger": "Notificar a todos ({count})",
+          "allConfirmTitle": "¿Notificar a todos los miembros?",
+          "allConfirmDescription": "Enviar la confirmación de asignación a {count} miembro(s) que aún no han sido notificados. Las asignaciones ya notificadas se omiten.",
+          "allConfirmSend": "Enviar los correos",
+          "allDoneTitle": "Notificaciones enviadas",
+          "allDoneSummary": "{sent} enviados · {skipped} ya notificados · {failed} con error.",
+          "errors": {
+            "notNotifiable": "Esta asignación no se puede notificar: no es una asignación confirmada.",
+            "noEmail": "Este miembro no tiene dirección de correo.",
+            "sendFailed": "No se pudo enviar el correo. Vuelve a intentarlo."
+          }
+        },
+        "remind": {
+          "column": "Recordatorio",
+          "send": "Recordar",
+          "retry": "Reintentar",
+          "sending": "Enviando…",
+          "cancel": "Cancelar",
+          "confirmSend": "Enviar el recordatorio",
+          "confirmTitle": "¿Enviar un recordatorio de pago?",
+          "confirmDescription": "¿Enviar un recordatorio de pago a {name} para este período?",
+          "status": {
+            "noEmail": "Sin correo",
+            "optedOut": "Dado de baja",
+            "sent": "Enviado",
+            "sentCount": "Enviado {count}×",
+            "failed": "Fallido",
+            "notSent": "No enviado"
+          },
+          "detail": {
+            "auto": "Automático",
+            "autoAndNudges": "Automático + {count, plural, one {# aviso} other {# avisos}}",
+            "nudgesOnly": "{count, plural, one {# aviso manual} other {# avisos manuales}}"
+          },
+          "allTrigger": "Recordar a todos ({count})",
+          "allConfirmTitle": "¿Recordar a todos los que no han pagado?",
+          "allConfirmDescription": "Enviar un recordatorio de pago a {count} miembro(s) que aún no han aportado. Se omiten los miembros ya avisados, sin correo o dados de baja.",
+          "allConfirmSend": "Enviar los recordatorios",
+          "allDoneTitle": "Recordatorios enviados",
+          "allDoneSummary": "{sent} enviados · {skipped} ya avisados · {failed} con error.",
+          "errors": {
+            "notRemindable": "No se puede enviar recordatorio a este miembro: ya no está en la lista de pendientes de pago.",
+            "noEmail": "Este miembro no tiene dirección de correo.",
+            "sendFailed": "No se pudo enviar el recordatorio. Vuelve a intentarlo."
+          }
         }
+      },
+      "schedule": {
+        "title": "Calendario de asignaciones",
+        "description": "Lotes de periodo fijo. Los fondos de pago directo no tienen periodos.",
+        "payAndGoDescription": "Este fondo funciona en modo de pago directo. Los tokens se asignan de inmediato cuando se detecta un depósito; no hay periodos.",
+        "label": "Periodo",
+        "startsAt": "Comienza el",
+        "cutoffDate": "Fecha límite",
+        "status": "Estado",
+        "closedAt": "Cerrado el",
+        "empty": "Aún no hay periodos.",
+        "newPeriod": "Nuevo período",
+        "edit": "Editar",
+        "actions": "Acciones",
+        "disabledDescription": "La asignación está desactivada para este fondo. Los ingresos se registran y se asignan a los miembros, pero no se emiten tokens."
       },
       "periods": {
         "dialog": {
@@ -794,6 +979,7 @@
         "unverified": "Correo electrónico no verificado",
         "connected": "Citizen Pay conectado",
         "notConnected": "Citizen Pay no conectado",
+        "hidden": "Oculto",
         "invite": {
           "title": "Invitación de Citizen Pay",
           "description": "Estado de la invitación enviada al comercio.",
@@ -818,6 +1004,7 @@
           "description": "Estado interno y vinculación con Citizen Pay.",
           "joined": "Se unió",
           "position": "Posición en el directorio",
+          "publiclyVisible": "Directorio público",
           "conditions": "Condiciones de aceptación",
           "citizenPayPlace": "ID de lugar de Citizen Pay",
           "citizenPayBusiness": "ID de negocio de Citizen Pay",
@@ -874,21 +1061,9 @@
       "title": "Pagos",
       "description": "Depósitos bancarios de los miembros y pagos a los comercios.",
       "tabs": {
-        "transactions": "Transacciones",
-        "unmatched": "Sin conciliar",
         "drafts": "Borradores",
         "pending": "Pendientes",
         "completed": "Completados"
-      },
-      "transactions": {
-        "date": "Fecha",
-        "counterpart": "Contraparte",
-        "reference": "Referencia",
-        "member": "Miembro",
-        "period": "Periodo",
-        "amount": "Importe",
-        "unmatched": "Sin conciliar",
-        "empty": "Aún no hay transacciones."
       },
       "settlement": {
         "place": "Lugar",
@@ -998,6 +1173,22 @@
           "successMinted": "Pedido añadido y neto acuñado para el lugar.",
           "mintFailed": "Pedido añadido, pero la acuñación automática falló. Concílialo desde la pestaña Incidencias."
         },
+        "addOrders": {
+          "trigger": "Añadir pedidos existentes",
+          "title": "Añadir pedidos existentes",
+          "description": "Añade pedidos que ya existen pero no se incluyeron en este pago: elige un intervalo de fechas y selecciona cuáles añadir.",
+          "from": "Desde",
+          "to": "Hasta",
+          "rangeHint": "Filtra por la fecha de creación del pedido. Solo se pueden añadir pedidos pagaderos y sin asignar.",
+          "preview": "Previsualizar",
+          "windowSummary": "{count, plural, =1 {# pedido disponible} other {# pedidos disponibles}}",
+          "net": "Neto",
+          "loadMore": "Mostrar más",
+          "empty": "No hay pedidos que añadir en este intervalo.",
+          "confirm": "{count, plural, =0 {Añadir pedidos} =1 {Añadir # pedido} other {Añadir # pedidos}}",
+          "success": "{count, plural, =1 {# pedido añadido al pago.} other {# pedidos añadidos al pago.}}",
+          "rejectedTitle": "Algunos pedidos no se pudieron añadir y se omitieron. La lista se ha actualizado: revisa y vuelve a intentarlo."
+        },
         "deduction": {
           "trigger": "Añadir deducción",
           "edit": "Editar deducción",
@@ -1050,6 +1241,8 @@
           "range": "Mostrando {from}–{to}",
           "prev": "Anterior",
           "next": "Siguiente",
+          "selectAll": "Seleccionar todo",
+          "selectRow": "Seleccionar el pedido",
           "receipt": {
             "success": "Confirmado",
             "reverted": "Revertido",
@@ -1077,6 +1270,14 @@
             "bankMatch": "Transferencia bancaria de respaldo",
             "bankMatchUnknown": "Remitente desconocido",
             "bankMatchNone": "Aún no se encontró ninguna transferencia que coincida con {ref}.",
+            "manualToggle": "Registrar una transacción existente en su lugar",
+            "manualLabel": "Hash de la transacción de liquidación",
+            "manualHint": "El pedido se marca como liquidado con este hash: no se mueven tokens. Introduce un hash de transacción con prefijo 0x.",
+            "manualConfirm": "Registrar",
+            "manualConfirmAnyway": "Registrar de todos modos",
+            "manualWarnReverted": "Esta transacción falló en la cadena: no liquidó nada. ¿Registrarla de todos modos?",
+            "manualWarnPending": "No se encontró recibo para esta transacción: puede que aún no esté minada o que el nodo no la conozca. ¿Registrarla de todos modos?",
+            "manualWarnUnavailable": "No se pudo verificar esta transacción en la cadena. Comprueba el hash antes de registrarla.",
             "payerPickHint": "Usar el hash de esta transacción"
           },
           "archive": {
@@ -1084,6 +1285,27 @@
             "title": "¿Archivar este pedido?",
             "description": "El pedido se elimina del pago y sus totales se recalculan. No se incluirá en ningún pago futuro.",
             "confirm": "Archivar pedido"
+          },
+          "bulk": {
+            "selectedCount": "{n} seleccionados",
+            "autoMatch": "Conciliar y corregir",
+            "archive": "Archivar",
+            "clear": "Limpiar",
+            "running": "Procesando…",
+            "archiveTitle": "¿Archivar los pedidos seleccionados?",
+            "archiveDescription": "{n} pedidos se quitarán de este pago y se recalcularán sus totales. No se incluirán en ningún pago futuro.",
+            "archiveConfirm": "Archivar pedidos",
+            "summary": {
+              "fixed": "{n} corregidos a partir de una transferencia coincidente del pagador.",
+              "nomatch": "{n} pendientes: no se encontró ninguna transferencia coincidente del pagador.",
+              "ambiguous": "{n} pendientes: varias transferencias coinciden; corrígelos a mano.",
+              "noaccount": "{n} omitidos: pagados por transferencia bancaria, corrígelos a mano.",
+              "error": "{n} con error: no se pudieron registrar. Vuelve a intentarlo en breve.",
+              "unavailable": "{n} omitidos: las transacciones en la cadena no están disponibles para este fondo.",
+              "truncated": "{n} sin verificar: demasiadas transacciones que recorrer; reduce la selección o reinténtalo.",
+              "archived": "{n} archivados.",
+              "archiveFailed": "{n} no se pudieron archivar. Vuelve a intentarlo en breve."
+            }
           }
         },
         "details": "Detalles",
@@ -1110,9 +1332,13 @@
           "rangeOrder": "La fecha de fin debe ser posterior a la fecha de inicio.",
           "noPlaceAccount": "Este lugar no tiene una cuenta en la cadena a la que acuñar.",
           "recordFailed": "Acuñado en la cadena, pero no se pudo registrar en el pago.",
+          "txHashInvalid": "Introduce un hash de transacción válido (0x seguido de 64 caracteres hexadecimales).",
           "archiveFailed": "No se pudo archivar el pedido. Vuelve a intentarlo en breve.",
           "payerFailed": "No se pudo cargar la cuenta del pagador.",
           "createOrderFailed": "No se pudo añadir el pedido. Vuelve a intentarlo en breve.",
+          "addOrdersFailed": "No se pudieron añadir los pedidos. Vuelve a intentarlo en breve.",
+          "addOrdersRejected": "Algunos de los pedidos seleccionados ya no se podían añadir.",
+          "noOrdersSelected": "Selecciona al menos un pedido para añadir.",
           "amountInvalid": "Introduce un importe válido.",
           "feeInvalid": "Introduce una comisión válida.",
           "amountPositive": "El importe debe ser mayor que cero.",
@@ -1222,6 +1448,7 @@
         "terms": "Términos",
         "citizenpay": "Citizen Pay",
         "fees": "Comisiones",
+        "emails": "Correos",
         "documents": "Documentos"
       },
       "general": {
@@ -1388,6 +1615,19 @@
         "syncPending": "Guardado localmente, pero aún no confirmado por Citizen Pay. Guarda de nuevo para reintentar la sincronización.",
         "syncFailed": "Tasa guardada, pero la sincronización con Citizen Pay falló. Guarda de nuevo para reintentar."
       },
+      "emails": {
+        "title": "Correos a los miembros",
+        "description": "Correos automáticos enviados a los miembros sobre sus depósitos y asignaciones.",
+        "pause": {
+          "label": "Suspender los correos de notificación a los miembros",
+          "description": "Durante la pausa, los miembros no reciben ningún correo de notificación: confirmaciones de depósito y asignación, activación, invitaciones y bonos por referidos se omiten todos; no se ponen en cola, así que no se envía nada retroactivamente al reanudar. Los correos de registro (verificación, bienvenida) y de contraseña siguen funcionando. Los correos a comercios y al equipo no se ven afectados."
+        },
+        "sender": {
+          "label": "Dirección del remitente",
+          "description": "Dirección «De» de los correos a los miembros. El nombre mostrado es el de tu fondo. El dominio debe estar verificado en tu proveedor de correo o los envíos fallarán. Déjalo vacío para usar la dirección predeterminada de la plataforma. Los correos a comercios, al equipo y de inicio de sesión no se ven afectados.",
+          "placeholder": "noreply@tufondo.org"
+        }
+      },
       "emailTemplates": {
         "allocationTitle": "Correo de confirmación de asignación",
         "allocationDescription": "El correo que reciben los miembros cuando una asignación llega a su tarjeta. Déjalo sin cambios para conservar el texto predeterminado, o personalízalo para este fondo.",
@@ -1517,6 +1757,7 @@
   "settings": {
     "errors": {
       "nameMin": "El nombre del fondo debe tener al menos 2 caracteres.",
+      "emailInvalid": "Introduce una dirección de correo válida.",
       "localeUnsupported": "Idioma no compatible.",
       "timezoneRequired": "La zona horaria es obligatoria.",
       "colorInvalid": "Use un color hexadecimal de 6 dígitos (p. ej. #1a73e8).",
@@ -1532,6 +1773,7 @@
     "roles": {
       "OWNER": "Propietario",
       "ADMIN": "Administrador",
+      "OPERATOR": "Operador",
       "VIEWER": "Observador"
     },
     "admin": {
@@ -1606,6 +1848,9 @@
       "allocationConfirmation": {
         "subject": "{amount} acaba de llegar a tu tarjeta — {fundName}",
         "textBody": "Hola {firstName}:\n\nTu asignación de {amount} acaba de acreditarse en tu tarjeta de {fundName}. Puedes gastarla en cualquier comercio asociado.\n\nEl equipo de {fundName}"
+      },
+      "footer": {
+        "unsubscribe": "Darse de baja de los recordatorios de pago"
       }
     },
     "signup": {
@@ -1614,6 +1859,9 @@
       "firstName": "Nombre",
       "lastName": "Apellidos",
       "email": "Correo electrónico",
+      "contributionAmount": "Importe que deseas aportar (opcional)",
+      "contributionAmountHint": "Déjalo vacío para usar el importe sugerido por tu nivel. Podrás acordar otro importe con un administrador.",
+      "remindersOptOut": "No quiero recibir recordatorios de pago por correo electrónico.",
       "submit": "Solicitar",
       "submitting": "Enviando…",
       "errors": {
@@ -1621,6 +1869,7 @@
         "lastNameRequired": "Los apellidos son obligatorios.",
         "emailInvalid": "Introduce una dirección de correo electrónico válida.",
         "emailTaken": "Ya existe una solicitud con este correo electrónico para este fondo.",
+        "amountInvalid": "Introduce un importe válido (hasta 2 decimales).",
         "fieldRequired": "{label} es obligatorio.",
         "generic": "Algo salió mal. Inténtalo de nuevo."
       },
@@ -1681,9 +1930,12 @@
         "firstNameLabel": "Nombre",
         "lastNameLabel": "Apellidos",
         "emailLabel": "Correo electrónico",
+        "notifyLabel": "Notificar al miembro por correo",
         "cancel": "Cancelar",
         "confirm": "Invitar miembro",
-        "inviting": "Enviando invitación…"
+        "confirmSilent": "Añadir miembro",
+        "inviting": "Enviando invitación…",
+        "adding": "Añadiendo…"
       },
       "addCard": {
         "button": "Añadir tarjeta",
@@ -1749,18 +2001,57 @@
         "description": "{memberName} está actualmente {currentStatus}.",
         "targetLabel": "Nuevo estado",
         "values": {
+          "NEW": "Nuevo",
           "ACTIVE": "Activo",
           "INACTIVE": "Inactivo",
-          "LEFT": "Dado de baja"
+          "PAUSED": "En pausa",
+          "STOPPED": "Dado de baja",
+          "REJECTED": "Rechazado"
         },
-        "leftWarning": "Marcar como Dado de baja registra una fecha de salida. Usa Inactivo para pausas temporales.",
         "cancel": "Cancelar",
         "confirm": "Actualizar",
-        "saving": "Guardando…"
+        "saving": "Guardando…",
+        "stoppedWarning": "Marcar como Dado de baja registra una fecha de salida. Usa En pausa para una pausa temporal."
+      },
+      "bulk": {
+        "selectAll": "Seleccionar todos los miembros",
+        "selectRow": "Seleccionar miembro",
+        "selected": "{count} seleccionados",
+        "clearSelection": "Limpiar",
+        "edit": "Editar selección",
+        "dialogTitle": "Editar los miembros seleccionados",
+        "dialogDescription": "Aplicar un cambio a los {count} miembros seleccionados.",
+        "propertyLabel": "Propiedad",
+        "property": {
+          "locale": "Idioma",
+          "status": "Estado",
+          "tier": "Nivel"
+        },
+        "valueLabel": "Nuevo valor",
+        "tierNone": "— Sin nivel —",
+        "statusHint": "Los miembros cuyo estado actual no permite la transición se omiten.",
+        "stoppedWarning": "Marcar como Dado de baja registra una fecha de salida. Usa En pausa para una pausa temporal.",
+        "resultSkipped": "{updated} actualizados, {skipped} omitidos (cambio de estado no permitido desde su estado actual).",
+        "done": "Hecho",
+        "cancel": "Cancelar",
+        "apply": "Aplicar",
+        "applying": "Aplicando…",
+        "errors": {
+          "noSelection": "Selecciona primero al menos un miembro.",
+          "tooMany": "Demasiados miembros seleccionados a la vez.",
+          "invalidValue": "Ese valor no es válido."
+        }
       },
       "import": {
         "title": "Importar miembros",
         "description": "Sube o pega un CSV con encabezados y asigna cada columna a un campo de miembro.",
+        "mode": {
+          "label": "Modo de importación",
+          "upsert": "Añadir y actualizar",
+          "updateOnly": "Solo actualizar (backfill)",
+          "upsertHint": "Crea los miembros nuevos y actualiza los existentes (emparejados por correo).",
+          "updateOnlyHint": "Solo actualiza las columnas asociadas de los miembros existentes (emparejados por correo). No se crea ningún miembro; las filas sin correspondencia se omiten."
+        },
         "fileLabel": "Archivo CSV",
         "pasteLabel": "O pega las filas",
         "mapHeading": "Asignar columnas",
@@ -1785,21 +2076,62 @@
           "householdAdults": "Adultos en el hogar",
           "householdChildren": "Niños en el hogar",
           "tier": "Nivel (por nombre)",
+          "contributionAmount": "Aportación acordada",
           "locale": "Idioma",
           "notes": "Notas",
-          "serial": "Serial de tarjeta"
+          "serial": "Serial de tarjeta",
+          "status": "Estado",
+          "cardNumber": "N.º de tarjeta (1…N)"
         },
         "errors": {
           "missingRequiredMapping": "Asigna los campos obligatorios (nombre, apellido, correo).",
+          "missingMatchKey": "Asocia la columna de correo para identificar qué miembros actualizar.",
           "columnMissing": "Falta en el CSV una columna asignada.",
           "empty": "No se encontraron filas de datos en el CSV."
         },
         "skip": {
           "missingName": "Falta el nombre o el apellido.",
           "invalidEmail": "Correo no válido.",
+          "noMatch": "No existe ningún miembro con este correo.",
           "error": "No se pudo importar esta fila."
         },
-        "fixedValuePlaceholder": "Aplicar a todas las filas"
+        "fixedValuePlaceholder": "Aplicar a todas las filas",
+        "statusMapHeading": "Correspondencia de estados",
+        "statusUnrecognized": "no reconocido",
+        "statusesDefaulted": "{count, plural, one {# valor de estado no reconocido, establecido en Nuevo} other {# valores de estado no reconocidos, establecidos en Nuevo}}:",
+        "cardNumbersNotFound": "{count, plural, one {# n.º de tarjeta sin tarjeta existente (sin vincular)} other {# n.º de tarjeta sin tarjeta existente (sin vincular)}}:"
+      },
+      "edit": {
+        "button": "Editar",
+        "title": "Editar miembro",
+        "description": "Actualiza los datos de contacto, el hogar y las notas de este miembro.",
+        "firstNameLabel": "Nombre",
+        "lastNameLabel": "Apellidos",
+        "emailLabel": "Correo electrónico",
+        "phoneLabel": "Teléfono",
+        "ibanLabel": "IBAN",
+        "localeLabel": "Idioma de los correos",
+        "localeDefault": "Predeterminado del fondo",
+        "localeHint": "El idioma en el que se envían los correos de este miembro.",
+        "addressLabel": "Dirección",
+        "postalCodeLabel": "Código postal",
+        "cityLabel": "Ciudad",
+        "householdAdultsLabel": "Adultos en el hogar",
+        "householdChildrenLabel": "Niños en el hogar",
+        "contributionAmountLabel": "Aportación acordada",
+        "contributionAmountHint": "Lo que pedimos a este miembro que aporte. Déjalo vacío para usar el objetivo del nivel ({target}). Mínimo: {min}.",
+        "contributionAmountHintNoTier": "Lo que pedimos a este miembro que aporte. Déjalo vacío para usar el objetivo del nivel cuando se le asigne uno.",
+        "notesLabel": "Notas",
+        "cancel": "Cancelar",
+        "confirm": "Guardar",
+        "saving": "Guardando…",
+        "errors": {
+          "tooLong": "Este valor es demasiado largo.",
+          "householdInvalid": "Introduce un número entero igual o mayor que 0.",
+          "amountInvalid": "Introduce un importe válido (hasta 2 decimales).",
+          "amountBelowMin": "El importe no puede ser inferior al mínimo del nivel ({min}).",
+          "localeInvalid": "Elige un idioma compatible."
+        }
       }
     }
   },
@@ -1843,10 +2175,74 @@
         "submitting": "Retirando…",
         "success": "Retiro confirmado en la cadena."
       },
+      "status": {
+        "button": "Cambiar estado",
+        "title": "Cambiar el estado de la tarjeta",
+        "description": "Definir el estado de la tarjeta de {holderLabel}. El cambio se refleja en Citizen Pay.",
+        "statusLabel": "Estado",
+        "options": {
+          "ACTIVE": {
+            "label": "Activa",
+            "description": "La tarjeta está en uso. Una tarjeta pasa automáticamente a «activa» con su primera recarga."
+          },
+          "INACTIVE": {
+            "label": "Inactiva",
+            "description": "Estado de fábrica: aún sin recargar. No bloquea nada; la tarjeta pasa a «activa» con su primera recarga."
+          },
+          "BLOCKED": {
+            "label": "Bloqueada",
+            "description": "El terminal rechaza esta tarjeta."
+          }
+        },
+        "lostLabel": "Reportada como perdida",
+        "lostDescription": "Marca interna para el seguimiento de tarjetas perdidas. No afecta al comportamiento del terminal.",
+        "cancel": "Cancelar",
+        "confirm": "Guardar",
+        "saving": "Guardando…"
+      },
+      "notify": {
+        "rowLabel": "Notificación",
+        "noEmail": "Sin dirección de correo",
+        "status": {
+          "sent": "Notificado",
+          "failed": "Error de envío",
+          "unsent": "No notificado"
+        },
+        "send": "Notificar al miembro",
+        "retry": "Reintentar",
+        "resend": "Reenviar",
+        "confirmTitle": "¿Notificar al miembro?",
+        "confirmDescription": "Enviar a {name} el correo «tu tarjeta está en camino».",
+        "cancel": "Cancelar",
+        "confirmSend": "Enviar el correo",
+        "sending": "Enviando…",
+        "errors": {
+          "notFound": "Tarjeta no encontrada.",
+          "noMember": "Esta tarjeta aún no está asignada a un miembro.",
+          "noEmail": "Este miembro no tiene dirección de correo registrada.",
+          "sendFailed": "No se pudo enviar el correo. Vuelve a intentarlo."
+        }
+      },
+      "bulk": {
+        "selectAll": "Seleccionar todas las tarjetas de esta página",
+        "selectRow": "Seleccionar {holder}",
+        "selected": "{count, plural, one {# tarjeta seleccionada} other {# tarjetas seleccionadas}}",
+        "changeStatus": "Cambiar estado",
+        "clear": "Limpiar",
+        "dialogTitle": "Cambiar el estado de las tarjetas",
+        "dialogDescription": "{count, plural, one {Definir el estado de # tarjeta seleccionada.} other {Definir el estado de las # tarjetas seleccionadas.}} El cambio se refleja en Citizen Pay.",
+        "cancel": "Cancelar",
+        "apply": "Aplicar",
+        "applying": "Aplicando…",
+        "errors": {
+          "none": "No hay tarjetas coincidentes seleccionadas."
+        }
+      },
       "errors": {
         "notFound": "Tarjeta no encontrada.",
         "alreadyBlocked": "Esta tarjeta ya está bloqueada.",
         "alreadyActive": "Esta tarjeta ya está activa.",
+        "invalidStatus": "Estado de tarjeta no válido.",
         "noAccount": "Esta tarjeta aún no tiene una cuenta en la cadena — no está completamente registrada en Citizen Pay.",
         "amountInvalid": "El importe debe ser un número con hasta 2 decimales.",
         "amountPositive": "El importe debe ser mayor que cero.",
@@ -1889,6 +2285,14 @@
           "empty": "No se encontraron filas válidas en el CSV.",
           "noMatches": "Ningún serial coincide con una tarjeta de este fondo.",
           "columnMissing": "Elige una columna de serial y una de número."
+        }
+      },
+      "source": {
+        "errors": {
+          "notFound": "Tarjeta no encontrada.",
+          "sourceNotFound": "Tarjeta fuente no encontrada.",
+          "self": "Una tarjeta no puede ser su propia fuente.",
+          "failed": "No se pudo actualizar la tarjeta fuente. Vuelve a intentarlo en un momento."
         }
       },
       "unassign": {
@@ -2036,6 +2440,20 @@
         "rejectReasonPlaceholder": "Se compartirá con el comercio en el correo de rechazo.",
         "reasonRequired": "Se requiere un motivo para que el comercio entienda la decisión."
       },
+      "visibility": {
+        "visible": "Visible",
+        "hidden": "Oculto"
+      },
+      "editName": {
+        "trigger": "Editar nombre",
+        "title": "Editar el nombre del comercio",
+        "description": "Este es el nombre público del comercio: se muestra en el directorio, los correos de asignación y las etiquetas de pago.",
+        "label": "Nombre",
+        "placeholder": "Nombre del comercio",
+        "cancel": "Cancelar",
+        "save": "Guardar",
+        "saving": "Guardando…"
+      },
       "email": {
         "approved": {
           "subject": "Solicitud aprobada — {fundName}",
@@ -2053,7 +2471,9 @@
         "alreadyApproved": "Este comercio ya está aprobado.",
         "alreadyRejected": "Este comercio ya está rechazado.",
         "notRejected": "Solo se pueden reconsiderar los comercios rechazados.",
-        "reasonRequired": "Se requiere un motivo."
+        "reasonRequired": "Se requiere un motivo.",
+        "nameRequired": "Introduce un nombre.",
+        "nameTaken": "Otro comercio de este fondo ya usa ese nombre."
       },
       "sync": {
         "trigger": "Sincronizar con Citizen Pay",
@@ -2171,6 +2591,21 @@
       "nextSteps": "Ponte en contacto con el administrador del fondo o vuelve a solicitarlo para recibir un nuevo correo de verificación."
     }
   },
+  "unsubscribe": {
+    "title": "Recordatorios de pago",
+    "errorTitle": "Enlace no válido",
+    "description": "Hola {firstName}: gestiona abajo tus preferencias de recordatorios de pago por correo.",
+    "status": {
+      "subscribed": "Actualmente recibes los recordatorios de pago por correo.",
+      "unsubscribed": "Ya no recibes los recordatorios de pago por correo."
+    },
+    "unsubscribe": "Darme de baja de los recordatorios",
+    "resubscribe": "Reactivar los recordatorios",
+    "saving": "Guardando…",
+    "errors": {
+      "invalidLink": "Este enlace de baja no es válido o ha caducado."
+    }
+  },
   "account": {
     "title": "Cuenta",
     "backToFunds": "Tus fondos",
@@ -2235,7 +2670,8 @@
       "features": "Funciones",
       "getStarted": "Empezar",
       "signIn": "Iniciar sesión",
-      "startFund": "Crear un fondo"
+      "startFund": "Crear un fondo",
+      "joinWaitlist": "Unirse a la lista de espera"
     },
     "hero": {
       "badge": "Código abierto · Multiinquilino · Alojado o autoalojado",
@@ -2261,8 +2697,7 @@
         "primaryColor": "Color principal",
         "tokenName": "Nombre del token",
         "tokenNameHelper": "Cómo se llama la moneda de tu fondo. En singular: del plural nos encargamos nosotros.",
-        "tryWith": "Pruébalo con esta marca",
-        "skipDemo": "Omitir la demo y crear un fondo",
+        "joinWaitlist": "Unirse a la lista de espera",
         "swatchHelperDefault": "el color predeterminado de la caisse.",
         "swatchHelperOther": "se usa en botones, resaltados y detalles.",
         "errors": {
@@ -2550,6 +2985,25 @@
         "eyebrow": "Para desarrolladores",
         "title": "Autoalójalo en tu propio servidor.",
         "body": "Descarga la imagen, ejecuta la migración, apunta un dominio. AGPL-3.0 en GitHub."
+      }
+    },
+    "waitlist": {
+      "emailLabel": "Correo electrónico",
+      "emailPlaceholder": "tu@ejemplo.com",
+      "fundNameLabel": "¿Cómo llamarías a tu fondo? (opcional)",
+      "fundNamePlaceholder": "Caisse de Saint-Gilles",
+      "submit": "Solicitar una invitación",
+      "submitting": "Inscribiendo…",
+      "successTitle": "Estás en la lista.",
+      "successBody": "Gracias. Te escribiremos en cuanto tu invitación esté lista.",
+      "errors": {
+        "fundNameMax": "No superes los {max} caracteres."
+      },
+      "emails": {
+        "confirm": {
+          "subject": "Estás en la lista de espera de La Caisse",
+          "text": "Hola:\n\nGracias por tu interés en La Caisse: estás en la lista de espera. Incorporamos los nuevos fondos en pequeños grupos y te enviaremos una invitación en cuanto se libere una plaza.\n\nNo tienes que hacer nada por ahora.\n\nEl equipo de La Caisse"
+        }
       }
     },
     "footer": {
