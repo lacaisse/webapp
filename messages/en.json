@@ -2013,6 +2013,35 @@
         "saving": "Saving…",
         "stoppedWarning": "Marking as Stopped stamps a departure date. Use Paused for a temporary pause."
       },
+      "bulk": {
+        "selectAll": "Select all members",
+        "selectRow": "Select member",
+        "selected": "{count} selected",
+        "clearSelection": "Clear",
+        "edit": "Edit selected",
+        "dialogTitle": "Edit selected members",
+        "dialogDescription": "Apply one change to the {count} selected member(s).",
+        "propertyLabel": "Property",
+        "property": {
+          "locale": "Language",
+          "status": "Status",
+          "tier": "Tier"
+        },
+        "valueLabel": "New value",
+        "tierNone": "— No tier —",
+        "statusHint": "Members whose current status can't move to the chosen one are skipped.",
+        "stoppedWarning": "Marking as Stopped stamps a departure date. Use Paused for a temporary pause.",
+        "resultSkipped": "{updated} updated, {skipped} skipped (status change not allowed from their current status).",
+        "done": "Done",
+        "cancel": "Cancel",
+        "apply": "Apply",
+        "applying": "Applying…",
+        "errors": {
+          "noSelection": "Select at least one member first.",
+          "tooMany": "Too many members selected at once.",
+          "invalidValue": "That value isn't valid."
+        }
+      },
       "import": {
         "title": "Import members",
         "description": "Upload or paste a CSV with headers, then map each column to a member field.",
@@ -2081,6 +2110,9 @@
         "emailLabel": "Email",
         "phoneLabel": "Phone",
         "ibanLabel": "IBAN",
+        "localeLabel": "Email language",
+        "localeDefault": "Fund default",
+        "localeHint": "The language this member's emails are sent in.",
         "addressLabel": "Address",
         "postalCodeLabel": "Postal code",
         "cityLabel": "City",
@@ -2097,7 +2129,8 @@
           "tooLong": "This value is too long.",
           "householdInvalid": "Enter a whole number of 0 or more.",
           "amountInvalid": "Enter a valid amount (up to 2 decimals).",
-          "amountBelowMin": "The amount can't be below the tier minimum ({min})."
+          "amountBelowMin": "The amount can't be below the tier minimum ({min}).",
+          "localeInvalid": "Pick a supported language."
         }
       }
     }

@@ -138,6 +138,7 @@ async function MemberDetail({
               lastName: member.lastName,
               email: member.email,
               phone: member.phone,
+              locale: member.locale,
               address: member.address,
               postalCode: member.postalCode,
               city: member.city,

@@ -24,9 +24,15 @@ import { prisma } from "@/services/db/prisma";
 import { requireCurrentFund } from "@/services/fund/server";
 import { contributionApplies } from "@/services/member/contribution";
 import { AddCardDialog } from "./add-card-dialog";
+import { BulkActionsBar } from "./bulk-actions-bar";
 import { InviteMemberDialog } from "./invite-member-dialog";
 import { MemberImportDialog } from "./member-import-dialog";
 import { MemberRowActions } from "./member-row-actions";
+import {
+  MemberSelectionProvider,
+  RowCheckbox,
+  SelectAllCheckbox,
+} from "./selection";
 import { StatusChangeDialog } from "./status-change-dialog";
 import { MemberTierPicker } from "./tier-picker";
 
@@ -222,7 +228,10 @@ async function MembersContent({
   };
 
   return (
-    <>
+    <MemberSelectionProvider
+      key={`${active}:${q ?? ""}`}
+      allIds={members.map((m) => m.id)}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Tabs
           active={active}
@@ -234,9 +243,14 @@ async function MembersContent({
         <TableSearch placeholder={t("searchPlaceholder")} />
       </div>
 
+      <BulkActionsBar tiers={tiers} />
+
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-10">
+              <SelectAllCheckbox />
+            </TableHead>
             <TableHead>{t("columns.name")}</TableHead>
             <TableHead>{t("columns.email")}</TableHead>
             <TableHead>{t("columns.status")}</TableHead>
@@ -248,12 +262,15 @@ async function MembersContent({
         </TableHeader>
         <TableBody>
           {members.length === 0 ? (
-            <TableEmpty colSpan={7}>{t("empty")}</TableEmpty>
+            <TableEmpty colSpan={8}>{t("empty")}</TableEmpty>
           ) : (
             members.map((m) => {
               const fullName = `${m.firstName} ${m.lastName}`.trim();
               return (
                 <TableRow key={m.id}>
+                  <TableCell className="w-10">
+                    <RowCheckbox id={m.id} />
+                  </TableCell>
                   <TableCell className="font-medium">
                     <Link
                       href={`/members/${m.id}`}
@@ -366,7 +383,7 @@ async function MembersContent({
           )}
         </TableBody>
       </Table>
-    </>
+    </MemberSelectionProvider>
   );
 }
 
@@ -420,7 +437,7 @@ function MembersToolbarSkeleton() {
         </div>
         <Skeleton className="h-9 w-48" />
       </div>
-      <TableSkeleton columns={7} alignRight={1} />
+      <TableSkeleton columns={8} alignRight={1} />
     </>
   );
 }
