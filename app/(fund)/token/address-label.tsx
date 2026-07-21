@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import Link from "next/link";
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -70,6 +71,30 @@ export function buildAddressDirectory(opts: {
   if (opts.minterSmartAccount)
     minterAddresses.add(opts.minterSmartAccount.toLowerCase());
   return { cards, places, accounts, profiles, minterAddresses };
+}
+
+/**
+ * Wraps an `AddressLabel` in a link to that account's audit page
+ * (/token/account/[address]) so every address in the explorer is a
+ * drill-down entry point. The zero address has no account to audit —
+ * it renders unwrapped.
+ */
+export function AddressLink({
+  address,
+  children,
+}: {
+  address: string;
+  children: React.ReactNode;
+}) {
+  if (isZeroAddress(address)) return <>{children}</>;
+  return (
+    <Link
+      href={`/token/account/${address.toLowerCase()}`}
+      className="inline-flex rounded-sm underline-offset-4 decoration-dotted hover:underline focus-visible:underline"
+    >
+      {children}
+    </Link>
+  );
 }
 
 export function AddressLabel({
