@@ -3,6 +3,7 @@ import "server-only";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
+import { mcp } from "better-auth/plugins";
 import { passkey } from "@better-auth/passkey";
 import { getTranslations } from "next-intl/server";
 import { prisma } from "@/services/db/prisma";
@@ -99,6 +100,30 @@ export const auth = betterAuth({
   },
 
   plugins: [
+    // OAuth 2.1 authorization server for MCP clients (agents operating the
+    // dashboard through /api/mcp). Clients self-register via dynamic client
+    // registration, the user authorizes on THIS host (loginPage is the auth
+    // host's own /login — the plugin stashes the OAuth query in a signed
+    // cookie and resumes the flow right after sign-in), and the issued
+    // bearer tokens land in OauthAccessToken. Deliberately short-lived:
+    // access tokens last an hour and refresh tokens a day, so an agent's
+    // authorization decays quickly unless the user re-approves.
+    //
+    // NOTE for the login/signup server actions: the post-login resume is a
+    // thrown `APIError("FOUND")` redirect — actions must forward it (see
+    // followOAuthResume in app/(auth-host)/actions.ts), not swallow it as a
+    // credential error.
+    mcp({
+      loginPage: "/login",
+      oidcConfig: {
+        loginPage: "/login", // OIDCOptions requires it too; same page
+        accessTokenExpiresIn: 60 * 60, // 1 h — the "short session"
+        refreshTokenExpiresIn: 60 * 60 * 24, // 1 day, then re-authorize
+        codeExpiresIn: 600,
+        requirePKCE: true,
+        allowDynamicClientRegistration: true,
+      },
+    }),
     passkey({
       rpName: "La Caisse",
       // rpID = apex, so a passkey registered on acme.lacaisse.eu works

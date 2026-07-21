@@ -22,6 +22,18 @@ import {
 
 export type ActionResult = { error: string } | { ok: true; message?: string };
 
+// MCP OAuth resume: when a sign-in happens mid-OAuth-authorization (the MCP
+// plugin stashed the authorize query in a signed `oidc_login_prompt` cookie
+// and sent the user to /login), Better Auth's after-hook finishes the
+// authorization inside the sign-in call and surfaces the client redirect as a
+// thrown `APIError("FOUND")` with a `location` header. Forward it — treating
+// it as a failure would eat the agent's authorization code.
+function followOAuthResume(e: APIError): never | void {
+  if (e.status !== "FOUND") return;
+  const location = e.headers ? new Headers(e.headers).get("location") : null;
+  if (location) redirect(location);
+}
+
 // After auth on this host (`auth.<APP_DOMAIN>`), we DON'T redirect the browser
 // straight to the target. Instead `buildPostAuthRedirect` mints a single-use
 // `AuthExchange` code bound to (userId, targetHost) and returns a URL pointing
@@ -53,8 +65,12 @@ export async function loginAction(
     });
   } catch (e) {
     // Better Auth surfaces auth failures as APIError. Treat them all as
-    // "invalid credentials" to avoid leaking which field was wrong.
-    if (e instanceof APIError) return { error: t("invalidCredentials") };
+    // "invalid credentials" to avoid leaking which field was wrong — except
+    // the MCP OAuth resume redirect, which rides in as APIError("FOUND").
+    if (e instanceof APIError) {
+      followOAuthResume(e);
+      return { error: t("invalidCredentials") };
+    }
     throw e;
   }
 
@@ -102,6 +118,7 @@ export async function signupAction(
     });
   } catch (e) {
     if (e instanceof APIError) {
+      followOAuthResume(e);
       // Surface the localized message Better Auth returned (e.g. "user already
       // exists"). Falls back to a generic "invalid input" if absent.
       return { error: e.body?.message ?? t("errors.invalidInput") };
