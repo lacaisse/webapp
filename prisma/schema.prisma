@@ -70,6 +70,11 @@ model User {
   triggeredAnnotations        TransactionAnnotation[] @relation("AnnotationTriggeredBy")
   triggeredPendingAnnotations PendingAnnotation[]     @relation("PendingAnnotationTriggeredBy")
 
+  // MCP OAuth provider (agents operating the dashboard via /api/mcp)
+  oauthApplications OauthApplication[]
+  oauthAccessTokens OauthAccessToken[]
+  oauthConsents     OauthConsent[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -161,6 +166,75 @@ model Passkey {
 
   createdAt DateTime @default(now())
 
+  @@index([userId])
+}
+
+// =============================================================================
+// MCP OAuth provider tables (Better Auth `mcp` plugin)
+// =============================================================================
+// The app acts as an OAuth 2.1 authorization server for MCP clients (agents
+// operating the dashboard via /api/mcp). Shapes are dictated by the plugin —
+// same "don't rename fields" rule as the core Better Auth tables above.
+// Clients self-register (dynamic client registration), users authorize on the
+// auth host, and short-lived bearer tokens land in OauthAccessToken.
+
+model OauthApplication {
+  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String
+  icon         String?
+  metadata     String?
+  clientId     String  @unique
+  clientSecret String?
+  redirectUrls String // comma-separated redirect URIs, exact-match checked
+  type         String // "web" | "native" — set by the registration endpoint
+  disabled     Boolean @default(false)
+  userId       String? @db.Uuid // registering user, when known
+
+  user         User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessTokens OauthAccessToken[]
+  consents     OauthConsent[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model OauthAccessToken {
+  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accessToken           String   @unique
+  refreshToken          String   @unique
+  accessTokenExpiresAt  DateTime
+  refreshTokenExpiresAt DateTime
+  clientId              String
+  userId                String?  @db.Uuid
+  scopes                String // space-separated OAuth scopes
+
+  client OauthApplication @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
+  user   User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clientId])
+  @@index([userId])
+  @@index([accessTokenExpiresAt])
+}
+
+model OauthConsent {
+  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId     String
+  userId       String  @db.Uuid
+  scopes       String
+  consentGiven Boolean
+
+  client OauthApplication @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
+  user   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clientId])
   @@index([userId])
 }
 
