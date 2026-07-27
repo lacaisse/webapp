@@ -432,7 +432,8 @@ export async function sendTestEmailAction(input: {
         : undefined,
     });
   } catch (e) {
-    console.error("[email] test send failed", fund.id, input.type, e);
+    const safeTypeForLog = String(input.type).replace(/[\r\n]/g, "");
+    console.error("[email] test send failed", fund.id, safeTypeForLog, e);
     return {
       error: t("fund.settings.emailTemplates.test.errors.sendFailed" as never),
     };
