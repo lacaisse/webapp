@@ -590,11 +590,12 @@ model Member {
   fundId String
   fund   Fund   @relation(fields: [fundId], references: [id], onDelete: Cascade)
 
-  // Identity (CitizenPay never sees these — only we do)
+  // Identity (CitizenPay never sees these — only we do). These three are the
+  // BASE fields: everything else a fund collects about a member is a custom
+  // question stored in `applicationData`, per-fund and admin-configurable.
   email     String
   firstName String
   lastName  String
-  phone     String?
 
   // Preferred language, captured from the request locale at self-signup so
   // every email we send them is in the language they registered in. Null for
@@ -608,19 +609,19 @@ model Member {
   userId String? @db.Uuid
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  // Address (reporting + printed correspondence)
+  // Address (reporting + printed correspondence). Stays a typed column rather
+  // than a custom question because formatMemberAddress composes it into the
+  // {address} placeholder that card-assigned emails render — a value in
+  // `applicationData` would never reach that.
   address    String?
   postalCode String?
   city       String?
 
-  // Household composition — input to tier assignment
-  householdAdults   Int @default(1)
-  householdChildren Int @default(0)
-
-  // Banking. `paymentReference` is the string the member writes on their
-  // bank transfer; bank-sync matches contributions by it. Per-fund unique.
-  // Generated in the create action — Prisma can't default this from a fn.
-  iban             String?
+  // `paymentReference` is the string the member writes on their bank transfer;
+  // bank-sync matches contributions by it. Per-fund unique. Generated in the
+  // create action — Prisma can't default this from a fn. (A member's own IBAN
+  // is not stored here: bank-sync matches through LinkedBankAccount, and the
+  // pay page's EPC QR uses the FUND's banking IBAN.)
   paymentReference String?
 
   // Tier assignment — drives the auto-allocation amount on bank-sync. La
