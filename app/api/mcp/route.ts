@@ -14,6 +14,12 @@ import { handleMcpRequest } from "@/services/mcp/handler";
 // walks the client through discovery → dynamic registration → user login on
 // the auth host → short-lived token. See the MCP section in AGENTS.md.
 
+// list_transfers is capped per call, but a full 1000-row page still resolves a
+// timestamp per block behind the scenes — comfortably more than the platform
+// default allows. Callers iterate with the cursor; each iteration needs room
+// to finish.
+export const maxDuration = 60;
+
 const handler = withMcpAuth(auth, (req, token) => handleMcpRequest(req, token));
 
 export { handler as GET, handler as POST, handler as DELETE };

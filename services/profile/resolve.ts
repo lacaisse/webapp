@@ -24,6 +24,11 @@ import { prisma } from "@/services/db/prisma";
 
 const POSITIVE_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 const NEGATIVE_TTL_MS = 60 * 60 * 1000; // 1h
+// CP caps its batch profiles endpoint at 200 accounts per request. Chunking
+// here (rather than at every call site) keeps the "pass me every address on
+// the page" contract true for callers with big address sets — a page render
+// stays a single chunk, a full-history walk splits.
+const CP_BATCH_SIZE = 200;
 
 export type ResolvedCard = {
   account: string;
@@ -174,7 +179,14 @@ export async function resolveAddresses(
   let fetched: Array<CitizenPayProfile | null>;
   try {
     const client = getCitizenPayClient(fund);
-    fetched = await client.getProfiles(toFetch);
+    const chunks: string[][] = [];
+    for (let i = 0; i < toFetch.length; i += CP_BATCH_SIZE) {
+      chunks.push(toFetch.slice(i, i + CP_BATCH_SIZE));
+    }
+    // Each chunk's result is positionally aligned with its own slice, so
+    // concatenating in chunk order restores alignment with `toFetch`.
+    const pages = await Promise.all(chunks.map((c) => client.getProfiles(c)));
+    fetched = pages.flat();
   } catch (e) {
     // CP unreachable — fall back to whatever stale cache we have for these
     // addresses (better than nothing), and mark the rest as unknown for
