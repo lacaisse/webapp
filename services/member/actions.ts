@@ -20,11 +20,33 @@ import {
   type ExtraValue,
 } from "./schema";
 
+// `redirectTo` on the error variant is set only for TERMINAL failures — the
+// ones the visitor can do nothing about. Errors they can fix (a taken email, a
+// missing required answer) stay inline in the form: bouncing someone off to an
+// external error page over a typo would lose everything they typed.
 export type SignupMemberResult =
-  | { error: string; field?: "firstName" | "lastName" | "email" }
+  | {
+      error: string;
+      field?: "firstName" | "lastName" | "email";
+      redirectTo?: string;
+    }
   | { ok: true; redirectTo: string };
 
 const MAX_REFERENCE_RETRIES = 5;
+
+// Append our failure marker to the fund's configured error URL, preserving any
+// query string it already carries. A malformed stored URL yields null so the
+// caller falls back to showing the error inline.
+function errorRedirect(errorUrl: string | null, code: string): string | undefined {
+  if (!errorUrl) return undefined;
+  try {
+    const url = new URL(errorUrl);
+    url.searchParams.set("error", code);
+    return url.toString();
+  } catch {
+    return undefined;
+  }
+}
 
 export async function signupMemberAction(input: {
   builtins: BuiltinSignupInput;
@@ -216,7 +238,15 @@ export async function signupMemberAction(input: {
           field: "email",
         };
       }
-      throw e;
+      // Anything else is our problem, not the visitor's. Log it (Vercel
+      // captures console.error) and hand back a terminal result so the fund's
+      // error redirect can fire — a raw error boundary would strand a visitor
+      // who arrived from the fund's own website with no way back.
+      console.error("[signup] member creation failed", fund.id, e);
+      return {
+        error: t("members.signup.errors.generic" as never),
+        redirectTo: errorRedirect(fund.memberSignupErrorUrl, "signup_failed"),
+      };
     }
 
     // Outside the transaction: fire the Resend send. The sender catches
@@ -259,7 +289,12 @@ export async function signupMemberAction(input: {
     return { ok: true, redirectTo };
   }
 
-  return { error: t("members.signup.errors.generic" as never) };
+  // Every attempt collided on paymentReference — vanishingly unlikely, and
+  // nothing the visitor can act on, so it takes the error redirect too.
+  return {
+    error: t("members.signup.errors.generic" as never),
+    redirectTo: errorRedirect(fund.memberSignupErrorUrl, "signup_failed"),
+  };
 }
 
 function isExtraEmpty(value: ExtraValue | undefined): boolean {

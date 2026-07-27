@@ -166,6 +166,10 @@ export async function updateLegalSettingsAction(
 
 // --- Signup redirects ----------------------------------------------------
 
+// Where a signup flow hands the visitor back to the fund's own website. These
+// are admin config on purpose: the public /join form never takes a redirect
+// target from the query string, which would make it an open redirect anyone
+// could point at a phishing page.
 const SignupRedirectsSchema = z.object({
   memberSignupSuccessUrl: z
     .string()
@@ -174,6 +178,18 @@ const SignupRedirectsSchema = z.object({
     .nullable()
     .optional(),
   merchantSignupSuccessUrl: z
+    .string()
+    .url({ error: "settings.errors.urlInvalid" })
+    .or(z.literal(""))
+    .nullable()
+    .optional(),
+  memberSignupCancelUrl: z
+    .string()
+    .url({ error: "settings.errors.urlInvalid" })
+    .or(z.literal(""))
+    .nullable()
+    .optional(),
+  memberSignupErrorUrl: z
     .string()
     .url({ error: "settings.errors.urlInvalid" })
     .or(z.literal(""))

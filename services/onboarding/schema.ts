@@ -36,6 +36,10 @@ export const FieldDataSchema = z
     helpText: z.string().nullable().optional(),
     required: z.boolean().default(false),
     position: z.number().int().min(0).default(0),
+    // Which step of the form this field appears on. Null / omitted = the
+    // first step. The action verifies the step belongs to the same fund and
+    // target before saving.
+    stepId: z.string().nullable().optional(),
     options: z.array(FieldOptionSchema).optional(),
   })
   .refine(
@@ -54,3 +58,19 @@ export type FieldData = z.infer<typeof FieldDataSchema>;
 export type OnboardingFieldResult =
   | { ok: true }
   | { error: string; field?: keyof FieldData };
+
+// --- Steps -----------------------------------------------------------------
+// A step is one page of the public signup form. Title/description are
+// admin-authored free text in the fund's own language, not i18n keys.
+
+export const StepDataSchema = z.object({
+  title: z.string().trim().min(1, { error: "onboardingSteps.errors.titleRequired" }),
+  description: z.string().trim().nullable().optional(),
+  position: z.number().int().min(0).default(0),
+});
+
+export type StepData = z.infer<typeof StepDataSchema>;
+
+export type OnboardingStepResult =
+  | { ok: true }
+  | { error: string; field?: keyof StepData };

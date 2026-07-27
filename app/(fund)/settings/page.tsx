@@ -13,12 +13,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, resolveActiveTab } from "@/components/ui/tabs";
 import { prisma } from "@/services/db/prisma";
 import { requireFundRole } from "@/services/auth/dal";
-import { requireCurrentFund } from "@/services/fund/server";
+import { getFundUrl, requireCurrentFund } from "@/services/fund/server";
 import {
   OnboardingFields,
   type FieldRow,
+  type StepOption,
 } from "./onboarding-fields";
 import { OnboardingSettings } from "./onboarding-settings";
+import { OnboardingSteps, type StepRow } from "./onboarding-steps";
+import {
+  SignupLinkReference,
+  type PrefillParam,
+} from "./signup-link-reference";
 import { EmailsTab } from "./emails-tab";
 import { DocumentsTab } from "./documents-tab";
 import { CitizenPayConnect } from "./citizenpay-connect";
@@ -126,6 +132,8 @@ async function SettingsContent({
     payoutFeeSynced: fund.payoutFeeSynced,
     memberSignupSuccessUrl: fund.memberSignupSuccessUrl,
     merchantSignupSuccessUrl: fund.merchantSignupSuccessUrl,
+    memberSignupCancelUrl: fund.memberSignupCancelUrl,
+    memberSignupErrorUrl: fund.memberSignupErrorUrl,
   };
 
   return (
@@ -211,6 +219,7 @@ async function SettingsContent({
         <Suspense fallback={<Skeleton className="h-64 w-full" />}>
           <OnboardingTab
             fundId={fund.id}
+            fundDomain={fund.domain}
             requireMemberEmailVerification={fund.requireMemberEmailVerification}
             requireMerchantEmailVerification={
               fund.requireMerchantEmailVerification
@@ -270,21 +279,30 @@ async function SettingsContent({
 
 async function OnboardingTab({
   fundId,
+  fundDomain,
   requireMemberEmailVerification,
   requireMerchantEmailVerification,
   fundForForms,
 }: {
   fundId: string;
+  fundDomain: string;
   requireMemberEmailVerification: boolean;
   requireMerchantEmailVerification: boolean;
   fundForForms: React.ComponentProps<typeof SignupRedirectsForm>["fund"];
 }) {
   const t = await getTranslations("fund.settings");
+  const tSignup = await getTranslations("members.signup");
 
-  const allFields = await prisma.onboardingField.findMany({
-    where: { fundId },
-    orderBy: [{ archivedAt: "asc" }, { position: "asc" }],
-  });
+  const [allFields, allSteps] = await Promise.all([
+    prisma.onboardingField.findMany({
+      where: { fundId },
+      orderBy: [{ archivedAt: "asc" }, { position: "asc" }],
+    }),
+    prisma.onboardingStep.findMany({
+      where: { fundId },
+      orderBy: [{ archivedAt: "asc" }, { position: "asc" }],
+    }),
+  ]);
 
   const rowsFor = (target: "MEMBER" | "MERCHANT"): FieldRow[] =>
     allFields
@@ -300,10 +318,46 @@ async function OnboardingTab({
           helpText: f.helpText,
           required: f.required,
           position: f.position,
+          stepId: f.stepId,
           options: config?.options ?? [],
           archivedAt: f.archivedAt,
         };
       });
+
+  const stepRowsFor = (target: "MEMBER" | "MERCHANT"): StepRow[] =>
+    allSteps
+      .filter((s) => s.target === target)
+      .map((s) => ({
+        id: s.id,
+        title: s.title,
+        description: s.description,
+        position: s.position,
+        archivedAt: s.archivedAt,
+        fieldCount: allFields.filter(
+          (f) => f.stepId === s.id && f.archivedAt === null,
+        ).length,
+      }));
+
+  // Only active steps can be assigned — see StepOption.
+  const stepOptionsFor = (target: "MEMBER" | "MERCHANT"): StepOption[] =>
+    allSteps
+      .filter((s) => s.target === target && s.archivedAt === null)
+      .map((s) => ({ id: s.id, title: s.title }));
+
+  // The prefill contract for the fund's own website: the built-in inputs
+  // plus every active member field, addressed by its key.
+  const prefillParams: PrefillParam[] = [
+    { name: "firstName", label: tSignup("firstName"), format: null },
+    { name: "lastName", label: tSignup("lastName"), format: null },
+    { name: "email", label: tSignup("email"), format: null },
+    ...allFields
+      .filter((f) => f.target === "MEMBER" && f.archivedAt === null)
+      .map((f) => ({
+        name: f.key,
+        label: f.label,
+        format: formatHintFor(f.type, f.config),
+      })),
+  ];
 
   return (
     <div className="space-y-6">
@@ -336,14 +390,73 @@ async function OnboardingTab({
       </Card>
       <Card>
         <CardHeader>
+          <CardTitle>{t("onboarding.integration.title")}</CardTitle>
+          <CardDescription>
+            {t("onboarding.integration.description")}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="pb-4">
+          <SignupLinkReference
+            joinUrl={`${getFundUrl(fundDomain)}/join`}
+            params={prefillParams}
+          />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("onboarding.stepsTitle")}</CardTitle>
+          <CardDescription>{t("onboarding.stepsDescription")}</CardDescription>
+        </CardHeader>
+        {/* Member-only for now: the merchant form still renders as a single
+            page, so a merchant steps manager here would be a control that
+            silently does nothing. OnboardingStep carries `target` already, so
+            wiring /join-merchant up later needs no schema change. */}
+        <CardContent className="pb-4">
+          <OnboardingSteps target="MEMBER" steps={stepRowsFor("MEMBER")} />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
           <CardTitle>{t("onboarding.fieldsTitle")}</CardTitle>
           <CardDescription>{t("onboarding.fieldsDescription")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-8 pb-4">
-          <OnboardingFields target="MEMBER" fields={rowsFor("MEMBER")} />
-          <OnboardingFields target="MERCHANT" fields={rowsFor("MERCHANT")} />
+          <OnboardingFields
+            target="MEMBER"
+            fields={rowsFor("MEMBER")}
+            steps={stepOptionsFor("MEMBER")}
+          />
+          <OnboardingFields
+            target="MERCHANT"
+            fields={rowsFor("MERCHANT")}
+            steps={stepOptionsFor("MERCHANT")}
+          />
         </CardContent>
       </Card>
     </div>
   );
+}
+
+// What values the param accepts, for the integration table. SELECT-likes list
+// their option values since those are the only strings prefill will honour
+// (see services/member/prefill.ts).
+function formatHintFor(type: string, config: unknown): string | null {
+  const options =
+    (config as { options?: { value: string }[] } | null)?.options ?? [];
+  switch (type) {
+    case "SELECT":
+      return options.map((o) => o.value).join(" | ") || null;
+    case "MULTISELECT":
+      return options.length
+        ? `${options.map((o) => o.value).join(",")} (comma-separated)`
+        : null;
+    case "CHECKBOX":
+      return "true | false";
+    case "DATE":
+      return "YYYY-MM-DD";
+    case "NUMBER":
+      return "123";
+    default:
+      return null;
+  }
 }

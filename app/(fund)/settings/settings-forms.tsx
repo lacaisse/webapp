@@ -199,6 +199,8 @@ type Fund = {
   payoutFeeSynced: boolean;
   memberSignupSuccessUrl: string | null;
   merchantSignupSuccessUrl: string | null;
+  memberSignupCancelUrl: string | null;
+  memberSignupErrorUrl: string | null;
 };
 
 export function GeneralForm({ fund }: { fund: Fund }) {
@@ -375,11 +377,15 @@ export function SignupRedirectsForm({ fund }: { fund: Fund }) {
       initial={{
         memberSignupSuccessUrl: fund.memberSignupSuccessUrl ?? "",
         merchantSignupSuccessUrl: fund.merchantSignupSuccessUrl ?? "",
+        memberSignupCancelUrl: fund.memberSignupCancelUrl ?? "",
+        memberSignupErrorUrl: fund.memberSignupErrorUrl ?? "",
       }}
       action={async (v) =>
         updateSignupRedirectsAction({
           memberSignupSuccessUrl: v.memberSignupSuccessUrl,
           merchantSignupSuccessUrl: v.merchantSignupSuccessUrl,
+          memberSignupCancelUrl: v.memberSignupCancelUrl,
+          memberSignupErrorUrl: v.memberSignupErrorUrl,
         })
       }
       fields={[
@@ -387,6 +393,18 @@ export function SignupRedirectsForm({ fund }: { fund: Fund }) {
           key: "memberSignupSuccessUrl",
           label: t("member"),
           hint: t("memberHint"),
+          type: "url",
+        },
+        {
+          key: "memberSignupCancelUrl",
+          label: t("memberCancel"),
+          hint: t("memberCancelHint"),
+          type: "url",
+        },
+        {
+          key: "memberSignupErrorUrl",
+          label: t("memberError"),
+          hint: t("memberErrorHint"),
           type: "url",
         },
         {

@@ -58,18 +58,27 @@ export type FieldRow = {
   helpText: string | null;
   required: boolean;
   position: number;
+  stepId: string | null;
   options: FieldOption[];
   archivedAt: Date | null;
 };
 
+// Only active steps are offered — assigning a field to an archived step would
+// silently drop it onto the first page anyway.
+export type StepOption = { id: string; title: string };
+
 export function OnboardingFields({
   target,
   fields,
+  steps,
 }: {
   target: "MEMBER" | "MERCHANT";
   fields: FieldRow[];
+  steps: StepOption[];
 }) {
   const t = useTranslations("fund.settings.onboarding.fields");
+  const stepTitle = (id: string | null) =>
+    steps.find((s) => s.id === id)?.title ?? null;
 
   return (
     <div className="space-y-3">
@@ -89,6 +98,7 @@ export function OnboardingFields({
         <FieldDialog
           target={target}
           existingKeys={fields.map((f) => f.key)}
+          steps={steps}
           trigger={
             <Button variant="default" size="sm">
               {t("add")}
@@ -104,12 +114,15 @@ export function OnboardingFields({
             <TableHead>{t("columns.key")}</TableHead>
             <TableHead>{t("columns.type")}</TableHead>
             <TableHead>{t("columns.required")}</TableHead>
+            {steps.length > 0 && <TableHead>{t("columns.step")}</TableHead>}
             <TableHead />
           </TableRow>
         </TableHeader>
         <TableBody>
           {fields.length === 0 ? (
-            <TableEmpty colSpan={6}>{t("empty")}</TableEmpty>
+            <TableEmpty colSpan={steps.length > 0 ? 7 : 6}>
+              {t("empty")}
+            </TableEmpty>
           ) : (
             fields.map((f) => (
               <TableRow key={f.id}>
@@ -138,6 +151,11 @@ export function OnboardingFields({
                     <span className="text-xs text-muted-foreground">—</span>
                   )}
                 </TableCell>
+                {steps.length > 0 && (
+                  <TableCell className="text-sm text-muted-foreground">
+                    {stepTitle(f.stepId) ?? t("firstStep")}
+                  </TableCell>
+                )}
                 <TableCell className="text-right">
                   <div className="inline-flex items-center gap-1">
                     <FieldDialog
@@ -145,6 +163,7 @@ export function OnboardingFields({
                       existingKeys={fields
                         .filter((x) => x.id !== f.id)
                         .map((x) => x.key)}
+                      steps={steps}
                       edit={f}
                       trigger={
                         <Button variant="ghost" size="sm">
@@ -167,11 +186,13 @@ export function OnboardingFields({
 function FieldDialog({
   target,
   existingKeys,
+  steps,
   edit,
   trigger,
 }: {
   target: "MEMBER" | "MERCHANT";
   existingKeys: string[];
+  steps: StepOption[];
   edit?: FieldRow;
   trigger: React.ReactNode;
 }) {
@@ -184,6 +205,7 @@ function FieldDialog({
   const [helpText, setHelpText] = useState(edit?.helpText ?? "");
   const [required, setRequired] = useState(edit?.required ?? false);
   const [position, setPosition] = useState(edit?.position ?? 0);
+  const [stepId, setStepId] = useState<string>(edit?.stepId ?? "");
   const [optionsText, setOptionsText] = useState(
     edit?.options.map((o) => `${o.value}:${o.label}`).join("\n") ?? "",
   );
@@ -200,6 +222,7 @@ function FieldDialog({
     setHelpText("");
     setRequired(false);
     setPosition(0);
+    setStepId("");
     setOptionsText("");
     setError(null);
   };
@@ -218,6 +241,7 @@ function FieldDialog({
         helpText: helpText.trim() || null,
         required,
         position,
+        stepId: stepId || null,
         options: needsOptions ? parseOptions(optionsText) : undefined,
       };
       const result = edit
@@ -325,6 +349,25 @@ function FieldDialog({
               <p className="text-xs text-muted-foreground">
                 {t("optionsHint")}
               </p>
+            </div>
+          )}
+          {steps.length > 0 && (
+            <div className="space-y-1">
+              <Label htmlFor="field-step">{t("step")}</Label>
+              <select
+                id="field-step"
+                value={stepId}
+                onChange={(e) => setStepId(e.target.value)}
+                className="h-8 w-full rounded-md bg-background px-2 text-sm ring-1 ring-foreground/15 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <option value="">{t("firstStep")}</option>
+                {steps.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.title}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">{t("stepHint")}</p>
             </div>
           )}
           <div className="grid grid-cols-2 gap-3">
