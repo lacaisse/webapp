@@ -349,10 +349,18 @@ model Fund {
   requireMemberEmailVerification   Boolean @default(true)
   requireMerchantEmailVerification Boolean @default(true)
 
-  // When set, member-facing confirmation emails (PAYMENT_CONFIRMATION at
-  // bank-sync ingest, ALLOCATION_CONFIRMATION when a sourced mint confirms)
-  // are skipped — not queued: resuming does not send them retroactively.
-  // Other emails (invites, verification, referral bonus) are unaffected.
+  // When set, member-facing notification emails are skipped — not queued, so
+  // resuming does not send them retroactively. Covers PAYMENT_CONFIRMATION
+  // (bank-sync ingest), ALLOCATION_CONFIRMATION (sourced mint confirms),
+  // REFERRAL_BONUS_AWARDED, MEMBER_ACTIVATED, MEMBER_INVITED, CARD_ASSIGNED and
+  // the automatic payment reminder (the monthly cron skips paused funds).
+  // The manual payment reminder is gated but overridable: it returns
+  // `pausedConfirmRequired` so the UI can ask the admin to confirm sending
+  // anyway, rather than bypassing the pause silently or refusing outright.
+  // NOT covered — deliberately: signup emails (MEMBER_EMAIL_VERIFICATION,
+  // MEMBER_WELCOME) and password emails, which are functional rather than
+  // notifications; the manual allocation notify, where an explicit admin click
+  // overrides the pause; and all merchant / team emails.
   confirmationEmailsPausedAt DateTime?
 
   // Custom From address for member-facing transactional emails (verification,
@@ -384,9 +392,10 @@ model Fund {
   allocationPeriods  AllocationPeriod[] // FIXED_PERIOD scheduling windows
   linkedBankAccounts LinkedBankAccount[] // learned IBAN → member mappings
   referrals          Referral[] // referral programme records (5.3.4)
-  emails             Email[] // transactional email outbox/log
-  emailTemplates     EmailTemplate[] // per-fund overrides of the default email wording
-  documentTemplates  DocumentTemplate[] // per-fund overrides of printable document wording (PDF letters)
+  emails                   Email[] // transactional email outbox/log
+  emailTemplates           EmailTemplate[] // per-fund library of custom email templates
+  emailTemplateAssignments EmailTemplateAssignment[] // which library template (if any) is active per email type
+  documentTemplates        DocumentTemplate[] // per-fund overrides of printable document wording (PDF letters)
 
   citizenPayConnectAttempts CitizenPayConnectAttempt[] // in-flight CP connect handoffs
   addressProfiles           AddressProfileCache[] // CP profile cache (token explorer / transfers)
@@ -1533,29 +1542,71 @@ model Email {
   @@index([status])
 }
 
-// Per-fund override of an email's wording. Absence of a row for a (fund, type)
-// pair = use the built-in i18n default (messages/*.json); a row replaces the
-// default subject/body for that fund. Bodies use {placeholder} tokens
-// interpolated at send time — the allowed set per type lives in
-// services/email/template-config.ts and is validated on save. Only
-// ALLOCATION_CONFIRMATION is wired today; the model is type-generic so more
-// templates can be made editable without a schema change.
+// A named, per-fund email template — one of possibly several the admins have
+// authored for a given email type. The built-in default (messages/*.json for
+// text types, TS constants for HTML types) is NEVER stored here and never
+// mutated: admins create a template by duplicating the default (or another
+// template), so the originals can't be broken. Which template — if any — is
+// actually sent for a type is decided by EmailTemplateAssignment; a type with
+// no assignment falls back to the built-in default. Content lives per language
+// in EmailTemplateLocalization. The allowed {placeholder} set per type lives in
+// services/email/template-config.ts and is validated on save.
 model EmailTemplate {
   id     String @id @default(cuid())
   fundId String
   fund   Fund   @relation(fields: [fundId], references: [id], onDelete: Cascade)
 
-  type     EmailType
-  locale   String // recipient language this override applies to (SUPPORTED_LOCALES); each language is edited independently
-  subject  String
-  bodyText String // plain-text body / text-MIME part (derived from bodyHtml when an HTML body is authored)
-  bodyHtml String? // rich-HTML body, injected into the branded shell; null = use bodyText as plain text
-  ctaLabel String? // for templates that render a CTA button (unused by ALLOCATION_CONFIRMATION)
+  type EmailType // the email type this template can be assigned to
+  name String // admin-facing label, unique within (fund, type)
+
+  localizations EmailTemplateLocalization[]
+  assignments   EmailTemplateAssignment[] // 0..1 — the assignment(s) pointing here
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([fundId, type, locale])
+  @@unique([fundId, type, name])
+  @@index([fundId])
+}
+
+// One language's content for an EmailTemplate. Each supported locale is authored
+// independently; a missing locale falls back to the built-in default for that
+// language at send time. Bodies use {placeholder} tokens interpolated at send.
+model EmailTemplateLocalization {
+  id         String        @id @default(cuid())
+  templateId String
+  template   EmailTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  locale   String // SUPPORTED_LOCALES
+  subject  String
+  bodyText String // plain-text / text-MIME part (derived from bodyHtml)
+  bodyHtml String? // rich-HTML body, injected into the branded shell; null = use bodyText
+  ctaLabel String? // reserved for CTA-bearing templates; unused by the current editable set
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([templateId, locale])
+}
+
+// Which library template (if any) a fund sends for a given email type. Exactly
+// one row per (fund, type). A null templateId — or no row at all — means "use
+// the built-in default". onDelete: SetNull means deleting the active template
+// cleanly reverts the type to its default without leaving a dangling pointer.
+model EmailTemplateAssignment {
+  id     String @id @default(cuid())
+  fundId String
+  fund   Fund   @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  type       EmailType
+  templateId String?
+  template   EmailTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([fundId, type])
+  @@index([fundId])
 }
 
 // Per-fund override of a printable document's wording (e.g. the card

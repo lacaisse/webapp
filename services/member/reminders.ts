@@ -26,7 +26,11 @@ import { REMINDER_ELIGIBLE_STATUS } from "./eligibility";
 //     each deposit to the right period window)
 //
 // PAY_AND_GO funds top up on demand and have no monthly request concept — they
-// are skipped entirely.
+// are skipped entirely. Funds with member emails paused
+// (Fund.confirmationEmailsPausedAt) are skipped too: the pause promises members
+// receive no notification emails, and this is the most visible automatic one.
+// Like the other paused sends, it's skipped and NOT queued — resuming does not
+// fire last month's request retroactively.
 
 const FUND_SELECT = {
   id: true,
@@ -56,7 +60,11 @@ export async function sendMonthlyPaymentReminders(): Promise<
 > {
   const now = new Date();
   const funds = await prisma.fund.findMany({
-    where: { allocationMode: "FIXED_PERIOD" },
+    where: {
+      allocationMode: "FIXED_PERIOD",
+      // Member emails paused → send nothing for this fund this run.
+      confirmationEmailsPausedAt: null,
+    },
     select: FUND_SELECT,
   });
 

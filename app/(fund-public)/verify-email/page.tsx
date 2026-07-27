@@ -135,6 +135,7 @@ async function dispatchMemberWelcome(
   });
   await sendMemberWelcome({
     emailId: emailRow.id,
+    fundId: fund.id,
     toEmail: member.email,
     fund: {
       name: fund.name,

@@ -857,7 +857,11 @@
             "notRemindable": "This member can't be reminded — they're no longer on the unpaid list.",
             "noEmail": "This member has no email address.",
             "sendFailed": "The reminder couldn't be sent. Try again."
-          }
+          },
+          "pausedConfirmTitle": "Member emails are paused",
+          "pausedConfirmDescription": "Member notification emails are paused for this fund. Sending this reminder to {name} will override the pause. Continue?",
+          "allPausedConfirmDescription": "Member notification emails are paused for this fund. Sending these reminders to {count} member(s) will override the pause. Continue?",
+          "pausedConfirmSend": "Send anyway"
         }
       },
       "periods": {
@@ -1651,7 +1655,7 @@
         "description": "Automatic emails sent to members about their deposits and allocations.",
         "pause": {
           "label": "Pause member notification emails",
-          "description": "While paused, members receive no notification emails: deposit and allocation confirmations, activation, invitation and referral-bonus emails are all skipped — not queued, so nothing is sent retroactively when you resume. Signup emails (verification, welcome) and password emails keep working. Merchant and team emails are unaffected."
+          "description": "While paused, members receive no notification emails: payment and allocation confirmations, activation, invitation, referral-bonus, “card on its way” and contribution reminders are all skipped — not queued, so nothing is sent retroactively when you resume. Signup emails (verification, welcome) and password emails keep working. Merchant and team emails are unaffected."
         },
         "sender": {
           "label": "Sender address",
@@ -1660,15 +1664,76 @@
         }
       },
       "emailTemplates": {
-        "allocationTitle": "Allocation confirmation email",
-        "allocationDescription": "The email members receive when an allocation lands on their card. Leave it untouched to keep the default wording, or customise it for this fund.",
-        "cardAssignedTitle": "Card-on-its-way email",
-        "cardAssignedDescription": "The email a member receives when their card is assigned and on its way. Leave it untouched to keep the default wording, or customise it for this fund.",
-        "paymentReminderTitle": "Contribution reminder email",
-        "paymentReminderDescription": "The monthly reminder sent on the 1st to members who haven't yet contributed for the period. Leave it untouched to keep the default wording, or customise it for this fund.",
+        "types": {
+          "ALLOCATION_CONFIRMATION": {
+            "title": "Allocation confirmation",
+            "description": "Email members receive when an allocation is credited to their card."
+          },
+          "CARD_ASSIGNED": {
+            "title": "Card on its way",
+            "description": "Email a member receives when their card is assigned and shipped."
+          },
+          "PAYMENT_REMINDER_FIRST": {
+            "title": "Contribution reminder (first)",
+            "description": "Automatic reminder sent on the 1st of the month to members who haven't yet contributed for the period."
+          },
+          "PAYMENT_REMINDER_SECOND": {
+            "title": "Contribution reminder (follow-up)",
+            "description": "Manual follow-up sent from a period's detail page to members still awaiting payment."
+          },
+          "MEMBER_WELCOME": {
+            "title": "Member welcome",
+            "description": "Welcome email sent to a new member after they sign up."
+          },
+          "MEMBER_INVITED": {
+            "title": "Member invitation",
+            "description": "Email sent to a member an admin has just added to the fund."
+          },
+          "MEMBER_ACTIVATED": {
+            "title": "Account activated",
+            "description": "Email a member receives when their account is activated and their card is ready."
+          },
+          "PAYMENT_CONFIRMATION": {
+            "title": "Payment received",
+            "description": "Email a member receives when a payment is received and reconciled."
+          },
+          "REFERRAL_BONUS_AWARDED": {
+            "title": "Referral bonus",
+            "description": "Email a sponsor receives when a referral bonus is credited to their card."
+          }
+        },
+        "defaultName": "Default template",
+        "builtIn": "Built-in",
+        "defaultReadOnly": "The default template can't be edited. Duplicate it to create a customisable version.",
+        "active": "Active",
+        "makeActive": "Make active",
+        "newTemplate": "New template",
+        "duplicate": "Duplicate",
+        "rename": "Rename",
+        "delete": "Delete",
+        "editTemplate": "Edit template",
+        "editTemplateDescription": "Customise the subject and body for each language, preview, and send a test.",
+        "createTitle": "New template",
+        "createDescription": "Name the template and choose what to start from.",
+        "nameLabel": "Name",
+        "namePlaceholder": "e.g. Warm tone",
+        "sourceLabel": "Start from",
+        "sourceDefault": "Default template",
+        "cancel": "Cancel",
+        "create": "Create",
+        "save": "Save",
+        "renameTitle": "Rename template",
+        "deleteTitle": "Delete template?",
+        "deleteDescription": "The template “{name}” will be permanently deleted. This can't be undone.",
+        "deleteActiveDescription": "“{name}” is the active template. Deleting it reverts this email to the default template. This can't be undone.",
+        "localeAuthored": "Customised for this language.",
+        "loadDefault": "Load default template",
         "subjectLabel": "Subject",
-        "bodyLabel": "Body",
-        "variablesHint": "You can use these placeholders — they're replaced with each member's details when the email is sent:",
+        "htmlLabel": "Body (HTML)",
+        "htmlHint": "Write the body in HTML — it's wrapped in your fund's layout (logo, footer). Use the variables below; they're replaced for each member at send time.",
+        "variablesHint": "You can use these variables — they're replaced with each member's details at send time:",
+        "previewLabel": "Preview",
+        "previewSubject": "Subject:",
         "variables": {
           "firstName": "The member's first name",
           "fundName": "This fund's name",
@@ -1680,43 +1745,35 @@
           "cardLink": "Link to the member's public card page",
           "cardNumber": "The member's card number",
           "paymentReference": "The reference to include on the bank transfer",
-          "paymentLink": "Link to the member's public payment page"
+          "paymentLink": "Link to the member's public payment page",
+          "occurredAt": "The date of the payment"
         },
-        "usingDefault": "Using the default template.",
-        "usingOverride": "Using a custom template for this fund.",
-        "reset": "Reset to default",
-        "resetConfirmTitle": "Reset to default template?",
-        "resetConfirmDescription": "This removes your custom wording and restores the default allocation-confirmation email. This can't be undone.",
-        "resetConfirmCancel": "Cancel",
-        "resetConfirmConfirm": "Reset",
         "errors": {
           "subjectRequired": "Enter a subject.",
           "subjectTooLong": "The subject is too long.",
-          "bodyRequired": "Enter a message body.",
-          "bodyTooLong": "The message body is too long.",
-          "unknownVariable": "Unknown placeholder \"{name}\". Remove it or use one of the listed variables."
+          "bodyRequired": "Enter a message.",
+          "bodyTooLong": "The message is too long.",
+          "unknownVariable": "Unknown variable “{name}”. Remove it or use one of the listed variables.",
+          "nameRequired": "Enter a name.",
+          "nameTooLong": "The name is too long.",
+          "nameTaken": "A template with this name already exists.",
+          "notFound": "This template can't be found."
         },
-        "htmlLabel": "Body (HTML)",
-        "htmlHint": "Write the body in HTML — it's wrapped in your fund's branded layout (logo, footer). Use the placeholders below; they're replaced per member when the email is sent.",
-        "previewLabel": "Preview",
-        "previewSubject": "Subject:",
         "test": {
           "title": "Send a test",
-          "description": "Pick a member to fill in the email's details, then send a copy to any address — populated with that member's live data.",
-          "memberLabel": "Use this member's data",
+          "description": "Optionally pick a member to fill in the data, then send a copy to an address of your choice.",
+          "memberLabel": "Test data",
+          "sampleData": "Sample data",
           "emailLabel": "Send to",
           "emailPlaceholder": "you@example.com",
           "send": "Send test",
           "sending": "Sending…",
           "sent": "Test email sent.",
-          "noMembers": "No active members with an allocation tier yet — add one to send a test.",
           "subjectPrefix": "[Test]",
           "errors": {
             "emailInvalid": "Enter a valid email address.",
-            "memberNotFound": "That member could not be found.",
-            "noTier": "That member has no allocation tier, so there's no amount to show.",
-            "noCard": "That member has no card yet, so there's nothing to link to.",
-            "sendFailed": "The test email could not be sent. Check the sender address and try again."
+            "memberNotFound": "This member can't be found.",
+            "sendFailed": "Couldn't send the test email. Check the sender address and try again."
           }
         }
       },

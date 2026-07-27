@@ -27,6 +27,15 @@ import { REMINDER_ELIGIBLE_STATUS } from "@/services/member/eligibility";
 // attributed to this period. On top of that, sending also requires an email
 // address and that the member hasn't opted out of reminders — members who fail
 // those last two stay on the unpaid report but are skipped (and surfaced) here.
+//
+// The fund-wide member-email pause (Fund.confirmationEmailsPausedAt) does not
+// silently apply here: a paused fund makes these actions return
+// `pausedConfirmRequired` instead of sending, and the caller re-invokes with
+// `overridePause: true` once the admin has confirmed in a modal. So the pause is
+// never bypassed by accident (unlike before, when reminders ignored it entirely)
+// and never silently swallows an explicit admin click either. The automatic
+// monthly cron (services/member/reminders.ts) has no such escape hatch — it
+// skips paused funds outright.
 
 const FUND_SELECT = {
   id: true,
@@ -37,6 +46,8 @@ const FUND_SELECT = {
   // Canonical host — used to build the public /pay/<serial> {paymentLink}.
   domain: true,
   citizenPayTreasurySlug: true,
+  // Fund-wide member-email pause; blocks the manual reminder (see above).
+  confirmationEmailsPausedAt: true,
 } satisfies Prisma.FundSelect;
 
 const MEMBER_SELECT = {
@@ -70,13 +81,20 @@ function unpaidSendableWhere(fundId: string, periodId: string) {
 
 type SingleStatus = "sent" | "alreadySent" | "failed";
 
+// Returned when member emails are paused and the admin hasn't confirmed the
+// override yet. The client shows a modal and re-calls with overridePause: true.
+export type PausedConfirmRequired = { pausedConfirmRequired: true };
+
 export type RemindMemberResult =
   | { ok: true; status: SingleStatus }
+  | PausedConfirmRequired
   | { error: string };
 
 export async function remindUnpaidMemberAction(input: {
   periodId: string;
   memberId: string;
+  // Set once the admin has confirmed sending despite the member-email pause.
+  overridePause?: boolean;
 }): Promise<RemindMemberResult> {
   const t = await getTranslations();
   const { fund } = await requireFundRole("ADMIN");
@@ -87,6 +105,9 @@ export async function remindUnpaidMemberAction(input: {
   });
   if (!period) {
     return { error: t("periods.errors.notFound" as never) };
+  }
+  if (period.fund.confirmationEmailsPausedAt && !input.overridePause) {
+    return { pausedConfirmRequired: true };
   }
 
   const member = await prisma.member.findFirst({
@@ -120,10 +141,13 @@ export async function remindUnpaidMemberAction(input: {
 
 export type RemindPeriodResult =
   | { ok: true; sent: number; skipped: number; failed: number }
+  | PausedConfirmRequired
   | { error: string };
 
 export async function remindPeriodUnpaidAction(input: {
   periodId: string;
+  // Set once the admin has confirmed sending despite the member-email pause.
+  overridePause?: boolean;
 }): Promise<RemindPeriodResult> {
   const t = await getTranslations();
   const { fund } = await requireFundRole("ADMIN");
@@ -134,6 +158,9 @@ export async function remindPeriodUnpaidAction(input: {
   });
   if (!period) {
     return { error: t("periods.errors.notFound" as never) };
+  }
+  if (period.fund.confirmationEmailsPausedAt && !input.overridePause) {
+    return { pausedConfirmRequired: true };
   }
 
   const members = await prisma.member.findMany({
@@ -212,6 +239,8 @@ async function remindOne(
   await sendPaymentReminder({
     emailId,
     fundId: fund.id,
+    // The manual follow-up nudge resolves the SECOND reminder's own template.
+    type: "PAYMENT_REMINDER_SECOND",
     toEmail: member.email,
     fund: {
       name: fund.name,

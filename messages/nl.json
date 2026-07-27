@@ -842,7 +842,11 @@
             "notRemindable": "Dit lid kan niet worden herinnerd — het staat niet meer op de lijst van openstaande betalingen.",
             "noEmail": "Dit lid heeft geen e-mailadres.",
             "sendFailed": "De herinnering kon niet worden verzonden. Probeer het opnieuw."
-          }
+          },
+          "pausedConfirmTitle": "E-mails naar leden staan op pauze",
+          "pausedConfirmDescription": "Notificatiemails naar leden staan op pauze voor dit fonds. Deze herinnering naar {name} sturen overschrijft de pauze. Doorgaan?",
+          "allPausedConfirmDescription": "Notificatiemails naar leden staan op pauze voor dit fonds. Deze herinneringen naar {count} lid/leden sturen overschrijft de pauze. Doorgaan?",
+          "pausedConfirmSend": "Toch versturen"
         }
       },
       "schedule": {
@@ -1651,7 +1655,7 @@
         "description": "Automatische e-mails naar leden over hun stortingen en allocaties.",
         "pause": {
           "label": "Notificatie-e-mails aan leden pauzeren",
-          "description": "Tijdens de pauze ontvangen leden geen notificatie-e-mails: bevestigingen van stortingen en allocaties, activerings-, uitnodigings- en verwijzingsbonus-e-mails worden allemaal overgeslagen — niet in de wachtrij gezet, dus er wordt bij hervatting niets met terugwerkende kracht verzonden. Registratie-e-mails (verificatie, welkom) en wachtwoord-e-mails blijven werken. E-mails aan handelaars en het team worden niet beïnvloed."
+          "description": "Tijdens de pauze ontvangen leden geen enkele notificatiemail: betalings- en toewijzingsbevestigingen, activering, uitnodiging, aanbrengbonus, “kaart onderweg” en bijdrageherinneringen worden allemaal overgeslagen — niet in de wachtrij gezet, dus er wordt niets met terugwerkende kracht verstuurd wanneer je hervat. Aanmeldmails (verificatie, welkom) en wachtwoordmails blijven werken. E-mails naar handelaren en het team worden niet beïnvloed."
         },
         "sender": {
           "label": "Afzenderadres",
@@ -1660,63 +1664,116 @@
         }
       },
       "emailTemplates": {
-        "allocationTitle": "E-mail allocatiebevestiging",
-        "allocationDescription": "De e-mail die leden ontvangen wanneer een allocatie op hun kaart wordt gestort. Laat deze ongewijzigd voor de standaardtekst, of pas hem aan voor dit fonds.",
-        "cardAssignedTitle": "E-mail kaart onderweg",
-        "cardAssignedDescription": "De e-mail die een lid ontvangt wanneer zijn kaart is toegewezen en onderweg is. Laat deze ongewijzigd voor de standaardtekst, of pas hem aan voor dit fonds.",
-        "paymentReminderTitle": "E-mail bijdrageherinnering",
-        "paymentReminderDescription": "De maandelijkse herinnering die op de 1e wordt verzonden naar leden die nog niet hebben bijgedragen voor de periode. Laat deze ongewijzigd voor de standaardtekst, of pas hem aan voor dit fonds.",
+        "types": {
+          "ALLOCATION_CONFIRMATION": {
+            "title": "Toewijzingsbevestiging",
+            "description": "E-mail die het lid ontvangt wanneer een toewijzing op zijn kaart wordt bijgeschreven."
+          },
+          "CARD_ASSIGNED": {
+            "title": "Kaart onderweg",
+            "description": "E-mail die een lid ontvangt wanneer zijn kaart is toegewezen en verzonden."
+          },
+          "PAYMENT_REMINDER_FIRST": {
+            "title": "Bijdrageherinnering (eerste)",
+            "description": "Automatische herinnering die op de 1e van de maand wordt verstuurd naar leden die nog niet hebben bijgedragen voor de periode."
+          },
+          "PAYMENT_REMINDER_SECOND": {
+            "title": "Bijdrageherinnering (opvolging)",
+            "description": "Handmatige opvolging die vanaf de detailpagina van een periode wordt verstuurd naar leden die nog niet hebben betaald."
+          },
+          "MEMBER_WELCOME": {
+            "title": "Welkom voor lid",
+            "description": "Welkomstmail die naar een nieuw lid wordt verstuurd na de aanmelding."
+          },
+          "MEMBER_INVITED": {
+            "title": "Uitnodiging van lid",
+            "description": "E-mail die wordt verstuurd naar een lid dat een beheerder zojuist aan het fonds heeft toegevoegd."
+          },
+          "MEMBER_ACTIVATED": {
+            "title": "Account geactiveerd",
+            "description": "E-mail die een lid ontvangt wanneer zijn account is geactiveerd en zijn kaart klaar is."
+          },
+          "PAYMENT_CONFIRMATION": {
+            "title": "Betaling ontvangen",
+            "description": "E-mail die een lid ontvangt wanneer een betaling is ontvangen en verwerkt."
+          },
+          "REFERRAL_BONUS_AWARDED": {
+            "title": "Aanbrengbonus",
+            "description": "E-mail die de aanbrenger ontvangt wanneer een aanbrengbonus op zijn kaart wordt bijgeschreven."
+          }
+        },
+        "defaultName": "Standaardsjabloon",
+        "builtIn": "Ingebouwd",
+        "defaultReadOnly": "Het standaardsjabloon kan niet worden bewerkt. Dupliceer het om een aanpasbare versie te maken.",
+        "active": "Actief",
+        "makeActive": "Activeren",
+        "newTemplate": "Nieuw sjabloon",
+        "duplicate": "Dupliceren",
+        "rename": "Naam wijzigen",
+        "delete": "Verwijderen",
+        "editTemplate": "Sjabloon bewerken",
+        "editTemplateDescription": "Pas het onderwerp en de inhoud per taal aan, bekijk een voorbeeld en verstuur een test.",
+        "createTitle": "Nieuw sjabloon",
+        "createDescription": "Geef het sjabloon een naam en kies waarmee je begint.",
+        "nameLabel": "Naam",
+        "namePlaceholder": "bijv. Warme toon",
+        "sourceLabel": "Beginnen met",
+        "sourceDefault": "Standaardsjabloon",
+        "cancel": "Annuleren",
+        "create": "Aanmaken",
+        "save": "Opslaan",
+        "renameTitle": "Sjabloonnaam wijzigen",
+        "deleteTitle": "Sjabloon verwijderen?",
+        "deleteDescription": "Het sjabloon “{name}” wordt definitief verwijderd. Dit kan niet ongedaan worden gemaakt.",
+        "deleteActiveDescription": "“{name}” is het actieve sjabloon. Als je het verwijdert, keert deze e-mail terug naar het standaardsjabloon. Dit kan niet ongedaan worden gemaakt.",
+        "localeAuthored": "Aangepast voor deze taal.",
+        "loadDefault": "Standaardsjabloon laden",
         "subjectLabel": "Onderwerp",
-        "bodyLabel": "Inhoud",
-        "variablesHint": "Je kunt deze plaatshouders gebruiken — ze worden vervangen door de gegevens van elk lid wanneer de e-mail wordt verzonden:",
+        "htmlLabel": "Inhoud (HTML)",
+        "htmlHint": "Schrijf de inhoud in HTML — deze wordt in de lay-out van je fonds geplaatst (logo, voettekst). Gebruik de variabelen hieronder; ze worden bij verzending per lid vervangen.",
+        "variablesHint": "Je kunt deze variabelen gebruiken — ze worden bij verzending vervangen door de gegevens van elk lid:",
+        "previewLabel": "Voorbeeld",
+        "previewSubject": "Onderwerp:",
         "variables": {
           "firstName": "De voornaam van het lid",
           "fundName": "De naam van dit fonds",
           "amount": "Het toegewezen bedrag",
           "lastName": "De achternaam van het lid",
           "cardSerial": "Het serienummer van de kaart van het lid",
-          "shopList": "Opsomming van de actieve handelaars van het fonds",
+          "shopList": "Lijst met de actieve handelaren van het fonds",
           "address": "Het postadres van het lid",
           "cardLink": "Link naar de openbare kaartpagina van het lid",
           "cardNumber": "Het kaartnummer van het lid",
           "paymentReference": "De mededeling die bij de overschrijving moet worden vermeld",
-          "paymentLink": "Link naar de openbare betaalpagina van het lid"
+          "paymentLink": "Link naar de openbare betaalpagina van het lid",
+          "occurredAt": "De datum van de betaling"
         },
-        "usingDefault": "Standaardsjabloon in gebruik.",
-        "usingOverride": "Aangepast sjabloon voor dit fonds in gebruik.",
-        "reset": "Terugzetten naar standaard",
-        "resetConfirmTitle": "Terugzetten naar standaardsjabloon?",
-        "resetConfirmDescription": "Hiermee verwijder je je aangepaste tekst en herstel je de standaard-e-mail. Dit kan niet ongedaan worden gemaakt.",
-        "resetConfirmCancel": "Annuleren",
-        "resetConfirmConfirm": "Terugzetten",
         "errors": {
           "subjectRequired": "Voer een onderwerp in.",
           "subjectTooLong": "Het onderwerp is te lang.",
-          "bodyRequired": "Voer een berichttekst in.",
-          "bodyTooLong": "De berichttekst is te lang.",
-          "unknownVariable": "Onbekende plaatshouder \"{name}\". Verwijder deze of gebruik een van de vermelde variabelen."
+          "bodyRequired": "Voer een bericht in.",
+          "bodyTooLong": "Het bericht is te lang.",
+          "unknownVariable": "Onbekende variabele “{name}”. Verwijder deze of gebruik een van de vermelde variabelen.",
+          "nameRequired": "Voer een naam in.",
+          "nameTooLong": "De naam is te lang.",
+          "nameTaken": "Er bestaat al een sjabloon met deze naam.",
+          "notFound": "Dit sjabloon kan niet worden gevonden."
         },
-        "htmlLabel": "Inhoud (HTML)",
-        "htmlHint": "Schrijf de inhoud in HTML — deze wordt in de huisstijl van je fonds geplaatst (logo, voettekst). Gebruik de plaatshouders hieronder; ze worden per lid vervangen wanneer de e-mail wordt verzonden.",
-        "previewLabel": "Voorbeeld",
-        "previewSubject": "Onderwerp:",
         "test": {
-          "title": "Stuur een test",
-          "description": "Kies een lid om de gegevens van de e-mail in te vullen en stuur een kopie naar een willekeurig adres — met de actuele gegevens van dat lid.",
-          "memberLabel": "Gegevens van dit lid gebruiken",
-          "emailLabel": "Verzenden naar",
+          "title": "Een test versturen",
+          "description": "Kies eventueel een lid om de gegevens in te vullen en stuur een kopie naar een adres naar keuze.",
+          "memberLabel": "Testgegevens",
+          "sampleData": "Voorbeeldgegevens",
+          "emailLabel": "Versturen naar",
           "emailPlaceholder": "jij@voorbeeld.com",
-          "send": "Test verzenden",
-          "sending": "Verzenden…",
-          "sent": "Test-e-mail verzonden.",
-          "noMembers": "Nog geen actieve leden met een allocatieniveau — voeg er een toe om een test te verzenden.",
+          "send": "Test versturen",
+          "sending": "Versturen…",
+          "sent": "Test-e-mail verstuurd.",
           "subjectPrefix": "[Test]",
           "errors": {
             "emailInvalid": "Voer een geldig e-mailadres in.",
-            "memberNotFound": "Dat lid kon niet worden gevonden.",
-            "noTier": "Dat lid heeft geen allocatieniveau, dus er is geen bedrag om te tonen.",
-            "noCard": "Dat lid heeft nog geen kaart, dus er is niets om naar te linken.",
-            "sendFailed": "De test-e-mail kon niet worden verzonden. Controleer het afzenderadres en probeer opnieuw."
+            "memberNotFound": "Dit lid kan niet worden gevonden.",
+            "sendFailed": "Kon de test-e-mail niet versturen. Controleer het afzenderadres en probeer het opnieuw."
           }
         }
       },
@@ -1904,17 +1961,6 @@
         "amountInvalid": "Voer een geldig bedrag in (maximaal 2 decimalen).",
         "fieldRequired": "{label} is verplicht.",
         "generic": "Er is iets misgegaan. Probeer opnieuw."
-      },
-      "emailTemplates": {
-        "verify": {
-          "subject": "Bevestig uw e-mail — {fundName}",
-          "textBody": "Hallo {firstName},\n\nBevestig uw e-mailadres om uw aanvraag bij {fundName} af te ronden. Klik op de onderstaande link — deze is 24 uur geldig:\n\n  {verifyUrl}\n\nAls u dit niet hebt aangevraagd, kunt u deze e-mail negeren.\n\nHet {fundName}-team",
-          "ctaLabel": "E-mail verifiëren"
-        },
-        "welcome": {
-          "subject": "Welkom bij {fundName}",
-          "textBody": "Hallo {firstName},\n\nWelkom bij {fundName}. Uw aanvraag wordt beoordeeld — een beheerder neemt binnenkort contact op.\n\nWanneer u klaar bent om bij te dragen, vermeld dan deze referentie op uw bankoverschrijving:\n  {paymentReference}\n\nBedankt,\nHet {fundName}-team"
-        }
       },
       "thanks": {
         "checkEmail": {

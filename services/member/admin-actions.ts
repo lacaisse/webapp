@@ -229,6 +229,7 @@ export async function activateMemberAction(input: {
   if (tx.emailId) {
     await sendMemberActivated({
       emailId: tx.emailId,
+      fundId: fund.id,
       toEmail: member.email,
       fund: {
         name: fund.name,
@@ -440,6 +441,7 @@ export async function inviteMemberAction(input: {
     if (notify && result.emailId) {
       await sendMemberInvited({
         emailId: result.emailId,
+        fundId: fund.id,
         toEmail: parsed.data.email,
         fund: {
           name: fund.name,
