@@ -319,6 +319,7 @@ async function OnboardingTab({
           required: f.required,
           position: f.position,
           stepId: f.stepId,
+          builtinKey: f.builtinKey,
           options: config?.options ?? [],
           archivedAt: f.archivedAt,
         };

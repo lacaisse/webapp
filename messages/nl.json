@@ -1598,7 +1598,11 @@
             "cancel": "Annuleren",
             "step": "Stap",
             "firstStep": "Eerste stap",
-            "stepHint": "Op welke pagina van het formulier dit veld verschijnt."
+            "stepHint": "Op welke pagina van het formulier dit veld verschijnt.",
+            "builtin": "Soort veld",
+            "builtinCustom": "Aangepaste vraag",
+            "builtinHint": "Een gegeven uit de ledenfiche wordt in zijn eigen kolom bewaard en voedt zo brieven, herinneringen en niveautoewijzing. Een aangepaste vraag wordt apart bij de aanvraag bewaard.",
+            "builtinLocked": "Wordt in de ledenfiche bewaard ({key}). Het invoertype ligt vast; label, hulptekst, verplichting en positie kun je wel aanpassen."
           },
           "archive": {
             "button": "Archiveren",
@@ -1612,7 +1616,8 @@
             "saving": "Opslaan…",
             "cancel": "Annuleren"
           },
-          "firstStep": "Eerste stap"
+          "firstStep": "Eerste stap",
+          "builtinBadge": "Ledenfiche"
         },
         "stepsTitle": "Formulierstappen",
         "stepsDescription": "Verdeel het inschrijfformulier over meerdere pagina's. Zonder stappen blijft het formulier één pagina.",
@@ -1893,7 +1898,9 @@
       "labelRequired": "Label is verplicht.",
       "optionEmpty": "Elke optie moet een waarde en een label hebben.",
       "optionsRequired": "Voeg ten minste één optie toe.",
-      "notFound": "Veld niet gevonden."
+      "notFound": "Veld niet gevonden.",
+      "builtinInvalid": "Dat lidgegeven is niet bekend.",
+      "builtinTaken": "Dat gegeven wordt al gevraagd op dit formulier (controleer ook gearchiveerde velden)."
     }
   },
   "tokenOps": {
@@ -2028,7 +2035,8 @@
         "amountInvalid": "Voer een geldig bedrag in (maximaal 2 decimalen).",
         "fieldRequired": "{label} is verplicht.",
         "generic": "Er is iets misgegaan. Probeer opnieuw.",
-        "required": "Dit veld is verplicht."
+        "required": "Dit veld is verplicht.",
+        "fieldInvalid": "{label} heeft geen geldige indeling."
       },
       "thanks": {
         "checkEmail": {
@@ -2302,6 +2310,15 @@
           "localeInvalid": "Kies een ondersteunde taal."
         }
       }
+    },
+    "builtinFields": {
+      "phone": "Telefoon",
+      "address": "Adres",
+      "postalCode": "Postcode",
+      "city": "Stad",
+      "iban": "IBAN",
+      "householdAdults": "Volwassenen in het huishouden",
+      "householdChildren": "Kinderen in het huishouden"
     }
   },
   "cards": {

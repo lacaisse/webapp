@@ -40,6 +40,11 @@ export const FieldDataSchema = z
     // first step. The action verifies the step belongs to the same fund and
     // target before saving.
     stepId: z.string().nullable().optional(),
+    // Set to collect a typed Member column instead of a custom
+    // `applicationData` entry. The action validates it against the built-in
+    // registry and forces `key` and `type` to match, so a client can't pair
+    // an arbitrary key or input type with a real column.
+    builtinKey: z.string().nullable().optional(),
     options: z.array(FieldOptionSchema).optional(),
   })
   .refine(

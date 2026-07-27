@@ -1598,7 +1598,11 @@
             "cancel": "Cancelar",
             "step": "Paso",
             "firstStep": "Primer paso",
-            "stepHint": "En qué página del formulario aparece este campo."
+            "stepHint": "En qué página del formulario aparece este campo.",
+            "builtin": "Tipo de campo",
+            "builtinCustom": "Pregunta personalizada",
+            "builtinHint": "Un dato de la ficha de miembro se guarda en su propia columna, así alimenta cartas, recordatorios y la asignación de nivel. Una pregunta personalizada se guarda aparte, junto a la candidatura.",
+            "builtinLocked": "Se guarda en la ficha de miembro ({key}). El tipo de entrada es fijo; puedes ajustar la etiqueta, la ayuda, si es obligatorio y su posición."
           },
           "archive": {
             "button": "Archivar",
@@ -1612,7 +1616,8 @@
             "saving": "Guardando…",
             "cancel": "Cancelar"
           },
-          "firstStep": "Primer paso"
+          "firstStep": "Primer paso",
+          "builtinBadge": "Ficha de miembro"
         },
         "stepsTitle": "Pasos del formulario",
         "stepsDescription": "Divide el formulario de inscripción en varias páginas. Sin pasos, el formulario ocupa una sola página.",
@@ -1893,7 +1898,9 @@
       "labelRequired": "La etiqueta es obligatoria.",
       "optionEmpty": "Cada opción debe tener un valor y una etiqueta.",
       "optionsRequired": "Añada al menos una opción.",
-      "notFound": "Campo no encontrado."
+      "notFound": "Campo no encontrado.",
+      "builtinInvalid": "Ese dato de miembro no es válido.",
+      "builtinTaken": "Ese dato ya se pide en este formulario (revisa también los campos archivados)."
     }
   },
   "tokenOps": {
@@ -2028,7 +2035,8 @@
         "amountInvalid": "Introduce un importe válido (hasta 2 decimales).",
         "fieldRequired": "{label} es obligatorio.",
         "generic": "Algo salió mal. Inténtalo de nuevo.",
-        "required": "Este campo es obligatorio."
+        "required": "Este campo es obligatorio.",
+        "fieldInvalid": "{label} no tiene un formato válido."
       },
       "emailTemplates": {
         "verify": {
@@ -2302,6 +2310,15 @@
           "localeInvalid": "Elige un idioma compatible."
         }
       }
+    },
+    "builtinFields": {
+      "phone": "Teléfono",
+      "address": "Dirección",
+      "postalCode": "Código postal",
+      "city": "Ciudad",
+      "iban": "IBAN",
+      "householdAdults": "Adultos en el hogar",
+      "householdChildren": "Niños en el hogar"
     }
   },
   "cards": {

@@ -999,8 +999,21 @@ model OnboardingField {
   target OnboardingTarget
 
   // Stable JSON key for `applicationData`. Once set, changing it would
-  // orphan historical answers — admin UI prevents editing.
+  // orphan historical answers — admin UI prevents editing. For a built-in
+  // field this equals `builtinKey`, so the existing (fundId, target, key)
+  // unique constraint also stops the same attribute being added twice.
   key String
+
+  // When set, this field collects a TYPED Member column (address, phone,
+  // householdAdults, …) rather than a custom `applicationData` entry. It is
+  // rendered, ordered, stepped, prefilled and validated identically — only
+  // the write target differs. See services/member/builtin-fields.ts.
+  //
+  // Deliberately an explicit column rather than inferring "is this key one of
+  // the built-in names?": funds already have custom fields, and one of them
+  // keyed `address` must keep writing to applicationData exactly as before
+  // instead of silently retargeting a real Member column.
+  builtinKey String?
 
   type     OnboardingFieldType
   label    String // shown to the applicant

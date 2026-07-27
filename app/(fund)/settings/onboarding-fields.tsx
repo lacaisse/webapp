@@ -32,6 +32,7 @@ import {
   restoreOnboardingFieldAction,
   updateOnboardingFieldAction,
 } from "@/services/onboarding/admin-actions";
+import { MEMBER_BUILTIN_FIELDS } from "@/services/member/builtin-fields";
 import type { FieldData, FieldOption } from "@/services/onboarding/schema";
 
 type FieldType = FieldData["type"];
@@ -59,6 +60,9 @@ export type FieldRow = {
   required: boolean;
   position: number;
   stepId: string | null;
+  // Set when this field collects a typed Member column rather than a custom
+  // applicationData answer. Immutable once created.
+  builtinKey: string | null;
   options: FieldOption[];
   archivedAt: Date | null;
 };
@@ -80,6 +84,12 @@ export function OnboardingFields({
   const stepTitle = (id: string | null) =>
     steps.find((s) => s.id === id)?.title ?? null;
 
+  // An attribute already on the form can't be added twice — including via an
+  // archived field, which still occupies the (fund, target, key) slot.
+  const usedBuiltinKeys = fields
+    .map((f) => f.builtinKey)
+    .filter((k): k is string => Boolean(k));
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
@@ -98,6 +108,7 @@ export function OnboardingFields({
         <FieldDialog
           target={target}
           existingKeys={fields.map((f) => f.key)}
+          usedBuiltinKeys={usedBuiltinKeys}
           steps={steps}
           trigger={
             <Button variant="default" size="sm">
@@ -132,6 +143,9 @@ export function OnboardingFields({
                 <TableCell>
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className="font-medium">{f.label}</span>
+                    {f.builtinKey && (
+                      <Badge variant="info">{t("builtinBadge")}</Badge>
+                    )}
                     {f.archivedAt && (
                       <Badge variant="default">{t("archived")}</Badge>
                     )}
@@ -163,6 +177,7 @@ export function OnboardingFields({
                       existingKeys={fields
                         .filter((x) => x.id !== f.id)
                         .map((x) => x.key)}
+                      usedBuiltinKeys={usedBuiltinKeys}
                       steps={steps}
                       edit={f}
                       trigger={
@@ -186,12 +201,14 @@ export function OnboardingFields({
 function FieldDialog({
   target,
   existingKeys,
+  usedBuiltinKeys,
   steps,
   edit,
   trigger,
 }: {
   target: "MEMBER" | "MERCHANT";
   existingKeys: string[];
+  usedBuiltinKeys: string[];
   steps: StepOption[];
   edit?: FieldRow;
   trigger: React.ReactNode;
@@ -201,6 +218,10 @@ function FieldDialog({
   const [open, setOpen] = useState(false);
   const [key, setKey] = useState(edit?.key ?? "");
   const [type, setType] = useState<FieldType>(edit?.type ?? "TEXT");
+  // "" = a custom question stored in applicationData; otherwise the Member
+  // column this field fills. Only offered for the member form, and only when
+  // creating: promoting a custom field would strand its historical answers.
+  const [builtinKey, setBuiltinKey] = useState(edit?.builtinKey ?? "");
   const [label, setLabel] = useState(edit?.label ?? "");
   const [helpText, setHelpText] = useState(edit?.helpText ?? "");
   const [required, setRequired] = useState(edit?.required ?? false);
@@ -212,12 +233,22 @@ function FieldDialog({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const needsOptions = TYPES_NEEDING_OPTIONS.includes(type);
+  const isBuiltin = builtinKey !== "";
+  const needsOptions = !isBuiltin && TYPES_NEEDING_OPTIONS.includes(type);
+  // Built-ins are member-only, and the picker hides attributes already on the
+  // form. When editing one, keep its own entry listed so the select can show it.
+  const builtinChoices =
+    target === "MEMBER"
+      ? MEMBER_BUILTIN_FIELDS.filter(
+          (b) => !usedBuiltinKeys.includes(b.key) || b.key === edit?.builtinKey,
+        )
+      : [];
 
   const reset = () => {
     if (edit) return;
     setKey("");
     setType("TEXT");
+    setBuiltinKey("");
     setLabel("");
     setHelpText("");
     setRequired(false);
@@ -227,15 +258,26 @@ function FieldDialog({
     setError(null);
   };
 
+  // Picking an attribute fills in its standard label — the admin just told us
+  // what this is, so making them retype "Postcode" is busywork. Still editable.
+  const onPickBuiltin = (next: string) => {
+    setBuiltinKey(next);
+    const choice = MEMBER_BUILTIN_FIELDS.find((b) => b.key === next);
+    setLabel(choice ? tRoot(choice.labelKey as never) : "");
+  };
+
   const onSubmit = () => {
     setError(null);
-    if (!edit && existingKeys.includes(key.trim())) {
+    if (!edit && !isBuiltin && existingKeys.includes(key.trim())) {
       setError(tRoot("onboardingFields.errors.keyTaken" as never));
       return;
     }
     startTransition(async () => {
       const data: FieldData = {
-        key: key.trim(),
+        // For a built-in the server overrides both of these from its registry;
+        // sending the attribute name keeps the payload honest either way.
+        key: isBuiltin ? builtinKey : key.trim(),
+        builtinKey: isBuiltin ? builtinKey : null,
         type,
         label: label.trim(),
         helpText: helpText.trim() || null,
@@ -271,41 +313,70 @@ function FieldDialog({
           <DialogDescription>{t("description")}</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          {/* Built-in-ness is fixed at creation: a custom field's answers
+              already live in applicationData, so flipping it later would
+              strand them, and repointing a built-in would rewrite meaning. */}
+          {!edit && builtinChoices.length > 0 && (
             <div className="space-y-1">
-              <Label htmlFor="field-key">
-                {t("key")}
-                <span className="ml-1 text-destructive" aria-hidden>
-                  *
-                </span>
-              </Label>
-              <Input
-                id="field-key"
-                value={key}
-                onChange={(e) => setKey(e.target.value)}
-                placeholder="profession"
-                autoComplete="off"
-                spellCheck={false}
-                disabled={Boolean(edit)}
-              />
-              <p className="text-xs text-muted-foreground">{t("keyHint")}</p>
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="field-type">{t("type")}</Label>
+              <Label htmlFor="field-builtin">{t("builtin")}</Label>
               <select
-                id="field-type"
-                value={type}
-                onChange={(e) => setType(e.target.value as FieldType)}
+                id="field-builtin"
+                value={builtinKey}
+                onChange={(e) => onPickBuiltin(e.target.value)}
                 className="h-8 w-full rounded-md bg-background px-2 text-sm ring-1 ring-foreground/15 outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                {FIELD_TYPES.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
+                <option value="">{t("builtinCustom")}</option>
+                {builtinChoices.map((b) => (
+                  <option key={b.key} value={b.key}>
+                    {tRoot(b.labelKey as never)}
                   </option>
                 ))}
               </select>
+              <p className="text-xs text-muted-foreground">{t("builtinHint")}</p>
             </div>
-          </div>
+          )}
+
+          {isBuiltin ? (
+            <div className="rounded-md bg-muted/50 p-2.5 text-xs text-muted-foreground">
+              {t("builtinLocked", { key: builtinKey })}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="field-key">
+                  {t("key")}
+                  <span className="ml-1 text-destructive" aria-hidden>
+                    *
+                  </span>
+                </Label>
+                <Input
+                  id="field-key"
+                  value={key}
+                  onChange={(e) => setKey(e.target.value)}
+                  placeholder="profession"
+                  autoComplete="off"
+                  spellCheck={false}
+                  disabled={Boolean(edit)}
+                />
+                <p className="text-xs text-muted-foreground">{t("keyHint")}</p>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="field-type">{t("type")}</Label>
+                <select
+                  id="field-type"
+                  value={type}
+                  onChange={(e) => setType(e.target.value as FieldType)}
+                  className="h-8 w-full rounded-md bg-background px-2 text-sm ring-1 ring-foreground/15 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {FIELD_TYPES.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
           <div className="space-y-1">
             <Label htmlFor="field-label">
               {t("label")}

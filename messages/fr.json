@@ -1598,7 +1598,11 @@
             "cancel": "Annuler",
             "step": "Étape",
             "firstStep": "Première étape",
-            "stepHint": "Page du formulaire sur laquelle ce champ apparaît."
+            "stepHint": "Page du formulaire sur laquelle ce champ apparaît.",
+            "builtin": "Type de champ",
+            "builtinCustom": "Question personnalisée",
+            "builtinHint": "Une information de la fiche membre est enregistrée dans sa colonne dédiée — elle alimente les courriers, les rappels et l'attribution de palier. Une question personnalisée est stockée à part, avec la candidature.",
+            "builtinLocked": "Enregistré dans la fiche membre ({key}). Le type de saisie est imposé ; vous pouvez adapter le libellé, l'aide, l'obligation et la position."
           },
           "archive": {
             "button": "Archiver",
@@ -1612,7 +1616,8 @@
             "saving": "Enregistrement…",
             "cancel": "Annuler"
           },
-          "firstStep": "Première étape"
+          "firstStep": "Première étape",
+          "builtinBadge": "Fiche membre"
         },
         "stepsTitle": "Étapes du formulaire",
         "stepsDescription": "Découpez le formulaire d'inscription en plusieurs pages. Sans étape, le formulaire tient sur une seule page.",
@@ -1893,7 +1898,9 @@
       "labelRequired": "Le libellé est requis.",
       "optionEmpty": "Chaque option doit avoir une valeur et un libellé.",
       "optionsRequired": "Ajoutez au moins une option.",
-      "notFound": "Champ introuvable."
+      "notFound": "Champ introuvable.",
+      "builtinInvalid": "Cette information de membre est inconnue.",
+      "builtinTaken": "Cette information est déjà demandée sur ce formulaire (vérifiez aussi les champs archivés)."
     }
   },
   "tokenOps": {
@@ -2028,7 +2035,8 @@
         "amountInvalid": "Saisissez un montant valide (jusqu'à 2 décimales).",
         "fieldRequired": "{label} est requis.",
         "generic": "Une erreur s'est produite. Réessayez.",
-        "required": "Ce champ est obligatoire."
+        "required": "Ce champ est obligatoire.",
+        "fieldInvalid": "{label} n'a pas un format valide."
       },
       "emailTemplates": {
         "verify": {
@@ -2302,6 +2310,15 @@
           "localeInvalid": "Choisissez une langue prise en charge."
         }
       }
+    },
+    "builtinFields": {
+      "phone": "Téléphone",
+      "address": "Adresse",
+      "postalCode": "Code postal",
+      "city": "Ville",
+      "iban": "IBAN",
+      "householdAdults": "Adultes dans le foyer",
+      "householdChildren": "Enfants dans le foyer"
     }
   },
   "cards": {

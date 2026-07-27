@@ -1598,7 +1598,11 @@
             "cancel": "Cancel",
             "step": "Step",
             "firstStep": "First step",
-            "stepHint": "Which page of the form this field appears on."
+            "stepHint": "Which page of the form this field appears on.",
+            "builtin": "Field kind",
+            "builtinCustom": "Custom question",
+            "builtinHint": "A member-record detail is saved to its own column, so it feeds letters, reminders and tier assignment. A custom question is stored separately, alongside the application.",
+            "builtinLocked": "Saved to the member record ({key}). The input type is fixed; you can still adjust the label, help text, whether it's required, and its position."
           },
           "archive": {
             "button": "Archive",
@@ -1612,7 +1616,8 @@
             "saving": "Saving…",
             "cancel": "Cancel"
           },
-          "firstStep": "First step"
+          "firstStep": "First step",
+          "builtinBadge": "Member record"
         },
         "stepsTitle": "Form steps",
         "stepsDescription": "Split the signup form into several pages. With no steps, the form stays on a single page.",
@@ -1893,7 +1898,9 @@
       "labelRequired": "Label is required.",
       "optionEmpty": "Each option must have a value and a label.",
       "optionsRequired": "Add at least one option.",
-      "notFound": "Field not found."
+      "notFound": "Field not found.",
+      "builtinInvalid": "That member detail is not a known one.",
+      "builtinTaken": "That detail is already asked for on this form (check archived fields too)."
     }
   },
   "tokenOps": {
@@ -2028,7 +2035,8 @@
         "amountInvalid": "Enter a valid amount (up to 2 decimals).",
         "fieldRequired": "{label} is required.",
         "generic": "Something went wrong. Please try again.",
-        "required": "This field is required."
+        "required": "This field is required.",
+        "fieldInvalid": "{label} is not in a valid format."
       },
       "emailTemplates": {
         "verify": {
@@ -2302,6 +2310,15 @@
           "localeInvalid": "Pick a supported language."
         }
       }
+    },
+    "builtinFields": {
+      "phone": "Phone number",
+      "address": "Address",
+      "postalCode": "Postcode",
+      "city": "City",
+      "iban": "IBAN",
+      "householdAdults": "Adults in the household",
+      "householdChildren": "Children in the household"
     }
   },
   "cards": {
