@@ -12,6 +12,11 @@ import {
   verificationExpiry,
 } from "@/services/email/verification";
 import { getFundUrl, requireCurrentFund } from "@/services/fund/server";
+import {
+  coerceBuiltinValue,
+  isMemberBuiltinKey,
+  type BuiltinColumnValue,
+} from "./builtin-fields";
 import { contributionApplies } from "./contribution";
 import { generatePaymentReference } from "./payment-reference";
 import {
@@ -20,11 +25,33 @@ import {
   type ExtraValue,
 } from "./schema";
 
+// `redirectTo` on the error variant is set only for TERMINAL failures — the
+// ones the visitor can do nothing about. Errors they can fix (a taken email, a
+// missing required answer) stay inline in the form: bouncing someone off to an
+// external error page over a typo would lose everything they typed.
 export type SignupMemberResult =
-  | { error: string; field?: "firstName" | "lastName" | "email" }
+  | {
+      error: string;
+      field?: "firstName" | "lastName" | "email";
+      redirectTo?: string;
+    }
   | { ok: true; redirectTo: string };
 
 const MAX_REFERENCE_RETRIES = 5;
+
+// Append our failure marker to the fund's configured error URL, preserving any
+// query string it already carries. A malformed stored URL yields null so the
+// caller falls back to showing the error inline.
+function errorRedirect(errorUrl: string | null, code: string): string | undefined {
+  if (!errorUrl) return undefined;
+  try {
+    const url = new URL(errorUrl);
+    url.searchParams.set("error", code);
+    return url.toString();
+  } catch {
+    return undefined;
+  }
+}
 
 export async function signupMemberAction(input: {
   builtins: BuiltinSignupInput;
@@ -58,15 +85,21 @@ export async function signupMemberAction(input: {
     ? parsed.data.contributionAmount || null
     : null;
 
-  // Filter application data to keys that exist on the fund's onboarding form,
-  // and enforce the `required` flag for each. Anything unknown is dropped
+  // Filter answers to keys that exist on the fund's onboarding form, and
+  // enforce the `required` flag for each. Anything unknown is dropped
   // (defensive against client tampering).
+  //
+  // Fields carrying a `builtinKey` are split off here: their answers belong in
+  // typed Member columns, not in the applicationData blob, so that an address
+  // collected at signup is the same address the email templates and tier
+  // assignment read. See services/member/builtin-fields.ts.
   const fields = await prisma.onboardingField.findMany({
     where: { fundId: fund.id, target: "MEMBER", archivedAt: null },
-    select: { key: true, label: true, required: true },
+    select: { key: true, label: true, required: true, builtinKey: true },
   });
   const incoming = input.applicationData ?? {};
   const filtered: Record<string, ExtraValue> = {};
+  const builtinColumns: Record<string, BuiltinColumnValue> = {};
   for (const field of fields) {
     const value = incoming[field.key];
     if (field.required && isExtraEmpty(value)) {
@@ -76,9 +109,26 @@ export async function signupMemberAction(input: {
         } as never),
       };
     }
-    if (!isExtraEmpty(value)) {
-      filtered[field.key] = normalizeExtra(value!);
+    if (isExtraEmpty(value)) continue;
+
+    if (field.builtinKey && isMemberBuiltinKey(field.builtinKey)) {
+      const coerced = coerceBuiltinValue(field.builtinKey, value);
+      if (!coerced.ok) {
+        return {
+          error: t("members.signup.errors.fieldInvalid" as never, {
+            label: field.label,
+          } as never),
+        };
+      }
+      // A null here means "answered blank"; leave the column at its default
+      // rather than writing null over a non-nullable count.
+      if (coerced.value !== null) {
+        builtinColumns[field.builtinKey] = coerced.value;
+      }
+      continue;
     }
+
+    filtered[field.key] = normalizeExtra(value!);
   }
 
   // Resolve the referral code if any. Soft-fail on invalid / self-referral —
@@ -162,6 +212,10 @@ export async function signupMemberAction(input: {
             // Gated on FIXED_PERIOD + tiers above.
             contributionAmount,
             emailVerifiedAt: requireVerify ? null : new Date(),
+            // Typed columns the fund chose to collect on the form. Spread
+            // before nothing else writes them, so an unconfigured column keeps
+            // its schema default.
+            ...builtinColumns,
             applicationData:
               Object.keys(filtered).length > 0 ? filtered : undefined,
           },
@@ -216,7 +270,15 @@ export async function signupMemberAction(input: {
           field: "email",
         };
       }
-      throw e;
+      // Anything else is our problem, not the visitor's. Log it (Vercel
+      // captures console.error) and hand back a terminal result so the fund's
+      // error redirect can fire — a raw error boundary would strand a visitor
+      // who arrived from the fund's own website with no way back.
+      console.error("[signup] member creation failed", fund.id, e);
+      return {
+        error: t("members.signup.errors.generic" as never),
+        redirectTo: errorRedirect(fund.memberSignupErrorUrl, "signup_failed"),
+      };
     }
 
     // Outside the transaction: fire the Resend send. The sender catches
@@ -259,7 +321,12 @@ export async function signupMemberAction(input: {
     return { ok: true, redirectTo };
   }
 
-  return { error: t("members.signup.errors.generic" as never) };
+  // Every attempt collided on paymentReference — vanishingly unlikely, and
+  // nothing the visitor can act on, so it takes the error redirect too.
+  return {
+    error: t("members.signup.errors.generic" as never),
+    redirectTo: errorRedirect(fund.memberSignupErrorUrl, "signup_failed"),
+  };
 }
 
 function isExtraEmpty(value: ExtraValue | undefined): boolean {

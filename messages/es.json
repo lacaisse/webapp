@@ -1554,7 +1554,11 @@
           "member": "URL de redirección de miembros",
           "memberHint": "A dónde van los miembros tras su último paso de registro (después de la verificación de correo, cuando está activada).",
           "merchant": "URL de redirección de comercios",
-          "merchantHint": "A dónde van los comercios tras su último paso de registro (después de la verificación de correo, cuando está activada)."
+          "merchantHint": "A dónde van los comercios tras su último paso de registro (después de la verificación de correo, cuando está activada).",
+          "memberCancel": "URL de cancelación — miembro",
+          "memberCancelHint": "Dónde aterrizan los miembros si abandonan el formulario (tras confirmar). Por defecto: el sitio web de la caja.",
+          "memberError": "URL de error — miembro",
+          "memberErrorHint": "Dónde aterrizan los miembros si la inscripción falla por un motivo técnico. Déjalo vacío para mostrar el error en el formulario."
         },
         "fieldsTitle": "Campos de la solicitud",
         "fieldsDescription": "Añade preguntas personalizadas a los formularios de registro de miembros y comercios. Los campos integrados (nombre, correo) siempre están presentes.",
@@ -1573,7 +1577,8 @@
             "label": "Etiqueta",
             "key": "Clave",
             "type": "Tipo",
-            "required": "Obligatorio"
+            "required": "Obligatorio",
+            "step": "Paso"
           },
           "dialog": {
             "createTitle": "Añadir un campo",
@@ -1590,7 +1595,14 @@
             "optionsHint": "Una opción por línea. Usa \"valor:etiqueta\" para definir un valor almacenado distinto, o solo la etiqueta.",
             "save": "Guardar",
             "saving": "Guardando…",
-            "cancel": "Cancelar"
+            "cancel": "Cancelar",
+            "step": "Paso",
+            "firstStep": "Primer paso",
+            "stepHint": "En qué página del formulario aparece este campo.",
+            "builtin": "Tipo de campo",
+            "builtinCustom": "Pregunta personalizada",
+            "builtinHint": "Un dato de la ficha de miembro se guarda en su propia columna, así alimenta cartas, recordatorios y la asignación de nivel. Una pregunta personalizada se guarda aparte, junto a la candidatura.",
+            "builtinLocked": "Se guarda en la ficha de miembro ({key}). El tipo de entrada es fijo; puedes ajustar la etiqueta, la ayuda, si es obligatorio y su posición."
           },
           "archive": {
             "button": "Archivar",
@@ -1603,6 +1615,66 @@
             "restoreConfirm": "Restaurar",
             "saving": "Guardando…",
             "cancel": "Cancelar"
+          },
+          "firstStep": "Primer paso",
+          "builtinBadge": "Ficha de miembro"
+        },
+        "stepsTitle": "Pasos del formulario",
+        "stepsDescription": "Divide el formulario de inscripción en varias páginas. Sin pasos, el formulario ocupa una sola página.",
+        "steps": {
+          "memberTitle": "Pasos — miembros",
+          "merchantTitle": "Pasos — comercios",
+          "description": "Los campos se reparten en estas páginas. Los campos sin paso aparecen en la primera.",
+          "add": "Añadir un paso",
+          "edit": "Editar",
+          "archived": "Archivado",
+          "empty": "Sin pasos — el formulario ocupa una sola página.",
+          "fieldCount": "{count, plural, =0 {sin campos} one {# campo} other {# campos}}",
+          "columns": {
+            "position": "#",
+            "title": "Título",
+            "fields": "Campos"
+          },
+          "dialog": {
+            "createTitle": "Añadir un paso",
+            "editTitle": "Editar el paso",
+            "description": "Los pasos se muestran en el orden definido por su posición. El título es visible para los candidatos.",
+            "title": "Título",
+            "titleHint": "Se muestra en la parte superior de esta página del formulario, en el idioma de la caja.",
+            "stepDescription": "Descripción",
+            "position": "Posición",
+            "positionHint": "Los pasos se ordenan por posición ascendente; el más bajo es la primera página.",
+            "save": "Guardar",
+            "saving": "Guardando…",
+            "cancel": "Cancelar"
+          },
+          "archive": {
+            "button": "Archivar",
+            "restore": "Restaurar",
+            "title": "¿Archivar este paso?",
+            "description": "El paso desaparece del formulario. No se pierde ninguna respuesta ya registrada.",
+            "fieldsMove": "{count, plural, one {# campo se moverá} other {# campos se moverán}} al primer paso del formulario.",
+            "restoreTitle": "¿Restaurar este paso?",
+            "restoreDescription": "El paso reaparece en el formulario en su posición anterior.",
+            "confirm": "Archivar",
+            "restoreConfirm": "Restaurar",
+            "saving": "Guardando…",
+            "cancel": "Cancelar"
+          }
+        },
+        "integration": {
+          "title": "Integración con el sitio web",
+          "description": "El enlace que tu sitio usa para enviar candidatos al formulario, con los datos ya rellenados.",
+          "urlLabel": "URL del formulario",
+          "exampleLabel": "Ejemplo con datos rellenados",
+          "exampleHint": "El candidato puede editar cada valor; cualquier valor inválido se ignora.",
+          "paramsLabel": "Parámetros aceptados",
+          "paramsHint": "Los parámetros desconocidos se ignoran. «ref», «step» y «error» están reservados.",
+          "copy": "Copiar",
+          "columns": {
+            "param": "Parámetro",
+            "field": "Campo",
+            "format": "Valores"
           }
         }
       },
@@ -1826,7 +1898,9 @@
       "labelRequired": "La etiqueta es obligatoria.",
       "optionEmpty": "Cada opción debe tener un valor y una etiqueta.",
       "optionsRequired": "Añada al menos una opción.",
-      "notFound": "Campo no encontrado."
+      "notFound": "Campo no encontrado.",
+      "builtinInvalid": "Ese dato de miembro no es válido.",
+      "builtinTaken": "Ese dato ya se pide en este formulario (revisa también los campos archivados)."
     }
   },
   "tokenOps": {
@@ -1960,7 +2034,9 @@
         "emailTaken": "Ya existe una solicitud con este correo electrónico para este fondo.",
         "amountInvalid": "Introduce un importe válido (hasta 2 decimales).",
         "fieldRequired": "{label} es obligatorio.",
-        "generic": "Algo salió mal. Inténtalo de nuevo."
+        "generic": "Algo salió mal. Inténtalo de nuevo.",
+        "required": "Este campo es obligatorio.",
+        "fieldInvalid": "{label} no tiene un formato válido."
       },
       "emailTemplates": {
         "verify": {
@@ -1984,6 +2060,18 @@
           "description": "Gracias por solicitar unirte a {fundName}.",
           "nextSteps": "Un administrador revisará tu solicitud y se pondrá en contacto por correo electrónico."
         }
+      },
+      "stepper": {
+        "progress": "Paso {current} de {total}",
+        "back": "Atrás",
+        "next": "Continuar"
+      },
+      "cancel": {
+        "button": "Cancelar la inscripción",
+        "title": "¿Abandonar la inscripción?",
+        "description": "Tus respuestas no se guardarán y saldrás de este formulario.",
+        "stay": "Seguir aquí",
+        "confirm": "Salir"
       }
     },
     "admin": {
@@ -2222,6 +2310,15 @@
           "localeInvalid": "Elige un idioma compatible."
         }
       }
+    },
+    "builtinFields": {
+      "phone": "Teléfono",
+      "address": "Dirección",
+      "postalCode": "Código postal",
+      "city": "Ciudad",
+      "iban": "IBAN",
+      "householdAdults": "Adultos en el hogar",
+      "householdChildren": "Niños en el hogar"
     }
   },
   "cards": {
@@ -3330,5 +3427,11 @@
       "help": "Si tienes alguna pregunta o problema con tu pago, ponte en contacto con {fundName}."
     },
     "notConnected": "Los datos bancarios aún no están disponibles. Inténtalo de nuevo más tarde o ponte en contacto con {fundName}."
+  },
+  "onboardingSteps": {
+    "errors": {
+      "titleRequired": "El título es obligatorio.",
+      "notFound": "Paso no encontrado."
+    }
   }
 }

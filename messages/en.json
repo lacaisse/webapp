@@ -1554,7 +1554,11 @@
           "member": "Member redirect URL",
           "memberHint": "Where members land after their final signup step (after email verification, when enabled).",
           "merchant": "Merchant redirect URL",
-          "merchantHint": "Where merchants land after their final signup step (after email verification, when enabled)."
+          "merchantHint": "Where merchants land after their final signup step (after email verification, when enabled).",
+          "memberCancel": "Cancel URL — member",
+          "memberCancelHint": "Where members land if they abandon the form (after confirming). Defaults to the fund's website.",
+          "memberError": "Error URL — member",
+          "memberErrorHint": "Where members land if the signup fails for a technical reason. Leave empty to show the error inside the form."
         },
         "fieldsTitle": "Application fields",
         "fieldsDescription": "Add custom questions to the member and merchant signup forms. Built-in fields (name, email) are always present.",
@@ -1573,7 +1577,8 @@
             "label": "Label",
             "key": "Key",
             "type": "Type",
-            "required": "Required"
+            "required": "Required",
+            "step": "Step"
           },
           "dialog": {
             "createTitle": "Add a field",
@@ -1590,7 +1595,14 @@
             "optionsHint": "One option per line. Use \"value:label\" to set a different stored value, or just the label.",
             "save": "Save",
             "saving": "Saving…",
-            "cancel": "Cancel"
+            "cancel": "Cancel",
+            "step": "Step",
+            "firstStep": "First step",
+            "stepHint": "Which page of the form this field appears on.",
+            "builtin": "Field kind",
+            "builtinCustom": "Custom question",
+            "builtinHint": "A member-record detail is saved to its own column, so it feeds letters, reminders and tier assignment. A custom question is stored separately, alongside the application.",
+            "builtinLocked": "Saved to the member record ({key}). The input type is fixed; you can still adjust the label, help text, whether it's required, and its position."
           },
           "archive": {
             "button": "Archive",
@@ -1603,6 +1615,66 @@
             "restoreConfirm": "Restore",
             "saving": "Saving…",
             "cancel": "Cancel"
+          },
+          "firstStep": "First step",
+          "builtinBadge": "Member record"
+        },
+        "stepsTitle": "Form steps",
+        "stepsDescription": "Split the signup form into several pages. With no steps, the form stays on a single page.",
+        "steps": {
+          "memberTitle": "Member steps",
+          "merchantTitle": "Merchant steps",
+          "description": "Fields are spread across these pages. Fields with no step show on the first one.",
+          "add": "Add a step",
+          "edit": "Edit",
+          "archived": "Archived",
+          "empty": "No steps — the form is a single page.",
+          "fieldCount": "{count, plural, =0 {no fields} one {# field} other {# fields}}",
+          "columns": {
+            "position": "#",
+            "title": "Title",
+            "fields": "Fields"
+          },
+          "dialog": {
+            "createTitle": "Add a step",
+            "editTitle": "Edit step",
+            "description": "Steps are shown in the order set by their position. The title is visible to applicants.",
+            "title": "Title",
+            "titleHint": "Shown at the top of this page of the form, in the fund's own language.",
+            "stepDescription": "Description",
+            "position": "Position",
+            "positionHint": "Steps are sorted by ascending position; the lowest is the first page.",
+            "save": "Save",
+            "saving": "Saving…",
+            "cancel": "Cancel"
+          },
+          "archive": {
+            "button": "Archive",
+            "restore": "Restore",
+            "title": "Archive this step?",
+            "description": "The step disappears from the form. No already-recorded answer is lost.",
+            "fieldsMove": "{count, plural, one {# field will move} other {# fields will move}} to the first step of the form.",
+            "restoreTitle": "Restore this step?",
+            "restoreDescription": "The step reappears in the form at its previous position.",
+            "confirm": "Archive",
+            "restoreConfirm": "Restore",
+            "saving": "Saving…",
+            "cancel": "Cancel"
+          }
+        },
+        "integration": {
+          "title": "Website integration",
+          "description": "The link your website uses to send people to the signup form, with details already filled in.",
+          "urlLabel": "Form URL",
+          "exampleLabel": "Example with prefill",
+          "exampleHint": "The applicant can edit every value; anything invalid is ignored.",
+          "paramsLabel": "Accepted parameters",
+          "paramsHint": "Unknown parameters are ignored. “ref”, “step” and “error” are reserved.",
+          "copy": "Copy",
+          "columns": {
+            "param": "Parameter",
+            "field": "Field",
+            "format": "Values"
           }
         }
       },
@@ -1826,7 +1898,9 @@
       "labelRequired": "Label is required.",
       "optionEmpty": "Each option must have a value and a label.",
       "optionsRequired": "Add at least one option.",
-      "notFound": "Field not found."
+      "notFound": "Field not found.",
+      "builtinInvalid": "That member detail is not a known one.",
+      "builtinTaken": "That detail is already asked for on this form (check archived fields too)."
     }
   },
   "tokenOps": {
@@ -1960,7 +2034,9 @@
         "emailTaken": "An application with this email already exists for this fund.",
         "amountInvalid": "Enter a valid amount (up to 2 decimals).",
         "fieldRequired": "{label} is required.",
-        "generic": "Something went wrong. Please try again."
+        "generic": "Something went wrong. Please try again.",
+        "required": "This field is required.",
+        "fieldInvalid": "{label} is not in a valid format."
       },
       "emailTemplates": {
         "verify": {
@@ -1984,6 +2060,18 @@
           "description": "Thanks for applying to {fundName}.",
           "nextSteps": "An admin will review your application and reach out by email."
         }
+      },
+      "stepper": {
+        "progress": "Step {current} of {total}",
+        "back": "Back",
+        "next": "Continue"
+      },
+      "cancel": {
+        "button": "Cancel signup",
+        "title": "Leave this signup?",
+        "description": "Your answers won't be saved and you'll leave this form.",
+        "stay": "Keep going",
+        "confirm": "Leave"
       }
     },
     "admin": {
@@ -2222,6 +2310,15 @@
           "localeInvalid": "Pick a supported language."
         }
       }
+    },
+    "builtinFields": {
+      "phone": "Phone number",
+      "address": "Address",
+      "postalCode": "Postcode",
+      "city": "City",
+      "iban": "IBAN",
+      "householdAdults": "Adults in the household",
+      "householdChildren": "Children in the household"
     }
   },
   "cards": {
@@ -3330,5 +3427,11 @@
       "help": "If you have any questions or problems with your payment, please contact {fundName}."
     },
     "notConnected": "Bank details are not available yet. Please try again later or contact {fundName}."
+  },
+  "onboardingSteps": {
+    "errors": {
+      "titleRequired": "The title is required.",
+      "notFound": "Step not found."
+    }
   }
 }

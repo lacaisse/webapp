@@ -380,6 +380,15 @@ model Fund {
   memberSignupSuccessUrl   String?
   merchantSignupSuccessUrl String?
 
+  // Where the member signup form sends the visitor when they abandon it
+  // (after an in-app confirmation) or when it fails terminally. Both are
+  // fund-admin config, never accepted as request params — a public form that
+  // redirects wherever the query string says is an open redirect. Cancel
+  // falls back to `websiteUrl`, then to hiding the button; an unset error URL
+  // keeps the failure inline in the form.
+  memberSignupCancelUrl String?
+  memberSignupErrorUrl  String?
+
   staff              FundMember[] // staff with admin access (OWNER/ADMIN/VIEWER)
   invites            FundInvite[] // pending staff invitations
   members            Member[] // demand-side recipients of allocations
@@ -387,6 +396,7 @@ model Fund {
   tiers              AllocationTier[] // contribution/allocation tiers
   merchants          Merchant[] // shops in the fund's network
   onboardingFields   OnboardingField[] // per-fund extras on the signup forms
+  onboardingSteps    OnboardingStep[] // optional multi-step grouping of those extras
   bankTransactions   BankTransaction[] // bank-sync mirror (incoming + outgoing)
   tokenOperations    TokenOperation[] // mint/burn/transfer audit log
   allocationPeriods  AllocationPeriod[] // FIXED_PERIOD scheduling windows
@@ -989,8 +999,21 @@ model OnboardingField {
   target OnboardingTarget
 
   // Stable JSON key for `applicationData`. Once set, changing it would
-  // orphan historical answers — admin UI prevents editing.
+  // orphan historical answers — admin UI prevents editing. For a built-in
+  // field this equals `builtinKey`, so the existing (fundId, target, key)
+  // unique constraint also stops the same attribute being added twice.
   key String
+
+  // When set, this field collects a TYPED Member column (address, phone,
+  // householdAdults, …) rather than a custom `applicationData` entry. It is
+  // rendered, ordered, stepped, prefilled and validated identically — only
+  // the write target differs. See services/member/builtin-fields.ts.
+  //
+  // Deliberately an explicit column rather than inferring "is this key one of
+  // the built-in names?": funds already have custom fields, and one of them
+  // keyed `address` must keep writing to applicationData exactly as before
+  // instead of silently retargeting a real Member column.
+  builtinKey String?
 
   type     OnboardingFieldType
   label    String // shown to the applicant
@@ -998,6 +1021,13 @@ model OnboardingField {
 
   required Boolean @default(false)
   position Int     @default(0)
+
+  // Optional multi-step grouping. NULL = the field renders in the first
+  // (implicit) step, which is also what every field looks like for a fund
+  // that never configured steps. SetNull rather than Cascade: deleting a step
+  // must not delete the answers' field definitions.
+  stepId String?
+  step   OnboardingStep? @relation(fields: [stepId], references: [id], onDelete: SetNull)
 
   // Type-specific config validated app-side, e.g.
   //   SELECT/MULTISELECT: { "options": [{ value, label }] }
@@ -1014,6 +1044,35 @@ model OnboardingField {
   updatedAt DateTime @updatedAt
 
   @@unique([fundId, target, key])
+  @@index([fundId, target])
+  @@index([stepId])
+}
+
+// An optional page in the public signup form. A fund with zero steps renders
+// the classic single-page form; with steps, the built-in identity fields lead
+// and each step then shows the OnboardingFields assigned to it, ordered by
+// `position`. Titles are admin-authored free text (like field labels), not
+// i18n keys — the fund writes them in its own language.
+model OnboardingStep {
+  id     String @id @default(cuid())
+  fundId String
+  fund   Fund   @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  target OnboardingTarget
+
+  title       String
+  description String?
+  position    Int     @default(0)
+
+  // Soft-delete, mirroring OnboardingField: an archived step disappears from
+  // the form and its fields fall back to the first step.
+  archivedAt DateTime?
+
+  fields OnboardingField[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([fundId, target])
 }
 

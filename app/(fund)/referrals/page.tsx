@@ -81,6 +81,8 @@ export default async function ReferralsPage() {
               payoutFeeSynced: fund.payoutFeeSynced,
               memberSignupSuccessUrl: fund.memberSignupSuccessUrl,
               merchantSignupSuccessUrl: fund.merchantSignupSuccessUrl,
+              memberSignupCancelUrl: fund.memberSignupCancelUrl,
+              memberSignupErrorUrl: fund.memberSignupErrorUrl,
             }}
           />
         </CardContent>

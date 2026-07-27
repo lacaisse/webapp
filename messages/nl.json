@@ -1554,7 +1554,11 @@
           "member": "Doorverwijs-URL voor leden",
           "memberHint": "Waar leden terechtkomen na hun laatste aanmeldstap (na e-mailverificatie, indien ingeschakeld).",
           "merchant": "Doorverwijs-URL voor handelaren",
-          "merchantHint": "Waar handelaren terechtkomen na hun laatste aanmeldstap (na e-mailverificatie, indien ingeschakeld)."
+          "merchantHint": "Waar handelaren terechtkomen na hun laatste aanmeldstap (na e-mailverificatie, indien ingeschakeld).",
+          "memberCancel": "Annuleer-URL — lid",
+          "memberCancelHint": "Waar leden terechtkomen als ze het formulier verlaten (na bevestiging). Standaard: de website van het fonds.",
+          "memberError": "Fout-URL — lid",
+          "memberErrorHint": "Waar leden terechtkomen als de inschrijving mislukt door een technische fout. Laat leeg om de fout in het formulier te tonen."
         },
         "fieldsTitle": "Aanvraagvelden",
         "fieldsDescription": "Voeg aangepaste vragen toe aan de aanmeldformulieren voor leden en handelaren. Ingebouwde velden (naam, e-mail) zijn altijd aanwezig.",
@@ -1573,7 +1577,8 @@
             "label": "Label",
             "key": "Sleutel",
             "type": "Type",
-            "required": "Verplicht"
+            "required": "Verplicht",
+            "step": "Stap"
           },
           "dialog": {
             "createTitle": "Een veld toevoegen",
@@ -1590,7 +1595,14 @@
             "optionsHint": "Eén optie per regel. Gebruik \"waarde:label\" om een andere opgeslagen waarde in te stellen, of alleen het label.",
             "save": "Opslaan",
             "saving": "Opslaan…",
-            "cancel": "Annuleren"
+            "cancel": "Annuleren",
+            "step": "Stap",
+            "firstStep": "Eerste stap",
+            "stepHint": "Op welke pagina van het formulier dit veld verschijnt.",
+            "builtin": "Soort veld",
+            "builtinCustom": "Aangepaste vraag",
+            "builtinHint": "Een gegeven uit de ledenfiche wordt in zijn eigen kolom bewaard en voedt zo brieven, herinneringen en niveautoewijzing. Een aangepaste vraag wordt apart bij de aanvraag bewaard.",
+            "builtinLocked": "Wordt in de ledenfiche bewaard ({key}). Het invoertype ligt vast; label, hulptekst, verplichting en positie kun je wel aanpassen."
           },
           "archive": {
             "button": "Archiveren",
@@ -1603,6 +1615,66 @@
             "restoreConfirm": "Herstellen",
             "saving": "Opslaan…",
             "cancel": "Annuleren"
+          },
+          "firstStep": "Eerste stap",
+          "builtinBadge": "Ledenfiche"
+        },
+        "stepsTitle": "Formulierstappen",
+        "stepsDescription": "Verdeel het inschrijfformulier over meerdere pagina's. Zonder stappen blijft het formulier één pagina.",
+        "steps": {
+          "memberTitle": "Stappen — leden",
+          "merchantTitle": "Stappen — handelaars",
+          "description": "Velden worden over deze pagina's verdeeld. Velden zonder stap verschijnen op de eerste.",
+          "add": "Stap toevoegen",
+          "edit": "Bewerken",
+          "archived": "Gearchiveerd",
+          "empty": "Geen stappen — het formulier is één pagina.",
+          "fieldCount": "{count, plural, =0 {geen velden} one {# veld} other {# velden}}",
+          "columns": {
+            "position": "#",
+            "title": "Titel",
+            "fields": "Velden"
+          },
+          "dialog": {
+            "createTitle": "Stap toevoegen",
+            "editTitle": "Stap bewerken",
+            "description": "Stappen worden getoond in de volgorde van hun positie. De titel is zichtbaar voor kandidaten.",
+            "title": "Titel",
+            "titleHint": "Wordt bovenaan deze pagina van het formulier getoond, in de taal van het fonds.",
+            "stepDescription": "Beschrijving",
+            "position": "Positie",
+            "positionHint": "Stappen worden oplopend op positie gesorteerd; de laagste is de eerste pagina.",
+            "save": "Opslaan",
+            "saving": "Opslaan…",
+            "cancel": "Annuleren"
+          },
+          "archive": {
+            "button": "Archiveren",
+            "restore": "Herstellen",
+            "title": "Deze stap archiveren?",
+            "description": "De stap verdwijnt uit het formulier. Er gaat geen reeds opgeslagen antwoord verloren.",
+            "fieldsMove": "{count, plural, one {# veld verhuist} other {# velden verhuizen}} naar de eerste stap van het formulier.",
+            "restoreTitle": "Deze stap herstellen?",
+            "restoreDescription": "De stap verschijnt weer in het formulier op zijn vorige positie.",
+            "confirm": "Archiveren",
+            "restoreConfirm": "Herstellen",
+            "saving": "Opslaan…",
+            "cancel": "Annuleren"
+          }
+        },
+        "integration": {
+          "title": "Website-integratie",
+          "description": "De link die je website gebruikt om mensen naar het inschrijfformulier te sturen, met gegevens al ingevuld.",
+          "urlLabel": "Formulier-URL",
+          "exampleLabel": "Voorbeeld met voorinvulling",
+          "exampleHint": "De kandidaat kan elke waarde aanpassen; ongeldige waarden worden genegeerd.",
+          "paramsLabel": "Geaccepteerde parameters",
+          "paramsHint": "Onbekende parameters worden genegeerd. “ref”, “step” en “error” zijn gereserveerd.",
+          "copy": "Kopiëren",
+          "columns": {
+            "param": "Parameter",
+            "field": "Veld",
+            "format": "Waarden"
           }
         }
       },
@@ -1826,7 +1898,9 @@
       "labelRequired": "Label is verplicht.",
       "optionEmpty": "Elke optie moet een waarde en een label hebben.",
       "optionsRequired": "Voeg ten minste één optie toe.",
-      "notFound": "Veld niet gevonden."
+      "notFound": "Veld niet gevonden.",
+      "builtinInvalid": "Dat lidgegeven is niet bekend.",
+      "builtinTaken": "Dat gegeven wordt al gevraagd op dit formulier (controleer ook gearchiveerde velden)."
     }
   },
   "tokenOps": {
@@ -1960,7 +2034,9 @@
         "emailTaken": "Er bestaat al een aanvraag met dit e-mailadres voor dit fonds.",
         "amountInvalid": "Voer een geldig bedrag in (maximaal 2 decimalen).",
         "fieldRequired": "{label} is verplicht.",
-        "generic": "Er is iets misgegaan. Probeer opnieuw."
+        "generic": "Er is iets misgegaan. Probeer opnieuw.",
+        "required": "Dit veld is verplicht.",
+        "fieldInvalid": "{label} heeft geen geldige indeling."
       },
       "thanks": {
         "checkEmail": {
@@ -1984,6 +2060,18 @@
           "subject": "Welkom bij {fundName}",
           "textBody": "Hallo {firstName},\n\nWelkom bij {fundName}. Uw aanvraag wordt beoordeeld — een beheerder neemt binnenkort contact op.\n\nU ontvangt uw betalingsreferentie samen met uw kaart.\n\nBedankt,\nHet {fundName}-team"
         }
+      },
+      "stepper": {
+        "progress": "Stap {current} van {total}",
+        "back": "Terug",
+        "next": "Doorgaan"
+      },
+      "cancel": {
+        "button": "Inschrijving annuleren",
+        "title": "Inschrijving verlaten?",
+        "description": "Je antwoorden worden niet opgeslagen en je verlaat dit formulier.",
+        "stay": "Doorgaan",
+        "confirm": "Verlaten"
       }
     },
     "admin": {
@@ -2222,6 +2310,15 @@
           "localeInvalid": "Kies een ondersteunde taal."
         }
       }
+    },
+    "builtinFields": {
+      "phone": "Telefoon",
+      "address": "Adres",
+      "postalCode": "Postcode",
+      "city": "Stad",
+      "iban": "IBAN",
+      "householdAdults": "Volwassenen in het huishouden",
+      "householdChildren": "Kinderen in het huishouden"
     }
   },
   "cards": {
@@ -3330,5 +3427,11 @@
       "help": "Als u vragen of problemen heeft met uw betaling, neem dan contact op met {fundName}."
     },
     "notConnected": "De bankgegevens zijn nog niet beschikbaar. Probeer het later opnieuw of neem contact op met {fundName}."
+  },
+  "onboardingSteps": {
+    "errors": {
+      "titleRequired": "De titel is verplicht.",
+      "notFound": "Stap niet gevonden."
+    }
   }
 }

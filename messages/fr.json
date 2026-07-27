@@ -1554,7 +1554,11 @@
           "member": "URL de redirection — membre",
           "memberHint": "Où atterrissent les membres après la dernière étape d'inscription (après la vérification email, si activée).",
           "merchant": "URL de redirection — commerce",
-          "merchantHint": "Où atterrissent les commerces après la dernière étape d'inscription (après la vérification email, si activée)."
+          "merchantHint": "Où atterrissent les commerces après la dernière étape d'inscription (après la vérification email, si activée).",
+          "memberCancel": "URL d'annulation — membre",
+          "memberCancelHint": "Où atterrissent les membres qui abandonnent le formulaire (après confirmation). Par défaut : le site web de la caisse.",
+          "memberError": "URL d'erreur — membre",
+          "memberErrorHint": "Où atterrissent les membres si l'inscription échoue pour une raison technique. Laissez vide pour afficher l'erreur dans le formulaire."
         },
         "fieldsTitle": "Champs d'inscription",
         "fieldsDescription": "Ajoutez des questions personnalisées aux formulaires d'inscription. Les champs de base (nom, email) sont toujours présents.",
@@ -1573,7 +1577,8 @@
             "label": "Libellé",
             "key": "Clé",
             "type": "Type",
-            "required": "Requis"
+            "required": "Requis",
+            "step": "Étape"
           },
           "dialog": {
             "createTitle": "Ajouter un champ",
@@ -1590,7 +1595,14 @@
             "optionsHint": "Une option par ligne. Utilisez \"valeur:libellé\" pour stocker une valeur différente, ou juste le libellé.",
             "save": "Enregistrer",
             "saving": "Enregistrement…",
-            "cancel": "Annuler"
+            "cancel": "Annuler",
+            "step": "Étape",
+            "firstStep": "Première étape",
+            "stepHint": "Page du formulaire sur laquelle ce champ apparaît.",
+            "builtin": "Type de champ",
+            "builtinCustom": "Question personnalisée",
+            "builtinHint": "Une information de la fiche membre est enregistrée dans sa colonne dédiée — elle alimente les courriers, les rappels et l'attribution de palier. Une question personnalisée est stockée à part, avec la candidature.",
+            "builtinLocked": "Enregistré dans la fiche membre ({key}). Le type de saisie est imposé ; vous pouvez adapter le libellé, l'aide, l'obligation et la position."
           },
           "archive": {
             "button": "Archiver",
@@ -1603,6 +1615,66 @@
             "restoreConfirm": "Restaurer",
             "saving": "Enregistrement…",
             "cancel": "Annuler"
+          },
+          "firstStep": "Première étape",
+          "builtinBadge": "Fiche membre"
+        },
+        "stepsTitle": "Étapes du formulaire",
+        "stepsDescription": "Découpez le formulaire d'inscription en plusieurs pages. Sans étape, le formulaire tient sur une seule page.",
+        "steps": {
+          "memberTitle": "Étapes — membres",
+          "merchantTitle": "Étapes — commerces",
+          "description": "Les champs sont répartis sur ces pages. Les champs sans étape s'affichent sur la première.",
+          "add": "Ajouter une étape",
+          "edit": "Modifier",
+          "archived": "Archivée",
+          "empty": "Aucune étape — le formulaire tient sur une seule page.",
+          "fieldCount": "{count, plural, =0 {aucun champ} one {# champ} other {# champs}}",
+          "columns": {
+            "position": "#",
+            "title": "Titre",
+            "fields": "Champs"
+          },
+          "dialog": {
+            "createTitle": "Ajouter une étape",
+            "editTitle": "Modifier l'étape",
+            "description": "Les étapes sont affichées dans l'ordre défini par leur position. Le titre est visible par les candidats.",
+            "title": "Titre",
+            "titleHint": "Affiché en haut de cette page du formulaire, dans la langue de la caisse.",
+            "stepDescription": "Description",
+            "position": "Position",
+            "positionHint": "Les étapes sont triées par position croissante ; la plus basse est la première page.",
+            "save": "Enregistrer",
+            "saving": "Enregistrement…",
+            "cancel": "Annuler"
+          },
+          "archive": {
+            "button": "Archiver",
+            "restore": "Restaurer",
+            "title": "Archiver cette étape ?",
+            "description": "L'étape disparaît du formulaire. Aucune réponse déjà enregistrée n'est perdue.",
+            "fieldsMove": "{count, plural, one {# champ sera déplacé} other {# champs seront déplacés}} vers la première étape du formulaire.",
+            "restoreTitle": "Restaurer cette étape ?",
+            "restoreDescription": "L'étape réapparaît dans le formulaire à sa position précédente.",
+            "confirm": "Archiver",
+            "restoreConfirm": "Restaurer",
+            "saving": "Enregistrement…",
+            "cancel": "Annuler"
+          }
+        },
+        "integration": {
+          "title": "Intégration site web",
+          "description": "Le lien que votre site utilise pour envoyer des candidats vers le formulaire, avec des informations déjà remplies.",
+          "urlLabel": "URL du formulaire",
+          "exampleLabel": "Exemple avec pré-remplissage",
+          "exampleHint": "Le candidat peut modifier chaque valeur ; toute valeur invalide est ignorée.",
+          "paramsLabel": "Paramètres acceptés",
+          "paramsHint": "Les paramètres inconnus sont ignorés. « ref », « step » et « error » sont réservés.",
+          "copy": "Copier",
+          "columns": {
+            "param": "Paramètre",
+            "field": "Champ",
+            "format": "Valeurs"
           }
         }
       },
@@ -1826,7 +1898,9 @@
       "labelRequired": "Le libellé est requis.",
       "optionEmpty": "Chaque option doit avoir une valeur et un libellé.",
       "optionsRequired": "Ajoutez au moins une option.",
-      "notFound": "Champ introuvable."
+      "notFound": "Champ introuvable.",
+      "builtinInvalid": "Cette information de membre est inconnue.",
+      "builtinTaken": "Cette information est déjà demandée sur ce formulaire (vérifiez aussi les champs archivés)."
     }
   },
   "tokenOps": {
@@ -1960,7 +2034,9 @@
         "emailTaken": "Une demande avec cet email existe déjà pour cette caisse.",
         "amountInvalid": "Saisissez un montant valide (jusqu'à 2 décimales).",
         "fieldRequired": "{label} est requis.",
-        "generic": "Une erreur s'est produite. Réessayez."
+        "generic": "Une erreur s'est produite. Réessayez.",
+        "required": "Ce champ est obligatoire.",
+        "fieldInvalid": "{label} n'a pas un format valide."
       },
       "emailTemplates": {
         "verify": {
@@ -1984,6 +2060,18 @@
           "description": "Merci pour votre demande auprès de {fundName}.",
           "nextSteps": "Un administrateur examinera votre demande et vous contactera par email."
         }
+      },
+      "stepper": {
+        "progress": "Étape {current} sur {total}",
+        "back": "Retour",
+        "next": "Continuer"
+      },
+      "cancel": {
+        "button": "Annuler l'inscription",
+        "title": "Abandonner l'inscription ?",
+        "description": "Vos réponses ne seront pas enregistrées et vous quitterez ce formulaire.",
+        "stay": "Continuer l'inscription",
+        "confirm": "Quitter"
       }
     },
     "admin": {
@@ -2222,6 +2310,15 @@
           "localeInvalid": "Choisissez une langue prise en charge."
         }
       }
+    },
+    "builtinFields": {
+      "phone": "Téléphone",
+      "address": "Adresse",
+      "postalCode": "Code postal",
+      "city": "Ville",
+      "iban": "IBAN",
+      "householdAdults": "Adultes dans le foyer",
+      "householdChildren": "Enfants dans le foyer"
     }
   },
   "cards": {
@@ -3330,5 +3427,11 @@
       "help": "Si vous avez des questions ou des problèmes avec votre paiement, veuillez contacter {fundName}."
     },
     "notConnected": "Les coordonnées bancaires ne sont pas encore disponibles. Veuillez réessayer plus tard ou contacter {fundName}."
+  },
+  "onboardingSteps": {
+    "errors": {
+      "titleRequired": "Le titre est requis.",
+      "notFound": "Étape introuvable."
+    }
   }
 }
