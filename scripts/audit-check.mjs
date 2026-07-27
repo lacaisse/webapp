@@ -80,6 +80,33 @@ const ALLOWLIST = {
     reason: "libvips image CVEs inherited by Next's bundled sharp. sharp runs only for next/image, which this app uses solely for the static local logo (/logo.png); no images.remotePatterns is configured (so Next refuses to optimise remote URLs), and all user/CitizenPay-supplied images render via raw <img>, bypassing sharp. No untrusted image bytes reach libvips at runtime. Same deferred-fix class as the postcss-via-next entry; clears when Next bumps bundled sharp.",
     reviewBy: "2026-10-01",
   },
+
+  // --- 2026-07-27 batch ---
+  // Published after the 2026-07 triage above. The directly fixable ones were
+  // fixed rather than triaged: next 16.2.9 -> 16.2.12 cleared four Next
+  // advisories (2x SSRF, DoS, proxy bypass) and better-auth was patched via
+  // `npm audit fix`. What remains is bundled or dev-only with no non-breaking
+  // fix available.
+  "GHSA-6g55-p6wh-862q": {
+    pkg: "postcss (build, via next)",
+    reason: "Arbitrary .map file read via an attacker-controlled sourceMappingURL comment. postcss here is the copy bundled inside next (node_modules/next/node_modules/postcss), run at build time over our own repo-authored CSS (Tailwind + globals.css) — no user- or tenant-supplied CSS is ever processed, so no attacker controls a sourceMappingURL. Not in the runtime bundle. Same deferred-fix class as GHSA-qx2v-qp2m-jg93; clears when Next bumps its bundled postcss.",
+    reviewBy: "2026-10-01",
+  },
+  "GHSA-r28c-9q8g-f849": {
+    pkg: "postcss (build, via next)",
+    reason: "Same bundled-postcss-via-next path as GHSA-6g55-p6wh-862q — path traversal in previous-source-map auto-loading, reachable only if an attacker controls the CSS being compiled. Build-time only, repo-authored stylesheets.",
+    reviewBy: "2026-10-01",
+  },
+  "GHSA-mh99-v99m-4gvg": {
+    pkg: "brace-expansion (transitive via minimatch)",
+    reason: "OOM crash from unbounded brace expansion. Same minimatch-in-build/lint-tooling path as GHSA-3jxr-9vmj-r5cp: every glob pattern is repo-authored, never attacker-supplied, and brace-expansion is not in the runtime bundle. Fix requires a breaking eslint 10 major.",
+    reviewBy: "2026-10-01",
+  },
+  "GHSA-c96f-x56v-gq3h": {
+    pkg: "find-my-way (dev, via @prisma/dev)",
+    reason: "HTTP/2 DDoS in the router used by @prisma/dev's local dev server. Dev-only Prisma tooling — that server is never run in CI or production and is not in the Next bundle. Same class as the @hono/node-server-via-@prisma/dev entry (GHSA-92pp-h63x-v22m).",
+    reviewBy: "2026-10-01",
+  },
 };
 
 function runAudit() {
