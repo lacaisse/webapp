@@ -145,7 +145,15 @@ export function SignupForm({
     return names;
   };
 
-  const onNext = async () => {
+  // preventDefault is load-bearing, not decoration. This handler awaits
+  // validation, so the click's default action is still pending when the
+  // resulting re-render swaps this button for the last step's submit button.
+  // The browser then performs that default action against the morphed
+  // element and submits the form — advancing a step would create the member
+  // halfway through the form. Cancelling the event up front kills that path;
+  // the distinct `key`s on the two buttons stop the morph as well.
+  const onNext = async (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
     const valid = await form.trigger(namesForStep(step) as never);
     if (valid) goToStep(step + 1);
   };
@@ -245,9 +253,15 @@ export function SignupForm({
         <>
           <div className="space-y-2">
             <Label htmlFor="firstName">{t("firstName")}</Label>
+            {/* `defaultValue` is what actually paints the prefilled value.
+                Base UI's Input only takes a value when it is controlled or
+                given defaultValue; RHF's register() supplies neither, so
+                without this the prefill lives in form state but the visitor
+                sees an empty box. Same for the three inputs below. */}
             <Input
               id="firstName"
               autoComplete="given-name"
+              defaultValue={prefill.firstName}
               {...form.register("firstName")}
             />
             {errors.firstName && (
@@ -262,6 +276,7 @@ export function SignupForm({
             <Input
               id="lastName"
               autoComplete="family-name"
+              defaultValue={prefill.lastName}
               {...form.register("lastName")}
             />
             {errors.lastName && (
@@ -277,6 +292,7 @@ export function SignupForm({
               id="email"
               type="email"
               autoComplete="email"
+              defaultValue={prefill.email}
               {...form.register("email")}
             />
             {errors.email && (
@@ -313,6 +329,7 @@ export function SignupForm({
             min={0}
             step="0.01"
             inputMode="decimal"
+            defaultValue={prefill.contributionAmount}
             {...form.register("contributionAmount")}
           />
           <p className="text-xs text-muted-foreground">
@@ -356,11 +373,12 @@ export function SignupForm({
         )}
 
         {isLast ? (
-          <Button type="submit" className="flex-1" disabled={pending}>
+          <Button key="submit" type="submit" className="flex-1" disabled={pending}>
             {pending ? t("submitting") : t("submit")}
           </Button>
         ) : (
           <Button
+            key="next"
             type="button"
             className="flex-1"
             onClick={onNext}
