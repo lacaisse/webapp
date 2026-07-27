@@ -434,8 +434,6 @@
           "title": "Identité",
           "description": "Coordonnées et ménage.",
           "address": "Adresse",
-          "household": "Ménage",
-          "householdValue": "{adults} adultes · {children} enfants",
           "joined": "Inscrit le",
           "left": "Parti le",
           "notes": "Notes"
@@ -446,13 +444,19 @@
           "tier": "Palier",
           "committed": "Contribution convenue",
           "committedDefault": "(cible du palier)",
-          "iban": "IBAN",
           "referralCode": "Code de parrainage",
           "primaryCard": "Carte principale"
         },
         "applicationData": {
           "title": "Données d'adhésion",
-          "description": "Champs personnalisés remplis par le membre."
+          "description": "Champs personnalisés remplis par le membre.",
+          "empty": "Aucune réponse enregistrée pour l'instant.",
+          "edit": "Modifier",
+          "editTitle": "Modifier les données d'adhésion",
+          "editDescription": "Seules les questions encore posées sur le formulaire sont modifiables. Les réponses aux questions archivées sont conservées.",
+          "save": "Enregistrer",
+          "saving": "Enregistrement…",
+          "cancel": "Annuler"
         },
         "cards": {
           "title": "Cartes",
@@ -2285,16 +2289,12 @@
         "firstNameLabel": "Prénom",
         "lastNameLabel": "Nom",
         "emailLabel": "E-mail",
-        "phoneLabel": "Téléphone",
-        "ibanLabel": "IBAN",
         "localeLabel": "Langue des e-mails",
         "localeDefault": "Défaut de la caisse",
         "localeHint": "La langue dans laquelle les e-mails de ce membre sont envoyés.",
         "addressLabel": "Adresse",
         "postalCodeLabel": "Code postal",
         "cityLabel": "Ville",
-        "householdAdultsLabel": "Adultes dans le foyer",
-        "householdChildrenLabel": "Enfants dans le foyer",
         "contributionAmountLabel": "Contribution convenue",
         "contributionAmountHint": "Ce que nous demandons à ce membre de contribuer. Laissez vide pour utiliser la cible du palier ({target}). Minimum : {min}.",
         "contributionAmountHintNoTier": "Ce que nous demandons à ce membre de contribuer. Laissez vide pour utiliser la cible du palier une fois celui-ci attribué.",
@@ -2304,7 +2304,6 @@
         "saving": "Enregistrement…",
         "errors": {
           "tooLong": "Cette valeur est trop longue.",
-          "householdInvalid": "Saisissez un nombre entier supérieur ou égal à 0.",
           "amountInvalid": "Saisissez un montant valide (jusqu'à 2 décimales).",
           "amountBelowMin": "Le montant ne peut pas être inférieur au minimum du palier ({min}).",
           "localeInvalid": "Choisissez une langue prise en charge."
@@ -2312,13 +2311,9 @@
       }
     },
     "builtinFields": {
-      "phone": "Téléphone",
       "address": "Adresse",
       "postalCode": "Code postal",
-      "city": "Ville",
-      "iban": "IBAN",
-      "householdAdults": "Adultes dans le foyer",
-      "householdChildren": "Enfants dans le foyer"
+      "city": "Ville"
     }
   },
   "cards": {

@@ -434,8 +434,6 @@
           "title": "Identity",
           "description": "Contact and household.",
           "address": "Address",
-          "household": "Household",
-          "householdValue": "{adults} adults · {children} children",
           "joined": "Joined",
           "left": "Left",
           "notes": "Notes"
@@ -446,13 +444,19 @@
           "tier": "Tier",
           "committed": "Committed contribution",
           "committedDefault": "(tier target)",
-          "iban": "IBAN",
           "referralCode": "Referral code",
           "primaryCard": "Primary card"
         },
         "applicationData": {
           "title": "Application data",
-          "description": "Custom onboarding fields submitted by the member."
+          "description": "Custom onboarding fields submitted by the member.",
+          "empty": "No answers recorded yet.",
+          "edit": "Edit",
+          "editTitle": "Edit membership details",
+          "editDescription": "Only questions the form still asks can be edited. Answers to archived questions are kept as they are.",
+          "save": "Save",
+          "saving": "Saving…",
+          "cancel": "Cancel"
         },
         "cards": {
           "title": "Cards",
@@ -2285,16 +2289,12 @@
         "firstNameLabel": "First name",
         "lastNameLabel": "Last name",
         "emailLabel": "Email",
-        "phoneLabel": "Phone",
-        "ibanLabel": "IBAN",
         "localeLabel": "Email language",
         "localeDefault": "Fund default",
         "localeHint": "The language this member's emails are sent in.",
         "addressLabel": "Address",
         "postalCodeLabel": "Postal code",
         "cityLabel": "City",
-        "householdAdultsLabel": "Adults in household",
-        "householdChildrenLabel": "Children in household",
         "contributionAmountLabel": "Committed contribution",
         "contributionAmountHint": "What we ask this member to contribute. Leave blank to use the tier target ({target}). Minimum: {min}.",
         "contributionAmountHintNoTier": "What we ask this member to contribute. Leave blank to use the tier target once a tier is assigned.",
@@ -2304,7 +2304,6 @@
         "saving": "Saving…",
         "errors": {
           "tooLong": "This value is too long.",
-          "householdInvalid": "Enter a whole number of 0 or more.",
           "amountInvalid": "Enter a valid amount (up to 2 decimals).",
           "amountBelowMin": "The amount can't be below the tier minimum ({min}).",
           "localeInvalid": "Pick a supported language."
@@ -2312,13 +2311,9 @@
       }
     },
     "builtinFields": {
-      "phone": "Phone number",
       "address": "Address",
       "postalCode": "Postcode",
-      "city": "City",
-      "iban": "IBAN",
-      "householdAdults": "Adults in the household",
-      "householdChildren": "Children in the household"
+      "city": "City"
     }
   },
   "cards": {

@@ -25,6 +25,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { contributionApplies } from "@/services/member/contribution";
+import type { ExtraValue } from "@/services/member/schema";
 import { prisma } from "@/services/db/prisma";
 import { requireCurrentFund } from "@/services/fund/server";
 
@@ -33,6 +34,7 @@ import { AddCardDialog } from "../add-card-dialog";
 import { MemberRowActions } from "../member-row-actions";
 import { StatusChangeDialog } from "../status-change-dialog";
 import { MemberTierPicker } from "../tier-picker";
+import { EditApplicationDataDialog } from "./edit-application-data-dialog";
 import { EditProfileDialog } from "./edit-profile-dialog";
 import { MintDialog } from "./mint-dialog";
 import { ReminderOptOutToggle } from "./reminder-opt-out-toggle";
@@ -105,9 +107,38 @@ async function MemberDetail({
     prisma.onboardingField.findMany({
       where: { fundId: fund.id, target: "MEMBER" },
       orderBy: [{ archivedAt: "asc" }, { position: "asc" }],
-      select: { key: true, label: true },
+      select: {
+        id: true,
+        key: true,
+        label: true,
+        helpText: true,
+        type: true,
+        required: true,
+        config: true,
+        archivedAt: true,
+      },
     }),
   ]);
+
+  // Only questions the fund still asks are editable. Answers to archived ones
+  // stay listed below (and are preserved by the action) but can't be changed —
+  // editing a question that no longer exists on the form would be misleading.
+  const editableFields = onboardingFields
+    .filter((f) => f.archivedAt === null)
+    .map((f) => {
+      const config =
+        (f.config as { options?: { value: string; label: string }[] } | null) ??
+        null;
+      return {
+        id: f.id,
+        key: f.key,
+        type: f.type,
+        label: f.label,
+        helpText: f.helpText,
+        required: f.required,
+        options: config?.options ?? [],
+      };
+    });
 
   // The commitment amount only applies to FIXED_PERIOD funds with tiers.
   const showContribution = contributionApplies(
@@ -137,14 +168,10 @@ async function MemberDetail({
               firstName: member.firstName,
               lastName: member.lastName,
               email: member.email,
-              phone: member.phone,
               locale: member.locale,
               address: member.address,
               postalCode: member.postalCode,
               city: member.city,
-              iban: member.iban,
-              householdAdults: member.householdAdults,
-              householdChildren: member.householdChildren,
               contributionAmount: member.contributionAmount?.toString() ?? null,
               notes: member.notes,
               tierTarget: member.tier?.allocationAmount.toString() ?? null,
@@ -185,7 +212,6 @@ async function MemberDetail({
           {!emailVerified && (
             <Badge variant="warning">{t("unverified")}</Badge>
           )}
-          {member.phone && <span>{member.phone}</span>}
         </div>
       </header>
 
@@ -199,12 +225,6 @@ async function MemberDetail({
             <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
               <DtDd label={t("profile.address")}>
                 {formatAddress(member.address, member.postalCode, member.city)}
-              </DtDd>
-              <DtDd label={t("profile.household")}>
-                {t("profile.householdValue", {
-                  adults: member.householdAdults,
-                  children: member.householdChildren,
-                })}
               </DtDd>
               <DtDd label={t("profile.joined")}>
                 {format.dateTime(member.joinedAt, { dateStyle: "medium" })}
@@ -254,9 +274,6 @@ async function MemberDetail({
                   )}
                 </DtDd>
               )}
-              <DtDd label={t("banking.iban")} mono>
-                {member.iban ?? "—"}
-              </DtDd>
               <DtDd label={t("banking.primaryCard")} mono>
                 {member.primaryCard?.account ??
                   member.primaryCard?.serialNumber ??
@@ -267,25 +284,46 @@ async function MemberDetail({
         </Card>
       </section>
 
-      {appData && Object.keys(appData).length > 0 && (
+      {/* Shown whenever the fund asks custom questions, even with no answers
+          yet, so an admin can fill them in for a member who was imported or
+          added by hand rather than through the public form. */}
+      {((appData && Object.keys(appData).length > 0) ||
+        editableFields.length > 0) && (
         <Card size="sm">
           <CardHeader>
-            <CardTitle>{t("applicationData.title")}</CardTitle>
-            <CardDescription>
-              {t("applicationData.description")}
-            </CardDescription>
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1">
+                <CardTitle>{t("applicationData.title")}</CardTitle>
+                <CardDescription>
+                  {t("applicationData.description")}
+                </CardDescription>
+              </div>
+              {editableFields.length > 0 && (
+                <EditApplicationDataDialog
+                  memberId={member.id}
+                  fields={editableFields}
+                  values={(appData ?? {}) as Record<string, ExtraValue>}
+                />
+              )}
+            </div>
           </CardHeader>
           <CardContent className="pb-3">
-            <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
-              {Object.entries(appData).map(([key, value]) => {
-                const field = onboardingFields.find((f) => f.key === key);
-                return (
-                  <DtDd key={key} label={field?.label ?? key}>
-                    {formatAppValue(value)}
-                  </DtDd>
-                );
-              })}
-            </dl>
+            {appData && Object.keys(appData).length > 0 ? (
+              <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
+                {Object.entries(appData).map(([key, value]) => {
+                  const field = onboardingFields.find((f) => f.key === key);
+                  return (
+                    <DtDd key={key} label={field?.label ?? key}>
+                      {formatAppValue(value)}
+                    </DtDd>
+                  );
+                })}
+              </dl>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {t("applicationData.empty")}
+              </p>
+            )}
           </CardContent>
         </Card>
       )}

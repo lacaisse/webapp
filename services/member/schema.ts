@@ -59,7 +59,6 @@ export const EditMemberProfileSchema = z.object({
     error: "members.signup.errors.lastNameRequired",
   }),
   email: z.string().trim().email({ error: "members.signup.errors.emailInvalid" }),
-  phone: OptionalText,
   // Preferred email language. Empty → null (fall back to the fund default). A
   // non-empty value must be one of SUPPORTED_LOCALES; the select constrains
   // this client-side, the refine guards a tampered request. See
@@ -70,21 +69,13 @@ export const EditMemberProfileSchema = z.object({
     .refine((v) => !v || isSupportedLocale(v), {
       error: "members.admin.edit.errors.localeInvalid",
     }),
+  // Postal address stays a typed column: formatMemberAddress composes it into
+  // the {address} placeholder that card-assigned emails render.
   address: OptionalText,
   postalCode: OptionalText,
   city: OptionalText,
-  iban: OptionalText,
+  // Staff commentary — never asked of the applicant, so not a custom question.
   notes: OptionalText,
-  householdAdults: z.coerce
-    .number({ error: "members.admin.edit.errors.householdInvalid" })
-    .int({ error: "members.admin.edit.errors.householdInvalid" })
-    .min(0, { error: "members.admin.edit.errors.householdInvalid" })
-    .max(50, { error: "members.admin.edit.errors.householdInvalid" }),
-  householdChildren: z.coerce
-    .number({ error: "members.admin.edit.errors.householdInvalid" })
-    .int({ error: "members.admin.edit.errors.householdInvalid" })
-    .min(0, { error: "members.admin.edit.errors.householdInvalid" })
-    .max(50, { error: "members.admin.edit.errors.householdInvalid" }),
   // Committed contribution amount (issue #82). Empty → null (use the tier
   // target). The tier-minimum floor is enforced server-side in the action,
   // where the member's current tier is known. See contribution.ts.

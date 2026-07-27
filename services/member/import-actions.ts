@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { requireFundRole } from "@/services/auth/dal";
 import { normalizeSerial } from "@/services/card/serial";
 import { parseCsv } from "@/services/csv/parse";
+import type { Prisma } from "@/services/db/generated/client";
 import { prisma } from "@/services/db/prisma";
 import { contributionApplies } from "./contribution";
 
@@ -178,22 +179,32 @@ export async function importMembersAction(input: {
       continue;
     }
 
-    // Optional scalar fields — only overwrite when mapped AND non-empty.
+    // Optional typed columns — only overwrite when mapped AND non-empty.
     const optional: Record<string, string> = {};
-    for (const key of ["phone", "address", "postalCode", "city", "notes"] as const) {
+    for (const key of ["address", "postalCode", "city", "notes"] as const) {
       const v = valueFor(key);
       if (v) optional[key] = v;
     }
-    const iban = valueFor("iban") || null;
-    if (iban) optional.iban = iban;
 
-    const household: Record<string, number> = {};
+    // Everything beyond the base identity, the postal address and the
+    // allocation fields is a custom question now, so these columns land in
+    // `applicationData` keyed exactly as the signup form would store them —
+    // strings, including the counts, since form inputs produce strings.
+    // The IBAN still seeds LinkedBankAccount further down; that is the part
+    // bank-sync actually reads.
+    const extras: Record<string, string> = {};
+    for (const key of ["phone", "iban"] as const) {
+      const v = valueFor(key);
+      if (v) extras[key] = v;
+    }
     for (const key of ["householdAdults", "householdChildren"] as const) {
       const raw = valueFor(key);
       if (raw === "") continue;
       const n = Number(raw);
-      if (Number.isInteger(n) && n >= 0) household[key] = n;
+      if (Number.isInteger(n) && n >= 0) extras[key] = String(n);
     }
+
+    const iban = valueFor("iban") || null;
 
     const tierName = valueFor("tier");
     const tierId = tierName ? tierByName.get(tierName.toLowerCase()) : undefined;
@@ -214,26 +225,36 @@ export async function importMembersAction(input: {
     try {
       const existing = await prisma.member.findUnique({
         where: { fundId_email: { fundId: fund.id, email } },
-        select: { id: true },
+        select: { id: true, applicationData: true },
       });
 
       let memberId: string;
       if (existing) {
-        await prisma.member.update({
-          where: { id: existing.id },
-          data: {
-            // Only overwrite names when actually provided — a partial backfill
-            // (e.g. commitment-only) leaves the existing name untouched.
-            ...(firstName ? { firstName } : {}),
-            ...(lastName ? { lastName } : {}),
-            ...optional,
-            ...household,
-            ...(tierId ? { tierId } : {}),
-            ...(locale ? { locale } : {}),
-            ...(status ? { status } : {}),
-            ...(contributionAmount ? { contributionAmount } : {}),
-          },
-        });
+        // Typed explicitly: `tierId` only exists on the *unchecked* input, and
+        // an inline `applicationData` object is enough to make inference pick
+        // the checked branch instead.
+        const data: Prisma.MemberUncheckedUpdateInput = {
+          // Only overwrite names when actually provided — a partial backfill
+          // (e.g. commitment-only) leaves the existing name untouched.
+          ...(firstName ? { firstName } : {}),
+          ...(lastName ? { lastName } : {}),
+          ...optional,
+          ...(tierId ? { tierId } : {}),
+          ...(locale ? { locale } : {}),
+          ...(status ? { status } : {}),
+          ...(contributionAmount ? { contributionAmount } : {}),
+        };
+        // Merge rather than replace: a partial backfill must not wipe answers
+        // to questions this CSV has no column for.
+        if (Object.keys(extras).length > 0) {
+          data.applicationData = {
+            ...((existing.applicationData as Record<string, string> | null) ??
+              {}),
+            ...extras,
+          } satisfies Prisma.InputJsonValue;
+        }
+
+        await prisma.member.update({ where: { id: existing.id }, data });
         memberId = existing.id;
         updated++;
       } else if (updateOnly) {
@@ -247,7 +268,7 @@ export async function importMembersAction(input: {
           firstName,
           lastName,
           optional,
-          household,
+          extras,
           tierId,
           locale,
           status,
@@ -352,7 +373,7 @@ async function createMember(args: {
   firstName: string;
   lastName: string;
   optional: Record<string, string>;
-  household: Record<string, number>;
+  extras: Record<string, string>;
   tierId: string | undefined;
   locale: string | undefined;
   status: MemberStatus | undefined;
@@ -372,7 +393,9 @@ async function createMember(args: {
           paymentReference: generatePaymentReference(),
           emailVerifiedAt: new Date(), // admin vouches for identity
           ...args.optional,
-          ...args.household,
+          ...(Object.keys(args.extras).length > 0
+            ? { applicationData: args.extras }
+            : {}),
           ...(args.tierId ? { tierId: args.tierId } : {}),
           ...(args.locale ? { locale: args.locale } : {}),
           ...(args.contributionAmount

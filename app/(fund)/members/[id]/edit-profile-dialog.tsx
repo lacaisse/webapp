@@ -28,15 +28,11 @@ type Values = {
   firstName: string;
   lastName: string;
   email: string;
-  phone: string;
   // "" means "no explicit preference" (falls back to the fund default locale).
   locale: string;
   address: string;
   postalCode: string;
   city: string;
-  iban: string;
-  householdAdults: string;
-  householdChildren: string;
   contributionAmount: string;
   notes: string;
 };
@@ -51,14 +47,10 @@ export function EditProfileDialog({
     firstName: string;
     lastName: string;
     email: string;
-    phone: string | null;
     locale: string | null;
     address: string | null;
     postalCode: string | null;
     city: string | null;
-    iban: string | null;
-    householdAdults: number;
-    householdChildren: number;
     contributionAmount: string | null;
     notes: string | null;
     // The member's tier target/min, for the committed-amount hint. Null when
@@ -82,14 +74,10 @@ export function EditProfileDialog({
     firstName: member.firstName,
     lastName: member.lastName,
     email: member.email,
-    phone: member.phone ?? "",
     locale: member.locale ?? "",
     address: member.address ?? "",
     postalCode: member.postalCode ?? "",
     city: member.city ?? "",
-    iban: member.iban ?? "",
-    householdAdults: String(member.householdAdults),
-    householdChildren: String(member.householdChildren),
     contributionAmount: member.contributionAmount ?? "",
     notes: member.notes ?? "",
   });
@@ -172,22 +160,6 @@ export function EditProfileDialog({
               autoComplete="email"
             />
           </div>
-          <Field
-            id="edit-phone"
-            label={t("phoneLabel")}
-            type="tel"
-            value={values.phone}
-            onChange={set("phone")}
-            invalid={errorField === "phone"}
-            autoComplete="tel"
-          />
-          <Field
-            id="edit-iban"
-            label={t("ibanLabel")}
-            value={values.iban}
-            onChange={set("iban")}
-            invalid={errorField === "iban"}
-          />
           <div className="space-y-2">
             <Label htmlFor="edit-locale">{t("localeLabel")}</Label>
             <select
@@ -231,24 +203,6 @@ export function EditProfileDialog({
             onChange={set("city")}
             invalid={errorField === "city"}
             autoComplete="address-level2"
-          />
-          <Field
-            id="edit-householdAdults"
-            label={t("householdAdultsLabel")}
-            type="number"
-            min={0}
-            value={values.householdAdults}
-            onChange={set("householdAdults")}
-            invalid={errorField === "householdAdults"}
-          />
-          <Field
-            id="edit-householdChildren"
-            label={t("householdChildrenLabel")}
-            type="number"
-            min={0}
-            value={values.householdChildren}
-            onChange={set("householdChildren")}
-            invalid={errorField === "householdChildren"}
           />
           {showContribution && (
             <div className="sm:col-span-2">

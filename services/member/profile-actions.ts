@@ -14,25 +14,23 @@ export type EditMemberProfileField =
   | "firstName"
   | "lastName"
   | "email"
-  | "phone"
   | "locale"
   | "address"
   | "postalCode"
   | "city"
-  | "iban"
   | "notes"
-  | "householdAdults"
-  | "householdChildren"
   | "contributionAmount";
 
 export type UpdateMemberProfileResult =
   | { ok: true }
   | { error: string; field?: EditMemberProfileField };
 
-// Admin edit of a member's core record (identity, address, household,
-// banking IBAN, notes). Tier and status are handled by their own actions —
-// not touched here. Email is per-fund unique, so a collision surfaces as a
-// field error rather than an unhandled P2002.
+// Admin edit of a member's core record: identity, postal address, preferred
+// language, staff notes and the committed contribution. Everything else a fund
+// collects is a custom question — edited through
+// updateMemberApplicationDataAction, not here. Tier and status have their own
+// actions. Email is per-fund unique, so a collision surfaces as a field error
+// rather than an unhandled P2002.
 export async function updateMemberProfileAction(
   input: unknown,
 ): Promise<UpdateMemberProfileResult> {
@@ -100,15 +98,11 @@ export async function updateMemberProfileAction(
         firstName: parsed.data.firstName,
         lastName: parsed.data.lastName,
         email: parsed.data.email,
-        phone: orNull(parsed.data.phone),
         locale: orNull(parsed.data.locale),
         address: orNull(parsed.data.address),
         postalCode: orNull(parsed.data.postalCode),
         city: orNull(parsed.data.city),
-        iban: orNull(parsed.data.iban),
         notes: orNull(parsed.data.notes),
-        householdAdults: parsed.data.householdAdults,
-        householdChildren: parsed.data.householdChildren,
         contributionAmount,
       },
     });
