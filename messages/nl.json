@@ -434,8 +434,6 @@
           "title": "Identiteit",
           "description": "Contact en huishouden.",
           "address": "Adres",
-          "household": "Huishouden",
-          "householdValue": "{adults} volwassenen · {children} kinderen",
           "joined": "Lid sinds",
           "left": "Vertrokken",
           "notes": "Notities"
@@ -446,13 +444,19 @@
           "tier": "Niveau",
           "committed": "Afgesproken bijdrage",
           "committedDefault": "(streefbedrag van het niveau)",
-          "iban": "IBAN",
           "referralCode": "Verwijzingscode",
           "primaryCard": "Hoofdkaart"
         },
         "applicationData": {
           "title": "Aanvraaggegevens",
-          "description": "Aangepaste onboardingvelden ingediend door het lid."
+          "description": "Aangepaste onboardingvelden ingediend door het lid.",
+          "empty": "Nog geen antwoorden vastgelegd.",
+          "edit": "Bewerken",
+          "editTitle": "Lidmaatschapsgegevens bewerken",
+          "editDescription": "Alleen vragen die het formulier nog stelt zijn bewerkbaar. Antwoorden op gearchiveerde vragen blijven behouden.",
+          "save": "Opslaan",
+          "saving": "Opslaan…",
+          "cancel": "Annuleren"
         },
         "cards": {
           "title": "Kaarten",
@@ -2285,16 +2289,12 @@
         "firstNameLabel": "Voornaam",
         "lastNameLabel": "Achternaam",
         "emailLabel": "E-mail",
-        "phoneLabel": "Telefoon",
-        "ibanLabel": "IBAN",
         "localeLabel": "Taal van de e-mails",
         "localeDefault": "Standaard van het fonds",
         "localeHint": "De taal waarin de e-mails van dit lid worden verzonden.",
         "addressLabel": "Adres",
         "postalCodeLabel": "Postcode",
         "cityLabel": "Stad",
-        "householdAdultsLabel": "Volwassenen in huishouden",
-        "householdChildrenLabel": "Kinderen in huishouden",
         "contributionAmountLabel": "Afgesproken bijdrage",
         "contributionAmountHint": "Wat we dit lid vragen bij te dragen. Laat leeg om het streefbedrag van het niveau te gebruiken ({target}). Minimum: {min}.",
         "contributionAmountHintNoTier": "Wat we dit lid vragen bij te dragen. Laat leeg om het streefbedrag van het niveau te gebruiken zodra er een niveau is toegewezen.",
@@ -2304,7 +2304,6 @@
         "saving": "Opslaan…",
         "errors": {
           "tooLong": "Deze waarde is te lang.",
-          "householdInvalid": "Voer een geheel getal van 0 of meer in.",
           "amountInvalid": "Voer een geldig bedrag in (maximaal 2 decimalen).",
           "amountBelowMin": "Het bedrag kan niet lager zijn dan het minimum van het niveau ({min}).",
           "localeInvalid": "Kies een ondersteunde taal."
@@ -2312,13 +2311,9 @@
       }
     },
     "builtinFields": {
-      "phone": "Telefoon",
       "address": "Adres",
       "postalCode": "Postcode",
-      "city": "Stad",
-      "iban": "IBAN",
-      "householdAdults": "Volwassenen in het huishouden",
-      "householdChildren": "Kinderen in het huishouden"
+      "city": "Stad"
     }
   },
   "cards": {

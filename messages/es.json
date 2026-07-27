@@ -434,8 +434,6 @@
           "title": "Identidad",
           "description": "Contacto y hogar.",
           "address": "Dirección",
-          "household": "Hogar",
-          "householdValue": "{adults} adultos · {children} niños",
           "joined": "Se unió",
           "left": "Se dio de baja",
           "notes": "Notas"
@@ -446,13 +444,19 @@
           "tier": "Nivel",
           "committed": "Aportación acordada",
           "committedDefault": "(objetivo del nivel)",
-          "iban": "IBAN",
           "referralCode": "Código de referido",
           "primaryCard": "Tarjeta principal"
         },
         "applicationData": {
           "title": "Datos de la solicitud",
-          "description": "Campos de incorporación personalizados enviados por el miembro."
+          "description": "Campos de incorporación personalizados enviados por el miembro.",
+          "empty": "Aún no hay respuestas registradas.",
+          "edit": "Editar",
+          "editTitle": "Editar los datos de adhesión",
+          "editDescription": "Solo se pueden editar las preguntas que el formulario sigue haciendo. Las respuestas a preguntas archivadas se conservan.",
+          "save": "Guardar",
+          "saving": "Guardando…",
+          "cancel": "Cancelar"
         },
         "cards": {
           "title": "Tarjetas",
@@ -2285,16 +2289,12 @@
         "firstNameLabel": "Nombre",
         "lastNameLabel": "Apellidos",
         "emailLabel": "Correo electrónico",
-        "phoneLabel": "Teléfono",
-        "ibanLabel": "IBAN",
         "localeLabel": "Idioma de los correos",
         "localeDefault": "Predeterminado del fondo",
         "localeHint": "El idioma en el que se envían los correos de este miembro.",
         "addressLabel": "Dirección",
         "postalCodeLabel": "Código postal",
         "cityLabel": "Ciudad",
-        "householdAdultsLabel": "Adultos en el hogar",
-        "householdChildrenLabel": "Niños en el hogar",
         "contributionAmountLabel": "Aportación acordada",
         "contributionAmountHint": "Lo que pedimos a este miembro que aporte. Déjalo vacío para usar el objetivo del nivel ({target}). Mínimo: {min}.",
         "contributionAmountHintNoTier": "Lo que pedimos a este miembro que aporte. Déjalo vacío para usar el objetivo del nivel cuando se le asigne uno.",
@@ -2304,7 +2304,6 @@
         "saving": "Guardando…",
         "errors": {
           "tooLong": "Este valor es demasiado largo.",
-          "householdInvalid": "Introduce un número entero igual o mayor que 0.",
           "amountInvalid": "Introduce un importe válido (hasta 2 decimales).",
           "amountBelowMin": "El importe no puede ser inferior al mínimo del nivel ({min}).",
           "localeInvalid": "Elige un idioma compatible."
@@ -2312,13 +2311,9 @@
       }
     },
     "builtinFields": {
-      "phone": "Teléfono",
       "address": "Dirección",
       "postalCode": "Código postal",
-      "city": "Ciudad",
-      "iban": "IBAN",
-      "householdAdults": "Adultos en el hogar",
-      "householdChildren": "Niños en el hogar"
+      "city": "Ciudad"
     }
   },
   "cards": {
