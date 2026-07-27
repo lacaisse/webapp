@@ -842,7 +842,11 @@
             "notRemindable": "No se puede enviar recordatorio a este miembro: ya no está en la lista de pendientes de pago.",
             "noEmail": "Este miembro no tiene dirección de correo.",
             "sendFailed": "No se pudo enviar el recordatorio. Vuelve a intentarlo."
-          }
+          },
+          "pausedConfirmTitle": "Los correos a los miembros están en pausa",
+          "pausedConfirmDescription": "Los correos de notificación a los miembros están en pausa para este fondo. Enviar este recordatorio a {name} anulará la pausa. ¿Continuar?",
+          "allPausedConfirmDescription": "Los correos de notificación a los miembros están en pausa para este fondo. Enviar estos recordatorios a {count} miembro(s) anulará la pausa. ¿Continuar?",
+          "pausedConfirmSend": "Enviar de todos modos"
         }
       },
       "schedule": {
@@ -1651,7 +1655,7 @@
         "description": "Correos automáticos enviados a los miembros sobre sus depósitos y asignaciones.",
         "pause": {
           "label": "Suspender los correos de notificación a los miembros",
-          "description": "Durante la pausa, los miembros no reciben ningún correo de notificación: confirmaciones de depósito y asignación, activación, invitaciones y bonos por referidos se omiten todos; no se ponen en cola, así que no se envía nada retroactivamente al reanudar. Los correos de registro (verificación, bienvenida) y de contraseña siguen funcionando. Los correos a comercios y al equipo no se ven afectados."
+          "description": "En pausa, los miembros no reciben ningún correo de notificación: confirmaciones de pago y de asignación, activación, invitación, bono por recomendación, «tarjeta en camino» y recordatorios de cuota se omiten — no se ponen en cola, así que no se envía nada retroactivamente al reanudar. Los correos de registro (verificación, bienvenida) y de contraseña siguen funcionando. Los correos a comercios y al equipo no se ven afectados."
         },
         "sender": {
           "label": "Dirección del remitente",
@@ -1660,63 +1664,116 @@
         }
       },
       "emailTemplates": {
-        "allocationTitle": "Correo de confirmación de asignación",
-        "allocationDescription": "El correo que reciben los miembros cuando una asignación llega a su tarjeta. Déjalo sin cambios para conservar el texto predeterminado, o personalízalo para este fondo.",
-        "cardAssignedTitle": "Correo de tarjeta en camino",
-        "cardAssignedDescription": "El correo que recibe un miembro cuando se le asigna su tarjeta y está en camino. Déjalo sin cambios para conservar el texto predeterminado, o personalízalo para este fondo.",
-        "paymentReminderTitle": "Correo de recordatorio de contribución",
-        "paymentReminderDescription": "El recordatorio mensual que se envía el día 1 a los miembros que aún no han contribuido en el período. Déjalo sin cambios para conservar el texto predeterminado, o personalízalo para este fondo.",
+        "types": {
+          "ALLOCATION_CONFIRMATION": {
+            "title": "Confirmación de asignación",
+            "description": "Correo que recibe el miembro cuando se acredita una asignación en su tarjeta."
+          },
+          "CARD_ASSIGNED": {
+            "title": "Tarjeta en camino",
+            "description": "Correo que recibe el miembro cuando se le asigna y envía su tarjeta."
+          },
+          "PAYMENT_REMINDER_FIRST": {
+            "title": "Recordatorio de cuota (primero)",
+            "description": "Recordatorio automático enviado el día 1 del mes a los miembros que aún no han contribuido en el período."
+          },
+          "PAYMENT_REMINDER_SECOND": {
+            "title": "Recordatorio de cuota (seguimiento)",
+            "description": "Recordatorio manual enviado desde el detalle de un período a los miembros que aún no han pagado."
+          },
+          "MEMBER_WELCOME": {
+            "title": "Bienvenida al miembro",
+            "description": "Correo de bienvenida enviado a un nuevo miembro tras registrarse."
+          },
+          "MEMBER_INVITED": {
+            "title": "Invitación de miembro",
+            "description": "Correo enviado a un miembro que un administrador acaba de añadir al fondo."
+          },
+          "MEMBER_ACTIVATED": {
+            "title": "Cuenta activada",
+            "description": "Correo que recibe el miembro cuando su cuenta se activa y su tarjeta está lista."
+          },
+          "PAYMENT_CONFIRMATION": {
+            "title": "Pago recibido",
+            "description": "Correo que recibe el miembro cuando se recibe y concilia un pago."
+          },
+          "REFERRAL_BONUS_AWARDED": {
+            "title": "Bono por recomendación",
+            "description": "Correo que recibe el padrino cuando se acredita un bono por recomendación en su tarjeta."
+          }
+        },
+        "defaultName": "Plantilla predeterminada",
+        "builtIn": "Integrada",
+        "defaultReadOnly": "La plantilla predeterminada no se puede editar. Duplícala para crear una versión personalizable.",
+        "active": "Activa",
+        "makeActive": "Activar",
+        "newTemplate": "Nueva plantilla",
+        "duplicate": "Duplicar",
+        "rename": "Cambiar nombre",
+        "delete": "Eliminar",
+        "editTemplate": "Editar plantilla",
+        "editTemplateDescription": "Personaliza el asunto y el cuerpo para cada idioma, previsualiza y envía una prueba.",
+        "createTitle": "Nueva plantilla",
+        "createDescription": "Ponle un nombre a la plantilla y elige su punto de partida.",
+        "nameLabel": "Nombre",
+        "namePlaceholder": "p. ej. Tono cercano",
+        "sourceLabel": "Partir de",
+        "sourceDefault": "Plantilla predeterminada",
+        "cancel": "Cancelar",
+        "create": "Crear",
+        "save": "Guardar",
+        "renameTitle": "Cambiar el nombre de la plantilla",
+        "deleteTitle": "¿Eliminar la plantilla?",
+        "deleteDescription": "La plantilla «{name}» se eliminará de forma permanente. Esta acción no se puede deshacer.",
+        "deleteActiveDescription": "«{name}» es la plantilla activa. Si la eliminas, este correo volverá a la plantilla predeterminada. Esta acción no se puede deshacer.",
+        "localeAuthored": "Personalizada para este idioma.",
+        "loadDefault": "Cargar la plantilla predeterminada",
         "subjectLabel": "Asunto",
-        "bodyLabel": "Cuerpo",
-        "variablesHint": "Puedes usar estos marcadores — se reemplazan con los datos de cada miembro al enviar el correo:",
+        "htmlLabel": "Cuerpo (HTML)",
+        "htmlHint": "Escribe el cuerpo en HTML — se integra en el diseño de tu fondo (logotipo, pie de página). Usa las variables de abajo; se sustituyen por cada miembro al enviar.",
+        "variablesHint": "Puedes usar estas variables — se sustituyen por los datos de cada miembro al enviar:",
+        "previewLabel": "Vista previa",
+        "previewSubject": "Asunto:",
         "variables": {
           "firstName": "El nombre del miembro",
           "fundName": "El nombre de este fondo",
           "amount": "El importe asignado",
           "lastName": "El apellido del miembro",
           "cardSerial": "El número de serie de la tarjeta del miembro",
-          "shopList": "Lista con viñetas de los comercios activos del fondo",
+          "shopList": "Lista de los comercios activos del fondo",
           "address": "La dirección postal del miembro",
           "cardLink": "Enlace a la página pública de la tarjeta del miembro",
           "cardNumber": "El número de tarjeta del miembro",
-          "paymentReference": "La referencia que se debe incluir en la transferencia bancaria",
-          "paymentLink": "Enlace a la página de pago pública del miembro"
+          "paymentReference": "La referencia a indicar en la transferencia bancaria",
+          "paymentLink": "Enlace a la página de pago pública del miembro",
+          "occurredAt": "La fecha del pago"
         },
-        "usingDefault": "Usando la plantilla predeterminada.",
-        "usingOverride": "Usando una plantilla personalizada para este fondo.",
-        "reset": "Restablecer predeterminada",
-        "resetConfirmTitle": "¿Restablecer la plantilla predeterminada?",
-        "resetConfirmDescription": "Esto elimina tu texto personalizado y restaura el correo predeterminado. Esta acción no se puede deshacer.",
-        "resetConfirmCancel": "Cancelar",
-        "resetConfirmConfirm": "Restablecer",
         "errors": {
           "subjectRequired": "Introduce un asunto.",
           "subjectTooLong": "El asunto es demasiado largo.",
-          "bodyRequired": "Introduce el cuerpo del mensaje.",
-          "bodyTooLong": "El cuerpo del mensaje es demasiado largo.",
-          "unknownVariable": "Marcador desconocido «{name}». Elimínalo o usa una de las variables indicadas."
+          "bodyRequired": "Introduce un mensaje.",
+          "bodyTooLong": "El mensaje es demasiado largo.",
+          "unknownVariable": "Variable desconocida «{name}». Elimínala o usa una de las variables indicadas.",
+          "nameRequired": "Introduce un nombre.",
+          "nameTooLong": "El nombre es demasiado largo.",
+          "nameTaken": "Ya existe una plantilla con este nombre.",
+          "notFound": "No se encuentra esta plantilla."
         },
-        "htmlLabel": "Cuerpo (HTML)",
-        "htmlHint": "Escribe el cuerpo en HTML — se incluye en el diseño con la marca de tu fondo (logotipo, pie de página). Usa los marcadores de abajo; se reemplazan por cada miembro al enviar el correo.",
-        "previewLabel": "Vista previa",
-        "previewSubject": "Asunto:",
         "test": {
           "title": "Enviar una prueba",
-          "description": "Elige un miembro para rellenar los datos del correo y envía una copia a cualquier dirección — con los datos reales de ese miembro.",
-          "memberLabel": "Usar los datos de este miembro",
+          "description": "Opcionalmente, elige un miembro para rellenar los datos y envía una copia a la dirección que quieras.",
+          "memberLabel": "Datos de prueba",
+          "sampleData": "Datos de ejemplo",
           "emailLabel": "Enviar a",
           "emailPlaceholder": "tu@ejemplo.com",
           "send": "Enviar prueba",
           "sending": "Enviando…",
           "sent": "Correo de prueba enviado.",
-          "noMembers": "Aún no hay miembros activos con un nivel de asignación — añade uno para enviar una prueba.",
           "subjectPrefix": "[Prueba]",
           "errors": {
             "emailInvalid": "Introduce una dirección de correo válida.",
-            "memberNotFound": "No se encontró ese miembro.",
-            "noTier": "Ese miembro no tiene nivel de asignación, así que no hay importe que mostrar.",
-            "noCard": "Ese miembro aún no tiene tarjeta, así que no hay nada a lo que enlazar.",
-            "sendFailed": "No se pudo enviar el correo de prueba. Comprueba la dirección del remitente e inténtalo de nuevo."
+            "memberNotFound": "No se encuentra este miembro.",
+            "sendFailed": "No se pudo enviar el correo de prueba. Comprueba la dirección de remitente e inténtalo de nuevo."
           }
         }
       },

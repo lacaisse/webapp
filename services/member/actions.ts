@@ -240,6 +240,7 @@ export async function signupMemberAction(input: {
     } else {
       await sendMemberWelcome({
         emailId: txResult.emailId,
+        fundId: fund.id,
         toEmail: txResult.member.email,
         fund: fundBranding,
         firstName: txResult.member.firstName,

@@ -233,6 +233,7 @@ async function queueAndSendReferralBonusEmail(args: {
     });
     await sendReferralBonusAwarded({
       emailId: emailRow.id,
+      fundId: args.fundId,
       toEmail: args.sponsorEmail,
       firstName: args.sponsorFirstName,
       fund: args.fundBranding,

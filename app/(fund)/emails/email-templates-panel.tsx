@@ -10,63 +10,29 @@ import {
 } from "@/components/ui/card";
 import { requireCurrentFund } from "@/services/fund/server";
 import { prisma } from "@/services/db/prisma";
-import {
-  sendTestAllocationEmailAction,
-  sendTestCardAssignedEmailAction,
-  sendTestPaymentReminderEmailAction,
-} from "@/services/email/template-actions";
-import { getEmailTemplatesForEditing } from "@/services/email/templates";
-import { EmailTemplateForm } from "./email-template-form";
+import { EDITABLE_EMAIL_TYPES } from "@/services/email/template-config";
+import { getEmailTemplateLibrary } from "@/services/email/templates";
+import { EmailTemplateSection } from "./email-template-section";
 
-// The "Templates" tab of the Emails section: the editable per-fund email
-// templates (allocation confirmation, card-assigned, payment reminder), each
-// authored independently per language with a live preview and a test-send
-// picker. Server component — it loads every editable locale for each template
-// (override or built-in default) plus the members that can seed a test, then
-// hands them to the client editors.
+// The "Templates" tab of the Emails section: for each member-facing email type,
+// the built-in default plus the fund's own library of custom templates, with a
+// picker choosing which one the system sends (falling back to the default). The
+// default is never editable in place — admins duplicate it to customise, so the
+// originals can't be broken. Server component — it loads every type's library
+// (default content + templates + active assignment) plus a member pool to seed
+// test sends, then hands them to the client sections.
 export async function EmailTemplatesPanel() {
-  const t = await getTranslations("fund.settings");
+  const t = await getTranslations("fund.settings.emailTemplates");
   const fund = await requireCurrentFund();
 
-  const [allocation, cardAssigned, paymentReminder] = await Promise.all([
-    getEmailTemplatesForEditing({
-      type: "ALLOCATION_CONFIRMATION",
-      fundId: fund.id,
-    }),
-    getEmailTemplatesForEditing({ type: "CARD_ASSIGNED", fundId: fund.id }),
-    getEmailTemplatesForEditing({
-      type: "PAYMENT_REMINDER_FIRST",
-      fundId: fund.id,
-    }),
-  ]);
-
-  // Test-send picker pools. Allocation needs a tier (supplies {amount});
-  // card-assigned needs a primary card (supplies {cardLink}/{cardNumber});
-  // the payment reminder needs both (a tier for {amount}, a card for {cardLink}).
-  const [allocationMembers, cardMembers, reminderMembers] = await Promise.all([
+  const [libraries, testMembers] = await Promise.all([
+    Promise.all(
+      EDITABLE_EMAIL_TYPES.map((type) =>
+        getEmailTemplateLibrary({ type, fundId: fund.id }),
+      ),
+    ),
     prisma.member.findMany({
-      where: { fundId: fund.id, status: "ACTIVE", tierId: { not: null } },
-      select: { id: true, firstName: true, lastName: true, email: true },
-      orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
-      take: 500,
-    }),
-    prisma.member.findMany({
-      where: {
-        fundId: fund.id,
-        status: "ACTIVE",
-        primaryCardId: { not: null },
-      },
-      select: { id: true, firstName: true, lastName: true, email: true },
-      orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
-      take: 500,
-    }),
-    prisma.member.findMany({
-      where: {
-        fundId: fund.id,
-        status: "ACTIVE",
-        tierId: { not: null },
-        primaryCardId: { not: null },
-      },
+      where: { fundId: fund.id, status: "ACTIVE" },
       select: { id: true, firstName: true, lastName: true, email: true },
       orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
       take: 500,
@@ -75,62 +41,23 @@ export async function EmailTemplatesPanel() {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("emailTemplates.allocationTitle")}</CardTitle>
-          <CardDescription>
-            {t("emailTemplates.allocationDescription")}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="pb-4">
-          <EmailTemplateForm
-            type="ALLOCATION_CONFIRMATION"
-            byLocale={allocation.byLocale}
-            defaultLocale={fund.defaultLocale}
-            variables={allocation.variables}
-            testMembers={allocationMembers}
-            testAction={sendTestAllocationEmailAction}
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("emailTemplates.cardAssignedTitle")}</CardTitle>
-          <CardDescription>
-            {t("emailTemplates.cardAssignedDescription")}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="pb-4">
-          <EmailTemplateForm
-            type="CARD_ASSIGNED"
-            byLocale={cardAssigned.byLocale}
-            defaultLocale={fund.defaultLocale}
-            variables={cardAssigned.variables}
-            testMembers={cardMembers}
-            testAction={sendTestCardAssignedEmailAction}
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("emailTemplates.paymentReminderTitle")}</CardTitle>
-          <CardDescription>
-            {t("emailTemplates.paymentReminderDescription")}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="pb-4">
-          <EmailTemplateForm
-            type="PAYMENT_REMINDER_FIRST"
-            byLocale={paymentReminder.byLocale}
-            defaultLocale={fund.defaultLocale}
-            variables={paymentReminder.variables}
-            testMembers={reminderMembers}
-            testAction={sendTestPaymentReminderEmailAction}
-          />
-        </CardContent>
-      </Card>
+      {libraries.map((library) => (
+        <Card key={library.type}>
+          <CardHeader>
+            <CardTitle>{t(`types.${library.type}.title`)}</CardTitle>
+            <CardDescription>
+              {t(`types.${library.type}.description`)}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pb-4">
+            <EmailTemplateSection
+              library={library}
+              defaultLocale={fund.defaultLocale}
+              testMembers={testMembers}
+            />
+          </CardContent>
+        </Card>
+      ))}
     </div>
   );
 }

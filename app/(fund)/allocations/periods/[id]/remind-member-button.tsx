@@ -37,17 +37,29 @@ export function RemindMemberButton({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Second stage: member emails are paused fund-wide, so the dialog switches to
+  // an explicit "send anyway" confirmation before we override the pause.
+  const [pausedConfirm, setPausedConfirm] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  const send = () => {
+  const send = (overridePause = false) => {
     setError(null);
     startTransition(async () => {
-      const result = await remindUnpaidMemberAction({ periodId, memberId });
+      const result = await remindUnpaidMemberAction({
+        periodId,
+        memberId,
+        overridePause,
+      });
+      if ("pausedConfirmRequired" in result) {
+        setPausedConfirm(true);
+        return;
+      }
       if ("error" in result) {
         setError(result.error);
         return;
       }
       setOpen(false);
+      setPausedConfirm(false);
       router.refresh();
     });
   };
@@ -57,7 +69,10 @@ export function RemindMemberButton({
       open={open}
       onOpenChange={(o) => {
         setOpen(o);
-        if (!o) setError(null);
+        if (!o) {
+          setError(null);
+          setPausedConfirm(false);
+        }
       }}
     >
       <DialogTrigger render={<Button variant="outline" size="sm" />}>
@@ -66,9 +81,13 @@ export function RemindMemberButton({
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{t("confirmTitle")}</DialogTitle>
+          <DialogTitle>
+            {pausedConfirm ? t("pausedConfirmTitle") : t("confirmTitle")}
+          </DialogTitle>
           <DialogDescription>
-            {t("confirmDescription", { name: memberName })}
+            {pausedConfirm
+              ? t("pausedConfirmDescription", { name: memberName })
+              : t("confirmDescription", { name: memberName })}
           </DialogDescription>
         </DialogHeader>
         {error && (
@@ -84,8 +103,12 @@ export function RemindMemberButton({
           >
             {t("cancel")}
           </Button>
-          <Button onClick={send} disabled={pending}>
-            {pending ? t("sending") : t("confirmSend")}
+          <Button onClick={() => send(pausedConfirm)} disabled={pending}>
+            {pending
+              ? t("sending")
+              : pausedConfirm
+                ? t("pausedConfirmSend")
+                : t("confirmSend")}
           </Button>
         </DialogFooter>
       </DialogContent>

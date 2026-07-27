@@ -7,22 +7,12 @@ import { useEffect, useState, useTransition } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   previewEmailTemplateAction,
-  resetEmailTemplateAction,
-  saveEmailTemplateAction,
+  saveTemplateLocalizationAction,
+  sendTestEmailAction,
 } from "@/services/email/template-actions";
 import type { EditableEmailType } from "@/services/email/template-config";
 import {
@@ -37,82 +27,76 @@ export type TestMember = {
   email: string;
 };
 
-export type TestSendAction = (input: {
-  memberId: string;
-  toEmail: string;
-  locale: string;
-}) => Promise<{ ok: true } | { error: string }>;
+type LocaleContent = { subject: string; bodyHtml: string };
 
-type LocaleState = {
-  override: { subject: string; bodyHtml: string } | null;
-  base: { subject: string; bodyHtml: string };
-};
-
-// Editor for a per-fund editable email template (subject + rich-HTML body),
-// authored independently per language. A language tab bar switches which locale
-// is being edited; unsaved edits are kept per-locale so switching never loses
-// work. Each language has a live server-rendered preview in the fund's branded
-// shell and shares one test-send picker (which renders in the active language).
-export function EmailTemplateForm({
+// The per-language editor for one email template — or, when templateId is null,
+// a read-only view of the built-in default (subject/body disabled, no Save). A
+// language tab bar switches which locale is edited; unsaved edits are kept per
+// locale so switching never loses work. Each language has a live server-rendered
+// preview in the fund's branded shell and a test-send picker.
+export function EmailTemplateEditor({
   type,
+  templateId,
   byLocale,
-  defaultLocale,
+  defaultByLocale,
   variables,
+  defaultLocale,
   testMembers,
-  testAction,
 }: {
   type: EditableEmailType;
-  byLocale: Record<string, LocaleState>;
-  // Language shown first — the fund's own default locale.
-  defaultLocale: string;
+  // null = the built-in default (read-only); a string = an editable template.
+  templateId: string | null;
+  // The template's authored content per language (null where a language hasn't
+  // been authored yet — the default is shown for it until saved). Ignored when
+  // templateId is null (the default view uses defaultByLocale directly).
+  byLocale: Record<string, LocaleContent | null>;
+  defaultByLocale: Record<string, LocaleContent>;
   variables: readonly string[];
+  defaultLocale: string;
   testMembers: TestMember[];
-  testAction: TestSendAction;
 }) {
   const t = useTranslations("fund.settings.emailTemplates");
   const tRoot = useTranslations("fund.settings");
   const tLocale = useTranslations("locale");
 
-  const initialLocale = byLocale[defaultLocale]
-    ? defaultLocale
-    : SUPPORTED_LOCALES[0];
-  const [activeLocale, setActiveLocale] = useState(initialLocale);
+  const readOnly = templateId === null;
 
-  // Per-locale drafts (seeded from the saved override, else the built-in
-  // default) so edits survive language switches until saved or reset.
-  const [drafts, setDrafts] = useState<
-    Record<string, { subject: string; bodyHtml: string }>
-  >(() =>
+  const initialLocale = SUPPORTED_LOCALES.includes(defaultLocale as never)
+    ? (defaultLocale as SupportedLocale)
+    : SUPPORTED_LOCALES[0];
+  const [activeLocale, setActiveLocale] = useState<string>(initialLocale);
+
+  // Per-locale drafts: the template's authored content, else the default (the
+  // default is also what read-only mode shows).
+  const [drafts, setDrafts] = useState<Record<string, LocaleContent>>(() =>
     Object.fromEntries(
       SUPPORTED_LOCALES.map((loc) => {
-        const entry = byLocale[loc];
-        const init = entry.override ?? entry.base;
+        const init = (!readOnly && byLocale[loc]) || defaultByLocale[loc];
         return [loc, { subject: init.subject, bodyHtml: init.bodyHtml }];
       }),
-    ),
-  );
-  const [overridden, setOverridden] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(
-      SUPPORTED_LOCALES.map((loc) => [loc, byLocale[loc].override !== null]),
     ),
   );
 
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [pending, startTransition] = useTransition();
-  const [resetting, startReset] = useTransition();
 
   const subject = drafts[activeLocale].subject;
   const bodyHtml = drafts[activeLocale].bodyHtml;
-  const isOverridden = overridden[activeLocale];
 
   const setSubject = (value: string) => {
     setSaved(false);
-    setDrafts((d) => ({ ...d, [activeLocale]: { ...d[activeLocale], subject: value } }));
+    setDrafts((d) => ({
+      ...d,
+      [activeLocale]: { ...d[activeLocale], subject: value },
+    }));
   };
   const setBodyHtml = (value: string) => {
     setSaved(false);
-    setDrafts((d) => ({ ...d, [activeLocale]: { ...d[activeLocale], bodyHtml: value } }));
+    setDrafts((d) => ({
+      ...d,
+      [activeLocale]: { ...d[activeLocale], bodyHtml: value },
+    }));
   };
 
   const onLocaleChange = (loc: string) => {
@@ -121,8 +105,19 @@ export function EmailTemplateForm({
     setActiveLocale(loc);
   };
 
-  // Test send: pick a member (populates the email's data) + the address to
-  // deliver to (editable, defaults to the picked member's own email).
+  // Replace the active language's draft with the built-in default (client-side;
+  // the admin still Saves to persist).
+  const onLoadDefault = () => {
+    setSaved(false);
+    setError(null);
+    const def = defaultByLocale[activeLocale];
+    setDrafts((d) => ({
+      ...d,
+      [activeLocale]: { subject: def.subject, bodyHtml: def.bodyHtml },
+    }));
+  };
+
+  // Test send: optional member (populates the email's data) + destination.
   const [testMemberId, setTestMemberId] = useState(testMembers[0]?.id ?? "");
   const [testEmail, setTestEmail] = useState(testMembers[0]?.email ?? "");
   const [testError, setTestError] = useState<string | null>(null);
@@ -133,8 +128,7 @@ export function EmailTemplateForm({
     setTestSent(false);
     setTestError(null);
     setTestMemberId(id);
-    // Convenience: prefill the destination with the picked member's address.
-    const m = testMembers.find((m) => m.id === id);
+    const m = testMembers.find((mem) => mem.id === id);
     if (m) setTestEmail(m.email);
   };
 
@@ -142,8 +136,10 @@ export function EmailTemplateForm({
     setTestError(null);
     setTestSent(false);
     startTest(async () => {
-      const result = await testAction({
-        memberId: testMemberId,
+      const result = await sendTestEmailAction({
+        type,
+        templateId,
+        memberId: testMemberId || null,
         toEmail: testEmail,
         locale: activeLocale,
       });
@@ -181,10 +177,12 @@ export function EmailTemplateForm({
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (readOnly || templateId === null) return;
     setError(null);
     setSaved(false);
     startTransition(async () => {
-      const result = await saveEmailTemplateAction({
+      const result = await saveTemplateLocalizationAction({
+        templateId,
         type,
         locale: activeLocale,
         subject,
@@ -195,28 +193,6 @@ export function EmailTemplateForm({
         return;
       }
       setSaved(true);
-      setOverridden((o) => ({ ...o, [activeLocale]: true }));
-    });
-  };
-
-  const onReset = () => {
-    setError(null);
-    setSaved(false);
-    startReset(async () => {
-      const result = await resetEmailTemplateAction({
-        type,
-        locale: activeLocale,
-      });
-      if ("error" in result) {
-        setError(result.error);
-        return;
-      }
-      const base = byLocale[activeLocale].base;
-      setDrafts((d) => ({
-        ...d,
-        [activeLocale]: { subject: base.subject, bodyHtml: base.bodyHtml },
-      }));
-      setOverridden((o) => ({ ...o, [activeLocale]: false }));
     });
   };
 
@@ -230,6 +206,7 @@ export function EmailTemplateForm({
       >
         {SUPPORTED_LOCALES.map((loc) => {
           const isActive = loc === activeLocale;
+          const authored = !readOnly && byLocale[loc] !== null;
           return (
             <button
               key={loc}
@@ -245,11 +222,11 @@ export function EmailTemplateForm({
               }
             >
               {tLocale(loc as SupportedLocale)}
-              {overridden[loc] && (
+              {authored && (
                 <span
                   aria-hidden
                   className="ml-1.5 size-1.5 rounded-full bg-primary"
-                  title={t("usingOverride")}
+                  title={t("localeAuthored")}
                 />
               )}
             </button>
@@ -269,6 +246,7 @@ export function EmailTemplateForm({
                 id={`${type}-template-subject`}
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
+                disabled={readOnly}
                 autoComplete="off"
                 spellCheck={false}
               />
@@ -280,15 +258,18 @@ export function EmailTemplateForm({
                 id={`${type}-template-body`}
                 value={bodyHtml}
                 onChange={(e) => setBodyHtml(e.target.value)}
+                disabled={readOnly}
                 rows={14}
                 spellCheck={false}
-                className="w-full rounded-md bg-background px-2.5 py-1.5 font-mono text-xs ring-1 ring-foreground/15 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="w-full rounded-md bg-background px-2.5 py-1.5 font-mono text-xs ring-1 ring-foreground/15 outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-70"
               />
               <p className="text-xs text-muted-foreground">{t("htmlHint")}</p>
             </div>
 
             <div className="space-y-1.5">
-              <p className="text-xs text-muted-foreground">{t("variablesHint")}</p>
+              <p className="text-xs text-muted-foreground">
+                {t("variablesHint")}
+              </p>
               <div className="flex flex-wrap gap-1.5">
                 {variables.map((v) => (
                   <span
@@ -322,7 +303,7 @@ export function EmailTemplateForm({
                 title={t("previewLabel")}
                 sandbox=""
                 srcDoc={previewHtml ?? ""}
-                className="h-[460px] w-full bg-white"
+                className="h-[420px] w-full bg-white"
               />
             </div>
           </div>
@@ -334,56 +315,27 @@ export function EmailTemplateForm({
           </Alert>
         )}
 
-        <div className="flex items-center justify-between gap-3">
-          <div className="text-xs text-muted-foreground">
-            {saved && !pending
-              ? tRoot("saved")
-              : isOverridden
-                ? t("usingOverride")
-                : t("usingDefault")}
+        {!readOnly && (
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-xs text-muted-foreground">
+              {saved && !pending ? tRoot("saved") : null}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onLoadDefault}
+                disabled={pending}
+              >
+                <RotateCcw className="size-3.5" />
+                {t("loadDefault")}
+              </Button>
+              <Button type="submit" disabled={pending}>
+                {pending ? tRoot("saving") : tRoot("save")}
+              </Button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            {isOverridden && (
-              <Dialog>
-                <DialogTrigger
-                  render={
-                    <Button type="button" variant="outline" disabled={resetting} />
-                  }
-                >
-                  <RotateCcw className="size-3.5" />
-                  {t("reset")}
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>{t("resetConfirmTitle")}</DialogTitle>
-                    <DialogDescription>
-                      {t("resetConfirmDescription")}
-                    </DialogDescription>
-                  </DialogHeader>
-                  <DialogFooter>
-                    <DialogClose render={<Button type="button" variant="outline" />}>
-                      {t("resetConfirmCancel")}
-                    </DialogClose>
-                    <DialogClose
-                      render={
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          onClick={onReset}
-                        />
-                      }
-                    >
-                      {t("resetConfirmConfirm")}
-                    </DialogClose>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            )}
-            <Button type="submit" disabled={pending}>
-              {pending ? tRoot("saving") : tRoot("save")}
-            </Button>
-          </div>
-        </div>
+        )}
       </form>
 
       <div className="space-y-3 rounded-md border border-border bg-muted/20 p-4">
@@ -392,67 +344,60 @@ export function EmailTemplateForm({
           <p className="text-xs text-muted-foreground">{t("test.description")}</p>
         </div>
 
-        {testMembers.length === 0 ? (
-          <p className="text-xs text-muted-foreground">{t("test.noMembers")}</p>
-        ) : (
-          <>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor={`${type}-test-member`}>
-                  {t("test.memberLabel")}
-                </Label>
-                <select
-                  id={`${type}-test-member`}
-                  value={testMemberId}
-                  onChange={(e) => onTestMemberChange(e.target.value)}
-                  className="w-full rounded-md bg-background px-2.5 py-1.5 text-sm ring-1 ring-foreground/15 outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  {testMembers.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {`${m.firstName} ${m.lastName}`.trim()} — {m.email}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor={`${type}-test-email`}>{t("test.emailLabel")}</Label>
-                <Input
-                  id={`${type}-test-email`}
-                  type="email"
-                  value={testEmail}
-                  onChange={(e) => {
-                    setTestSent(false);
-                    setTestEmail(e.target.value);
-                  }}
-                  placeholder={t("test.emailPlaceholder")}
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-              </div>
-            </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor={`${type}-test-member`}>{t("test.memberLabel")}</Label>
+            <select
+              id={`${type}-test-member`}
+              value={testMemberId}
+              onChange={(e) => onTestMemberChange(e.target.value)}
+              className="w-full rounded-md bg-background px-2.5 py-1.5 text-sm ring-1 ring-foreground/15 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <option value="">{t("test.sampleData")}</option>
+              {testMembers.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {`${m.firstName} ${m.lastName}`.trim()} — {m.email}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor={`${type}-test-email`}>{t("test.emailLabel")}</Label>
+            <Input
+              id={`${type}-test-email`}
+              type="email"
+              value={testEmail}
+              onChange={(e) => {
+                setTestSent(false);
+                setTestEmail(e.target.value);
+              }}
+              placeholder={t("test.emailPlaceholder")}
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </div>
+        </div>
 
-            {testError && (
-              <Alert variant="destructive">
-                <AlertDescription>{testError}</AlertDescription>
-              </Alert>
-            )}
-
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-xs text-muted-foreground">
-                {testSent && !testing ? t("test.sent") : null}
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onSendTest}
-                disabled={testing || !testMemberId || !testEmail.trim()}
-              >
-                <Send className="size-3.5" />
-                {testing ? t("test.sending") : t("test.send")}
-              </Button>
-            </div>
-          </>
+        {testError && (
+          <Alert variant="destructive">
+            <AlertDescription>{testError}</AlertDescription>
+          </Alert>
         )}
+
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-xs text-muted-foreground">
+            {testSent && !testing ? t("test.sent") : null}
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onSendTest}
+            disabled={testing || !testEmail.trim()}
+          >
+            <Send className="size-3.5" />
+            {testing ? t("test.sending") : t("test.send")}
+          </Button>
+        </div>
       </div>
     </div>
   );

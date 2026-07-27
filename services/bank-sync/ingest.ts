@@ -365,6 +365,7 @@ async function dispatchPaymentConfirmation(args: {
     });
     await sendPaymentConfirmation({
       emailId: emailRow.id,
+      fundId: args.fund.id,
       toEmail: member.email,
       firstName: member.firstName,
       fund: {
