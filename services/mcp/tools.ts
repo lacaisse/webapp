@@ -6,15 +6,23 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 import { getBalances } from "@/services/alchemy/balances";
 import { formatTokenAmount, isZeroAddress } from "@/services/alchemy/format";
-import { listTransfers } from "@/services/alchemy/transfers";
+import {
+  listTransfers,
+  type AlchemyTransfer,
+} from "@/services/alchemy/transfers";
 import { prisma } from "@/services/db/prisma";
+import { resolveAddresses } from "@/services/profile/resolve";
 import { loadFullAccountHistory } from "@/services/token-audit/history";
 import {
   buildBalanceTimeline,
   formatSignedAmount,
   hexToBigInt,
 } from "@/services/token-audit/timeline";
-import { ANNOTATION_KINDS } from "@/services/transaction-annotation/annotate";
+import {
+  ANNOTATION_KINDS,
+  getAnnotations,
+  type TxAnnotation,
+} from "@/services/transaction-annotation/annotate";
 
 import { McpToolError, requireFundAccessForUser } from "./authz";
 
@@ -35,6 +43,18 @@ const ADDRESS = z
   .regex(/^0x[a-fA-F0-9]{40}$/, "must be a 0x wallet address");
 const TX_HASH = z.string().regex(/^0x[a-fA-F0-9]{64}$/);
 
+// One list_transfers call returns at most this many rows — a bound on the
+// response an agent has to read and on how long the request can run. The whole
+// history is still reachable: a capped call says so in `complete`/`hint` and
+// hands back the cursor to continue from.
+const MAX_TRANSFERS_PER_CALL = 1000;
+const DEFAULT_TRANSFERS_PER_CALL = 100;
+// Upstream page size. Alchemy's own per-request cap is 1000.
+const TRANSFER_FETCH_PAGE = 1000;
+// Bulk pulls fan out into IN-lists; keep every query well under Postgres's
+// bind-parameter limit and CP's batch cap.
+const LOOKUP_CHUNK = 500;
+
 type ToolResult = {
   content: Array<{ type: "text"; text: string }>;
   isError?: boolean;
@@ -42,6 +62,19 @@ type ToolResult = {
 
 function ok(data: unknown): ToolResult {
   return { content: [{ type: "text", text: JSON.stringify(data, null, 1) }] };
+}
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size)
+    out.push(items.slice(i, i + size));
+  return out;
+}
+
+// CSV field: quote when the value could break the row, double inner quotes.
+function csvCell(value: string | null | undefined): string {
+  const s = value ?? "";
+  return /[",\n\r]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
 }
 
 function fail(message: string): ToolResult {
@@ -86,6 +119,8 @@ function requireToken(fund: TokenFund) {
 // DB-only address labels (cards, named fund accounts, treasury). Unlike the
 // dashboard tables we skip CitizenPay profile/place lookups here — tool calls
 // should stay fast and CP-outage-proof; unlabelled addresses come back raw.
+// An agent that wants the full picture for a handful of addresses calls
+// `resolve_addresses`, which does hit CP (through the persisted cache).
 async function buildLabels(fund: {
   id: string;
   tokenMinterEoaAddress: string | null;
@@ -125,6 +160,67 @@ async function buildLabels(fund: {
     );
   }
   return labels;
+}
+
+// The dashboard's full-fidelity labelling for a known set of addresses: the DB
+// labels above, plus CitizenPay place / profile names for whatever is left —
+// what the token table shows. One CP round-trip at most, absorbed by
+// AddressProfileCache, and `resolveAddresses` degrades to local-only labels
+// when CP is down.
+async function buildRichLabels(
+  fund: Parameters<typeof buildLabels>[0] & {
+    citizenPayApiKeyId: string | null;
+    citizenPayApiKeyEnc: string | null;
+  },
+  addresses: string[],
+) {
+  // Dedupe before chunking: a full-history pull hands us two addresses per
+  // transfer, and the same wallets recur on nearly every row.
+  const unique = [...new Set(addresses.map((a) => a.toLowerCase()))];
+  const [labels, resolvedChunks] = await Promise.all([
+    buildLabels(fund),
+    Promise.all(
+      chunk(unique, LOOKUP_CHUNK).map((slice) => resolveAddresses(fund, slice)),
+    ),
+  ]);
+  // DB labels win — a local card/account name is more specific than whatever
+  // CP holds for the same address.
+  for (const resolved of resolvedChunks) {
+    for (const place of resolved.places) {
+      if (!labels.has(place.account)) {
+        labels.set(place.account, `place:${place.name}`);
+      }
+    }
+    for (const profile of resolved.profiles) {
+      const name = profile.name?.trim() || profile.username?.trim();
+      if (name && !labels.has(profile.account)) {
+        labels.set(profile.account, `profile:${name}`);
+      }
+    }
+  }
+  return labels;
+}
+
+// getAnnotations in bounded IN-lists, merged. Same contract as the single
+// call: a Map keyed by lowercased tx hash.
+async function annotationsFor(fundId: string, txHashes: string[]) {
+  const unique = [...new Set(txHashes.map((h) => h.toLowerCase()))];
+  const maps = await Promise.all(
+    chunk(unique, LOOKUP_CHUNK).map((slice) => getAnnotations(fundId, slice)),
+  );
+  const merged = new Map<string, TxAnnotation>();
+  for (const map of maps) {
+    for (const [hash, annotation] of map) merged.set(hash, annotation);
+  }
+  return merged;
+}
+
+// The label on its own ("card:Ana Duarte"), or "" when the address is
+// unlabelled. Separate from `label` so CSV can put it in its own column.
+function labelText(labels: Map<string, string>, address: string): string {
+  const lower = address.toLowerCase();
+  if (isZeroAddress(lower)) return "mint/burn";
+  return labels.get(lower) ?? "";
 }
 
 function label(labels: Map<string, string>, address: string): string {
@@ -216,39 +312,150 @@ export function registerTools(server: McpServer, ctx: { userId: string }) {
     "list_transfers",
     {
       description:
-        "Most recent on-chain transfers of the fund's token, newest first, with card/account/treasury labels where known. Pass the returned nextCursor to page further back. Requires ADMIN.",
+        "On-chain transfers of the fund's token, newest first — the same list the dashboard's token page shows, including each transfer's annotation (kind, trigger, acting admin, note) and card / account / treasury / place / profile labels for both sides. Returns at most `limit` transfers (max 1000) per call. To pull the token's entire history, keep calling with the returned `nextCursor` until `complete` is true — `complete: false` always means there is older history left, and the response's `hint` spells out the exact next call. `format: \"csv\"` costs a fraction of the JSON in tokens and is the better choice when walking many pages. Requires ADMIN.",
       inputSchema: {
         fund: FUND_PARAM,
-        cursor: z.string().optional().describe("Opaque cursor from a previous call"),
-        pageSize: z.number().int().min(1).max(100).default(25),
+        cursor: z
+          .string()
+          .optional()
+          .describe(
+            "nextCursor from a previous call. Omit to start at the newest transfer.",
+          ),
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(MAX_TRANSFERS_PER_CALL)
+          .default(DEFAULT_TRANSFERS_PER_CALL)
+          .describe(
+            `Max transfers to return in this call (1-${MAX_TRANSFERS_PER_CALL}). Upstream paging is handled internally to reach it.`,
+          ),
+        format: z
+          .enum(["json", "csv"])
+          .default("json")
+          .describe(
+            'Row encoding. "csv" (columns: when,from,fromLabel,to,toLabel,amount,symbol,txHash,kind,trigger,triggeredBy,note) is much cheaper for a full-history pull.',
+          ),
       },
     },
-    guarded(async ({ fund: fundDomain, cursor, pageSize }) => {
+    guarded(async ({ fund: fundDomain, cursor, limit, format }) => {
       const { fund } = await requireFundAccessForUser(
         ctx.userId,
         fundDomain,
         "ADMIN",
       );
       const token = requireToken(fund);
-      const [page, labels] = await Promise.all([
-        listTransfers({
+
+      // Walk upstream pages until we have `limit` rows or the cursor runs
+      // dry — one tool call is one usable chunk regardless of how the upstream
+      // cursor happens to split it. An empty page is the runaway guard:
+      // upstream handing back a cursor forever without rows must not loop.
+      const transfers: AlchemyTransfer[] = [];
+      let pageKey = cursor ?? null;
+      let complete = false;
+      while (transfers.length < limit) {
+        const page = await listTransfers({
           chainId: token.chainId,
           contractAddress: token.contractAddress,
-          pageSize,
-          pageKey: cursor ?? null,
-        }),
-        buildLabels(fund),
+          pageSize: Math.min(limit - transfers.length, TRANSFER_FETCH_PAGE),
+          pageKey,
+        });
+        transfers.push(...page.transfers);
+        pageKey = page.nextPageKey;
+        if (!pageKey || page.transfers.length === 0) {
+          complete = !pageKey;
+          break;
+        }
+      }
+
+      const [labels, annotations] = await Promise.all([
+        buildRichLabels(
+          fund,
+          transfers.flatMap((tx) => [tx.from, tx.to]),
+        ),
+        annotationsFor(
+          fund.id,
+          transfers.map((tx) => tx.hash),
+        ),
       ]);
-      return ok({
-        transfers: page.transfers.map((tx) => ({
+
+      const rows = transfers.map((tx) => {
+        const annotation = annotations.get(tx.hash.toLowerCase());
+        return {
           when: tx.blockTimestamp,
-          from: label(labels, tx.from),
-          to: label(labels, tx.to),
+          from: tx.from.toLowerCase(),
+          to: tx.to.toLowerCase(),
           amount: formatTokenAmount(tx.rawValue, token.decimals),
-          symbol: token.symbol,
           txHash: tx.hash,
+          // Annotation columns from the dashboard table.
+          kind: annotation?.kind ?? null,
+          trigger: annotation?.trigger ?? null,
+          triggeredBy: annotation?.triggeredByName ?? null,
+          note: annotation?.note ?? null,
+        };
+      });
+
+      const meta = {
+        count: rows.length,
+        // True once the cursor ran dry — nothing older than the last row
+        // exists. False means the call stopped at `limit`.
+        complete,
+        nextCursor: pageKey,
+        symbol: token.symbol,
+        // Spelled out rather than left implicit in `complete`: a capped call
+        // is the normal way to read a long history, and the caller shouldn't
+        // have to infer that more exists or how to ask for it.
+        hint: complete
+          ? undefined
+          : `Older transfers remain. Call list_transfers again with cursor="${pageKey}" (same fund, limit up to ${MAX_TRANSFERS_PER_CALL}) and repeat until complete is true.`,
+      };
+
+      if (format === "csv") {
+        const header =
+          "when,from,fromLabel,to,toLabel,amount,symbol,txHash,kind,trigger,triggeredBy,note";
+        const body = rows.map((r) =>
+          [
+            r.when,
+            r.from,
+            labelText(labels, r.from),
+            r.to,
+            labelText(labels, r.to),
+            r.amount,
+            token.symbol,
+            r.txHash,
+            r.kind,
+            r.trigger,
+            r.triggeredBy,
+            r.note,
+          ]
+            .map(csvCell)
+            .join(","),
+        );
+        // Metadata and rows as separate content blocks — embedding the CSV in
+        // a JSON string would escape every newline and undo the saving.
+        return {
+          content: [
+            { type: "text", text: JSON.stringify(meta) },
+            { type: "text", text: [header, ...body].join("\n") },
+          ],
+        };
+      }
+
+      return ok({
+        ...meta,
+        transfers: rows.map((r) => ({
+          when: r.when,
+          from: label(labels, r.from),
+          to: label(labels, r.to),
+          amount: r.amount,
+          symbol: token.symbol,
+          txHash: r.txHash,
+          // Omitted entirely when the transfer carries no annotation.
+          kind: r.kind ?? undefined,
+          trigger: r.trigger ?? undefined,
+          triggeredBy: r.triggeredBy ?? undefined,
+          note: r.note ?? undefined,
         })),
-        nextCursor: page.nextPageKey,
       });
     }),
   );
@@ -272,7 +479,7 @@ export function registerTools(server: McpServer, ctx: { userId: string }) {
       );
       const token = requireToken(fund);
       const account = address.toLowerCase();
-      const [history, balances, labels] = await Promise.all([
+      const [history, balances] = await Promise.all([
         loadFullAccountHistory({
           chainId: token.chainId,
           contractAddress: token.contractAddress,
@@ -283,7 +490,12 @@ export function registerTools(server: McpServer, ctx: { userId: string }) {
           contractAddress: token.contractAddress,
           addresses: [account],
         }),
-        buildLabels(fund),
+      ]);
+      // Labels wait on the history — the counterparties to resolve are exactly
+      // the addresses it turned up.
+      const labels = await buildRichLabels(fund, [
+        account,
+        ...history.transfers.flatMap((tx) => [tx.from, tx.to]),
       ]);
       const currentBalance = hexToBigInt(balances[0]?.rawBalance);
       const timeline = buildBalanceTimeline({
@@ -318,6 +530,73 @@ export function registerTools(server: McpServer, ctx: { userId: string }) {
           txHash: e.transfer.hash,
         })),
       });
+    }),
+  );
+
+  server.registerTool(
+    "resolve_addresses",
+    {
+      description:
+        "Identify on-chain addresses: each one resolves to a fund card (with holder name), a merchant place, or a CitizenPay profile (name, username, avatar) for external wallets — or `unknown` when nothing matches. Same 3-tier resolution the dashboard uses to label transfers, so feed it the addresses returned by list_transfers or account_audit. Requires ADMIN.",
+      inputSchema: {
+        fund: FUND_PARAM,
+        addresses: z
+          .array(ADDRESS)
+          .min(1)
+          .max(100)
+          .describe("Wallet addresses to look up, in any order"),
+      },
+    },
+    guarded(async ({ fund: fundDomain, addresses }) => {
+      const { fund } = await requireFundAccessForUser(
+        ctx.userId,
+        fundDomain,
+        "ADMIN",
+      );
+      const resolved = await resolveAddresses(fund, addresses);
+
+      const byAccount = new Map<string, Record<string, unknown>>();
+      for (const c of resolved.cards) {
+        byAccount.set(c.account, {
+          kind: "card",
+          name: c.name,
+          cardId: c.cardId,
+          serialNumber: c.serialNumber,
+        });
+      }
+      for (const p of resolved.places) {
+        byAccount.set(p.account, {
+          kind: "place",
+          name: p.name,
+          merchantId: p.merchantId,
+        });
+      }
+      for (const p of resolved.profiles) {
+        byAccount.set(p.account, {
+          kind: "profile",
+          name: p.name || null,
+          username: p.username || null,
+          description: p.description || null,
+          image: p.image,
+          parent: p.parent,
+        });
+      }
+
+      // One entry per requested address, in request order — duplicates and
+      // mixed casing included, so the agent can zip the result back onto
+      // whatever list it started from.
+      return ok(
+        addresses.map((raw) => {
+          const account = raw.toLowerCase();
+          if (isZeroAddress(account)) {
+            return { account, kind: "zero", name: "mint/burn" };
+          }
+          return {
+            account,
+            ...(byAccount.get(account) ?? { kind: "unknown" }),
+          };
+        }),
+      );
     }),
   );
 
