@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import {
   assignPlaceBurns,
   assignPlaceMints,
+  autoMatchRoute,
+  isConfirmableOrderStatus,
   matchPayerTransfer,
   utcDay,
   type MatchTransfer,
@@ -298,5 +300,42 @@ describe("assignPlaceBurns", () => {
       [burn({ date: "2026-07-01T00:05:00Z" })],
     );
     expect(res.unmatched).toEqual([1]);
+  });
+});
+
+describe("isConfirmableOrderStatus", () => {
+  it("accepts the statuses that settle as a real on-chain transfer", () => {
+    expect(isConfirmableOrderStatus("paid")).toBe(true);
+    expect(isConfirmableOrderStatus("refund")).toBe(true);
+    expect(isConfirmableOrderStatus("refunded")).toBe(true);
+  });
+
+  it("rejects anything else — those stay in Issues until reconciled by hand", () => {
+    expect(isConfirmableOrderStatus("correction")).toBe(false);
+    expect(isConfirmableOrderStatus("pending")).toBe(false);
+    expect(isConfirmableOrderStatus("")).toBe(false);
+  });
+});
+
+describe("autoMatchRoute", () => {
+  it("routes a refund to the place's outgoing burn, payer account or not", () => {
+    expect(autoMatchRoute({ status: "refund", account: null })).toBe("place-burn");
+    expect(autoMatchRoute({ status: "refund", account: "0xpayer" })).toBe(
+      "place-burn",
+    );
+  });
+
+  it("routes a refunded order to the place's incoming mint even with a payer", () => {
+    expect(autoMatchRoute({ status: "refunded", account: "0xpayer" })).toBe(
+      "place-mint",
+    );
+  });
+
+  it("routes a terminal (payer-less) paid order to the place's incoming mint", () => {
+    expect(autoMatchRoute({ status: "paid", account: null })).toBe("place-mint");
+  });
+
+  it("routes a paid order with a payer to that payer's own transfer", () => {
+    expect(autoMatchRoute({ status: "paid", account: "0xpayer" })).toBe("payer");
   });
 });

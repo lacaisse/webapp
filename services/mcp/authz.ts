@@ -8,16 +8,45 @@ import { toCanonicalFundDomain } from "@/services/fund/host";
 
 // Fund authorization for MCP tool calls.
 //
-// ⚠️ Deliberate deviation from the DAL: dashboard pages derive the fund from
-// the request HOST (proxy.ts headers) and never accept a fund from the
-// client. MCP requests all arrive on one endpoint with a bearer token, so
-// the fund is a tool PARAMETER instead — which is safe only because the
-// membership check below is the tenant gate: the token's user must hold at
-// least `minRole` in the named fund or the call fails. Every tool goes
-// through here before touching fund data; none may query by a raw fundId
-// from input.
+// The endpoint is mounted on every host, and servers are normally registered
+// at a FUND url (`https://<fund-domain>/api/mcp`) — so proxy.ts has already
+// resolved the fund and forwarded `x-fund-domain`, exactly like a dashboard
+// page. `requireFundForTool` uses that as the default, which is why tools take
+// `fund` as an OPTIONAL argument.
+//
+// It stays overridable (and is required when the server is registered on the
+// apex, which belongs to no fund) — safe only because the membership check
+// below is the real tenant gate: the token's user must hold at least `minRole`
+// in whichever fund is resolved or the call fails. Every tool goes through here
+// before touching fund data; none may query by a raw fundId from input.
 
 export class McpToolError extends Error {}
+
+/** What every tool handler is closed over: the token's user + the host fund. */
+export type ToolContext = {
+  userId: string;
+  /** Fund domain from the request host; null on the apex / auth hosts. */
+  fundDomain: string | null;
+};
+
+/**
+ * Resolve the fund a tool call is about — the explicit `fund` argument when
+ * given, otherwise the fund this MCP server is connected to — and authorize
+ * the token's user against it.
+ */
+export async function requireFundForTool(
+  ctx: ToolContext,
+  fundArg: string | undefined,
+  minRole: FundRole,
+) {
+  const domain = fundArg?.trim() || ctx.fundDomain;
+  if (!domain) {
+    throw new McpToolError(
+      "No fund in scope: this MCP server is connected to the apex host, which belongs to no fund. Pass `fund` (list_funds returns the domains you can use), or reconnect to https://<fund-domain>/api/mcp.",
+    );
+  }
+  return requireFundAccessForUser(ctx.userId, domain, minRole);
+}
 
 export async function requireFundAccessForUser(
   userId: string,

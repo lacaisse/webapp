@@ -24,7 +24,7 @@ import {
   recordOrderHashesAction,
   type PlanPlaceMintsResult,
 } from "@/services/payout/admin-actions";
-import type { AutoMatchStatus } from "@/services/payout/match";
+import { autoMatchRoute, type AutoMatchStatus } from "@/services/payout/match";
 
 // Orders processed per server round-trip. Small batches keep the progress bar
 // moving and bound each request; the action also caches transfers per payer.
@@ -80,23 +80,15 @@ export function BulkIssueActions({
 
   const busy = matching || archiving;
 
-  // Auto-match routes per order type, all recording a real settlement hash
-  // (nothing moves on-chain):
-  //   • `refund` orders           → a burn OUT of the place account (`total`);
-  //   • `refunded` + terminal paid → a mint IN to the place account (`net`);
-  //   • paid with a payer account  → the payer's outgoing payment (`total`).
-  // Refund/refunded settle against the place account regardless of whether they
-  // carry a payer account, so they're routed by status before the account split.
+  // Auto-match records a real settlement hash per order — nothing moves
+  // on-chain. Which matcher resolves an order is `autoMatchRoute`'s call
+  // (services/payout/match.ts), shared with the server-side one-shot runner so
+  // both route identically.
   const onAutoMatch = () => {
     setSummary(null);
-    const isRefund = (o: BulkOrder) => o.status === "refund";
-    // Place-mint side: `refunded` (original order, still an incoming mint) plus
-    // any non-refund order with no payer account (terminal paid).
-    const isMint = (o: BulkOrder) =>
-      !isRefund(o) && (o.status === "refunded" || o.account == null);
-    const burnOrders = orders.filter(isRefund);
-    const mintOrders = orders.filter(isMint);
-    const payerOrders = orders.filter((o) => !isRefund(o) && !isMint(o));
+    const burnOrders = orders.filter((o) => autoMatchRoute(o) === "place-burn");
+    const mintOrders = orders.filter((o) => autoMatchRoute(o) === "place-mint");
+    const payerOrders = orders.filter((o) => autoMatchRoute(o) === "payer");
     const total = orders.length;
     setProgress({ done: 0, total });
     startMatch(async () => {
