@@ -4,12 +4,19 @@ import "server-only";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 
+import { getCurrentFundDomain } from "@/services/fund/server";
+
 import { registerTools } from "./tools";
 
 // One MCP server instance per request (stateless Streamable HTTP): no session
 // ids, plain JSON responses, nothing held in memory between calls — exactly
 // what a serverless deployment wants. Auth happened before we get here
 // (withMcpAuth in app/api/mcp/route.ts); the token's userId scopes every tool.
+//
+// The endpoint is mounted on every host and servers are normally registered at
+// a fund URL (`https://<fund-domain>/api/mcp`), so proxy.ts has already
+// resolved the fund for us — tools take it from here and only need an explicit
+// `fund` argument on the apex. See ./authz.ts.
 
 export async function handleMcpRequest(
   req: Request,
@@ -29,7 +36,10 @@ export async function handleMcpRequest(
   }
 
   const server = new McpServer({ name: "lacaisse", version: "1.0.0" });
-  registerTools(server, { userId: token.userId });
+  registerTools(server, {
+    userId: token.userId,
+    fundDomain: await getCurrentFundDomain(),
+  });
 
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined, // stateless

@@ -24,24 +24,17 @@ import {
   type TxAnnotation,
 } from "@/services/transaction-annotation/annotate";
 
-import { McpToolError, requireFundAccessForUser } from "./authz";
+import { McpToolError, requireFundForTool, type ToolContext } from "./authz";
+import { registerPayoutTools } from "./payout-tools";
+import { ADDRESS, chunk, csvCell, FUND_PARAM, guarded, ok, TX_HASH } from "./tool-kit";
 
-// The v1 dashboard toolset for MCP agents. Every fund-scoped tool takes the
-// fund's domain and authorizes through requireFundAccessForUser — the
-// membership check is the tenant gate (see authz.ts). Role floors mirror the
-// dashboard pages: member listing is OPERATOR+, everything token-related is
-// ADMIN+ (same as /token).
-//
-// Tool results are JSON-as-text — structured enough for an agent to reason
-// over, human-readable enough to paste into a report.
-
-const FUND_PARAM = z
-  .string()
-  .describe('Fund domain, e.g. "paybrussels.lacaisse.eu"');
-const ADDRESS = z
-  .string()
-  .regex(/^0x[a-fA-F0-9]{40}$/, "must be a 0x wallet address");
-const TX_HASH = z.string().regex(/^0x[a-fA-F0-9]{64}$/);
+// The v1 dashboard toolset for MCP agents. Every fund-scoped tool resolves its
+// fund through requireFundForTool — the fund this server is connected to
+// (proxy.ts, since servers are registered at a fund URL) unless the call names
+// another one — and the membership check there is the tenant gate (see
+// authz.ts). Role floors mirror the dashboard pages: member listing is
+// OPERATOR+, everything token-related is ADMIN+ (same as /token), and the
+// payout tools (./payout-tools.ts) match the /payments pages.
 
 // One list_transfers call returns at most this many rows — a bound on the
 // response an agent has to read and on how long the request can run. The whole
@@ -54,48 +47,6 @@ const TRANSFER_FETCH_PAGE = 1000;
 // Bulk pulls fan out into IN-lists; keep every query well under Postgres's
 // bind-parameter limit and CP's batch cap.
 const LOOKUP_CHUNK = 500;
-
-type ToolResult = {
-  content: Array<{ type: "text"; text: string }>;
-  isError?: boolean;
-};
-
-function ok(data: unknown): ToolResult {
-  return { content: [{ type: "text", text: JSON.stringify(data, null, 1) }] };
-}
-
-function chunk<T>(items: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < items.length; i += size)
-    out.push(items.slice(i, i + size));
-  return out;
-}
-
-// CSV field: quote when the value could break the row, double inner quotes.
-function csvCell(value: string | null | undefined): string {
-  const s = value ?? "";
-  return /[",\n\r]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
-}
-
-function fail(message: string): ToolResult {
-  return { content: [{ type: "text", text: message }], isError: true };
-}
-
-// Wrap a tool handler so authz failures become tool errors (visible to the
-// agent) instead of protocol-level 500s.
-function guarded<A extends unknown[]>(
-  fn: (...args: A) => Promise<ToolResult>,
-): (...args: A) => Promise<ToolResult> {
-  return async (...args) => {
-    try {
-      return await fn(...args);
-    } catch (e) {
-      if (e instanceof McpToolError) return fail(e.message);
-      console.error("[mcp] tool failed", e);
-      return fail("Internal error while running the tool.");
-    }
-  };
-}
 
 type TokenFund = {
   tokenAddress: string | null;
@@ -230,12 +181,14 @@ function label(labels: Map<string, string>, address: string): string {
   return hit ? `${lower} (${hit})` : lower;
 }
 
-export function registerTools(server: McpServer, ctx: { userId: string }) {
+export function registerTools(server: McpServer, ctx: ToolContext) {
+  registerPayoutTools(server, ctx);
+
   server.registerTool(
     "list_funds",
     {
       description:
-        "List the funds (caisses) the authorized user belongs to, with their role in each. Use the returned domain as the `fund` argument of every other tool.",
+        "List the funds (caisses) the authorized user belongs to, with their role in each, and which one this MCP server is connected to. Tools default to the connected fund; pass another fund's `domain` as their `fund` argument to reach it instead.",
       inputSchema: {},
     },
     guarded(async () => {
@@ -252,15 +205,19 @@ export function registerTools(server: McpServer, ctx: { userId: string }) {
           },
         },
       });
-      return ok(
-        memberships.map((m) => ({
+      return ok({
+        // Null when the server is connected to the apex — every tool then
+        // needs an explicit `fund`.
+        connectedFund: ctx.fundDomain,
+        funds: memberships.map((m) => ({
           domain: m.fund.domain,
           name: m.fund.name,
           role: m.role,
           tokenSymbol: m.fund.tokenSymbol,
           hasToken: Boolean(m.fund.tokenAddress),
+          connected: m.fund.domain === ctx.fundDomain,
         })),
-      );
+      });
     }),
   );
 
@@ -276,11 +233,7 @@ export function registerTools(server: McpServer, ctx: { userId: string }) {
       },
     },
     guarded(async ({ fund: fundDomain, query, limit }) => {
-      const { fund } = await requireFundAccessForUser(
-        ctx.userId,
-        fundDomain,
-        "OPERATOR",
-      );
+      const { fund } = await requireFundForTool(ctx, fundDomain, "OPERATOR");
       const members = await prisma.member.findMany({
         where: {
           fundId: fund.id,
@@ -339,11 +292,7 @@ export function registerTools(server: McpServer, ctx: { userId: string }) {
       },
     },
     guarded(async ({ fund: fundDomain, cursor, limit, format }) => {
-      const { fund } = await requireFundAccessForUser(
-        ctx.userId,
-        fundDomain,
-        "ADMIN",
-      );
+      const { fund } = await requireFundForTool(ctx, fundDomain, "ADMIN");
       const token = requireToken(fund);
 
       // Walk upstream pages until we have `limit` rows or the cursor runs
@@ -472,11 +421,7 @@ export function registerTools(server: McpServer, ctx: { userId: string }) {
       },
     },
     guarded(async ({ fund: fundDomain, address, recentCount }) => {
-      const { fund } = await requireFundAccessForUser(
-        ctx.userId,
-        fundDomain,
-        "ADMIN",
-      );
+      const { fund } = await requireFundForTool(ctx, fundDomain, "ADMIN");
       const token = requireToken(fund);
       const account = address.toLowerCase();
       const [history, balances] = await Promise.all([
@@ -548,11 +493,7 @@ export function registerTools(server: McpServer, ctx: { userId: string }) {
       },
     },
     guarded(async ({ fund: fundDomain, addresses }) => {
-      const { fund } = await requireFundAccessForUser(
-        ctx.userId,
-        fundDomain,
-        "ADMIN",
-      );
+      const { fund } = await requireFundForTool(ctx, fundDomain, "ADMIN");
       const resolved = await resolveAddresses(fund, addresses);
 
       const byAccount = new Map<string, Record<string, unknown>>();
@@ -612,11 +553,7 @@ export function registerTools(server: McpServer, ctx: { userId: string }) {
       },
     },
     guarded(async ({ fund: fundDomain, txHash, note }) => {
-      const { fund } = await requireFundAccessForUser(
-        ctx.userId,
-        fundDomain,
-        "ADMIN",
-      );
+      const { fund } = await requireFundForTool(ctx, fundDomain, "ADMIN");
       // Same upsert contract as annotateTransactionAction (the dashboard
       // path): keep any system `kind`, only touch the note; blank clears.
       const hash = txHash.toLowerCase();

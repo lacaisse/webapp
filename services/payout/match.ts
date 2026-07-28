@@ -32,6 +32,35 @@ export type ArchiveOrdersItemResult = {
   error?: string;
 };
 
+// Order statuses whose settlement is a real on-chain tx we can verify against a
+// receipt and auto-match: `paid` (payment or mint), `refunded` (the original
+// order — still an incoming mint), `refund` (a burn from the place). Anything
+// else has no hash to check and stays in Issues until reconciled by hand.
+const CONFIRMABLE_STATUSES = new Set(["paid", "refund", "refunded"]);
+
+export function isConfirmableOrderStatus(status: string): boolean {
+  return CONFIRMABLE_STATUSES.has(status);
+}
+
+// Which on-chain side an order settles against, and therefore which matcher
+// resolves it:
+//   • `refund`                    → a burn OUT of the place account (`total`);
+//   • `refunded` / no payer account → a mint IN to the place account (`net`);
+//   • paid with a payer account   → the payer's own outgoing payment (`total`).
+// Refund/refunded settle against the place regardless of whether they carry a
+// payer account, so status is checked before the account split. Shared by the
+// dashboard's bulk Auto-match and the MCP fix tool so both route identically.
+export type AutoMatchRoute = "place-burn" | "place-mint" | "payer";
+
+export function autoMatchRoute(order: {
+  status: string;
+  account: string | null;
+}): AutoMatchRoute {
+  if (order.status === "refund") return "place-burn";
+  if (order.status === "refunded" || order.account == null) return "place-mint";
+  return "payer";
+}
+
 // A payer's on-chain transfer, normalised to the fields matching needs.
 export type MatchTransfer = {
   hash: string;

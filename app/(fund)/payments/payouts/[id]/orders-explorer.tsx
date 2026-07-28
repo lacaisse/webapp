@@ -18,18 +18,13 @@ import {
 } from "@/components/ui/table";
 import type { PayoutOrder } from "@/services/citizenpay/types";
 import { checkPayoutReceiptsAction } from "@/services/payout/admin-actions";
+import { isConfirmableOrderStatus } from "@/services/payout/match";
 import { cn } from "@/lib/utils";
 
 import { BulkIssueActions } from "./bulk-issue-actions";
 import { OrderReconcileActions } from "./order-reconcile-actions";
 
 type OrderStatus = "checking" | "confirmed" | "unconfirmed";
-
-// Order statuses whose settlement is a real on-chain tx we can verify/auto-match:
-// `paid` (payment or mint), `refunded` (original order, still an incoming mint),
-// `refund` (a burn from the place). Other statuses have no hash to check and stay
-// in Issues until reconciled by hand.
-const CONFIRMABLE_STATUSES = new Set(["paid", "refund", "refunded"]);
 
 // CP order status → badge variant. `paid` is the happy path; refunds get a
 // warning tint, anything else stays neutral.
@@ -72,7 +67,7 @@ export function OrdersExplorer({
       settled
         ? []
         : orders.filter(
-            (o) => CONFIRMABLE_STATUSES.has(o.status) && !!o.txHash,
+            (o) => isConfirmableOrderStatus(o.status) && !!o.txHash,
           ),
     [orders, settled],
   );
@@ -108,7 +103,7 @@ export function OrdersExplorer({
     for (const o of orders) {
       initial[o.id] = settled
         ? "confirmed"
-        : CONFIRMABLE_STATUSES.has(o.status) && o.txHash
+        : isConfirmableOrderStatus(o.status) && o.txHash
           ? "checking"
           : "unconfirmed";
     }
