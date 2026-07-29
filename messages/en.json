@@ -795,6 +795,9 @@
           "confirm": "Remove",
           "removing": "Removing…"
         },
+        "movePeriod": {
+          "placeholder": "Move to period…"
+        },
         "attachAllocation": {
           "button": "Attach allocation",
           "title": "Attach an existing allocation",

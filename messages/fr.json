@@ -780,6 +780,9 @@
           "confirm": "Retirer",
           "removing": "Retrait…"
         },
+        "movePeriod": {
+          "placeholder": "Déplacer vers une période…"
+        },
         "attachAllocation": {
           "button": "Associer une allocation",
           "title": "Associer une allocation existante",
