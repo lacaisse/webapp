@@ -25,6 +25,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { AttributeDialog } from "@/app/(fund)/allocations/bank-transaction-actions";
+import { fetchFundPeriods } from "@/app/(fund)/bank/data";
 import { findAllocationPlans } from "@/services/allocation-periods/run";
 import { Prisma } from "@/services/db/generated/client";
 import { prisma } from "@/services/db/prisma";
@@ -33,6 +34,7 @@ import { requireCurrentFund } from "@/services/fund/server";
 
 import { AllocateMemberButton } from "./allocate-member-button";
 import { AttachAllocationDialog } from "./attach-allocation-dialog";
+import { MoveDepositPeriodPicker } from "./move-deposit-period-picker";
 import { NotifyAllButton } from "./notify-all-button";
 import { NotifyAllocationButton } from "./notify-allocation-button";
 import { RemindMemberButton } from "./remind-member-button";
@@ -116,6 +118,11 @@ async function AllocationPeriodDetail({
   });
 
   if (!period) notFound();
+
+  // Every period in the fund (incl. closed ones) — offered on the Deposits
+  // tab so an admin can move an unallocated deposit to another period, then
+  // allocate it there manually (see MoveDepositPeriodPicker).
+  const periods = await fetchFundPeriods(fund.id);
 
   const depositsTotal = period.bankTransactions.reduce(
     (acc, b) => acc + Number(b.amount),
@@ -485,6 +492,11 @@ async function AllocationPeriodDetail({
                                 depositAmount={`${b.amount.toString()} ${b.currency}`}
                               />
                             )}
+                            <MoveDepositPeriodPicker
+                              bankTransactionId={b.id}
+                              currentPeriodId={period.id}
+                              periods={periods}
+                            />
                             <RemoveDepositButton
                               bankTransactionId={b.id}
                               label={

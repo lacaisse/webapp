@@ -780,6 +780,9 @@
           "confirm": "Quitar",
           "removing": "Quitando…"
         },
+        "movePeriod": {
+          "placeholder": "Mover a otro período…"
+        },
         "attachAllocation": {
           "button": "Vincular una asignación",
           "title": "Vincular una asignación existente",

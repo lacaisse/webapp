@@ -780,6 +780,9 @@
           "confirm": "Verwijderen",
           "removing": "Verwijderen…"
         },
+        "movePeriod": {
+          "placeholder": "Verplaatsen naar periode…"
+        },
         "attachAllocation": {
           "button": "Allocatie koppelen",
           "title": "Een bestaande allocatie koppelen",
