@@ -169,6 +169,8 @@ const CARD_ASSIGNED_DEFAULTS: Record<
     <a href="{cardLink}" style="background-color: hsl(25, 95%, 53%); color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">Voir ma carte {fundName}</a>
   </div>
   <p style="color: #6b7280; font-size: 14px;">Numéro de carte : {cardNumber}</p>
+  <p style="color: #6b7280; font-size: 14px;">Référence de paiement : {paymentReference}</p>
+  <p style="color: #6b7280; font-size: 14px;">IBAN : {iban}</p>
   <p>À bientôt,<br>L'équipe {fundName}</p>
 </div>`,
   },
@@ -186,6 +188,8 @@ const CARD_ASSIGNED_DEFAULTS: Record<
     <a href="{cardLink}" style="background-color: hsl(25, 95%, 53%); color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">View my {fundName} card</a>
   </div>
   <p style="color: #6b7280; font-size: 14px;">Card number: {cardNumber}</p>
+  <p style="color: #6b7280; font-size: 14px;">Payment reference: {paymentReference}</p>
+  <p style="color: #6b7280; font-size: 14px;">IBAN: {iban}</p>
   <p>See you soon,<br>The {fundName} team</p>
 </div>`,
   },
