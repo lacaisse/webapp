@@ -130,3 +130,66 @@ export async function bulkUpdateMembersAction(input: {
   revalidatePath("/members");
   return { ok: true, updated, skipped };
 }
+
+// =============================================================================
+// Bulk delete
+// =============================================================================
+// Same eligibility rule as the single-member delete action (issue #109 /
+// #35): a member can only be permanently removed if they have no attached
+// card and no financial history. Ineligible members in the selection are
+// skipped and reported back, not silently dropped or forced.
+
+export type BulkDeleteMembersResult =
+  | { ok: true; deleted: number; skipped: number }
+  | { error: string };
+
+export async function bulkDeleteMembersAction(input: {
+  memberIds: string[];
+}): Promise<BulkDeleteMembersResult> {
+  const t = await getTranslations();
+  const { fund } = await requireFundRole("OPERATOR");
+
+  const memberIds = Array.from(new Set(input.memberIds ?? [])).filter(
+    (id): id is string => typeof id === "string" && id.length > 0,
+  );
+  if (memberIds.length === 0) {
+    return { error: t("members.admin.bulk.errors.noSelection" as never) };
+  }
+  if (memberIds.length > MAX_BULK) {
+    return { error: t("members.admin.bulk.errors.tooMany" as never) };
+  }
+
+  const members = await prisma.member.findMany({
+    where: { id: { in: memberIds }, fundId: fund.id },
+    select: {
+      id: true,
+      _count: {
+        select: { cards: true, bankTransactions: true, tokenOperations: true },
+      },
+    },
+  });
+  if (members.length === 0) {
+    return { error: t("members.admin.errors.notFound" as never) };
+  }
+
+  const eligibleIds = members
+    .filter(
+      (m) =>
+        m._count.cards === 0 &&
+        m._count.bankTransactions === 0 &&
+        m._count.tokenOperations === 0,
+    )
+    .map((m) => m.id);
+  const skipped = members.length - eligibleIds.length;
+
+  let deleted = 0;
+  if (eligibleIds.length > 0) {
+    const res = await prisma.member.deleteMany({
+      where: { id: { in: eligibleIds }, fundId: fund.id },
+    });
+    deleted = res.count;
+  }
+
+  revalidatePath("/members");
+  return { ok: true, deleted, skipped };
+}

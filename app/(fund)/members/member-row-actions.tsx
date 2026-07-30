@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 "use client";
 
+import { Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState, useTransition } from "react";
 
@@ -17,7 +18,10 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { activateMemberAction } from "@/services/member/admin-actions";
+import {
+  activateMemberAction,
+  deleteMemberAction,
+} from "@/services/member/admin-actions";
 
 import { UnattachedCardPicker } from "./unattached-card-picker";
 
@@ -170,6 +174,75 @@ export function MemberRowActions({
           </Button>
           <Button onClick={onActivate} disabled={pending}>
             {pending ? labels.pending : labels.confirm}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Permanent removal — gated server-side to members with no attached card and
+// no financial history (issue #109). The row doesn't pre-check either
+// condition; the confirm step just surfaces whichever error the server
+// returns, same as the merchant delete flow.
+export function DeleteMemberButton({
+  memberId,
+  memberName,
+}: {
+  memberId: string;
+  memberName: string;
+}) {
+  const t = useTranslations("members.admin.delete");
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function onConfirm() {
+    setError(null);
+    startTransition(async () => {
+      const result = await deleteMemberAction({ memberId });
+      if ("error" in result) {
+        setError(result.error);
+        return;
+      }
+      setOpen(false);
+    });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !pending && setOpen(o)}>
+      <DialogTrigger
+        render={
+          <Button variant="outline" size="sm" aria-label={t("trigger")}>
+            <Trash2 className="size-4" />
+          </Button>
+        }
+      />
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t("title", { memberName })}</DialogTitle>
+          <DialogDescription>
+            {t("description", { memberName })}
+          </DialogDescription>
+        </DialogHeader>
+        <Alert variant="destructive">
+          <AlertDescription>{t("irreversibleWarning")}</AlertDescription>
+        </Alert>
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => setOpen(false)}
+            disabled={pending}
+          >
+            {t("cancel")}
+          </Button>
+          <Button variant="destructive" onClick={onConfirm} disabled={pending}>
+            {pending ? t("deleting") : t("confirm")}
           </Button>
         </DialogFooter>
       </DialogContent>

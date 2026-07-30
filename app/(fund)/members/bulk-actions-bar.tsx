@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import type { MemberStatus } from "@/services/db/generated/enums";
 import { SUPPORTED_LOCALES, type SupportedLocale } from "@/services/i18n/config";
 import {
+  bulkDeleteMembersAction,
   bulkUpdateMembersAction,
   type BulkMemberUpdate,
 } from "@/services/member/bulk-actions";
@@ -38,7 +39,8 @@ const SELECT_CLASS =
 export function BulkActionsBar({ tiers }: { tiers: Tier[] }) {
   const t = useTranslations("members.admin.bulk");
   const { selected, clear } = useMemberSelection();
-  const [open, setOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const count = selected.size;
 
   if (count === 0) return null;
@@ -50,18 +52,140 @@ export function BulkActionsBar({ tiers }: { tiers: Tier[] }) {
         <Button variant="ghost" size="sm" onClick={clear}>
           {t("clearSelection")}
         </Button>
-        <Button size="sm" onClick={() => setOpen(true)}>
+        <Button variant="outline" size="sm" onClick={() => setDeleteOpen(true)}>
+          {t("delete.trigger")}
+        </Button>
+        <Button size="sm" onClick={() => setEditOpen(true)}>
           {t("edit")}
         </Button>
       </div>
       <BulkEditDialog
-        open={open}
-        onOpenChange={setOpen}
+        open={editOpen}
+        onOpenChange={setEditOpen}
         memberIds={[...selected]}
         tiers={tiers}
         onApplied={clear}
       />
+      <BulkDeleteDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        memberIds={[...selected]}
+        onApplied={clear}
+      />
     </div>
+  );
+}
+
+// Bulk-delete counterpart to the merchant/single-member delete flow (issue
+// #35). Same eligibility rule as deleteMemberAction — no card, no financial
+// history — enforced server-side; ineligible members in the selection are
+// skipped and reported back rather than silently dropped.
+function BulkDeleteDialog({
+  open,
+  onOpenChange,
+  memberIds,
+  onApplied,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  memberIds: string[];
+  onApplied: () => void;
+}) {
+  const t = useTranslations("members.admin.bulk.delete");
+  const router = useRouter();
+
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{
+    deleted: number;
+    skipped: number;
+  } | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const finish = () => {
+    onOpenChange(false);
+    onApplied();
+    router.refresh();
+  };
+
+  const onConfirm = () => {
+    setError(null);
+    startTransition(async () => {
+      const res = await bulkDeleteMembersAction({ memberIds });
+      if ("error" in res) {
+        setError(res.error);
+        return;
+      }
+      if (res.skipped > 0) {
+        setResult(res);
+        return;
+      }
+      finish();
+    });
+  };
+
+  const handleOpenChange = (next: boolean) => {
+    if (next) {
+      setError(null);
+      setResult(null);
+    }
+    onOpenChange(next);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t("title")}</DialogTitle>
+          <DialogDescription>
+            {t("description", { count: memberIds.length })}
+          </DialogDescription>
+        </DialogHeader>
+
+        {result ? (
+          <Alert variant={result.skipped > 0 ? "warning" : "default"}>
+            <AlertDescription>
+              {t("resultSkipped", {
+                deleted: result.deleted,
+                skipped: result.skipped,
+              })}
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <Alert variant="destructive">
+            <AlertDescription>{t("irreversibleWarning")}</AlertDescription>
+          </Alert>
+        )}
+
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        <DialogFooter>
+          {result ? (
+            <Button onClick={finish}>{t("done")}</Button>
+          ) : (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                disabled={pending}
+              >
+                {t("cancel")}
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={onConfirm}
+                disabled={pending}
+              >
+                {pending ? t("deleting") : t("confirm")}
+              </Button>
+            </>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

@@ -2179,6 +2179,19 @@
         "tierNotFound": "Niveau niet gevonden of gearchiveerd.",
         "invalidStatusTransition": "Deze statuswijziging is niet toegestaan vanuit de huidige status."
       },
+      "delete": {
+        "trigger": "Verwijderen",
+        "title": "{memberName} definitief verwijderen?",
+        "description": "Het profiel van {memberName} wordt uit deze caisse verwijderd. Alleen toegestaan als het lid geen gekoppelde kaart en geen financiële geschiedenis heeft.",
+        "irreversibleWarning": "Deze actie is onomkeerbaar.",
+        "cancel": "Annuleren",
+        "confirm": "Definitief verwijderen",
+        "deleting": "Verwijderen…",
+        "errors": {
+          "hasCard": "Ontkoppel eerst de kaart(en) van dit lid voordat je het verwijdert.",
+          "hasHistory": "Dit lid heeft banktransacties of tokenbewerkingen — verwijderen zou die geschiedenis wissen."
+        }
+      },
       "status": {
         "button": "Status",
         "title": "Lidstatus wijzigen",
@@ -2224,6 +2237,17 @@
           "noSelection": "Selecteer eerst minstens één lid.",
           "tooMany": "Te veel leden tegelijk geselecteerd.",
           "invalidValue": "Die waarde is niet geldig."
+        },
+        "delete": {
+          "trigger": "Selectie verwijderen",
+          "title": "Geselecteerde leden verwijderen?",
+          "description": "Probeert de {count} geselecteerde le(d)en definitief te verwijderen. Alleen leden zonder gekoppelde kaart en zonder financiële geschiedenis kunnen worden verwijderd.",
+          "irreversibleWarning": "Deze actie is onomkeerbaar.",
+          "resultSkipped": "{deleted} verwijderd, {skipped} overgeslagen (heeft een kaart of financiële geschiedenis).",
+          "done": "Klaar",
+          "cancel": "Annuleren",
+          "confirm": "Verwijderen",
+          "deleting": "Verwijderen…"
         }
       },
       "import": {

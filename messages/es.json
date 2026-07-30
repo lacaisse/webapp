@@ -2179,6 +2179,19 @@
         "tierNotFound": "Nivel no encontrado o archivado.",
         "invalidStatusTransition": "Ese cambio de estado no está permitido desde el estado actual."
       },
+      "delete": {
+        "trigger": "Eliminar",
+        "title": "¿Eliminar definitivamente a {memberName}?",
+        "description": "La ficha de {memberName} se eliminará de esta caja. Solo se permite si el miembro no tiene ninguna tarjeta asignada ni historial financiero.",
+        "irreversibleWarning": "Esta acción es irreversible.",
+        "cancel": "Cancelar",
+        "confirm": "Eliminar definitivamente",
+        "deleting": "Eliminando…",
+        "errors": {
+          "hasCard": "Desvincula primero la(s) tarjeta(s) de este miembro antes de eliminarlo.",
+          "hasHistory": "Este miembro tiene transacciones bancarias u operaciones de token — eliminarlo borraría ese historial."
+        }
+      },
       "status": {
         "button": "Estado",
         "title": "Cambiar el estado del miembro",
@@ -2224,6 +2237,17 @@
           "noSelection": "Selecciona primero al menos un miembro.",
           "tooMany": "Demasiados miembros seleccionados a la vez.",
           "invalidValue": "Ese valor no es válido."
+        },
+        "delete": {
+          "trigger": "Eliminar selección",
+          "title": "¿Eliminar los miembros seleccionados?",
+          "description": "Intenta eliminar definitivamente los {count} miembro(s) seleccionado(s). Solo se pueden eliminar los miembros sin tarjeta asignada ni historial financiero.",
+          "irreversibleWarning": "Esta acción es irreversible.",
+          "resultSkipped": "{deleted} eliminado(s), {skipped} omitido(s) (tiene tarjeta o historial financiero).",
+          "done": "Listo",
+          "cancel": "Cancelar",
+          "confirm": "Eliminar",
+          "deleting": "Eliminando…"
         }
       },
       "import": {

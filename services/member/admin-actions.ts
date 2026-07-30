@@ -495,6 +495,44 @@ export async function setMemberReminderOptOutAction(input: {
   return { ok: true, unsubscribed: input.unsubscribe };
 }
 
+// =============================================================================
+// Delete (single member)
+// =============================================================================
+// Permanent removal, gated to members with no attached card and no
+// financial history (issue #109). Both conditions are checked server-side
+// regardless of what the row happened to show — the row action doesn't
+// pre-filter, it just surfaces whichever error applies.
+export type DeleteMemberResult = { ok: true } | { error: string };
+
+export async function deleteMemberAction(input: {
+  memberId: string;
+}): Promise<DeleteMemberResult> {
+  const t = await getTranslations();
+  const { fund } = await requireFundRole("OPERATOR");
+
+  const member = await prisma.member.findFirst({
+    where: { id: input.memberId, fundId: fund.id },
+    select: {
+      id: true,
+      _count: {
+        select: { cards: true, bankTransactions: true, tokenOperations: true },
+      },
+    },
+  });
+  if (!member) return { error: t("members.admin.errors.notFound" as never) };
+  if (member._count.cards > 0) {
+    return { error: t("members.admin.delete.errors.hasCard" as never) };
+  }
+  if (member._count.bankTransactions > 0 || member._count.tokenOperations > 0) {
+    return { error: t("members.admin.delete.errors.hasHistory" as never) };
+  }
+
+  await prisma.member.delete({ where: { id: member.id } });
+
+  revalidatePath("/members");
+  return { ok: true };
+}
+
 function isP2002For(e: unknown, field: string): boolean {
   if (!(e instanceof Error) || !("code" in e)) return false;
   if ((e as { code?: string }).code !== "P2002") return false;
