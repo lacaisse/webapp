@@ -13,6 +13,7 @@ import {
 
 import {
   FieldDataSchema,
+  FieldUpdateDataSchema,
   StepDataSchema,
   type FieldData,
   type FieldOption,
@@ -121,7 +122,10 @@ export async function updateOnboardingFieldAction(input: {
     return { error: t("onboardingFields.errors.notFound" as never) };
   }
 
-  const parsed = FieldDataSchema.safeParse(input.data);
+  // Uses the update schema, not FieldDataSchema: the key below is immutable
+  // and ignored regardless, so it shouldn't be re-validated against the
+  // create-time format rule (older fields can carry a key that predates it).
+  const parsed = FieldUpdateDataSchema.safeParse(input.data);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
     return {
