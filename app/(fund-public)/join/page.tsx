@@ -13,6 +13,7 @@ import { parseSignupPrefill } from "@/services/member/prefill";
 import { prisma } from "@/services/db/prisma";
 import { requireCurrentFund } from "@/services/fund/server";
 import { buildFormSteps } from "@/services/onboarding/form-steps";
+import { parseVisibleIf } from "@/services/onboarding/visibility";
 import { SignupForm } from "./signup-form";
 
 // A fund's own website links people here, optionally carrying what it already
@@ -46,6 +47,7 @@ export default async function MemberSignupPage({
         position: true,
         stepId: true,
         config: true,
+        visibleIf: true,
       },
     }),
     prisma.onboardingStep.findMany({
@@ -73,6 +75,7 @@ export default async function MemberSignupPage({
       position: f.position,
       stepId: f.stepId,
       options: config?.options ?? [],
+      visibleIf: parseVisibleIf(f.visibleIf),
     };
   });
 

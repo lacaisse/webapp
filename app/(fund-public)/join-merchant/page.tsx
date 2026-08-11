@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/card";
 import { prisma } from "@/services/db/prisma";
 import { requireCurrentFund } from "@/services/fund/server";
+import { parseVisibleIf } from "@/services/onboarding/visibility";
 import { MerchantSignupForm } from "./signup-form";
 
 export default async function MerchantSignupPage() {
@@ -27,6 +28,7 @@ export default async function MerchantSignupPage() {
       helpText: true,
       required: true,
       config: true,
+      visibleIf: true,
     },
   });
 
@@ -40,6 +42,7 @@ export default async function MerchantSignupPage() {
       helpText: f.helpText,
       required: f.required,
       options: config?.options ?? [],
+      visibleIf: parseVisibleIf(f.visibleIf),
     };
   });
 

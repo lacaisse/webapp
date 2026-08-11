@@ -1609,7 +1609,23 @@
             "builtin": "Type de champ",
             "builtinCustom": "Question personnalisée",
             "builtinHint": "Une information de la fiche membre est enregistrée dans sa colonne dédiée — elle alimente les courriers, les rappels et l'attribution de palier. Une question personnalisée est stockée à part, avec la candidature.",
-            "builtinLocked": "Enregistré dans la fiche membre ({key}). Le type de saisie est imposé ; vous pouvez adapter le libellé, l'aide, l'obligation et la position."
+            "builtinLocked": "Enregistré dans la fiche membre ({key}). Le type de saisie est imposé ; vous pouvez adapter le libellé, l'aide, l'obligation et la position.",
+            "visibleIf": {
+              "label": "Afficher seulement si",
+              "none": "Toujours affiché",
+              "operatorLabel": "Comparaison",
+              "valueLabel": "Valeur",
+              "valuePlaceholder": "ex. 1",
+              "hint": "Ce champ n'apparaît (et n'est requis) que si la réponse au champ choisi satisfait cette condition.",
+              "operators": {
+                "eq": "est égal à",
+                "neq": "est différent de",
+                "gt": "est supérieur à",
+                "gte": "est supérieur ou égal à",
+                "lt": "est inférieur à",
+                "lte": "est inférieur ou égal à"
+              }
+            }
           },
           "archive": {
             "button": "Archiver",
@@ -1624,7 +1640,8 @@
             "cancel": "Annuler"
           },
           "firstStep": "Première étape",
-          "builtinBadge": "Fiche membre"
+          "builtinBadge": "Fiche membre",
+          "visibleIfCaption": "Affiché si « {label} » {operator} {value}"
         },
         "stepsTitle": "Étapes du formulaire",
         "stepsDescription": "Découpez le formulaire d'inscription en plusieurs pages. Sans étape, le formulaire tient sur une seule page.",
@@ -1907,7 +1924,9 @@
       "optionsRequired": "Ajoutez au moins une option.",
       "notFound": "Champ introuvable.",
       "builtinInvalid": "Cette information de membre est inconnue.",
-      "builtinTaken": "Cette information est déjà demandée sur ce formulaire (vérifiez aussi les champs archivés)."
+      "builtinTaken": "Cette information est déjà demandée sur ce formulaire (vérifiez aussi les champs archivés).",
+      "visibleIfInvalid": "La condition d'affichage n'est pas valide — vérifiez le champ dont elle dépend.",
+      "visibleIfValueRequired": "Indiquez la valeur de la condition d'affichage."
     }
   },
   "tokenOps": {

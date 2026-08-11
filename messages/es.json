@@ -1609,7 +1609,23 @@
             "builtin": "Tipo de campo",
             "builtinCustom": "Pregunta personalizada",
             "builtinHint": "Un dato de la ficha de miembro se guarda en su propia columna, así alimenta cartas, recordatorios y la asignación de nivel. Una pregunta personalizada se guarda aparte, junto a la candidatura.",
-            "builtinLocked": "Se guarda en la ficha de miembro ({key}). El tipo de entrada es fijo; puedes ajustar la etiqueta, la ayuda, si es obligatorio y su posición."
+            "builtinLocked": "Se guarda en la ficha de miembro ({key}). El tipo de entrada es fijo; puedes ajustar la etiqueta, la ayuda, si es obligatorio y su posición.",
+            "visibleIf": {
+              "label": "Mostrar solo si",
+              "none": "Siempre visible",
+              "operatorLabel": "Comparación",
+              "valueLabel": "Valor",
+              "valuePlaceholder": "p. ej. 1",
+              "hint": "Este campo solo aparece (y solo es obligatorio) si la respuesta del campo elegido cumple esta condición.",
+              "operators": {
+                "eq": "es igual a",
+                "neq": "es diferente de",
+                "gt": "es mayor que",
+                "gte": "es mayor o igual que",
+                "lt": "es menor que",
+                "lte": "es menor o igual que"
+              }
+            }
           },
           "archive": {
             "button": "Archivar",
@@ -1624,7 +1640,8 @@
             "cancel": "Cancelar"
           },
           "firstStep": "Primer paso",
-          "builtinBadge": "Ficha de miembro"
+          "builtinBadge": "Ficha de miembro",
+          "visibleIfCaption": "Se muestra si «{label}» {operator} {value}"
         },
         "stepsTitle": "Pasos del formulario",
         "stepsDescription": "Divide el formulario de inscripción en varias páginas. Sin pasos, el formulario ocupa una sola página.",
@@ -1907,7 +1924,9 @@
       "optionsRequired": "Añada al menos una opción.",
       "notFound": "Campo no encontrado.",
       "builtinInvalid": "Ese dato de miembro no es válido.",
-      "builtinTaken": "Ese dato ya se pide en este formulario (revisa también los campos archivados)."
+      "builtinTaken": "Ese dato ya se pide en este formulario (revisa también los campos archivados).",
+      "visibleIfInvalid": "Esa condición de visibilidad no es válida — revisa el campo del que depende.",
+      "visibleIfValueRequired": "Indica el valor de la condición de visibilidad."
     }
   },
   "tokenOps": {

@@ -12,6 +12,7 @@ import {
   verificationExpiry,
 } from "@/services/email/verification";
 import { getFundUrl, requireCurrentFund } from "@/services/fund/server";
+import { isFieldVisible, parseVisibleIf } from "@/services/onboarding/visibility";
 import {
   coerceBuiltinValue,
   isMemberBuiltinKey,
@@ -95,13 +96,26 @@ export async function signupMemberAction(input: {
   // assignment read. See services/member/builtin-fields.ts.
   const fields = await prisma.onboardingField.findMany({
     where: { fundId: fund.id, target: "MEMBER", archivedAt: null },
-    select: { key: true, label: true, required: true, builtinKey: true },
+    select: {
+      key: true,
+      label: true,
+      required: true,
+      builtinKey: true,
+      visibleIf: true,
+    },
   });
   const incoming = input.applicationData ?? {};
   const filtered: Record<string, ExtraValue> = {};
   const builtinColumns: Record<string, BuiltinColumnValue> = {};
   for (const field of fields) {
     const value = incoming[field.key];
+    // A field hidden by its own visibleIf rule (dependency unanswered / not
+    // yet satisfying the comparison) is neither required nor stored — a
+    // stale answer left over from before the visitor's dependency answer
+    // changed shouldn't persist. `visibleIf.fieldKey` only ever references
+    // another custom field (enforced at save time), so `incoming` alone —
+    // not the typed builtins — is the right lookup source.
+    if (!isFieldVisible(parseVisibleIf(field.visibleIf), incoming)) continue;
     if (field.required && isExtraEmpty(value)) {
       return {
         error: t("members.signup.errors.fieldRequired" as never, {

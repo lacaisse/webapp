@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { z } from "zod";
 
+import { isFieldVisible, type VisibleIf } from "./visibility";
+
 // Builds a Zod schema for a fund's custom signup fields from their runtime
 // definitions, so the client can enforce `required` per field.
 //
@@ -25,6 +27,11 @@ export type ExtraFieldDef = {
     | "CHECKBOX"
     | "DATE";
   required: boolean;
+  // When set, `required` only applies while the dependency condition holds —
+  // a field hidden by its own visibleIf rule can't be enforced. The per-field
+  // schema below is built as optional in that case; the object-level
+  // superRefine re-applies `required` only for fields currently visible.
+  visibleIf?: VisibleIf | null;
 };
 
 const REQUIRED = "members.signup.errors.required";
@@ -33,9 +40,30 @@ const EMAIL_INVALID = "members.signup.errors.emailInvalid";
 export function buildExtrasSchema(fields: ExtraFieldDef[]) {
   const shape: Record<string, z.ZodType> = {};
   for (const field of fields) {
-    shape[field.key] = schemaFor(field);
+    shape[field.key] = field.visibleIf
+      ? schemaFor({ ...field, required: false })
+      : schemaFor(field);
   }
-  return z.object(shape);
+  const base = z.object(shape);
+
+  const conditional = fields.filter((f) => f.visibleIf && f.required);
+  if (conditional.length === 0) return base;
+
+  return base.superRefine((data, ctx) => {
+    for (const field of conditional) {
+      if (!isFieldVisible(field.visibleIf, data)) continue;
+      if (isEmpty(data[field.key], field.type)) {
+        ctx.addIssue({ code: "custom", message: REQUIRED, path: [field.key] });
+      }
+    }
+  });
+}
+
+function isEmpty(value: unknown, type: ExtraFieldDef["type"]): boolean {
+  if (value === undefined || value === null) return true;
+  if (type === "MULTISELECT") return !Array.isArray(value) || value.length === 0;
+  if (type === "CHECKBOX") return value !== true;
+  return typeof value !== "string" || value.trim() === "";
 }
 
 function schemaFor(field: ExtraFieldDef): z.ZodType {

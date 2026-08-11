@@ -28,6 +28,7 @@ import { contributionApplies } from "@/services/member/contribution";
 import type { ExtraValue } from "@/services/member/schema";
 import { prisma } from "@/services/db/prisma";
 import { requireCurrentFund } from "@/services/fund/server";
+import { parseVisibleIf } from "@/services/onboarding/visibility";
 
 import { UnassignCardButton } from "../../cards/unassign-card-button";
 import { AddCardDialog } from "../add-card-dialog";
@@ -115,6 +116,7 @@ async function MemberDetail({
         type: true,
         required: true,
         config: true,
+        visibleIf: true,
         archivedAt: true,
       },
     }),
@@ -137,6 +139,7 @@ async function MemberDetail({
         helpText: f.helpText,
         required: f.required,
         options: config?.options ?? [],
+        visibleIf: parseVisibleIf(f.visibleIf),
       };
     });
 

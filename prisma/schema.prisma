@@ -1037,6 +1037,15 @@ model OnboardingField {
   //   DATE:               { "minDate": "...", "maxDate": "..." }
   config Json?
 
+  // Optional conditional-visibility rule: { fieldKey, operator, value }.
+  // Shown (and required) only when the named field's submitted answer
+  // satisfies the comparison — e.g. show `householdincome` only when
+  // `householdAdults` > 1. null = always shown. `fieldKey` must reference
+  // another active CUSTOM field of this (fundId, target) — never a
+  // built-in — enforced app-side in services/onboarding/admin-actions.ts.
+  // See services/onboarding/visibility.ts for the shape and evaluation.
+  visibleIf Json?
+
   // Soft-delete: archived fields don't appear in new forms but historical
   // applicationData referencing the field's key keeps its context.
   archivedAt DateTime?

@@ -14,12 +14,14 @@ import {
 import {
   FieldDataSchema,
   StepDataSchema,
+  UpdateFieldDataSchema,
   type FieldData,
   type FieldOption,
   type OnboardingFieldResult,
   type OnboardingStepResult,
   type StepData,
 } from "./schema";
+import { NUMERIC_ONLY_OPERATORS, type VisibleIf } from "./visibility";
 
 // CRUD for OnboardingField rows. Keys are immutable after creation —
 // stored applicationData blobs reference them by key, so changing a key
@@ -67,6 +69,23 @@ export async function createOnboardingFieldAction(input: {
     };
   }
 
+  // A built-in is always shown (it's identity/address, not an optional
+  // extra) — mirrors how `config` is forced to null for it below.
+  const visibleIf = builtin
+    ? null
+    : await resolveVisibleIf(
+        fund.id,
+        input.target,
+        parsed.data.key,
+        parsed.data.visibleIf,
+      );
+  if (visibleIf === INVALID_VISIBLE_IF) {
+    return {
+      error: t("onboardingFields.errors.visibleIfInvalid" as never),
+      field: "visibleIf",
+    };
+  }
+
   try {
     await prisma.onboardingField.create({
       data: {
@@ -83,6 +102,9 @@ export async function createOnboardingFieldAction(input: {
         config: builtin
           ? Prisma.JsonNull
           : configFor(parsed.data.type, parsed.data.options),
+        visibleIf: visibleIf
+          ? (visibleIf as Prisma.InputJsonValue)
+          : Prisma.JsonNull,
       },
     });
   } catch (e) {
@@ -121,7 +143,10 @@ export async function updateOnboardingFieldAction(input: {
     return { error: t("onboardingFields.errors.notFound" as never) };
   }
 
-  const parsed = FieldDataSchema.safeParse(input.data);
+  // The key is immutable, so it is never re-validated here — see the
+  // UpdateFieldDataSchema comment for why re-running the create-time regex
+  // against an unchanged, already-stored key would (and did) block edits.
+  const parsed = UpdateFieldDataSchema.safeParse(input.data);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
     return {
@@ -142,14 +167,28 @@ export async function updateOnboardingFieldAction(input: {
     };
   }
 
-  // Key is immutable. Silently ignore any mismatch from the client. So is
-  // built-in-ness: a custom field can't be promoted to write into a real
-  // Member column (its historical answers live in applicationData), and a
-  // built-in can't be demoted or re-pointed at a different column. The input
-  // type follows from the column for the same reason.
+  // So is built-in-ness: a custom field can't be promoted to write into a
+  // real Member column (its historical answers live in applicationData), and
+  // a built-in can't be demoted or re-pointed at a different column. The
+  // input type follows from the column for the same reason.
   const existingBuiltin = existing.builtinKey
     ? getBuiltinField(existing.builtinKey)
     : null;
+
+  const visibleIf = existingBuiltin
+    ? null
+    : await resolveVisibleIf(
+        fund.id,
+        existing.target,
+        existing.key,
+        parsed.data.visibleIf,
+      );
+  if (visibleIf === INVALID_VISIBLE_IF) {
+    return {
+      error: t("onboardingFields.errors.visibleIfInvalid" as never),
+      field: "visibleIf",
+    };
+  }
 
   await prisma.onboardingField.update({
     where: { id: existing.id },
@@ -163,6 +202,9 @@ export async function updateOnboardingFieldAction(input: {
       config: existingBuiltin
         ? Prisma.JsonNull
         : configFor(parsed.data.type, parsed.data.options),
+      visibleIf: visibleIf
+        ? (visibleIf as Prisma.InputJsonValue)
+        : Prisma.JsonNull,
     },
   });
 
@@ -367,6 +409,37 @@ async function resolveStepId(
     select: { id: true },
   });
   return step ? step.id : INVALID_STEP;
+}
+
+const INVALID_VISIBLE_IF = Symbol("invalid-visible-if");
+
+// A dependency must be another active CUSTOM field of the same (fund,
+// target) — never itself, never a built-in (its answer never lands in
+// `applicationData`, so a rule pointing at one could never be resolved at
+// signup; see the comment on VisibleIfSchema). Ordering operators
+// (gt/gte/lt/lte) only make sense against a NUMBER field.
+async function resolveVisibleIf(
+  fundId: string,
+  target: "MEMBER" | "MERCHANT",
+  ownKey: string,
+  visibleIf: VisibleIf | null | undefined,
+): Promise<VisibleIf | null | typeof INVALID_VISIBLE_IF> {
+  if (!visibleIf) return null;
+  if (visibleIf.fieldKey === ownKey) return INVALID_VISIBLE_IF;
+
+  const dependency = await prisma.onboardingField.findFirst({
+    where: { fundId, target, key: visibleIf.fieldKey, archivedAt: null },
+    select: { type: true, builtinKey: true },
+  });
+  if (!dependency || dependency.builtinKey) return INVALID_VISIBLE_IF;
+  if (
+    NUMERIC_ONLY_OPERATORS.includes(visibleIf.operator) &&
+    dependency.type !== "NUMBER"
+  ) {
+    return INVALID_VISIBLE_IF;
+  }
+
+  return visibleIf;
 }
 
 function configFor(

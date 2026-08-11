@@ -14,6 +14,7 @@ import { Tabs, resolveActiveTab } from "@/components/ui/tabs";
 import { prisma } from "@/services/db/prisma";
 import { requireFundRole } from "@/services/auth/dal";
 import { getFundUrl, requireCurrentFund } from "@/services/fund/server";
+import { parseVisibleIf } from "@/services/onboarding/visibility";
 import {
   OnboardingFields,
   type FieldRow,
@@ -321,6 +322,7 @@ async function OnboardingTab({
           stepId: f.stepId,
           builtinKey: f.builtinKey,
           options: config?.options ?? [],
+          visibleIf: parseVisibleIf(f.visibleIf),
           archivedAt: f.archivedAt,
         };
       });

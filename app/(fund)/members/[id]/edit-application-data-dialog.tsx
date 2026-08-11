@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { updateMemberApplicationDataAction } from "@/services/member/application-data-actions";
 import type { ExtraValue } from "@/services/member/schema";
+import { isFieldVisible } from "@/services/onboarding/visibility";
 import {
   OnboardingFieldInput,
   type FieldValue,
@@ -96,21 +97,23 @@ export function EditApplicationDataDialog({
           <DialogDescription>{t("editDescription")}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
-          {fields.map((field) => (
-            <OnboardingFieldInput
-              key={field.id}
-              field={field}
-              value={draft[field.key]}
-              onChange={(v) =>
-                setDraft((prev) => ({ ...prev, [field.key]: v }))
-              }
-              error={
-                fieldErrors[field.key]
-                  ? translate(tRoot, fieldErrors[field.key])
-                  : undefined
-              }
-            />
-          ))}
+          {fields
+            .filter((field) => isFieldVisible(field.visibleIf, draft))
+            .map((field) => (
+              <OnboardingFieldInput
+                key={field.id}
+                field={field}
+                value={draft[field.key]}
+                onChange={(v) =>
+                  setDraft((prev) => ({ ...prev, [field.key]: v }))
+                }
+                error={
+                  fieldErrors[field.key]
+                    ? translate(tRoot, fieldErrors[field.key])
+                    : undefined
+                }
+              />
+            ))}
         </div>
         {error && (
           <Alert variant="destructive">

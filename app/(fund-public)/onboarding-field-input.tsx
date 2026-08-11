@@ -2,6 +2,7 @@
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import type { VisibleIf } from "@/services/onboarding/visibility";
 
 // Renders the appropriate input for a per-fund OnboardingField. Used by
 // both the member and merchant signup forms. Value is read/written as the
@@ -27,6 +28,10 @@ export type OnboardingFieldDef = {
   helpText: string | null;
   required: boolean;
   options: { value: string; label: string }[];
+  // Set when this field should only render once another field's answer
+  // satisfies a comparison — the form component decides whether to render
+  // this input at all; see services/onboarding/visibility.ts.
+  visibleIf: VisibleIf | null;
 };
 
 export type FieldValue = string | string[] | boolean;
