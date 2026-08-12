@@ -2197,6 +2197,18 @@
         "saving": "Guardando…",
         "stoppedWarning": "Marcar como Dado de baja registra una fecha de salida. Usa En pausa para una pausa temporal."
       },
+      "delete": {
+        "trigger": "Eliminar",
+        "title": "¿Eliminar a {memberName} definitivamente?",
+        "description": "La ficha del miembro se eliminará de esta caja. Solo disponible para miembros sin tarjeta vinculada ni historial de transacciones.",
+        "irreversibleWarning": "Esta acción no se puede deshacer. Si quieres conservar un registro de este miembro, cambia su estado a Dado de baja en su lugar.",
+        "cancel": "Cancelar",
+        "confirm": "Eliminar definitivamente",
+        "deleting": "Eliminando…",
+        "errors": {
+          "notDeletable": "Solo se pueden eliminar los miembros sin tarjeta vinculada ni historial de transacciones."
+        }
+      },
       "bulk": {
         "selectAll": "Seleccionar todos los miembros",
         "selectRow": "Seleccionar miembro",
@@ -2224,6 +2236,17 @@
           "noSelection": "Selecciona primero al menos un miembro.",
           "tooMany": "Demasiados miembros seleccionados a la vez.",
           "invalidValue": "Ese valor no es válido."
+        },
+        "delete": {
+          "trigger": "Eliminar selección",
+          "dialogTitle": "Eliminar miembros seleccionados",
+          "dialogDescription": "Eliminar definitivamente los {count} miembro(s) seleccionados sin tarjeta vinculada ni historial de transacciones.",
+          "irreversibleWarning": "Esta acción no se puede deshacer. Los miembros con tarjeta vinculada o historial de transacciones se omiten, no se eliminan.",
+          "resultSkipped": "{deleted} eliminados, {skipped} omitidos (tarjeta vinculada o historial de transacciones).",
+          "done": "Hecho",
+          "cancel": "Cancelar",
+          "confirm": "Eliminar definitivamente",
+          "deleting": "Eliminando…"
         }
       },
       "import": {

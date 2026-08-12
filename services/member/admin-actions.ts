@@ -16,6 +16,7 @@ import {
 } from "@/services/email/transactional";
 import { ANNOTATION_TRIGGERS } from "@/services/transaction-annotation/annotate";
 import { resolveOrEnqueueAnnotation } from "@/services/transaction-annotation/pending";
+import { isMemberDeletable } from "./eligibility";
 import { BuiltinSignupSchema } from "./schema";
 import { generatePaymentReference } from "./payment-reference";
 
@@ -493,6 +494,40 @@ export async function setMemberReminderOptOutAction(input: {
   revalidatePath("/members");
   revalidatePath(`/members/${member.id}`);
   return { ok: true, unsubscribed: input.unsubscribe };
+}
+
+export type DeleteMemberResult = { ok: true } | { error: string };
+
+// Hard delete (issue #109) — permanent, row action on the members list.
+// Only allowed when the member has no linked card and no transaction
+// history (see isMemberDeletable): those are exactly the members a fund can
+// still safely remove without losing audit trail, e.g. a duplicate or a
+// member added by mistake. Everything else (referrals, linked bank accounts,
+// emails) cascades or detaches per the schema's own delete rules.
+export async function deleteMemberAction(input: {
+  memberId: string;
+}): Promise<DeleteMemberResult> {
+  const t = await getTranslations();
+  const { fund } = await requireFundRole("OPERATOR");
+
+  const member = await prisma.member.findFirst({
+    where: { id: input.memberId, fundId: fund.id },
+    select: {
+      id: true,
+      _count: {
+        select: { cards: true, bankTransactions: true, tokenOperations: true },
+      },
+    },
+  });
+  if (!member) return { error: t("members.admin.errors.notFound" as never) };
+  if (!isMemberDeletable(member._count)) {
+    return { error: t("members.admin.delete.errors.notDeletable" as never) };
+  }
+
+  await prisma.member.delete({ where: { id: member.id } });
+
+  revalidatePath("/members");
+  return { ok: true };
 }
 
 function isP2002For(e: unknown, field: string): boolean {

@@ -15,6 +15,23 @@ export function isAllocationEligible(status: MemberStatus): boolean {
   return status === ALLOCATION_ELIGIBLE_STATUS;
 }
 
+// A member is safe to hard-delete (issues #109/#35) only when there's no
+// linked card and no transaction history — otherwise the delete would sever
+// real audit trail (cards become orphaned, bank transactions/mints lose their
+// member link). Checked both for the row-action gate and, authoritatively,
+// server-side before the actual delete.
+export function isMemberDeletable(counts: {
+  cards: number;
+  bankTransactions: number;
+  tokenOperations: number;
+}): boolean {
+  return (
+    counts.cards === 0 &&
+    counts.bankTransactions === 0 &&
+    counts.tokenOperations === 0
+  );
+}
+
 // Members who receive the monthly payment-request reminder (issue #39). Same
 // status gate as allocations: only ACTIVE members are expected to contribute;
 // NEW / INACTIVE / PAUSED / STOPPED / REJECTED are all excluded (the issue
