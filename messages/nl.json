@@ -2335,7 +2335,8 @@
     "builtinFields": {
       "address": "Adres",
       "postalCode": "Postcode",
-      "city": "Stad"
+      "city": "Stad",
+      "tier": "Toewijzingsniveau"
     }
   },
   "cards": {

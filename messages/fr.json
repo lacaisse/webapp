@@ -2335,7 +2335,8 @@
     "builtinFields": {
       "address": "Adresse",
       "postalCode": "Code postal",
-      "city": "Ville"
+      "city": "Ville",
+      "tier": "Palier d'allocation"
     }
   },
   "cards": {

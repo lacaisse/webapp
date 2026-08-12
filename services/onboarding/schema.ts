@@ -13,21 +13,23 @@ const FieldOptionSchema = z.object({
 
 export type FieldOption = z.infer<typeof FieldOptionSchema>;
 
-// Key validation applies to NEW keys only. `key` is immutable after creation
-// (see admin-actions.ts), so re-running this regex against an unchanged,
-// already-stored key on every edit would reject legitimate rows the moment
-// the rule tightens — which is exactly what broke editing the pre-existing
-// `householdAdults` / `householdChildren` fields (camelCase, seeded before
-// this lowercase-only rule existed). `FieldDataObjectSchema` carries the
-// field so `create` can validate it; `UpdateFieldDataSchema` omits it
-// entirely so `update` neither validates nor accepts a new value for it.
+// Key validation applies to NEW, admin-typed keys only — enforced below via a
+// refinement rather than a plain `.regex()`, for two independent reasons:
+//   1. `key` is immutable after creation (see admin-actions.ts), so
+//      re-running this regex against an unchanged, already-stored key on
+//      every edit would reject legitimate rows the moment the rule
+//      tightens — which is exactly what broke editing the pre-existing
+//      `householdAdults` / `householdChildren` fields (camelCase, seeded
+//      before this lowercase-only rule existed).
+//   2. A built-in's key is a fixed Member column name handed down by the
+//      registry (e.g. `postalCode`, `tierId`), not typed by the admin —
+//      checked for real by resolveBuiltin in admin-actions.ts, not by this
+//      pattern.
+// `FieldDataObjectSchema` carries the field so `create` can validate it;
+// `UpdateFieldDataSchema` omits it entirely so `update` neither validates
+// nor accepts a new value for it.
 const FieldDataObjectSchema = z.object({
-  key: z
-    .string()
-    .min(1, { error: "onboardingFields.errors.keyRequired" })
-    .regex(/^[a-z][a-z0-9_]*$/, {
-      error: "onboardingFields.errors.keyInvalid",
-    }),
+  key: z.string().min(1, { error: "onboardingFields.errors.keyRequired" }),
   type: z.enum([
     "TEXT",
     "TEXTAREA",
@@ -74,7 +76,10 @@ const optionsRequiredRefinement = {
 export const FieldDataSchema = FieldDataObjectSchema.refine(
   optionsRequiredRefinement.check,
   optionsRequiredRefinement.message,
-);
+).refine((v) => v.builtinKey || /^[a-z][a-z0-9_]*$/.test(v.key), {
+  error: "onboardingFields.errors.keyInvalid",
+  path: ["key"],
+});
 
 // Used by `updateOnboardingFieldAction`: same shape minus `key`, which is
 // immutable and therefore never validated (or accepted) on edit.
