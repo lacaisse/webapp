@@ -137,10 +137,14 @@ export async function sendCardAssigned(args: {
   firstName: string;
   lastName: string;
   // Pre-resolved scalars (see services/email/templates.ts): formatted postal
-  // address, public tap URL, per-fund card number.
+  // address, public tap URL, per-fund card number, the bank-transfer reference
+  // (the card's serial — same value shown on MEMBER_ACTIVATED/reminders), and
+  // the fund's connected bank account IBAN ("" if not yet bank-connected).
   address: string;
   cardLink: string;
   cardNumber: string;
+  paymentReference: string;
+  iban: string;
 }): Promise<void> {
   await dispatchTemplate({
     emailId: args.emailId,
@@ -158,6 +162,8 @@ export async function sendCardAssigned(args: {
           address: args.address,
           cardLink: args.cardLink,
           cardNumber: args.cardNumber,
+          paymentReference: args.paymentReference,
+          iban: args.iban,
         },
       }),
     to: args.toEmail,

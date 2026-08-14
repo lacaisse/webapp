@@ -337,6 +337,9 @@ async function buildTestVars(
       card?.number != null ? String(card.number) : (sample.cardNumber ?? ""),
     address: formatMemberAddress(member),
     occurredAt: sample.occurredAt ?? "",
+    // Test sends use the illustrative sample IBAN rather than a live
+    // CitizenPay banking-status call — this is a preview, not a real send.
+    iban: sample.iban ?? "",
   };
 
   let htmlVars: Record<string, string> | undefined;
