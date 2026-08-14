@@ -84,9 +84,15 @@ export async function signupMemberAction(input: {
   // tier picker (services/member/admin-tier-actions.ts).
   const liveTiers = await prisma.allocationTier.findMany({
     where: { fundId: fund.id, archivedAt: null },
-    select: { id: true },
+    select: { id: true, hiddenAtSignup: true },
   });
-  const liveTierIds = new Set(liveTiers.map((t) => t.id));
+  // The allowlist is the signup-VISIBLE subset (issue #37) — a tier hidden from
+  // the picker must also be rejected when named directly, or hiding it would be
+  // cosmetic. The contribution check below still counts every live tier: hiding
+  // a tier from applicants doesn't change whether the fund runs on tiers.
+  const liveTierIds = new Set(
+    liveTiers.filter((t) => !t.hiddenAtSignup).map((t) => t.id),
+  );
   const contributionAmount = contributionApplies(fund.allocationMode, liveTiers.length)
     ? parsed.data.contributionAmount || null
     : null;
