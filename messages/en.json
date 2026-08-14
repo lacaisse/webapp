@@ -1800,6 +1800,10 @@
           "REFERRAL_BONUS_AWARDED": {
             "title": "Referral bonus",
             "description": "Email a sponsor receives when a referral bonus is credited to their card."
+          },
+          "MEMBER_PAYMENT_LINK": {
+            "title": "Payment link (on request)",
+            "description": "Sent by hand from a member's page when they ask for their payment link again."
           }
         },
         "defaultName": "Default template",
@@ -2037,6 +2041,10 @@
       "paymentConfirmation": {
         "subject": "Payment received — {fundName}",
         "textBody": "Hi {firstName},\n\nWe just received your payment of {amount} on {occurredAt} to {fundName}.\n\nIf your fund runs on pay-and-go, your card has already been topped up. Otherwise the credit will land at the next allocation period.\n\nThe {fundName} team"
+      },
+      "paymentLink": {
+        "subject": "Your payment link — {fundName}",
+        "textBody": "Hi {firstName},\n\nHere is your {fundName} payment link:\n\n{paymentLink}\n\nTo check your balance and your card history:\n\n{cardLink}\n\nFor any transfer, quote this reference so we can credit your card automatically:\n\n  {paymentReference}\n\nSee you soon,\nThe {fundName} team"
       },
       "allocationConfirmation": {
         "subject": "{amount} just landed on your card — {fundName}",
@@ -2360,6 +2368,20 @@
           "amountInvalid": "Enter a valid amount (up to 2 decimals).",
           "amountBelowMin": "The amount can't be below the tier minimum ({min}).",
           "localeInvalid": "Pick a supported language."
+        }
+      },
+      "paymentLink": {
+        "send": "Send payment link",
+        "resend": "Resend payment link",
+        "confirmTitle": "Send the payment link?",
+        "confirmDescription": "{name} will receive their payment link, their card link and their transfer reference by email.",
+        "confirm": "Send",
+        "sending": "Sending…",
+        "cancel": "Cancel",
+        "errors": {
+          "noEmail": "This member has no email address.",
+          "noCard": "This member has no card yet — the payment link depends on it.",
+          "sendFailed": "Sending failed. Please try again."
         }
       }
     },
