@@ -217,11 +217,22 @@ export async function sendPaymentConfirmation(args: {
           firstName: args.firstName,
           fundName: args.fund.name,
           amount: args.amount,
-          occurredAt: args.occurredAt,
+          occurredAt: formatEmailDate(args.occurredAt, locale),
         },
       }),
     to: args.toEmail,
   });
+}
+
+// `args.occurredAt` arrives as a raw ISO-8601 timestamp (from the bank feed,
+// via BankTransaction.occurredAt) — format it into the recipient's locale
+// instead of interpolating the ISO string verbatim into the email.
+function formatEmailDate(isoTimestamp: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(new Date(isoTimestamp));
 }
 
 export async function sendPaymentReminder(args: {
