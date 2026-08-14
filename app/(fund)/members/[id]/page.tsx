@@ -38,6 +38,7 @@ import { MemberTierPicker } from "../tier-picker";
 import { EditApplicationDataDialog } from "./edit-application-data-dialog";
 import { EditProfileDialog } from "./edit-profile-dialog";
 import { MintDialog } from "./mint-dialog";
+import { ReconcileOperationButton } from "./reconcile-operation-button";
 import { ReminderOptOutToggle } from "./reminder-opt-out-toggle";
 import { SendPaymentLinkButton } from "./send-payment-link-button";
 
@@ -438,11 +439,12 @@ async function MemberDetail({
                 {t("tokenOps.amount")}
               </TableHead>
               <TableHead>{t("tokenOps.status")}</TableHead>
+              <TableHead />
             </TableRow>
           </TableHeader>
           <TableBody>
             {member.tokenOperations.length === 0 ? (
-              <TableEmpty colSpan={6}>{t("tokenOps.empty")}</TableEmpty>
+              <TableEmpty colSpan={7}>{t("tokenOps.empty")}</TableEmpty>
             ) : (
               member.tokenOperations.map((op) => (
                 <TableRow key={op.id}>
@@ -461,6 +463,15 @@ async function MemberDetail({
                   </TableCell>
                   <TableCell>
                     <OperationStatusBadge status={op.status} />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {/* Ask the bundler what actually happened (issue #162).
+                        Offered for MINT/BURN rows that carry a hash — a row
+                        with none never reached the bundler and belongs to the
+                        mint-retry cron instead. */}
+                    {op.txHash && (
+                      <ReconcileOperationButton operationId={op.id} />
+                    )}
                   </TableCell>
                 </TableRow>
               ))
