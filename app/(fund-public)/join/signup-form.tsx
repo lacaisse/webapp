@@ -8,6 +8,7 @@ import { useMemo, useState, useTransition } from "react";
 import {
   Controller,
   useForm,
+  useWatch,
   type FieldErrors,
   type Resolver,
 } from "react-hook-form";
@@ -33,6 +34,7 @@ import {
 } from "@/services/member/schema";
 import { buildExtrasSchema } from "@/services/onboarding/extras-schema";
 import type { FormStep } from "@/services/onboarding/form-steps";
+import { isFieldVisible } from "@/services/onboarding/visibility";
 import {
   OnboardingFieldInput,
   type FieldValue,
@@ -222,6 +224,15 @@ export function SignupForm({
   const current = steps[step];
   const isLast = step === lastIndex;
 
+  // Re-evaluated on every keystroke so a field like `householdincome`
+  // appears the moment `householdAdults` crosses its threshold. The action
+  // re-checks visibility server-side regardless — this is UX only.
+  const extrasValues = (useWatch({ control: form.control, name: "extras" }) ??
+    {}) as Record<string, unknown>;
+  const visibleFields = current.fields.filter((field) =>
+    isFieldVisible(field.visibleIf, extrasValues),
+  );
+
   return (
     <form
       onSubmit={form.handleSubmit(onSubmit, onInvalid)}
@@ -304,7 +315,7 @@ export function SignupForm({
         </>
       )}
 
-      {current.fields.map((field) => (
+      {visibleFields.map((field) => (
         <Controller
           key={field.id}
           control={form.control}

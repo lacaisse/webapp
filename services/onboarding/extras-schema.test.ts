@@ -92,3 +92,42 @@ describe("buildExtrasSchema — no fields", () => {
     expect(buildExtrasSchema([]).safeParse({}).success).toBe(true);
   });
 });
+
+describe("buildExtrasSchema — conditional required (visibleIf)", () => {
+  const fields: ExtraFieldDef[] = [
+    def("householdAdults", "NUMBER", false),
+    {
+      ...def("householdincome", "TEXT", true),
+      visibleIf: { fieldKey: "householdAdults", operator: "gt", value: "1" },
+    },
+  ];
+  const schema = buildExtrasSchema(fields);
+
+  it("does not require the dependent field while hidden", () => {
+    expect(
+      schema.safeParse({ householdAdults: "1", householdincome: "" }).success,
+    ).toBe(true);
+    expect(schema.safeParse({ householdAdults: "1" }).success).toBe(true);
+  });
+
+  it("requires it once the condition is met", () => {
+    const result = schema.safeParse({
+      householdAdults: "2",
+      householdincome: "",
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].path).toEqual(["householdincome"]);
+      expect(result.error.issues[0].message).toBe(
+        "members.signup.errors.required",
+      );
+    }
+  });
+
+  it("accepts an answer once visible", () => {
+    expect(
+      schema.safeParse({ householdAdults: "2", householdincome: "3000" })
+        .success,
+    ).toBe(true);
+  });
+});

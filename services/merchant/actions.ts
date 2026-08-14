@@ -13,6 +13,7 @@ import {
   verificationExpiry,
 } from "@/services/email/verification";
 import { getFundUrl, requireCurrentFund } from "@/services/fund/server";
+import { isFieldVisible, parseVisibleIf } from "@/services/onboarding/visibility";
 import {
   BuiltinMerchantSignupSchema,
   type BuiltinMerchantSignupInput,
@@ -56,12 +57,15 @@ export async function signupMerchantAction(input: {
   // Filter application data to known OnboardingField keys, enforce `required`.
   const fields = await prisma.onboardingField.findMany({
     where: { fundId: fund.id, target: "MERCHANT", archivedAt: null },
-    select: { key: true, label: true, required: true },
+    select: { key: true, label: true, required: true, visibleIf: true },
   });
   const incoming = input.applicationData ?? {};
   const filtered: Record<string, ExtraValue> = {};
   for (const field of fields) {
     const value = incoming[field.key];
+    // Hidden by its own visibleIf rule — neither required nor stored. See
+    // the matching comment in services/member/actions.ts.
+    if (!isFieldVisible(parseVisibleIf(field.visibleIf), incoming)) continue;
     if (field.required && isExtraEmpty(value)) {
       return {
         error: t("merchants.signup.errors.fieldRequired" as never, {

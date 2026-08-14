@@ -1609,7 +1609,23 @@
             "builtin": "Soort veld",
             "builtinCustom": "Aangepaste vraag",
             "builtinHint": "Een gegeven uit de ledenfiche wordt in zijn eigen kolom bewaard en voedt zo brieven, herinneringen en niveautoewijzing. Een aangepaste vraag wordt apart bij de aanvraag bewaard.",
-            "builtinLocked": "Wordt in de ledenfiche bewaard ({key}). Het invoertype ligt vast; label, hulptekst, verplichting en positie kun je wel aanpassen."
+            "builtinLocked": "Wordt in de ledenfiche bewaard ({key}). Het invoertype ligt vast; label, hulptekst, verplichting en positie kun je wel aanpassen.",
+            "visibleIf": {
+              "label": "Alleen tonen als",
+              "none": "Altijd zichtbaar",
+              "operatorLabel": "Vergelijking",
+              "valueLabel": "Waarde",
+              "valuePlaceholder": "bv. 1",
+              "hint": "Dit veld verschijnt (en is alleen verplicht) zodra het antwoord op het gekozen veld aan deze voorwaarde voldoet.",
+              "operators": {
+                "eq": "is gelijk aan",
+                "neq": "is niet gelijk aan",
+                "gt": "is groter dan",
+                "gte": "is groter dan of gelijk aan",
+                "lt": "is kleiner dan",
+                "lte": "is kleiner dan of gelijk aan"
+              }
+            }
           },
           "archive": {
             "button": "Archiveren",
@@ -1624,7 +1640,8 @@
             "cancel": "Annuleren"
           },
           "firstStep": "Eerste stap",
-          "builtinBadge": "Ledenfiche"
+          "builtinBadge": "Ledenfiche",
+          "visibleIfCaption": "Getoond als “{label}” {operator} {value}"
         },
         "stepsTitle": "Formulierstappen",
         "stepsDescription": "Verdeel het inschrijfformulier over meerdere pagina's. Zonder stappen blijft het formulier één pagina.",
@@ -1907,7 +1924,9 @@
       "optionsRequired": "Voeg ten minste één optie toe.",
       "notFound": "Veld niet gevonden.",
       "builtinInvalid": "Dat lidgegeven is niet bekend.",
-      "builtinTaken": "Dat gegeven wordt al gevraagd op dit formulier (controleer ook gearchiveerde velden)."
+      "builtinTaken": "Dat gegeven wordt al gevraagd op dit formulier (controleer ook gearchiveerde velden).",
+      "visibleIfInvalid": "Die zichtbaarheidsvoorwaarde is ongeldig — controleer het veld waarvan ze afhangt.",
+      "visibleIfValueRequired": "Vul een waarde in voor de zichtbaarheidsvoorwaarde."
     }
   },
   "tokenOps": {

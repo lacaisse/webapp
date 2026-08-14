@@ -1609,7 +1609,23 @@
             "builtin": "Field kind",
             "builtinCustom": "Custom question",
             "builtinHint": "A member-record detail is saved to its own column, so it feeds letters, reminders and tier assignment. A custom question is stored separately, alongside the application.",
-            "builtinLocked": "Saved to the member record ({key}). The input type is fixed; you can still adjust the label, help text, whether it's required, and its position."
+            "builtinLocked": "Saved to the member record ({key}). The input type is fixed; you can still adjust the label, help text, whether it's required, and its position.",
+            "visibleIf": {
+              "label": "Only show when",
+              "none": "Always shown",
+              "operatorLabel": "Comparison",
+              "valueLabel": "Value",
+              "valuePlaceholder": "e.g. 1",
+              "hint": "This field only appears (and is only required) once the chosen field's answer satisfies this condition.",
+              "operators": {
+                "eq": "equals",
+                "neq": "does not equal",
+                "gt": "is greater than",
+                "gte": "is greater than or equal to",
+                "lt": "is less than",
+                "lte": "is less than or equal to"
+              }
+            }
           },
           "archive": {
             "button": "Archive",
@@ -1624,7 +1640,8 @@
             "cancel": "Cancel"
           },
           "firstStep": "First step",
-          "builtinBadge": "Member record"
+          "builtinBadge": "Member record",
+          "visibleIfCaption": "Shown when “{label}” {operator} {value}"
         },
         "stepsTitle": "Form steps",
         "stepsDescription": "Split the signup form into several pages. With no steps, the form stays on a single page.",
@@ -1907,7 +1924,9 @@
       "optionsRequired": "Add at least one option.",
       "notFound": "Field not found.",
       "builtinInvalid": "That member detail is not a known one.",
-      "builtinTaken": "That detail is already asked for on this form (check archived fields too)."
+      "builtinTaken": "That detail is already asked for on this form (check archived fields too).",
+      "visibleIfInvalid": "That visibility condition isn't valid — check the field it depends on.",
+      "visibleIfValueRequired": "Enter a value for the visibility condition."
     }
   },
   "tokenOps": {

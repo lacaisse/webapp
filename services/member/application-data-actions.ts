@@ -8,6 +8,7 @@ import { requireFundRole } from "@/services/auth/dal";
 import { Prisma } from "@/services/db/generated/client";
 import { prisma } from "@/services/db/prisma";
 import { buildExtrasSchema } from "@/services/onboarding/extras-schema";
+import { parseVisibleIf } from "@/services/onboarding/visibility";
 
 import { mergeApplicationData } from "./application-data";
 import type { ExtraValue } from "./schema";
@@ -48,10 +49,20 @@ export async function updateMemberApplicationDataAction(input: {
   // nor silently destroyed by saving the form that no longer shows it.
   const fields = await prisma.onboardingField.findMany({
     where: { fundId: fund.id, target: "MEMBER", archivedAt: null },
-    select: { key: true, type: true, required: true, label: true },
+    select: {
+      key: true,
+      type: true,
+      required: true,
+      label: true,
+      visibleIf: true,
+    },
   });
 
-  const parsed = buildExtrasSchema(fields).safeParse(input.values);
+  const extraFields = fields.map((f) => ({
+    ...f,
+    visibleIf: parseVisibleIf(f.visibleIf),
+  }));
+  const parsed = buildExtrasSchema(extraFields).safeParse(input.values);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
     const key = typeof issue.path[0] === "string" ? issue.path[0] : undefined;

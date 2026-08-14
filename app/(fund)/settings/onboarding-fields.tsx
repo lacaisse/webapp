@@ -34,6 +34,12 @@ import {
 } from "@/services/onboarding/admin-actions";
 import { MEMBER_BUILTIN_FIELDS } from "@/services/member/builtin-fields";
 import type { FieldData, FieldOption } from "@/services/onboarding/schema";
+import {
+  NUMERIC_ONLY_OPERATORS,
+  VISIBLE_IF_OPERATORS,
+  type VisibleIf,
+  type VisibleIfOperator,
+} from "@/services/onboarding/visibility";
 
 type FieldType = FieldData["type"];
 
@@ -64,6 +70,9 @@ export type FieldRow = {
   // applicationData answer. Immutable once created.
   builtinKey: string | null;
   options: FieldOption[];
+  // Show (and require) this field only when another field's answer
+  // satisfies a comparison. See services/onboarding/visibility.ts.
+  visibleIf: VisibleIf | null;
   archivedAt: Date | null;
 };
 
@@ -110,6 +119,9 @@ export function OnboardingFields({
           existingKeys={fields.map((f) => f.key)}
           usedBuiltinKeys={usedBuiltinKeys}
           steps={steps}
+          dependencyChoices={fields.filter(
+            (x) => !x.archivedAt && !x.builtinKey,
+          )}
           trigger={
             <Button variant="default" size="sm">
               {t("add")}
@@ -155,6 +167,19 @@ export function OnboardingFields({
                       {f.helpText}
                     </div>
                   )}
+                  {f.visibleIf && (
+                    <div className="text-xs text-muted-foreground">
+                      {t("visibleIfCaption", {
+                        label:
+                          fields.find((x) => x.key === f.visibleIf!.fieldKey)
+                            ?.label ?? f.visibleIf.fieldKey,
+                        operator: t(
+                          `dialog.visibleIf.operators.${f.visibleIf.operator}` as never,
+                        ),
+                        value: f.visibleIf.value,
+                      })}
+                    </div>
+                  )}
                 </TableCell>
                 <TableCell className="font-mono text-xs">{f.key}</TableCell>
                 <TableCell className="text-sm">{f.type}</TableCell>
@@ -179,6 +204,9 @@ export function OnboardingFields({
                         .map((x) => x.key)}
                       usedBuiltinKeys={usedBuiltinKeys}
                       steps={steps}
+                      dependencyChoices={fields.filter(
+                        (x) => !x.archivedAt && !x.builtinKey && x.id !== f.id,
+                      )}
                       edit={f}
                       trigger={
                         <Button variant="ghost" size="sm">
@@ -203,6 +231,7 @@ function FieldDialog({
   existingKeys,
   usedBuiltinKeys,
   steps,
+  dependencyChoices,
   edit,
   trigger,
 }: {
@@ -210,6 +239,9 @@ function FieldDialog({
   existingKeys: string[];
   usedBuiltinKeys: string[];
   steps: StepOption[];
+  // Other active, non-builtin fields this field's visibility can depend on —
+  // excludes itself (when editing) and builtins (see visibility.ts).
+  dependencyChoices: FieldRow[];
   edit?: FieldRow;
   trigger: React.ReactNode;
 }) {
@@ -230,6 +262,17 @@ function FieldDialog({
   const [optionsText, setOptionsText] = useState(
     edit?.options.map((o) => `${o.value}:${o.label}`).join("\n") ?? "",
   );
+  // "" = always shown. Otherwise this field only appears once `dependsOnKey`'s
+  // answer satisfies `operator`/`conditionValue` — see visibility.ts.
+  const [dependsOnKey, setDependsOnKey] = useState(
+    edit?.visibleIf?.fieldKey ?? "",
+  );
+  const [operator, setOperator] = useState<VisibleIfOperator>(
+    edit?.visibleIf?.operator ?? "eq",
+  );
+  const [conditionValue, setConditionValue] = useState(
+    edit?.visibleIf?.value ?? "",
+  );
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -244,6 +287,24 @@ function FieldDialog({
         )
       : [];
 
+  // Ordering comparisons (greater/less than) only make sense against a
+  // NUMBER field; a text/select/checkbox dependency only offers equals/not.
+  const dependency = dependencyChoices.find((d) => d.key === dependsOnKey);
+  const operatorChoices =
+    dependency?.type === "NUMBER"
+      ? VISIBLE_IF_OPERATORS
+      : VISIBLE_IF_OPERATORS.filter(
+          (op) => !NUMERIC_ONLY_OPERATORS.includes(op),
+        );
+
+  const onPickDependency = (nextKey: string) => {
+    setDependsOnKey(nextKey);
+    const dep = dependencyChoices.find((d) => d.key === nextKey);
+    if (dep?.type !== "NUMBER" && NUMERIC_ONLY_OPERATORS.includes(operator)) {
+      setOperator("eq");
+    }
+  };
+
   const reset = () => {
     if (edit) return;
     setKey("");
@@ -255,6 +316,9 @@ function FieldDialog({
     setPosition(0);
     setStepId("");
     setOptionsText("");
+    setDependsOnKey("");
+    setOperator("eq");
+    setConditionValue("");
     setError(null);
   };
 
@@ -285,6 +349,14 @@ function FieldDialog({
         position,
         stepId: stepId || null,
         options: needsOptions ? parseOptions(optionsText) : undefined,
+        visibleIf:
+          !isBuiltin && dependsOnKey
+            ? {
+                fieldKey: dependsOnKey,
+                operator,
+                value: conditionValue.trim(),
+              }
+            : null,
       };
       const result = edit
         ? await updateOnboardingFieldAction({ fieldId: edit.id, data })
@@ -439,6 +511,52 @@ function FieldDialog({
                 ))}
               </select>
               <p className="text-xs text-muted-foreground">{t("stepHint")}</p>
+            </div>
+          )}
+          {!isBuiltin && dependencyChoices.length > 0 && (
+            <div className="space-y-1">
+              <Label htmlFor="field-visible-if">{t("visibleIf.label")}</Label>
+              <select
+                id="field-visible-if"
+                value={dependsOnKey}
+                onChange={(e) => onPickDependency(e.target.value)}
+                className="h-8 w-full rounded-md bg-background px-2 text-sm ring-1 ring-foreground/15 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <option value="">{t("visibleIf.none")}</option>
+                {dependencyChoices.map((d) => (
+                  <option key={d.key} value={d.key}>
+                    {d.label}
+                  </option>
+                ))}
+              </select>
+              {dependsOnKey && (
+                <div className="grid grid-cols-2 gap-3 pt-1.5">
+                  <select
+                    aria-label={t("visibleIf.operatorLabel")}
+                    value={operator}
+                    onChange={(e) =>
+                      setOperator(e.target.value as VisibleIfOperator)
+                    }
+                    className="h-8 w-full rounded-md bg-background px-2 text-sm ring-1 ring-foreground/15 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {operatorChoices.map((op) => (
+                      <option key={op} value={op}>
+                        {t(`visibleIf.operators.${op}`)}
+                      </option>
+                    ))}
+                  </select>
+                  <Input
+                    aria-label={t("visibleIf.valueLabel")}
+                    value={conditionValue}
+                    onChange={(e) => setConditionValue(e.target.value)}
+                    placeholder={t("visibleIf.valuePlaceholder")}
+                    autoComplete="off"
+                  />
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">
+                {t("visibleIf.hint")}
+              </p>
             </div>
           )}
           <div className="grid grid-cols-2 gap-3">
