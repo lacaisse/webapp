@@ -3482,5 +3482,27 @@
       "titleRequired": "El título es obligatorio.",
       "notFound": "Paso no encontrado."
     }
+  },
+  "token": {
+    "reconcile": {
+      "trigger": "Verificar",
+      "title": "Verificar esta operación",
+      "description": "Consulta al bundler qué ocurrió realmente en la cadena. No se vuelve a emitir nada: solo se corrige nuestro registro.",
+      "confirm": "Verificar",
+      "checking": "Verificando…",
+      "cancel": "Cancelar",
+      "close": "Cerrar",
+      "outcomes": {
+        "settled": "Confirmada en la cadena. Se ha registrado el hash real de la transacción.",
+        "pending": "Todavía en curso en el bundler. No se ha cambiado nada — inténtalo más tarde.",
+        "failed": "Fallo definitivo en la cadena. La operación se marca como fallida y el miembro puede volver a recibir su asignación.",
+        "never-submitted": "Esta operación nunca llegó al bundler. Se encarga el cron de reenvío."
+      },
+      "errors": {
+        "notFound": "Operación no encontrada.",
+        "noChain": "No hay cadena de tokens configurada para esta caja.",
+        "inconclusive": "No se pudo contactar con el bundler. No se ha cambiado nada — inténtalo de nuevo."
+      }
+    }
   }
 }

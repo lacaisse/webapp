@@ -3482,5 +3482,27 @@
       "titleRequired": "Le titre est requis.",
       "notFound": "Étape introuvable."
     }
+  },
+  "token": {
+    "reconcile": {
+      "trigger": "Vérifier",
+      "title": "Vérifier cette opération",
+      "description": "Interroge le bundler pour savoir ce qui s'est réellement passé sur la chaîne. Aucune opération n'est réémise : seul notre enregistrement est corrigé.",
+      "confirm": "Vérifier",
+      "checking": "Vérification…",
+      "cancel": "Annuler",
+      "close": "Fermer",
+      "outcomes": {
+        "settled": "Confirmée sur la chaîne. Le hash de transaction réel a été enregistré.",
+        "pending": "Toujours en cours côté bundler. Rien n'a été modifié — réessayez plus tard.",
+        "failed": "Échec définitif sur la chaîne. L'opération est marquée en échec, le membre peut être réalloué.",
+        "never-submitted": "Cette opération n'a jamais atteint le bundler. Le cron de réémission s'en charge."
+      },
+      "errors": {
+        "notFound": "Opération introuvable.",
+        "noChain": "Aucune chaîne de jetons configurée pour cette caisse.",
+        "inconclusive": "Le bundler n'a pas pu répondre. Rien n'a été modifié — réessayez."
+      }
+    }
   }
 }
