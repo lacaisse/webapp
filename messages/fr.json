@@ -2179,19 +2179,6 @@
         "tierNotFound": "Palier introuvable ou archivé.",
         "invalidStatusTransition": "Ce changement de statut n'est pas autorisé depuis l'état actuel."
       },
-      "delete": {
-        "trigger": "Supprimer",
-        "title": "Supprimer définitivement {memberName} ?",
-        "description": "La fiche de {memberName} sera retirée de cette caisse. Autorisé uniquement si le membre n'a aucune carte attribuée ni historique financier.",
-        "irreversibleWarning": "Cette action est irréversible.",
-        "cancel": "Annuler",
-        "confirm": "Supprimer définitivement",
-        "deleting": "Suppression…",
-        "errors": {
-          "hasCard": "Détachez d'abord la ou les cartes de ce membre avant de le supprimer.",
-          "hasHistory": "Ce membre a des transactions bancaires ou des opérations de jetons — la suppression effacerait cet historique."
-        }
-      },
       "status": {
         "button": "Statut",
         "title": "Changer le statut du membre",
@@ -2237,17 +2224,6 @@
           "noSelection": "Sélectionnez d'abord au moins un membre.",
           "tooMany": "Trop de membres sélectionnés à la fois.",
           "invalidValue": "Cette valeur n'est pas valide."
-        },
-        "delete": {
-          "trigger": "Supprimer la sélection",
-          "title": "Supprimer les membres sélectionnés ?",
-          "description": "Tente de supprimer définitivement les {count} membre(s) sélectionné(s). Seuls les membres sans carte attribuée ni historique financier peuvent être supprimés.",
-          "irreversibleWarning": "Cette action est irréversible.",
-          "resultSkipped": "{deleted} supprimé(s), {skipped} ignoré(s) (carte attribuée ou historique financier).",
-          "done": "Terminé",
-          "cancel": "Annuler",
-          "confirm": "Supprimer",
-          "deleting": "Suppression…"
         }
       },
       "import": {

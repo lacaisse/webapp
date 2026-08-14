@@ -2179,19 +2179,6 @@
         "tierNotFound": "Tier not found or archived.",
         "invalidStatusTransition": "That status change isn't allowed from the current state."
       },
-      "delete": {
-        "trigger": "Delete",
-        "title": "Permanently delete {memberName}?",
-        "description": "{memberName}'s record will be removed from this fund. Only allowed when the member has no attached card and no financial history.",
-        "irreversibleWarning": "This action is irreversible.",
-        "cancel": "Cancel",
-        "confirm": "Delete permanently",
-        "deleting": "Deleting…",
-        "errors": {
-          "hasCard": "Unassign this member's card(s) before deleting.",
-          "hasHistory": "This member has bank transactions or token operations — deleting would lose that history."
-        }
-      },
       "status": {
         "button": "Status",
         "title": "Change member status",
@@ -2237,17 +2224,6 @@
           "noSelection": "Select at least one member first.",
           "tooMany": "Too many members selected at once.",
           "invalidValue": "That value isn't valid."
-        },
-        "delete": {
-          "trigger": "Delete selected",
-          "title": "Delete selected members?",
-          "description": "Attempt to permanently delete the {count} selected member(s). Only members with no attached card and no financial history can be deleted.",
-          "irreversibleWarning": "This action is irreversible.",
-          "resultSkipped": "{deleted} deleted, {skipped} skipped (has a card or financial history).",
-          "done": "Done",
-          "cancel": "Cancel",
-          "confirm": "Delete",
-          "deleting": "Deleting…"
         }
       },
       "import": {

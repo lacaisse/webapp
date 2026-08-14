@@ -27,7 +27,7 @@ import { AddCardDialog } from "./add-card-dialog";
 import { BulkActionsBar } from "./bulk-actions-bar";
 import { InviteMemberDialog } from "./invite-member-dialog";
 import { MemberImportDialog } from "./member-import-dialog";
-import { DeleteMemberButton, MemberRowActions } from "./member-row-actions";
+import { MemberRowActions } from "./member-row-actions";
 import {
   MemberSelectionProvider,
   RowCheckbox,
@@ -375,7 +375,6 @@ async function MembersContent({
                         memberName={fullName}
                         currentStatus={m.status}
                       />
-                      <DeleteMemberButton memberId={m.id} memberName={fullName} />
                     </div>
                   </TableCell>
                 </TableRow>
