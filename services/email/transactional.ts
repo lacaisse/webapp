@@ -3,12 +3,17 @@ import "server-only";
 
 import { getTranslations } from "next-intl/server";
 
+import type { FundCredentials } from "@/services/citizenpay/client";
 import { prisma } from "@/services/db/prisma";
 import { getFundUrl } from "@/services/fund/server";
 import { DEFAULT_LOCALE, isSupportedLocale } from "@/services/i18n/config";
 import { buildUnsubscribeToken } from "@/services/member/unsubscribe";
 import { renderBrandedEmail } from "./template";
-import { resolveAllocationTemplate, resolveEmailTemplate } from "./templates";
+import {
+  resolveAllocationTemplate,
+  resolveCardAssignedTemplate,
+  resolveEmailTemplate,
+} from "./templates";
 import { sendEmail } from "./resend";
 
 // One function per EmailType that renders the body, calls Resend, and updates
@@ -134,26 +139,28 @@ export async function sendCardAssigned(args: {
   fundId: string;
   toEmail: string;
   fund: FundBranding;
+  // CitizenPay credentials — only used (lazily, see resolveCardAssignedTemplate)
+  // when the active template actually references {iban}.
+  citizenPay: FundCredentials;
   firstName: string;
   lastName: string;
   // Pre-resolved scalars (see services/email/templates.ts): formatted postal
-  // address, public tap URL, per-fund card number, the bank-transfer reference
-  // (the card's serial — same value shown on MEMBER_ACTIVATED/reminders), and
-  // the fund's connected bank account IBAN ("" if not yet bank-connected).
+  // address, public tap URL, per-fund card number, and the bank-transfer
+  // reference (the card's serial — same value shown on
+  // MEMBER_ACTIVATED/reminders).
   address: string;
   cardLink: string;
   cardNumber: string;
   paymentReference: string;
-  iban: string;
 }): Promise<void> {
   await dispatchTemplate({
     emailId: args.emailId,
     fund: args.fund,
     // The fund's active template (or the built-in default).
     render: (locale) =>
-      resolveEmailTemplate({
+      resolveCardAssignedTemplate({
         fundId: args.fundId,
-        type: "CARD_ASSIGNED",
+        fund: args.citizenPay,
         locale,
         vars: {
           firstName: args.firstName,
@@ -163,7 +170,6 @@ export async function sendCardAssigned(args: {
           cardLink: args.cardLink,
           cardNumber: args.cardNumber,
           paymentReference: args.paymentReference,
-          iban: args.iban,
         },
       }),
     to: args.toEmail,

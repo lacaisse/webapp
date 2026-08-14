@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import "server-only";
 
-import { getCitizenPayClient, type FundCredentials } from "@/services/citizenpay/client";
+import type { FundCredentials } from "@/services/citizenpay/client";
 import { resolveTreasurySlug } from "@/services/citizenpay/treasury-slug";
 import { prisma } from "@/services/db/prisma";
 import { buildCardLink, formatMemberAddress } from "@/services/email/templates";
@@ -95,6 +95,9 @@ export async function dispatchCardAssignedEmail(args: {
       logoUrl: fund.logoUrl,
       senderEmail: fund.senderEmail,
     },
+    // Only used (lazily) if the active template references {iban} — see
+    // resolveCardAssignedTemplate.
+    citizenPay: fund,
     firstName: card.member.firstName,
     lastName: card.member.lastName,
     address: formatMemberAddress(card.member),
@@ -103,7 +106,6 @@ export async function dispatchCardAssignedEmail(args: {
     // The bank-transfer reference is the card's serial — the same value
     // bank-sync matches deposits on (see services/member/reminders.ts).
     paymentReference: card.serialNumber,
-    iban: await resolveFundIban(fund),
   });
 
   // sendCardAssigned swallows errors and marks the row FAILED — read back the
@@ -113,18 +115,4 @@ export async function dispatchCardAssignedEmail(args: {
     select: { status: true },
   });
   return after?.status === "SENT" ? "SENT" : "FAILED";
-}
-
-// The fund's connected bank account IBAN (issue #86), same source as the
-// public payment page (app/(fund-public)/pay/[serial]). Degrades to "" — same
-// as an unconnected fund would show on that page — rather than failing the
-// whole card-assigned send over a CitizenPay hiccup.
-async function resolveFundIban(fund: FundCredentials): Promise<string> {
-  try {
-    const status = await getCitizenPayClient(fund).getBankingStatus();
-    return status.accountReference ?? "";
-  } catch (e) {
-    console.warn("[card.notify] getBankingStatus failed", e);
-    return "";
-  }
 }

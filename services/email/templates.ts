@@ -3,12 +3,17 @@ import "server-only";
 
 import { getTranslations } from "next-intl/server";
 
+import type { FundCredentials } from "@/services/citizenpay/client";
+import { resolveFundIban } from "@/services/citizenpay/fund-iban";
 import { prisma } from "@/services/db/prisma";
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from "@/services/i18n/config";
+import { dropBlankTokenLines, interpolate } from "./interpolate";
 import {
   EDITABLE_EMAIL_TEMPLATES,
   type EditableEmailType,
 } from "./template-config";
+
+export { dropBlankTokenLines, interpolate };
 
 // Base of the public card "tap" page. Matches the CitizenPay API's own redirect
 // (`{TAP_BASE_URL}/card/<serial>?network=<treasury-slug>`); overridable via env
@@ -46,17 +51,6 @@ export function formatMemberAddress(member: {
 // or the assigned one has no content for the recipient's language. {placeholder}
 // tokens are interpolated here; the body can be rich HTML (injected into the
 // branded shell) or plain text. See loadActiveTemplateContent below.
-
-// Replace {token} with vars[token]. Unknown tokens are left literal (the save
-// validation already rejects those, so this only guards against drift).
-export function interpolate(
-  template: string,
-  vars: Record<string, string>,
-): string {
-  return template.replace(/\{(\w+)\}/g, (whole, name: string) =>
-    name in vars ? vars[name] : whole,
-  );
-}
 
 function escapeHtml(s: string): string {
   return s
@@ -393,11 +387,12 @@ function renderContent(
   vars: Record<string, string>,
   htmlVars?: Record<string, string>,
 ): Rendered {
+  const allVars = htmlVars ? { ...vars, ...htmlVars } : vars;
   return {
-    subject: interpolate(content.subject, vars),
-    text: interpolate(content.bodyText, vars),
+    subject: interpolate(dropBlankTokenLines(content.subject, vars), vars),
+    text: interpolate(dropBlankTokenLines(content.bodyText, vars), vars),
     html: content.bodyHtml
-      ? interpolate(content.bodyHtml, htmlVars ? { ...vars, ...htmlVars } : vars)
+      ? interpolate(dropBlankTokenLines(content.bodyHtml, allVars), allVars)
       : undefined,
   };
 }
@@ -455,6 +450,34 @@ export async function resolveAllocationTemplate(args: {
     { ...base, shopList: shop.text },
     { shopList: shop.html },
   );
+}
+
+// The CARD_ASSIGNED email. Loads the active template (or default), then
+// resolves {iban} lazily — only queried when the content actually references
+// it — so a fund whose template doesn't show an IBAN line never pays for the
+// live CitizenPay round-trip on every card assignment.
+export async function resolveCardAssignedTemplate(args: {
+  fundId: string;
+  fund: FundCredentials;
+  locale: string;
+  vars: {
+    firstName: string;
+    lastName: string;
+    fundName: string;
+    address: string;
+    cardLink: string;
+    cardNumber: string;
+    paymentReference: string;
+  };
+}): Promise<Rendered> {
+  const content = await loadActiveTemplateContent({
+    fundId: args.fundId,
+    type: "CARD_ASSIGNED",
+    locale: args.locale,
+  });
+  const scan = `${content.subject}\n${content.bodyText}\n${content.bodyHtml ?? ""}`;
+  const iban = scan.includes("{iban}") ? await resolveFundIban(args.fund) : "";
+  return renderContent(content, { ...args.vars, iban });
 }
 
 // One editable template's content for one language, as HTML (the editor always
