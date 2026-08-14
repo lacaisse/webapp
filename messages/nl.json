@@ -1793,6 +1793,10 @@
             "title": "Betaling ontvangen",
             "description": "E-mail die een lid ontvangt wanneer een betaling is ontvangen en verwerkt."
           },
+          "PAYMENT_BELOW_MINIMUM": {
+            "title": "Bijdrage onder het minimum",
+            "description": "Verzonden naar het lid wanneer de ontvangen bijdrage lager is dan het minimum van zijn niveau."
+          },
           "REFERRAL_BONUS_AWARDED": {
             "title": "Aanbrengbonus",
             "description": "E-mail die de aanbrenger ontvangt wanneer een aanbrengbonus op zijn kaart wordt bijgeschreven."
@@ -2033,6 +2037,10 @@
       "paymentConfirmation": {
         "subject": "Betaling ontvangen — {fundName}",
         "textBody": "Hallo {firstName},\n\nWe hebben zojuist uw betaling van {amount} op {occurredAt} aan {fundName} ontvangen.\n\nAls uw fonds op pay-and-go werkt, is uw kaart al opgewaardeerd. Anders wordt het tegoed verwerkt bij de volgende allocatieperiode.\n\nHet {fundName}-team"
+      },
+      "paymentBelowMinimum": {
+        "subject": "Je bijdrage ligt onder het vereiste minimum — {fundName}",
+        "textBody": "Hallo {firstName} {lastName},\n\nWe bevestigen dat we je maandelijkse bijdrage van {amount} op {occurredAt} hebben ontvangen. Helaas ligt dit bedrag onder {minContribution}, de minimale maandelijkse bijdrage om aan {fundName} te kunnen deelnemen.\n\nOm je toewijzing van {allocationAmount}€ te ontvangen (uitbetaald op de 15e van elke maand), vragen we je het resterende bedrag vóór de 9e van de maand over te maken.\n\nNeem gerust contact met ons op als je vragen hebt.\n\nBedankt voor je begrip,\n\nHet team van {fundName}"
       },
       "allocationConfirmation": {
         "subject": "{amount} zijn zojuist op uw kaart gezet — {fundName}",

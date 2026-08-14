@@ -1793,6 +1793,10 @@
             "title": "Paiement reçu",
             "description": "E-mail envoyé au membre lorsqu'un paiement est reçu et rapproché."
           },
+          "PAYMENT_BELOW_MINIMUM": {
+            "title": "Cotisation sous le minimum",
+            "description": "E-mail envoyé au membre lorsque la cotisation reçue est inférieure au minimum de son palier."
+          },
           "REFERRAL_BONUS_AWARDED": {
             "title": "Bonus de parrainage",
             "description": "E-mail envoyé au parrain lorsqu'un bonus de parrainage est crédité sur sa carte."
@@ -2040,6 +2044,10 @@
       },
       "footer": {
         "unsubscribe": "Se désinscrire des rappels de paiement"
+      },
+      "paymentBelowMinimum": {
+        "subject": "Votre cotisation est en dessous du minimum requis — {fundName}",
+        "textBody": "Bonjour {firstName} {lastName},\n\nNous vous confirmons que nous avons bien reçu votre cotisation mensuelle de {amount} le {occurredAt}. Malheureusement, ce montant est inférieur à {minContribution}, qui représente la cotisation minimale mensuelle pour pouvoir participer à {fundName}.\n\nAfin de pouvoir recevoir vos {allocationAmount}€ (versés le 15 du mois), vous êtes prié(e) de bien vouloir transférer le reste du montant avant le 9 du mois.\n\nN'hésitez pas à nous contacter en cas de problème.\n\nEn vous remerciant de votre compréhension,\n\nL'équipe {fundName}"
       }
     },
     "signup": {

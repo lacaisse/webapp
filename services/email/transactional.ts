@@ -235,6 +235,45 @@ function formatEmailDate(isoTimestamp: string, locale: string): string {
   }).format(new Date(isoTimestamp));
 }
 
+// Sent (in place of PAYMENT_CONFIRMATION) when a matched deposit is below the
+// member's tier minimum contribution: confirms receipt but flags the shortfall
+// and the top-up deadline. Like the confirmation, `occurredAt` arrives as a raw
+// ISO-8601 timestamp — format it in the recipient's locale (never interpolate
+// the ISO string; see #147).
+export async function sendPaymentBelowMinimum(args: {
+  emailId: string;
+  fundId: string;
+  toEmail: string;
+  firstName: string;
+  lastName: string;
+  fund: FundBranding;
+  amount: string;
+  minContribution: string;
+  allocationAmount: string;
+  occurredAt: string;
+}): Promise<void> {
+  await dispatchTemplate({
+    emailId: args.emailId,
+    fund: args.fund,
+    render: (locale) =>
+      resolveEmailTemplate({
+        fundId: args.fundId,
+        type: "PAYMENT_BELOW_MINIMUM",
+        locale,
+        vars: {
+          firstName: args.firstName,
+          lastName: args.lastName,
+          fundName: args.fund.name,
+          amount: args.amount,
+          minContribution: args.minContribution,
+          allocationAmount: args.allocationAmount,
+          occurredAt: formatEmailDate(args.occurredAt, locale),
+        },
+      }),
+    to: args.toEmail,
+  });
+}
+
 export async function sendPaymentReminder(args: {
   emailId: string;
   fundId: string;
