@@ -9,6 +9,7 @@ import type { MemberStatus } from "@/services/db/generated/enums";
 import { prisma } from "@/services/db/prisma";
 import { isSupportedLocale } from "@/services/i18n/config";
 
+import { isMemberDeletable } from "./eligibility";
 import { MEMBER_STATUSES, MEMBER_STATUS_TRANSITIONS } from "./status-config";
 
 // Which member property a bulk edit targets. One property per operation so the
@@ -129,4 +130,64 @@ export async function bulkUpdateMembersAction(input: {
 
   revalidatePath("/members");
   return { ok: true, updated, skipped };
+}
+
+export type BulkDeleteMembersResult =
+  | { ok: true; deleted: number; skipped: number }
+  | { error: string };
+
+// Bulk counterpart to deleteMemberAction (issue #35). Same eligibility gate —
+// no linked card, no transaction history, no referral either way — applied per
+// member; anyone who doesn't qualify is skipped and reported back rather than
+// blocking the whole batch or being silently dropped.
+export async function bulkDeleteMembersAction(input: {
+  memberIds: string[];
+}): Promise<BulkDeleteMembersResult> {
+  const t = await getTranslations();
+  const { fund } = await requireFundRole("OPERATOR");
+
+  const memberIds = Array.from(new Set(input.memberIds ?? [])).filter(
+    (id): id is string => typeof id === "string" && id.length > 0,
+  );
+  if (memberIds.length === 0) {
+    return { error: t("members.admin.bulk.errors.noSelection" as never) };
+  }
+  if (memberIds.length > MAX_BULK) {
+    return { error: t("members.admin.bulk.errors.tooMany" as never) };
+  }
+
+  const members = await prisma.member.findMany({
+    where: { id: { in: memberIds }, fundId: fund.id },
+    select: {
+      id: true,
+      _count: {
+        select: {
+          cards: true,
+          bankTransactions: true,
+          tokenOperations: true,
+          sponsoredReferrals: true,
+        },
+      },
+      referralRecord: { select: { id: true } },
+    },
+  });
+  if (members.length === 0) {
+    return { error: t("members.admin.errors.notFound" as never) };
+  }
+
+  const deletableIds = members
+    .filter((m) => isMemberDeletable(m))
+    .map((m) => m.id);
+  const skipped = members.length - deletableIds.length;
+
+  let deleted = 0;
+  if (deletableIds.length > 0) {
+    const res = await prisma.member.deleteMany({
+      where: { id: { in: deletableIds }, fundId: fund.id },
+    });
+    deleted = res.count;
+  }
+
+  revalidatePath("/members");
+  return { ok: true, deleted, skipped };
 }

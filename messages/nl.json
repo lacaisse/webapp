@@ -2216,6 +2216,18 @@
         "saving": "Opslaan…",
         "stoppedWarning": "Markeren als Gestopt legt een vertrekdatum vast. Gebruik Gepauzeerd voor een tijdelijke pauze."
       },
+      "delete": {
+        "trigger": "Verwijderen",
+        "title": "{memberName} definitief verwijderen?",
+        "description": "De ledenrij wordt uit deze caisse verwijderd. Alleen beschikbaar voor leden zonder gekoppelde kaart, zonder transactiegeschiedenis en zonder doorverwijzingen.",
+        "irreversibleWarning": "Dit kan niet ongedaan worden gemaakt. Wil je dit lid liever op de lijst houden, wijzig dan de status naar Gestopt.",
+        "cancel": "Annuleren",
+        "confirm": "Definitief verwijderen",
+        "deleting": "Verwijderen…",
+        "errors": {
+          "notDeletable": "Alleen leden zonder gekoppelde kaart, zonder transactiegeschiedenis en zonder doorverwijzingen kunnen worden verwijderd."
+        }
+      },
       "bulk": {
         "selectAll": "Alle leden selecteren",
         "selectRow": "Lid selecteren",
@@ -2243,6 +2255,17 @@
           "noSelection": "Selecteer eerst minstens één lid.",
           "tooMany": "Te veel leden tegelijk geselecteerd.",
           "invalidValue": "Die waarde is niet geldig."
+        },
+        "delete": {
+          "trigger": "Selectie verwijderen",
+          "dialogTitle": "Geselecteerde leden verwijderen",
+          "dialogDescription": "De {count} geselecteerde leden zonder gekoppelde kaart, zonder transactiegeschiedenis en zonder doorverwijzingen definitief verwijderen.",
+          "irreversibleWarning": "Dit kan niet ongedaan worden gemaakt. Leden met een gekoppelde kaart, transactiegeschiedenis of doorverwijzingen worden overgeslagen, niet verwijderd.",
+          "resultSkipped": "{deleted} verwijderd, {skipped} overgeslagen (gekoppelde kaart, transactiegeschiedenis of doorverwijzingen).",
+          "done": "Klaar",
+          "cancel": "Annuleren",
+          "confirm": "Definitief verwijderen",
+          "deleting": "Verwijderen…"
         }
       },
       "import": {

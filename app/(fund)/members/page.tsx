@@ -23,8 +23,10 @@ import { MemberStatus } from "@/services/db/generated/enums";
 import { prisma } from "@/services/db/prisma";
 import { requireCurrentFund } from "@/services/fund/server";
 import { contributionApplies } from "@/services/member/contribution";
+import { isMemberDeletable } from "@/services/member/eligibility";
 import { AddCardDialog } from "./add-card-dialog";
 import { BulkActionsBar } from "./bulk-actions-bar";
+import { DeleteMemberButton } from "./delete-member-button";
 import { InviteMemberDialog } from "./invite-member-dialog";
 import { MemberImportDialog } from "./member-import-dialog";
 import { MemberRowActions } from "./member-row-actions";
@@ -188,6 +190,20 @@ async function MembersContent({
           take: 1,
           select: { amount: true, currency: true },
         },
+        // Counts (not the rows themselves) drive the delete row action: a
+        // member can only be hard-deleted with no linked card, no transaction
+        // history and no referral either way (issues #109/#35). Referrals
+        // cascade on delete rather than detaching, so they gate it too — see
+        // isMemberDeletable.
+        _count: {
+          select: {
+            cards: true,
+            bankTransactions: true,
+            tokenOperations: true,
+            sponsoredReferrals: true,
+          },
+        },
+        referralRecord: { select: { id: true } },
       },
     }),
     prisma.allocationTier.findMany({
@@ -375,6 +391,12 @@ async function MembersContent({
                         memberName={fullName}
                         currentStatus={m.status}
                       />
+                      {isMemberDeletable(m) && (
+                        <DeleteMemberButton
+                          memberId={m.id}
+                          memberName={fullName}
+                        />
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

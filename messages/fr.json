@@ -2216,6 +2216,18 @@
         "saving": "Enregistrement…",
         "stoppedWarning": "Marquer comme Arrêté enregistre une date de départ. Utilisez En pause pour une pause temporaire."
       },
+      "delete": {
+        "trigger": "Supprimer",
+        "title": "Supprimer {memberName} définitivement ?",
+        "description": "La fiche du membre sera retirée de cette caisse. Disponible uniquement pour les membres sans carte liée, sans historique de transaction et sans parrainage.",
+        "irreversibleWarning": "Cette action est irréversible. Si vous souhaitez garder une trace de ce membre, changez plutôt son statut en Arrêté.",
+        "cancel": "Annuler",
+        "confirm": "Supprimer définitivement",
+        "deleting": "Suppression…",
+        "errors": {
+          "notDeletable": "Seuls les membres sans carte liée, sans historique de transaction et sans parrainage peuvent être supprimés."
+        }
+      },
       "bulk": {
         "selectAll": "Sélectionner tous les membres",
         "selectRow": "Sélectionner le membre",
@@ -2243,6 +2255,17 @@
           "noSelection": "Sélectionnez d'abord au moins un membre.",
           "tooMany": "Trop de membres sélectionnés à la fois.",
           "invalidValue": "Cette valeur n'est pas valide."
+        },
+        "delete": {
+          "trigger": "Supprimer la sélection",
+          "dialogTitle": "Supprimer les membres sélectionnés",
+          "dialogDescription": "Supprimer définitivement les {count} membre(s) sélectionné(s) sans carte liée, ni historique de transaction, ni parrainage.",
+          "irreversibleWarning": "Cette action est irréversible. Les membres avec une carte liée, un historique de transaction ou un parrainage sont ignorés, pas supprimés.",
+          "resultSkipped": "{deleted} supprimé(s), {skipped} ignoré(s) (carte liée, historique de transaction ou parrainage).",
+          "done": "Terminé",
+          "cancel": "Annuler",
+          "confirm": "Supprimer définitivement",
+          "deleting": "Suppression…"
         }
       },
       "import": {

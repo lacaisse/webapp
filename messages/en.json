@@ -2216,6 +2216,18 @@
         "saving": "Saving…",
         "stoppedWarning": "Marking as Stopped stamps a departure date. Use Paused for a temporary pause."
       },
+      "delete": {
+        "trigger": "Delete",
+        "title": "Delete {memberName} permanently?",
+        "description": "The member row will be removed from this fund. This is only available for members with no linked card, no transaction history and no referrals.",
+        "irreversibleWarning": "This cannot be undone. If you might want to keep this member on file, change their status to Stopped instead.",
+        "cancel": "Cancel",
+        "confirm": "Delete permanently",
+        "deleting": "Deleting…",
+        "errors": {
+          "notDeletable": "Only members with no linked card, no transaction history and no referrals can be deleted."
+        }
+      },
       "bulk": {
         "selectAll": "Select all members",
         "selectRow": "Select member",
@@ -2243,6 +2255,17 @@
           "noSelection": "Select at least one member first.",
           "tooMany": "Too many members selected at once.",
           "invalidValue": "That value isn't valid."
+        },
+        "delete": {
+          "trigger": "Delete selected",
+          "dialogTitle": "Delete selected members",
+          "dialogDescription": "Permanently delete the {count} selected member(s) that have no linked card, no transaction history and no referrals.",
+          "irreversibleWarning": "This cannot be undone. Members with a linked card, transaction history or referrals are skipped, not deleted.",
+          "resultSkipped": "{deleted} deleted, {skipped} skipped (linked card, transaction history or referrals).",
+          "done": "Done",
+          "cancel": "Cancel",
+          "confirm": "Delete permanently",
+          "deleting": "Deleting…"
         }
       },
       "import": {
