@@ -1803,6 +1803,10 @@
           "REFERRAL_BONUS_AWARDED": {
             "title": "Bonus de parrainage",
             "description": "E-mail envoyé au parrain lorsqu'un bonus de parrainage est crédité sur sa carte."
+          },
+          "MEMBER_PAYMENT_LINK": {
+            "title": "Lien de paiement (à la demande)",
+            "description": "E-mail envoyé manuellement depuis la fiche d'un membre qui redemande son lien de paiement."
           }
         },
         "defaultName": "Modèle par défaut",
@@ -2040,6 +2044,10 @@
       "paymentConfirmation": {
         "subject": "Paiement reçu — {fundName}",
         "textBody": "Bonjour {firstName},\n\nNous venons de recevoir votre paiement de {amount} le {occurredAt} à {fundName}.\n\nSi votre caisse fonctionne en pay-and-go, votre carte a déjà été créditée. Sinon, le crédit sera attribué lors de la prochaine période d'allocation.\n\nL'équipe {fundName}"
+      },
+      "paymentLink": {
+        "subject": "Votre lien de paiement — {fundName}",
+        "textBody": "Bonjour {firstName},\n\nVoici votre lien de paiement {fundName} :\n\n{paymentLink}\n\nPour consulter votre solde et l'historique de votre carte :\n\n{cardLink}\n\nPour tout virement, indiquez cette référence afin que nous puissions créditer votre carte automatiquement :\n\n  {paymentReference}\n\nÀ bientôt,\nL'équipe {fundName}"
       },
       "allocationConfirmation": {
         "subject": "{amount} viennent d'arriver sur votre carte — {fundName}",
@@ -2363,6 +2371,20 @@
           "amountInvalid": "Saisissez un montant valide (jusqu'à 2 décimales).",
           "amountBelowMin": "Le montant ne peut pas être inférieur au minimum du palier ({min}).",
           "localeInvalid": "Choisissez une langue prise en charge."
+        }
+      },
+      "paymentLink": {
+        "send": "Envoyer le lien de paiement",
+        "resend": "Renvoyer le lien de paiement",
+        "confirmTitle": "Envoyer le lien de paiement ?",
+        "confirmDescription": "{name} recevra par e-mail son lien de paiement, le lien vers sa carte et sa référence de virement.",
+        "confirm": "Envoyer",
+        "sending": "Envoi…",
+        "cancel": "Annuler",
+        "errors": {
+          "noEmail": "Ce membre n'a pas d'adresse e-mail.",
+          "noCard": "Ce membre n'a pas encore de carte — le lien de paiement en dépend.",
+          "sendFailed": "L'envoi a échoué. Réessayez."
         }
       }
     },

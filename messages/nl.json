@@ -1803,6 +1803,10 @@
           "REFERRAL_BONUS_AWARDED": {
             "title": "Aanbrengbonus",
             "description": "E-mail die de aanbrenger ontvangt wanneer een aanbrengbonus op zijn kaart wordt bijgeschreven."
+          },
+          "MEMBER_PAYMENT_LINK": {
+            "title": "Betaallink (op verzoek)",
+            "description": "Handmatig verzonden vanaf de ledenpagina wanneer een lid opnieuw om de betaallink vraagt."
           }
         },
         "defaultName": "Standaardsjabloon",
@@ -2040,6 +2044,10 @@
       "paymentConfirmation": {
         "subject": "Betaling ontvangen — {fundName}",
         "textBody": "Hallo {firstName},\n\nWe hebben zojuist uw betaling van {amount} op {occurredAt} aan {fundName} ontvangen.\n\nAls uw fonds op pay-and-go werkt, is uw kaart al opgewaardeerd. Anders wordt het tegoed verwerkt bij de volgende allocatieperiode.\n\nHet {fundName}-team"
+      },
+      "paymentLink": {
+        "subject": "Je betaallink — {fundName}",
+        "textBody": "Hallo {firstName},\n\nHier is je betaallink van {fundName}:\n\n{paymentLink}\n\nOm je saldo en de geschiedenis van je kaart te bekijken:\n\n{cardLink}\n\nVermeld bij elke overschrijving deze referentie zodat we je kaart automatisch kunnen crediteren:\n\n  {paymentReference}\n\nTot binnenkort,\nHet team van {fundName}"
       },
       "paymentBelowMinimum": {
         "subject": "Je bijdrage ligt onder het vereiste minimum — {fundName}",
@@ -2363,6 +2371,20 @@
           "amountInvalid": "Voer een geldig bedrag in (maximaal 2 decimalen).",
           "amountBelowMin": "Het bedrag kan niet lager zijn dan het minimum van het niveau ({min}).",
           "localeInvalid": "Kies een ondersteunde taal."
+        }
+      },
+      "paymentLink": {
+        "send": "Betaallink versturen",
+        "resend": "Betaallink opnieuw versturen",
+        "confirmTitle": "Betaallink versturen?",
+        "confirmDescription": "{name} ontvangt per e-mail de betaallink, de link naar de kaart en de overschrijvingsreferentie.",
+        "confirm": "Versturen",
+        "sending": "Versturen…",
+        "cancel": "Annuleren",
+        "errors": {
+          "noEmail": "Dit lid heeft geen e-mailadres.",
+          "noCard": "Dit lid heeft nog geen kaart — de betaallink is daarvan afhankelijk.",
+          "sendFailed": "Verzenden mislukt. Probeer het opnieuw."
         }
       }
     },

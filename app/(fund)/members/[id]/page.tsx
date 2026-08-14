@@ -39,6 +39,7 @@ import { EditApplicationDataDialog } from "./edit-application-data-dialog";
 import { EditProfileDialog } from "./edit-profile-dialog";
 import { MintDialog } from "./mint-dialog";
 import { ReminderOptOutToggle } from "./reminder-opt-out-toggle";
+import { SendPaymentLinkButton } from "./send-payment-link-button";
 
 // Synchronous shell so the route paints its skeleton instantly; the member
 // (params-dependent, uncached) streams in behind <Suspense>.
@@ -196,6 +197,17 @@ async function MemberDetail({
           )}
           {member.status === "ACTIVE" && member.primaryCardId && (
             <AddCardDialog memberId={member.id} memberName={fullName} />
+          )}
+          {/* On-request payment link (issue #45). Needs a card, since both
+              links are keyed on the card serial. */}
+          {member.primaryCardId && member.email && (
+            <SendPaymentLinkButton
+              memberId={member.id}
+              memberName={fullName}
+              alreadySent={member.emails.some(
+                (e) => e.type === "MEMBER_PAYMENT_LINK" && e.status === "SENT",
+              )}
+            />
           )}
           <StatusChangeDialog
             memberId={member.id}

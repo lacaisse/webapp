@@ -1803,6 +1803,10 @@
           "REFERRAL_BONUS_AWARDED": {
             "title": "Bono por recomendación",
             "description": "Correo que recibe el padrino cuando se acredita un bono por recomendación en su tarjeta."
+          },
+          "MEMBER_PAYMENT_LINK": {
+            "title": "Enlace de pago (a petición)",
+            "description": "Enviado manualmente desde la ficha de un miembro cuando vuelve a pedir su enlace de pago."
           }
         },
         "defaultName": "Plantilla predeterminada",
@@ -2040,6 +2044,10 @@
       "paymentConfirmation": {
         "subject": "Pago recibido — {fundName}",
         "textBody": "Hola {firstName}:\n\nAcabamos de recibir tu pago de {amount} el {occurredAt} para {fundName}.\n\nSi tu fondo funciona con pago inmediato, tu tarjeta ya se ha recargado. De lo contrario, el crédito se aplicará en el próximo período de asignación.\n\nEl equipo de {fundName}"
+      },
+      "paymentLink": {
+        "subject": "Tu enlace de pago — {fundName}",
+        "textBody": "Hola {firstName},\n\nAquí tienes tu enlace de pago de {fundName}:\n\n{paymentLink}\n\nPara consultar tu saldo y el historial de tu tarjeta:\n\n{cardLink}\n\nEn cualquier transferencia, indica esta referencia para que podamos acreditar tu tarjeta automáticamente:\n\n  {paymentReference}\n\nHasta pronto,\nEl equipo de {fundName}"
       },
       "paymentBelowMinimum": {
         "subject": "Tu contribución está por debajo del mínimo requerido — {fundName}",
@@ -2363,6 +2371,20 @@
           "amountInvalid": "Introduce un importe válido (hasta 2 decimales).",
           "amountBelowMin": "El importe no puede ser inferior al mínimo del nivel ({min}).",
           "localeInvalid": "Elige un idioma compatible."
+        }
+      },
+      "paymentLink": {
+        "send": "Enviar el enlace de pago",
+        "resend": "Reenviar el enlace de pago",
+        "confirmTitle": "¿Enviar el enlace de pago?",
+        "confirmDescription": "{name} recibirá por correo su enlace de pago, el enlace a su tarjeta y su referencia de transferencia.",
+        "confirm": "Enviar",
+        "sending": "Enviando…",
+        "cancel": "Cancelar",
+        "errors": {
+          "noEmail": "Este miembro no tiene dirección de correo.",
+          "noCard": "Este miembro aún no tiene tarjeta — el enlace de pago depende de ella.",
+          "sendFailed": "El envío ha fallado. Inténtalo de nuevo."
         }
       }
     },
