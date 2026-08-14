@@ -3482,5 +3482,27 @@
       "titleRequired": "De titel is verplicht.",
       "notFound": "Stap niet gevonden."
     }
+  },
+  "token": {
+    "reconcile": {
+      "trigger": "Verifiëren",
+      "title": "Deze operatie verifiëren",
+      "description": "Vraagt de bundler wat er werkelijk on-chain is gebeurd. Er wordt niets opnieuw uitgegeven — alleen onze registratie wordt gecorrigeerd.",
+      "confirm": "Verifiëren",
+      "checking": "Bezig met controleren…",
+      "cancel": "Annuleren",
+      "close": "Sluiten",
+      "outcomes": {
+        "settled": "On-chain bevestigd. De echte transactiehash is vastgelegd.",
+        "pending": "Nog onderweg bij de bundler. Er is niets gewijzigd — probeer het later opnieuw.",
+        "failed": "Definitieve on-chain fout. De operatie is als mislukt gemarkeerd, het lid kan opnieuw worden toegewezen.",
+        "never-submitted": "Deze operatie heeft de bundler nooit bereikt. De hermint-cron handelt dit af."
+      },
+      "errors": {
+        "notFound": "Operatie niet gevonden.",
+        "noChain": "Geen tokenketen geconfigureerd voor deze caisse.",
+        "inconclusive": "De bundler was niet bereikbaar. Er is niets gewijzigd — probeer opnieuw."
+      }
+    }
   }
 }

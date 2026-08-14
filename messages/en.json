@@ -3482,5 +3482,27 @@
       "titleRequired": "The title is required.",
       "notFound": "Step not found."
     }
+  },
+  "token": {
+    "reconcile": {
+      "trigger": "Verify",
+      "title": "Verify this operation",
+      "description": "Asks the bundler what actually happened on-chain. Nothing is re-minted — only our record is corrected.",
+      "confirm": "Verify",
+      "checking": "Checking…",
+      "cancel": "Cancel",
+      "close": "Close",
+      "outcomes": {
+        "settled": "Confirmed on-chain. The real transaction hash has been recorded.",
+        "pending": "Still in flight at the bundler. Nothing was changed — check again later.",
+        "failed": "Terminal on-chain failure. The operation is marked failed, so the member can be allocated again.",
+        "never-submitted": "This operation never reached the bundler. The mint-retry cron handles it."
+      },
+      "errors": {
+        "notFound": "Operation not found.",
+        "noChain": "No token chain configured for this fund.",
+        "inconclusive": "The bundler could not be reached. Nothing was changed — try again."
+      }
+    }
   }
 }
