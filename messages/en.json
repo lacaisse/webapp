@@ -649,6 +649,7 @@
         "max": "Maximum",
         "members": "Members",
         "empty": "No tiers configured. Add one to start allocating.",
+        "hiddenAtSignup": "Hidden at signup",
         "dialog": {
           "createTitle": "Add a tier",
           "editTitle": "Edit tier",
@@ -658,6 +659,8 @@
           "allocation": "Allocation amount",
           "max": "Maximum contribution",
           "position": "Display position",
+          "hiddenAtSignup": "Hide this tier on the signup form",
+          "hiddenAtSignupHint": "The tier stays assignable by an admin and keeps driving allocations — it just never appears in the public signup form.",
           "save": "Save",
           "saving": "Saving…",
           "cancel": "Cancel"

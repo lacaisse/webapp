@@ -1123,6 +1123,13 @@ model AllocationTier {
   // Display order in the admin UI. Lower = first.
   position Int @default(0)
 
+  // Hidden from the public signup form (issue #37): the tier stays fully live
+  // — admins can assign it, it drives allocations, it shows in the admin UI —
+  // but applicants never see it in the signup tier picker (issue #157), and a
+  // crafted submission naming it is rejected. Distinct from archivedAt, which
+  // retires a tier everywhere.
+  hiddenAtSignup Boolean @default(false)
+
   // Soft-delete: archived tiers can't be assigned to new members but
   // existing assignments remain so historical reporting still works.
   archivedAt DateTime?

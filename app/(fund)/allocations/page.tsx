@@ -146,7 +146,16 @@ async function TiersTab({ fundId }: { fundId: string }) {
           ) : (
             tiers.map((tier) => (
               <TableRow key={tier.id}>
-                <TableCell className="font-medium">{tier.name}</TableCell>
+                <TableCell className="font-medium">
+                  <span className="inline-flex items-center gap-2">
+                    {tier.name}
+                    {/* Hidden from the signup picker (issue #37) — the tier is
+                        otherwise fully live, so flag it rather than hide it. */}
+                    {tier.hiddenAtSignup && (
+                      <Badge variant="outline">{t("hiddenAtSignup")}</Badge>
+                    )}
+                  </span>
+                </TableCell>
                 <TableCell className="text-right text-sm text-muted-foreground">
                   {tier.minContribution.toString()}
                 </TableCell>
@@ -171,6 +180,7 @@ async function TiersTab({ fundId }: { fundId: string }) {
                           allocationAmount: tier.allocationAmount.toString(),
                           maxContribution: tier.maxContribution.toString(),
                           position: tier.position,
+                          hiddenAtSignup: tier.hiddenAtSignup,
                         },
                       }}
                       trigger={
