@@ -1722,6 +1722,10 @@ enum EmailType {
   MERCHANT_REJECTED
   REFERRAL_BONUS_AWARDED
   CARD_ASSIGNED
+
+  // Sent by hand from the member detail page when a member asks for their
+  // payment link / account page again (issue #45). No automatic trigger.
+  MEMBER_PAYMENT_LINK
 }
 
 enum EmailStatus {
