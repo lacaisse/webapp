@@ -1793,6 +1793,10 @@
             "title": "Pago recibido",
             "description": "Correo que recibe el miembro cuando se recibe y concilia un pago."
           },
+          "PAYMENT_BELOW_MINIMUM": {
+            "title": "Contribución por debajo del mínimo",
+            "description": "Enviado al miembro cuando la contribución recibida es inferior al mínimo de su nivel."
+          },
           "REFERRAL_BONUS_AWARDED": {
             "title": "Bono por recomendación",
             "description": "Correo que recibe el padrino cuando se acredita un bono por recomendación en su tarjeta."
@@ -2033,6 +2037,10 @@
       "paymentConfirmation": {
         "subject": "Pago recibido — {fundName}",
         "textBody": "Hola {firstName}:\n\nAcabamos de recibir tu pago de {amount} el {occurredAt} para {fundName}.\n\nSi tu fondo funciona con pago inmediato, tu tarjeta ya se ha recargado. De lo contrario, el crédito se aplicará en el próximo período de asignación.\n\nEl equipo de {fundName}"
+      },
+      "paymentBelowMinimum": {
+        "subject": "Tu contribución está por debajo del mínimo requerido — {fundName}",
+        "textBody": "Hola {firstName} {lastName},\n\nTe confirmamos que hemos recibido tu contribución mensual de {amount} el {occurredAt}. Lamentablemente, este importe es inferior a {minContribution}, la contribución mensual mínima necesaria para participar en {fundName}.\n\nPara poder recibir tu asignación de {allocationAmount}€ (abonada el día 15 de cada mes), te rogamos que transfieras el importe restante antes del día 9 del mes.\n\nNo dudes en ponerte en contacto con nosotros si tienes alguna duda.\n\nGracias por tu comprensión,\n\nEl equipo de {fundName}"
       },
       "allocationConfirmation": {
         "subject": "{amount} acaba de llegar a tu tarjeta — {fundName}",

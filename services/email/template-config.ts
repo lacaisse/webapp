@@ -122,6 +122,25 @@ export const EDITABLE_EMAIL_TEMPLATES = {
     defaultIsHtml: false,
     variables: ["firstName", "fundName", "amount", "occurredAt"],
   },
+  PAYMENT_BELOW_MINIMUM: {
+    i18nKey: "members.email.paymentBelowMinimum",
+    hasCta: false,
+    defaultIsHtml: false,
+    // Editable because the built-in default states a payout calendar ("versés
+    // le 15 du mois", "avant le 9 du mois") that is one fund's policy, not a
+    // platform rule — every other fund needs to be able to correct it without
+    // a code change. {minContribution} is the tier's minimum, {allocationAmount}
+    // the allocation that minimum unlocks, {amount} what actually arrived.
+    variables: [
+      "firstName",
+      "lastName",
+      "fundName",
+      "amount",
+      "minContribution",
+      "allocationAmount",
+      "occurredAt",
+    ],
+  },
   REFERRAL_BONUS_AWARDED: {
     i18nKey: "members.admin.email.referralBonusAwarded",
     hasCta: false,
@@ -196,6 +215,15 @@ export const PREVIEW_SAMPLE_VALUES: Record<
     firstName: "Alex",
     fundName: "Your fund",
     amount: "25",
+    occurredAt: "24/07/2026",
+  },
+  PAYMENT_BELOW_MINIMUM: {
+    firstName: "Alex",
+    lastName: "Dupont",
+    fundName: "Your fund",
+    amount: "15",
+    minContribution: "25",
+    allocationAmount: "50",
     occurredAt: "24/07/2026",
   },
   REFERRAL_BONUS_AWARDED: {

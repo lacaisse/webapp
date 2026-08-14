@@ -1793,6 +1793,10 @@
             "title": "Payment received",
             "description": "Email a member receives when a payment is received and reconciled."
           },
+          "PAYMENT_BELOW_MINIMUM": {
+            "title": "Contribution below minimum",
+            "description": "Sent to the member when a received contribution falls below their tier's minimum."
+          },
           "REFERRAL_BONUS_AWARDED": {
             "title": "Referral bonus",
             "description": "Email a sponsor receives when a referral bonus is credited to their card."

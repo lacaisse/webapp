@@ -392,6 +392,7 @@ async function dispatchContributionEmail(args: {
       });
       await sendPaymentBelowMinimum({
         emailId: emailRow.id,
+        fundId: args.fund.id,
         toEmail: member.email,
         firstName: member.firstName,
         lastName: member.lastName,

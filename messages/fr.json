@@ -1793,6 +1793,10 @@
             "title": "Paiement reçu",
             "description": "E-mail envoyé au membre lorsqu'un paiement est reçu et rapproché."
           },
+          "PAYMENT_BELOW_MINIMUM": {
+            "title": "Cotisation sous le minimum",
+            "description": "E-mail envoyé au membre lorsque la cotisation reçue est inférieure au minimum de son palier."
+          },
           "REFERRAL_BONUS_AWARDED": {
             "title": "Bonus de parrainage",
             "description": "E-mail envoyé au parrain lorsqu'un bonus de parrainage est crédité sur sa carte."

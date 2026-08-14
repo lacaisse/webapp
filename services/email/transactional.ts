@@ -242,6 +242,7 @@ function formatEmailDate(isoTimestamp: string, locale: string): string {
 // the ISO string; see #147).
 export async function sendPaymentBelowMinimum(args: {
   emailId: string;
+  fundId: string;
   toEmail: string;
   firstName: string;
   lastName: string;
@@ -254,14 +255,12 @@ export async function sendPaymentBelowMinimum(args: {
   await dispatchTemplate({
     emailId: args.emailId,
     fund: args.fund,
-    render: async (locale) => {
-      const t = await getTranslations({
+    render: (locale) =>
+      resolveEmailTemplate({
+        fundId: args.fundId,
+        type: "PAYMENT_BELOW_MINIMUM",
         locale,
-        namespace: "members.email.paymentBelowMinimum",
-      });
-      return {
-        subject: t("subject", { fundName: args.fund.name }),
-        text: t("textBody", {
+        vars: {
           firstName: args.firstName,
           lastName: args.lastName,
           fundName: args.fund.name,
@@ -269,9 +268,8 @@ export async function sendPaymentBelowMinimum(args: {
           minContribution: args.minContribution,
           allocationAmount: args.allocationAmount,
           occurredAt: formatEmailDate(args.occurredAt, locale),
-        }),
-      };
-    },
+        },
+      }),
     to: args.toEmail,
   });
 }
