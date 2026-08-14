@@ -649,6 +649,7 @@
         "max": "Maximum",
         "members": "Membres",
         "empty": "Aucun palier configuré. Ajoutez-en un pour commencer.",
+        "hiddenAtSignup": "Masqué à l'inscription",
         "dialog": {
           "createTitle": "Ajouter un palier",
           "editTitle": "Modifier le palier",
@@ -658,6 +659,8 @@
           "allocation": "Montant d'allocation",
           "max": "Contribution maximum",
           "position": "Ordre d'affichage",
+          "hiddenAtSignup": "Masquer ce palier lors de l'inscription",
+          "hiddenAtSignupHint": "Le palier reste assignable par un administrateur et continue d'alimenter les allocations — il n'apparaît simplement pas dans le formulaire d'inscription public.",
           "save": "Enregistrer",
           "saving": "Enregistrement…",
           "cancel": "Annuler"

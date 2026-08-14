@@ -56,8 +56,11 @@ export default async function MemberSignupPage({
       orderBy: { position: "asc" },
       select: { id: true, title: true, description: true, position: true },
     }),
+    // Signup-visible tiers only: hiddenAtSignup tiers stay assignable by admins
+    // but are never offered to applicants (issue #37). signupMemberAction
+    // applies the same filter as the authoritative allowlist.
     prisma.allocationTier.findMany({
-      where: { fundId: fund.id, archivedAt: null },
+      where: { fundId: fund.id, archivedAt: null, hiddenAtSignup: false },
       orderBy: { position: "asc" },
       select: { id: true, name: true },
     }),

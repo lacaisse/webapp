@@ -6,6 +6,7 @@ import { useState, useTransition } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -34,6 +35,7 @@ type Mode =
         allocationAmount: string;
         maxContribution: string;
         position: number;
+        hiddenAtSignup: boolean;
       };
     };
 
@@ -55,6 +57,7 @@ export function TierDialog({
           allocationAmount: "",
           maxContribution: "",
           position: 0,
+          hiddenAtSignup: false,
         };
 
   const [open, setOpen] = useState(false);
@@ -63,6 +66,7 @@ export function TierDialog({
   const [alloc, setAlloc] = useState(initial.allocationAmount);
   const [maxC, setMaxC] = useState(initial.maxContribution);
   const [position, setPosition] = useState(initial.position);
+  const [hiddenAtSignup, setHiddenAtSignup] = useState(initial.hiddenAtSignup);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -75,6 +79,7 @@ export function TierDialog({
         allocationAmount: alloc,
         maxContribution: maxC,
         position,
+        hiddenAtSignup,
       };
       const result =
         mode.kind === "create"
@@ -142,6 +147,21 @@ export function TierDialog({
             onChange={(v) => setPosition(Number.parseInt(v) || 0)}
             inputMode="numeric"
           />
+          <div className="flex items-start gap-3">
+            <Checkbox
+              id="tier-hidden"
+              checked={hiddenAtSignup}
+              onCheckedChange={(checked) => setHiddenAtSignup(checked === true)}
+            />
+            <div className="space-y-1">
+              <Label htmlFor="tier-hidden" className="font-normal">
+                {t("hiddenAtSignup")}
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                {t("hiddenAtSignupHint")}
+              </p>
+            </div>
+          </div>
         </div>
         {error && (
           <Alert variant="destructive">

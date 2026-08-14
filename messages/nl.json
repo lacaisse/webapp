@@ -649,6 +649,7 @@
         "max": "Maximum",
         "members": "Leden",
         "empty": "Nog geen niveaus geconfigureerd. Voeg er een toe om te beginnen.",
+        "hiddenAtSignup": "Verborgen bij aanmelding",
         "dialog": {
           "createTitle": "Niveau toevoegen",
           "editTitle": "Niveau bewerken",
@@ -658,6 +659,8 @@
           "allocation": "Allocatiebedrag",
           "max": "Maximum bijdrage",
           "position": "Volgorde",
+          "hiddenAtSignup": "Verberg dit niveau op het aanmeldformulier",
+          "hiddenAtSignupHint": "Het niveau blijft toewijsbaar door een beheerder en blijft toewijzingen aansturen — het verschijnt alleen niet in het openbare aanmeldformulier.",
           "save": "Opslaan",
           "saving": "Opslaan…",
           "cancel": "Annuleren"

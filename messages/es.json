@@ -649,6 +649,7 @@
         "max": "Máximo",
         "members": "Miembros",
         "empty": "No hay niveles configurados. Añade uno para empezar a asignar.",
+        "hiddenAtSignup": "Oculto en el registro",
         "dialog": {
           "createTitle": "Añadir un nivel",
           "editTitle": "Editar nivel",
@@ -658,6 +659,8 @@
           "allocation": "Importe de asignación",
           "max": "Contribución máxima",
           "position": "Posición de visualización",
+          "hiddenAtSignup": "Ocultar este nivel en el formulario de registro",
+          "hiddenAtSignupHint": "El nivel sigue siendo asignable por un administrador y sigue generando asignaciones — simplemente no aparece en el formulario de registro público.",
           "save": "Guardar",
           "saving": "Guardando…",
           "cancel": "Cancelar"
