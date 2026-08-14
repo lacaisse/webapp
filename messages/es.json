@@ -2200,13 +2200,13 @@
       "delete": {
         "trigger": "Eliminar",
         "title": "¿Eliminar a {memberName} definitivamente?",
-        "description": "La ficha del miembro se eliminará de esta caja. Solo disponible para miembros sin tarjeta vinculada ni historial de transacciones.",
+        "description": "La ficha del miembro se eliminará de esta caja. Solo disponible para miembros sin tarjeta vinculada, sin historial de transacciones y sin referidos.",
         "irreversibleWarning": "Esta acción no se puede deshacer. Si quieres conservar un registro de este miembro, cambia su estado a Dado de baja en su lugar.",
         "cancel": "Cancelar",
         "confirm": "Eliminar definitivamente",
         "deleting": "Eliminando…",
         "errors": {
-          "notDeletable": "Solo se pueden eliminar los miembros sin tarjeta vinculada ni historial de transacciones."
+          "notDeletable": "Solo se pueden eliminar los miembros sin tarjeta vinculada, sin historial de transacciones y sin referidos."
         }
       },
       "bulk": {
@@ -2240,9 +2240,9 @@
         "delete": {
           "trigger": "Eliminar selección",
           "dialogTitle": "Eliminar miembros seleccionados",
-          "dialogDescription": "Eliminar definitivamente los {count} miembro(s) seleccionados sin tarjeta vinculada ni historial de transacciones.",
-          "irreversibleWarning": "Esta acción no se puede deshacer. Los miembros con tarjeta vinculada o historial de transacciones se omiten, no se eliminan.",
-          "resultSkipped": "{deleted} eliminados, {skipped} omitidos (tarjeta vinculada o historial de transacciones).",
+          "dialogDescription": "Eliminar definitivamente los {count} miembro(s) seleccionados sin tarjeta vinculada, sin historial de transacciones y sin referidos.",
+          "irreversibleWarning": "Esta acción no se puede deshacer. Los miembros con tarjeta vinculada, historial de transacciones o referidos se omiten, no se eliminan.",
+          "resultSkipped": "{deleted} eliminados, {skipped} omitidos (tarjeta vinculada, historial de transacciones o referidos).",
           "done": "Hecho",
           "cancel": "Cancelar",
           "confirm": "Eliminar definitivamente",

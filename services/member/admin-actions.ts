@@ -499,11 +499,11 @@ export async function setMemberReminderOptOutAction(input: {
 export type DeleteMemberResult = { ok: true } | { error: string };
 
 // Hard delete (issue #109) — permanent, row action on the members list.
-// Only allowed when the member has no linked card and no transaction
-// history (see isMemberDeletable): those are exactly the members a fund can
-// still safely remove without losing audit trail, e.g. a duplicate or a
-// member added by mistake. Everything else (referrals, linked bank accounts,
-// emails) cascades or detaches per the schema's own delete rules.
+// Only allowed when the member has no linked card, no transaction history and
+// no referral on either side (see isMemberDeletable): those are exactly the
+// members a fund can still safely remove without losing audit trail, e.g. a
+// duplicate or a member added by mistake. What's left (linked bank accounts,
+// email verifications) cascades and emails detach, per the schema's own rules.
 export async function deleteMemberAction(input: {
   memberId: string;
 }): Promise<DeleteMemberResult> {
@@ -515,12 +515,18 @@ export async function deleteMemberAction(input: {
     select: {
       id: true,
       _count: {
-        select: { cards: true, bankTransactions: true, tokenOperations: true },
+        select: {
+          cards: true,
+          bankTransactions: true,
+          tokenOperations: true,
+          sponsoredReferrals: true,
+        },
       },
+      referralRecord: { select: { id: true } },
     },
   });
   if (!member) return { error: t("members.admin.errors.notFound" as never) };
-  if (!isMemberDeletable(member._count)) {
+  if (!isMemberDeletable(member)) {
     return { error: t("members.admin.delete.errors.notDeletable" as never) };
   }
 

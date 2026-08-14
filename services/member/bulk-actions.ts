@@ -137,9 +137,9 @@ export type BulkDeleteMembersResult =
   | { error: string };
 
 // Bulk counterpart to deleteMemberAction (issue #35). Same eligibility gate —
-// no linked card, no transaction history — applied per member; anyone who
-// doesn't qualify is skipped and reported back rather than blocking the whole
-// batch or being silently dropped.
+// no linked card, no transaction history, no referral either way — applied per
+// member; anyone who doesn't qualify is skipped and reported back rather than
+// blocking the whole batch or being silently dropped.
 export async function bulkDeleteMembersAction(input: {
   memberIds: string[];
 }): Promise<BulkDeleteMembersResult> {
@@ -161,8 +161,14 @@ export async function bulkDeleteMembersAction(input: {
     select: {
       id: true,
       _count: {
-        select: { cards: true, bankTransactions: true, tokenOperations: true },
+        select: {
+          cards: true,
+          bankTransactions: true,
+          tokenOperations: true,
+          sponsoredReferrals: true,
+        },
       },
+      referralRecord: { select: { id: true } },
     },
   });
   if (members.length === 0) {
@@ -170,7 +176,7 @@ export async function bulkDeleteMembersAction(input: {
   }
 
   const deletableIds = members
-    .filter((m) => isMemberDeletable(m._count))
+    .filter((m) => isMemberDeletable(m))
     .map((m) => m.id);
   const skipped = members.length - deletableIds.length;
 

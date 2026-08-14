@@ -190,16 +190,20 @@ async function MembersContent({
           take: 1,
           select: { amount: true, currency: true },
         },
-        // Counts (not the rows themselves) drive the delete row action:
-        // a member can only be hard-deleted with no linked card and no
-        // transaction history (issues #109/#35).
+        // Counts (not the rows themselves) drive the delete row action: a
+        // member can only be hard-deleted with no linked card, no transaction
+        // history and no referral either way (issues #109/#35). Referrals
+        // cascade on delete rather than detaching, so they gate it too — see
+        // isMemberDeletable.
         _count: {
           select: {
             cards: true,
             bankTransactions: true,
             tokenOperations: true,
+            sponsoredReferrals: true,
           },
         },
+        referralRecord: { select: { id: true } },
       },
     }),
     prisma.allocationTier.findMany({
@@ -387,7 +391,7 @@ async function MembersContent({
                         memberName={fullName}
                         currentStatus={m.status}
                       />
-                      {isMemberDeletable(m._count) && (
+                      {isMemberDeletable(m) && (
                         <DeleteMemberButton
                           memberId={m.id}
                           memberName={fullName}
