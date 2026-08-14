@@ -108,17 +108,18 @@ async function dispatchMemberWelcome(
   memberId: string,
 ) {
   // Signup-flow email: deliberately ignores the member-email pause — the
-  // member just verified and this welcome carries their payment reference.
+  // member just verified. The welcome no longer carries a payment reference
+  // (the member has no card yet; the reference is the card UID, delivered with
+  // the card).
   const member = await prisma.member.findUnique({
     where: { id: memberId },
     select: {
       id: true,
       email: true,
       firstName: true,
-      paymentReference: true,
     },
   });
-  if (!member?.paymentReference) return;
+  if (!member?.email) return;
 
   const t = await getTranslations("members.signup.emailTemplates.welcome");
   const subject = t("subject", { fundName: fund.name });
@@ -134,6 +135,7 @@ async function dispatchMemberWelcome(
   });
   await sendMemberWelcome({
     emailId: emailRow.id,
+    fundId: fund.id,
     toEmail: member.email,
     fund: {
       name: fund.name,
@@ -141,6 +143,5 @@ async function dispatchMemberWelcome(
       logoUrl: fund.logoUrl,
     },
     firstName: member.firstName,
-    paymentReference: member.paymentReference,
   });
 }

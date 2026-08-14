@@ -19,7 +19,8 @@ import { ANNOTATION_TRIGGERS } from "@/services/transaction-annotation/annotate"
 
 // Bank-sync ingestion. Mirrors CitizenPay-reported bank movements into the
 // local BankTransaction table, attempts to match each INCOMING row to a
-// member (paymentReference → remittance info → IBAN), and, for funds in
+// member (card UID serial → structured communication → IBAN; see
+// matching/match.ts), and, for funds in
 // PAY_AND_GO mode, triggers a mint at the matched member's tier amount.
 //
 // Idempotency: BankTransaction has @@unique([fundId, externalId]). If a
@@ -364,6 +365,7 @@ async function dispatchPaymentConfirmation(args: {
     });
     await sendPaymentConfirmation({
       emailId: emailRow.id,
+      fundId: args.fund.id,
       toEmail: member.email,
       firstName: member.firstName,
       fund: {

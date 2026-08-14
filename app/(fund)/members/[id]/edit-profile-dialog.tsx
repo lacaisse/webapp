@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SUPPORTED_LOCALES } from "@/services/i18n/config";
 import {
   type EditMemberProfileField,
   updateMemberProfileAction,
@@ -27,36 +28,41 @@ type Values = {
   firstName: string;
   lastName: string;
   email: string;
-  phone: string;
+  // "" means "no explicit preference" (falls back to the fund default locale).
+  locale: string;
   address: string;
   postalCode: string;
   city: string;
-  iban: string;
-  householdAdults: string;
-  householdChildren: string;
+  contributionAmount: string;
   notes: string;
 };
 
 export function EditProfileDialog({
   memberId,
   member,
+  showContribution,
 }: {
   memberId: string;
   member: {
     firstName: string;
     lastName: string;
     email: string;
-    phone: string | null;
+    locale: string | null;
     address: string | null;
     postalCode: string | null;
     city: string | null;
-    iban: string | null;
-    householdAdults: number;
-    householdChildren: number;
+    contributionAmount: string | null;
     notes: string | null;
+    // The member's tier target/min, for the committed-amount hint. Null when
+    // the member has no tier yet.
+    tierTarget: string | null;
+    tierMin: string | null;
   };
+  // Only FIXED_PERIOD funds with tiers show the commitment-amount field.
+  showContribution: boolean;
 }) {
   const t = useTranslations("members.admin.edit");
+  const tLocale = useTranslations("locale");
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -68,13 +74,11 @@ export function EditProfileDialog({
     firstName: member.firstName,
     lastName: member.lastName,
     email: member.email,
-    phone: member.phone ?? "",
+    locale: member.locale ?? "",
     address: member.address ?? "",
     postalCode: member.postalCode ?? "",
     city: member.city ?? "",
-    iban: member.iban ?? "",
-    householdAdults: String(member.householdAdults),
-    householdChildren: String(member.householdChildren),
+    contributionAmount: member.contributionAmount ?? "",
     notes: member.notes ?? "",
   });
 
@@ -156,22 +160,24 @@ export function EditProfileDialog({
               autoComplete="email"
             />
           </div>
-          <Field
-            id="edit-phone"
-            label={t("phoneLabel")}
-            type="tel"
-            value={values.phone}
-            onChange={set("phone")}
-            invalid={errorField === "phone"}
-            autoComplete="tel"
-          />
-          <Field
-            id="edit-iban"
-            label={t("ibanLabel")}
-            value={values.iban}
-            onChange={set("iban")}
-            invalid={errorField === "iban"}
-          />
+          <div className="space-y-2">
+            <Label htmlFor="edit-locale">{t("localeLabel")}</Label>
+            <select
+              id="edit-locale"
+              value={values.locale}
+              onChange={(e) => set("locale")(e.target.value)}
+              aria-invalid={errorField === "locale"}
+              className="h-9 w-full rounded-md bg-background px-2 text-sm ring-1 ring-foreground/15 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <option value="">{t("localeDefault")}</option>
+              {SUPPORTED_LOCALES.map((loc) => (
+                <option key={loc} value={loc}>
+                  {tLocale(loc)}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-muted-foreground">{t("localeHint")}</p>
+          </div>
           <div className="sm:col-span-2">
             <Field
               id="edit-address"
@@ -198,24 +204,28 @@ export function EditProfileDialog({
             invalid={errorField === "city"}
             autoComplete="address-level2"
           />
-          <Field
-            id="edit-householdAdults"
-            label={t("householdAdultsLabel")}
-            type="number"
-            min={0}
-            value={values.householdAdults}
-            onChange={set("householdAdults")}
-            invalid={errorField === "householdAdults"}
-          />
-          <Field
-            id="edit-householdChildren"
-            label={t("householdChildrenLabel")}
-            type="number"
-            min={0}
-            value={values.householdChildren}
-            onChange={set("householdChildren")}
-            invalid={errorField === "householdChildren"}
-          />
+          {showContribution && (
+            <div className="sm:col-span-2">
+              <Field
+                id="edit-contributionAmount"
+                label={t("contributionAmountLabel")}
+                hint={
+                  member.tierTarget
+                    ? t("contributionAmountHint", {
+                        target: member.tierTarget,
+                        min: member.tierMin ?? member.tierTarget,
+                      })
+                    : t("contributionAmountHintNoTier")
+                }
+                type="number"
+                min={0}
+                step="0.01"
+                value={values.contributionAmount}
+                onChange={set("contributionAmount")}
+                invalid={errorField === "contributionAmount"}
+              />
+            </div>
+          )}
           <div className="space-y-2 sm:col-span-2">
             <Label htmlFor="edit-notes">{t("notesLabel")}</Label>
             <textarea
@@ -262,6 +272,7 @@ function Field({
   invalid,
   type,
   min,
+  step,
   autoComplete,
 }: {
   id: string;
@@ -273,6 +284,7 @@ function Field({
   invalid?: boolean;
   type?: string;
   min?: number;
+  step?: string;
   autoComplete?: string;
 }) {
   return (
@@ -289,6 +301,7 @@ function Field({
         id={id}
         type={type}
         min={min}
+        step={step}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         aria-invalid={invalid}

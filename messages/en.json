@@ -421,6 +421,7 @@
       },
       "contribution": {
         "target": "Target",
+        "committed": "Committed",
         "lastReceived": "Last received",
         "none": "—"
       },
@@ -433,8 +434,6 @@
           "title": "Identity",
           "description": "Contact and household.",
           "address": "Address",
-          "household": "Household",
-          "householdValue": "{adults} adults · {children} children",
           "joined": "Joined",
           "left": "Left",
           "notes": "Notes"
@@ -443,13 +442,21 @@
           "title": "Membership",
           "description": "Tier, banking, and referral identifiers.",
           "tier": "Tier",
-          "iban": "IBAN",
+          "committed": "Committed contribution",
+          "committedDefault": "(tier target)",
           "referralCode": "Referral code",
           "primaryCard": "Primary card"
         },
         "applicationData": {
           "title": "Application data",
-          "description": "Custom onboarding fields submitted by the member."
+          "description": "Custom onboarding fields submitted by the member.",
+          "empty": "No answers recorded yet.",
+          "edit": "Edit",
+          "editTitle": "Edit membership details",
+          "editDescription": "Only questions the form still asks can be edited. Answers to archived questions are kept as they are.",
+          "save": "Save",
+          "saving": "Saving…",
+          "cancel": "Cancel"
         },
         "cards": {
           "title": "Cards",
@@ -549,6 +556,8 @@
           "title": "Card information",
           "description": "Serial, wallet, and lifecycle events.",
           "serial": "Serial",
+          "tapLink": "Card interface",
+          "tapLinkLabel": "Open on CitizenPay",
           "holder": "Holder",
           "member": "Member",
           "account": "Wallet",
@@ -786,6 +795,9 @@
           "confirm": "Remove",
           "removing": "Removing…"
         },
+        "movePeriod": {
+          "placeholder": "Move to period…"
+        },
         "attachAllocation": {
           "button": "Attach allocation",
           "title": "Attach an existing allocation",
@@ -852,7 +864,11 @@
             "notRemindable": "This member can't be reminded — they're no longer on the unpaid list.",
             "noEmail": "This member has no email address.",
             "sendFailed": "The reminder couldn't be sent. Try again."
-          }
+          },
+          "pausedConfirmTitle": "Member emails are paused",
+          "pausedConfirmDescription": "Member notification emails are paused for this fund. Sending this reminder to {name} will override the pause. Continue?",
+          "allPausedConfirmDescription": "Member notification emails are paused for this fund. Sending these reminders to {count} member(s) will override the pause. Continue?",
+          "pausedConfirmSend": "Send anyway"
         }
       },
       "periods": {
@@ -939,6 +955,37 @@
         "prev": "Previous",
         "next": "Next",
         "error": "Couldn't load wallet balances."
+      },
+      "account": {
+        "title": "Account audit",
+        "back": "Token explorer",
+        "balance": "On-chain balance",
+        "shareOfSupply": "{share}% of total supply",
+        "totalIn": "Total received",
+        "totalOut": "Total sent",
+        "transfersIn": "{count} incoming transfers",
+        "transfersOut": "{count} outgoing transfers",
+        "status": "Audit status",
+        "reconciled": "Reconciled",
+        "reconciledHint": "Received minus sent exactly matches the on-chain balance.",
+        "unexplained": "Unexplained difference",
+        "unexplainedHint": "The history doesn't add up to the balance: {amount} is unaccounted for.",
+        "truncated": "Partial history",
+        "truncatedHint": "Only the {count} most recent transfers are shown. The balance before this window was {amount}.",
+        "date": "When",
+        "counterparty": "Counterparty",
+        "amount": "Amount",
+        "balanceAfter": "Balance after",
+        "trigger": "Trigger",
+        "note": "Note",
+        "empty": "No transfers involve this wallet yet.",
+        "error": "Couldn't load the on-chain history for this wallet.",
+        "prev": "Previous",
+        "next": "Next",
+        "issued": "Issued",
+        "retired": "Destroyed",
+        "treasury": "Treasury",
+        "unknown": "External wallet"
       }
     },
     "merchants": {
@@ -1069,8 +1116,8 @@
         "net": "Net",
         "manualDeduction": "Manual deduction",
         "placeBalance": "Place balance",
-        "placeBalanceEnough": "Enough to burn",
-        "placeBalanceLow": "Below the net amount",
+        "placeBalanceEnough": "Enough to settle",
+        "placeBalanceLow": "Below the payout total",
         "status": "Status",
         "burnTx": "Burn tx",
         "loadError": "Couldn't load payouts from CitizenPay. Try again shortly.",
@@ -1168,6 +1215,22 @@
           "successMinted": "Order added and net minted to the place.",
           "mintFailed": "Order added, but automatic minting failed. Reconcile it from the Issues tab."
         },
+        "addOrders": {
+          "trigger": "Add existing orders",
+          "title": "Add existing orders",
+          "description": "Pull in orders that already exist but weren't included in this payout — pick a date range, then choose which to add.",
+          "from": "From",
+          "to": "To",
+          "rangeHint": "Windows on the order's creation date. Only unassigned, payable orders can be added.",
+          "preview": "Preview",
+          "windowSummary": "{count, plural, =1 {# order available} other {# orders available}}",
+          "net": "Net",
+          "loadMore": "Show more",
+          "empty": "No orders can be added for this range.",
+          "confirm": "{count, plural, =0 {Add orders} =1 {Add # order} other {Add # orders}}",
+          "success": "{count, plural, =1 {# order added to the payout.} other {# orders added to the payout.}}",
+          "rejectedTitle": "Some orders couldn't be added and were skipped. The list has been refreshed — review and try again."
+        },
         "deduction": {
           "trigger": "Add deduction",
           "edit": "Edit deduction",
@@ -1220,6 +1283,8 @@
           "range": "Showing {from}–{to}",
           "prev": "Previous",
           "next": "Next",
+          "selectAll": "Select all issues",
+          "selectRow": "Select order",
           "receipt": {
             "success": "Confirmed",
             "reverted": "Reverted",
@@ -1246,13 +1311,43 @@
             "payerNoHistory": "No transfers found for this account.",
             "bankMatch": "Backing bank transfer",
             "bankMatchUnknown": "Unknown sender",
-            "bankMatchNone": "No transfer found matching {ref} yet."
+            "bankMatchNone": "No transfer found matching {ref} yet.",
+            "manualToggle": "Record an existing transaction instead",
+            "manualLabel": "Settlement transaction hash",
+            "manualHint": "The order is marked settled with this hash — no tokens are moved. Enter a 0x-prefixed transaction hash.",
+            "manualConfirm": "Record",
+            "manualConfirmAnyway": "Record anyway",
+            "manualWarnReverted": "This transaction reverted on-chain — it did not settle anything. Record it anyway?",
+            "manualWarnPending": "No receipt found for this transaction — it may not be mined yet, or it's unknown to the node. Record it anyway?",
+            "manualWarnUnavailable": "Couldn't verify this transaction on-chain. Double-check the hash before recording it.",
+            "payerPickHint": "Use this transaction's hash"
           },
           "archive": {
             "button": "Archive",
             "title": "Archive this order?",
             "description": "The order is removed from the payout and its totals are recomputed. It won't be included in any future payout.",
             "confirm": "Archive order"
+          },
+          "bulk": {
+            "selectedCount": "{n} selected",
+            "autoMatch": "Auto-match & fix",
+            "archive": "Archive",
+            "clear": "Clear",
+            "running": "Working…",
+            "archiveTitle": "Archive selected orders?",
+            "archiveDescription": "{n} orders will be removed from this payout and their totals recomputed. They won't be included in any future payout.",
+            "archiveConfirm": "Archive orders",
+            "summary": {
+              "fixed": "{n} fixed from a matching payer transfer.",
+              "nomatch": "{n} left — no matching payer transfer found.",
+              "ambiguous": "{n} left — several transfers matched; fix these by hand.",
+              "noaccount": "{n} skipped — paid by bank transfer, fix these by hand.",
+              "error": "{n} failed — couldn't be recorded. Try again shortly.",
+              "unavailable": "{n} skipped — on-chain transfers are unavailable for this fund.",
+              "truncated": "{n} not checked — too many transfers to scan; narrow the selection or retry.",
+              "archived": "{n} archived.",
+              "archiveFailed": "{n} couldn't be archived. Try again shortly."
+            }
           }
         },
         "details": "Details",
@@ -1279,9 +1374,13 @@
           "rangeOrder": "The end date must be after the start date.",
           "noPlaceAccount": "This place has no on-chain account to mint to.",
           "recordFailed": "Minted on-chain but couldn't record it on the payout.",
+          "txHashInvalid": "Enter a valid transaction hash (0x followed by 64 hex characters).",
           "archiveFailed": "Couldn't archive the order. Try again shortly.",
           "payerFailed": "Couldn't load the payer's account.",
           "createOrderFailed": "Couldn't add the order. Try again shortly.",
+          "addOrdersFailed": "Couldn't add the orders. Try again shortly.",
+          "addOrdersRejected": "Some of the selected orders could no longer be added.",
+          "noOrdersSelected": "Select at least one order to add.",
           "amountInvalid": "Enter a valid amount.",
           "feeInvalid": "Enter a valid fee.",
           "amountPositive": "The amount must be greater than zero.",
@@ -1296,9 +1395,9 @@
           "unlinkButton": "Unlink",
           "title": "Link this deposit to a member",
           "description": "Enter the member's payment reference or email. The deposit will count toward their allocation.",
-          "identifierLabel": "Payment reference or email",
-          "identifierPlaceholder": "ABCDEFGH or member@example.com",
-          "identifierHint": "Case-insensitive. Payment references are 8 characters from our generated alphabet.",
+          "identifierLabel": "Card reference or email",
+          "identifierPlaceholder": "04A2B7C9D1 or member@example.com",
+          "identifierHint": "Case-insensitive. The card reference is the card's UID (serial number), printed on the member's invitation.",
           "identifierRequired": "Enter a reference or email.",
           "cancel": "Cancel",
           "confirm": "Link",
@@ -1462,7 +1561,11 @@
           "member": "Member redirect URL",
           "memberHint": "Where members land after their final signup step (after email verification, when enabled).",
           "merchant": "Merchant redirect URL",
-          "merchantHint": "Where merchants land after their final signup step (after email verification, when enabled)."
+          "merchantHint": "Where merchants land after their final signup step (after email verification, when enabled).",
+          "memberCancel": "Cancel URL — member",
+          "memberCancelHint": "Where members land if they abandon the form (after confirming). Defaults to the fund's website.",
+          "memberError": "Error URL — member",
+          "memberErrorHint": "Where members land if the signup fails for a technical reason. Leave empty to show the error inside the form."
         },
         "fieldsTitle": "Application fields",
         "fieldsDescription": "Add custom questions to the member and merchant signup forms. Built-in fields (name, email) are always present.",
@@ -1481,7 +1584,8 @@
             "label": "Label",
             "key": "Key",
             "type": "Type",
-            "required": "Required"
+            "required": "Required",
+            "step": "Step"
           },
           "dialog": {
             "createTitle": "Add a field",
@@ -1498,7 +1602,30 @@
             "optionsHint": "One option per line. Use \"value:label\" to set a different stored value, or just the label.",
             "save": "Save",
             "saving": "Saving…",
-            "cancel": "Cancel"
+            "cancel": "Cancel",
+            "step": "Step",
+            "firstStep": "First step",
+            "stepHint": "Which page of the form this field appears on.",
+            "builtin": "Field kind",
+            "builtinCustom": "Custom question",
+            "builtinHint": "A member-record detail is saved to its own column, so it feeds letters, reminders and tier assignment. A custom question is stored separately, alongside the application.",
+            "builtinLocked": "Saved to the member record ({key}). The input type is fixed; you can still adjust the label, help text, whether it's required, and its position.",
+            "visibleIf": {
+              "label": "Only show when",
+              "none": "Always shown",
+              "operatorLabel": "Comparison",
+              "valueLabel": "Value",
+              "valuePlaceholder": "e.g. 1",
+              "hint": "This field only appears (and is only required) once the chosen field's answer satisfies this condition.",
+              "operators": {
+                "eq": "equals",
+                "neq": "does not equal",
+                "gt": "is greater than",
+                "gte": "is greater than or equal to",
+                "lt": "is less than",
+                "lte": "is less than or equal to"
+              }
+            }
           },
           "archive": {
             "button": "Archive",
@@ -1511,6 +1638,67 @@
             "restoreConfirm": "Restore",
             "saving": "Saving…",
             "cancel": "Cancel"
+          },
+          "firstStep": "First step",
+          "builtinBadge": "Member record",
+          "visibleIfCaption": "Shown when “{label}” {operator} {value}"
+        },
+        "stepsTitle": "Form steps",
+        "stepsDescription": "Split the signup form into several pages. With no steps, the form stays on a single page.",
+        "steps": {
+          "memberTitle": "Member steps",
+          "merchantTitle": "Merchant steps",
+          "description": "Fields are spread across these pages. Fields with no step show on the first one.",
+          "add": "Add a step",
+          "edit": "Edit",
+          "archived": "Archived",
+          "empty": "No steps — the form is a single page.",
+          "fieldCount": "{count, plural, =0 {no fields} one {# field} other {# fields}}",
+          "columns": {
+            "position": "#",
+            "title": "Title",
+            "fields": "Fields"
+          },
+          "dialog": {
+            "createTitle": "Add a step",
+            "editTitle": "Edit step",
+            "description": "Steps are shown in the order set by their position. The title is visible to applicants.",
+            "title": "Title",
+            "titleHint": "Shown at the top of this page of the form, in the fund's own language.",
+            "stepDescription": "Description",
+            "position": "Position",
+            "positionHint": "Steps are sorted by ascending position; the lowest is the first page.",
+            "save": "Save",
+            "saving": "Saving…",
+            "cancel": "Cancel"
+          },
+          "archive": {
+            "button": "Archive",
+            "restore": "Restore",
+            "title": "Archive this step?",
+            "description": "The step disappears from the form. No already-recorded answer is lost.",
+            "fieldsMove": "{count, plural, one {# field will move} other {# fields will move}} to the first step of the form.",
+            "restoreTitle": "Restore this step?",
+            "restoreDescription": "The step reappears in the form at its previous position.",
+            "confirm": "Archive",
+            "restoreConfirm": "Restore",
+            "saving": "Saving…",
+            "cancel": "Cancel"
+          }
+        },
+        "integration": {
+          "title": "Website integration",
+          "description": "The link your website uses to send people to the signup form, with details already filled in.",
+          "urlLabel": "Form URL",
+          "exampleLabel": "Example with prefill",
+          "exampleHint": "The applicant can edit every value; anything invalid is ignored.",
+          "paramsLabel": "Accepted parameters",
+          "paramsHint": "Unknown parameters are ignored. “ref”, “step” and “error” are reserved.",
+          "copy": "Copy",
+          "columns": {
+            "param": "Parameter",
+            "field": "Field",
+            "format": "Values"
           }
         }
       },
@@ -1563,7 +1751,7 @@
         "description": "Automatic emails sent to members about their deposits and allocations.",
         "pause": {
           "label": "Pause member notification emails",
-          "description": "While paused, members receive no notification emails: deposit and allocation confirmations, activation, invitation and referral-bonus emails are all skipped — not queued, so nothing is sent retroactively when you resume. Signup emails (verification, welcome) and password emails keep working. Merchant and team emails are unaffected."
+          "description": "While paused, members receive no notification emails: payment and allocation confirmations, activation, invitation, referral-bonus, “card on its way” and contribution reminders are all skipped — not queued, so nothing is sent retroactively when you resume. Signup emails (verification, welcome) and password emails keep working. Merchant and team emails are unaffected."
         },
         "sender": {
           "label": "Sender address",
@@ -1572,15 +1760,76 @@
         }
       },
       "emailTemplates": {
-        "allocationTitle": "Allocation confirmation email",
-        "allocationDescription": "The email members receive when an allocation lands on their card. Leave it untouched to keep the default wording, or customise it for this fund.",
-        "cardAssignedTitle": "Card-on-its-way email",
-        "cardAssignedDescription": "The email a member receives when their card is assigned and on its way. Leave it untouched to keep the default wording, or customise it for this fund.",
-        "paymentReminderTitle": "Contribution reminder email",
-        "paymentReminderDescription": "The monthly reminder sent on the 1st to members who haven't yet contributed for the period. Leave it untouched to keep the default wording, or customise it for this fund.",
+        "types": {
+          "ALLOCATION_CONFIRMATION": {
+            "title": "Allocation confirmation",
+            "description": "Email members receive when an allocation is credited to their card."
+          },
+          "CARD_ASSIGNED": {
+            "title": "Card on its way",
+            "description": "Email a member receives when their card is assigned and shipped."
+          },
+          "PAYMENT_REMINDER_FIRST": {
+            "title": "Contribution reminder (first)",
+            "description": "Automatic reminder sent on the 1st of the month to members who haven't yet contributed for the period."
+          },
+          "PAYMENT_REMINDER_SECOND": {
+            "title": "Contribution reminder (follow-up)",
+            "description": "Manual follow-up sent from a period's detail page to members still awaiting payment."
+          },
+          "MEMBER_WELCOME": {
+            "title": "Member welcome",
+            "description": "Welcome email sent to a new member after they sign up."
+          },
+          "MEMBER_INVITED": {
+            "title": "Member invitation",
+            "description": "Email sent to a member an admin has just added to the fund."
+          },
+          "MEMBER_ACTIVATED": {
+            "title": "Account activated",
+            "description": "Email a member receives when their account is activated and their card is ready."
+          },
+          "PAYMENT_CONFIRMATION": {
+            "title": "Payment received",
+            "description": "Email a member receives when a payment is received and reconciled."
+          },
+          "REFERRAL_BONUS_AWARDED": {
+            "title": "Referral bonus",
+            "description": "Email a sponsor receives when a referral bonus is credited to their card."
+          }
+        },
+        "defaultName": "Default template",
+        "builtIn": "Built-in",
+        "defaultReadOnly": "The default template can't be edited. Duplicate it to create a customisable version.",
+        "active": "Active",
+        "makeActive": "Make active",
+        "newTemplate": "New template",
+        "duplicate": "Duplicate",
+        "rename": "Rename",
+        "delete": "Delete",
+        "editTemplate": "Edit template",
+        "editTemplateDescription": "Customise the subject and body for each language, preview, and send a test.",
+        "createTitle": "New template",
+        "createDescription": "Name the template and choose what to start from.",
+        "nameLabel": "Name",
+        "namePlaceholder": "e.g. Warm tone",
+        "sourceLabel": "Start from",
+        "sourceDefault": "Default template",
+        "cancel": "Cancel",
+        "create": "Create",
+        "save": "Save",
+        "renameTitle": "Rename template",
+        "deleteTitle": "Delete template?",
+        "deleteDescription": "The template “{name}” will be permanently deleted. This can't be undone.",
+        "deleteActiveDescription": "“{name}” is the active template. Deleting it reverts this email to the default template. This can't be undone.",
+        "localeAuthored": "Customised for this language.",
+        "loadDefault": "Load default template",
         "subjectLabel": "Subject",
-        "bodyLabel": "Body",
-        "variablesHint": "You can use these placeholders — they're replaced with each member's details when the email is sent:",
+        "htmlLabel": "Body (HTML)",
+        "htmlHint": "Write the body in HTML — it's wrapped in your fund's layout (logo, footer). Use the variables below; they're replaced for each member at send time.",
+        "variablesHint": "You can use these variables — they're replaced with each member's details at send time:",
+        "previewLabel": "Preview",
+        "previewSubject": "Subject:",
         "variables": {
           "firstName": "The member's first name",
           "fundName": "This fund's name",
@@ -1591,43 +1840,36 @@
           "address": "The member's postal address",
           "cardLink": "Link to the member's public card page",
           "cardNumber": "The member's card number",
-          "paymentReference": "The reference to include on the bank transfer"
+          "paymentReference": "The reference to include on the bank transfer",
+          "paymentLink": "Link to the member's public payment page",
+          "occurredAt": "The date of the payment"
         },
-        "usingDefault": "Using the default template.",
-        "usingOverride": "Using a custom template for this fund.",
-        "reset": "Reset to default",
-        "resetConfirmTitle": "Reset to default template?",
-        "resetConfirmDescription": "This removes your custom wording and restores the default allocation-confirmation email. This can't be undone.",
-        "resetConfirmCancel": "Cancel",
-        "resetConfirmConfirm": "Reset",
         "errors": {
           "subjectRequired": "Enter a subject.",
           "subjectTooLong": "The subject is too long.",
-          "bodyRequired": "Enter a message body.",
-          "bodyTooLong": "The message body is too long.",
-          "unknownVariable": "Unknown placeholder \"{name}\". Remove it or use one of the listed variables."
+          "bodyRequired": "Enter a message.",
+          "bodyTooLong": "The message is too long.",
+          "unknownVariable": "Unknown variable “{name}”. Remove it or use one of the listed variables.",
+          "nameRequired": "Enter a name.",
+          "nameTooLong": "The name is too long.",
+          "nameTaken": "A template with this name already exists.",
+          "notFound": "This template can't be found."
         },
-        "htmlLabel": "Body (HTML)",
-        "htmlHint": "Write the body in HTML — it's wrapped in your fund's branded layout (logo, footer). Use the placeholders below; they're replaced per member when the email is sent.",
-        "previewLabel": "Preview",
-        "previewSubject": "Subject:",
         "test": {
           "title": "Send a test",
-          "description": "Pick a member to fill in the email's details, then send a copy to any address — populated with that member's live data.",
-          "memberLabel": "Use this member's data",
+          "description": "Optionally pick a member to fill in the data, then send a copy to an address of your choice.",
+          "memberLabel": "Test data",
+          "sampleData": "Sample data",
           "emailLabel": "Send to",
           "emailPlaceholder": "you@example.com",
           "send": "Send test",
           "sending": "Sending…",
           "sent": "Test email sent.",
-          "noMembers": "No active members with an allocation tier yet — add one to send a test.",
           "subjectPrefix": "[Test]",
           "errors": {
             "emailInvalid": "Enter a valid email address.",
-            "memberNotFound": "That member could not be found.",
-            "noTier": "That member has no allocation tier, so there's no amount to show.",
-            "noCard": "That member has no card yet, so there's nothing to link to.",
-            "sendFailed": "The test email could not be sent. Check the sender address and try again."
+            "memberNotFound": "This member can't be found.",
+            "sendFailed": "Couldn't send the test email. Check the sender address and try again."
           }
         }
       },
@@ -1653,7 +1895,7 @@
           "first_name": "The member's first name",
           "last_name": "The member's last name",
           "card_number": "The member's card number",
-          "payment_reference": "The member's payment reference"
+          "payment_reference": "The member's payment reference (their card UID)"
         },
         "errors": {
           "bodyRequired": "Enter the letter body.",
@@ -1680,7 +1922,11 @@
       "labelRequired": "Label is required.",
       "optionEmpty": "Each option must have a value and a label.",
       "optionsRequired": "Add at least one option.",
-      "notFound": "Field not found."
+      "notFound": "Field not found.",
+      "builtinInvalid": "That member detail is not a known one.",
+      "builtinTaken": "That detail is already asked for on this form (check archived fields too).",
+      "visibleIfInvalid": "That visibility condition isn't valid — check the field it depends on.",
+      "visibleIfValueRequired": "Enter a value for the visibility condition."
     }
   },
   "tokenOps": {
@@ -1802,6 +2048,8 @@
       "firstName": "First name",
       "lastName": "Last name",
       "email": "Email",
+      "contributionAmount": "Amount you'd like to contribute (optional)",
+      "contributionAmountHint": "Leave blank to use the amount suggested by your tier. You can agree on a different amount with an admin.",
       "remindersOptOut": "I don't want to receive payment reminder emails.",
       "submit": "Apply",
       "submitting": "Submitting…",
@@ -1810,8 +2058,11 @@
         "lastNameRequired": "Last name is required.",
         "emailInvalid": "Enter a valid email address.",
         "emailTaken": "An application with this email already exists for this fund.",
+        "amountInvalid": "Enter a valid amount (up to 2 decimals).",
         "fieldRequired": "{label} is required.",
-        "generic": "Something went wrong. Please try again."
+        "generic": "Something went wrong. Please try again.",
+        "required": "This field is required.",
+        "fieldInvalid": "{label} is not in a valid format."
       },
       "emailTemplates": {
         "verify": {
@@ -1821,7 +2072,7 @@
         },
         "welcome": {
           "subject": "Welcome to {fundName}",
-          "textBody": "Hi {firstName},\n\nWelcome to {fundName}. Your application is under review — an admin will reach out soon.\n\nWhen you're ready to contribute, include this reference on your bank transfer:\n  {paymentReference}\n\nThanks,\nThe {fundName} team"
+          "textBody": "Hi {firstName},\n\nWelcome to {fundName}. Your application is under review — an admin will reach out soon.\n\nYou'll receive your payment reference together with your card.\n\nThanks,\nThe {fundName} team"
         }
       },
       "thanks": {
@@ -1835,6 +2086,18 @@
           "description": "Thanks for applying to {fundName}.",
           "nextSteps": "An admin will review your application and reach out by email."
         }
+      },
+      "stepper": {
+        "progress": "Step {current} of {total}",
+        "back": "Back",
+        "next": "Continue"
+      },
+      "cancel": {
+        "button": "Cancel signup",
+        "title": "Leave this signup?",
+        "description": "Your answers won't be saved and you'll leave this form.",
+        "stay": "Keep going",
+        "confirm": "Leave"
       }
     },
     "admin": {
@@ -1911,7 +2174,7 @@
         },
         "invited": {
           "subject": "You've been invited to {fundName}",
-          "textBody": "Hi {firstName},\n\nAn admin at {fundName} has just added you as a member. You'll receive your card the next time you connect with the team.\n\nWhen you're ready to contribute, include this reference on your bank transfer so we can credit your card automatically:\n\n  {paymentReference}\n\nThe {fundName} team"
+          "textBody": "Hi {firstName},\n\nAn admin at {fundName} has just added you as a member. You'll receive your card the next time you connect with the team, along with the reference to put on your contribution transfers.\n\nThe {fundName} team"
         },
         "referralBonusAwarded": {
           "subject": "Your referral bonus has been added — {fundName}",
@@ -1953,9 +2216,45 @@
         "saving": "Saving…",
         "stoppedWarning": "Marking as Stopped stamps a departure date. Use Paused for a temporary pause."
       },
+      "bulk": {
+        "selectAll": "Select all members",
+        "selectRow": "Select member",
+        "selected": "{count} selected",
+        "clearSelection": "Clear",
+        "edit": "Edit selected",
+        "dialogTitle": "Edit selected members",
+        "dialogDescription": "Apply one change to the {count} selected member(s).",
+        "propertyLabel": "Property",
+        "property": {
+          "locale": "Language",
+          "status": "Status",
+          "tier": "Tier"
+        },
+        "valueLabel": "New value",
+        "tierNone": "— No tier —",
+        "statusHint": "Members whose current status can't move to the chosen one are skipped.",
+        "stoppedWarning": "Marking as Stopped stamps a departure date. Use Paused for a temporary pause.",
+        "resultSkipped": "{updated} updated, {skipped} skipped (status change not allowed from their current status).",
+        "done": "Done",
+        "cancel": "Cancel",
+        "apply": "Apply",
+        "applying": "Applying…",
+        "errors": {
+          "noSelection": "Select at least one member first.",
+          "tooMany": "Too many members selected at once.",
+          "invalidValue": "That value isn't valid."
+        }
+      },
       "import": {
         "title": "Import members",
         "description": "Upload or paste a CSV with headers, then map each column to a member field.",
+        "mode": {
+          "label": "Import mode",
+          "upsert": "Add and update",
+          "updateOnly": "Update existing only (backfill)",
+          "upsertHint": "Creates new members and updates existing ones (matched by email).",
+          "updateOnlyHint": "Only updates the mapped columns on existing members (matched by email). No members are created; unmatched rows are skipped."
+        },
         "fileLabel": "CSV file",
         "pasteLabel": "Or paste rows",
         "mapHeading": "Map columns",
@@ -1980,6 +2279,7 @@
           "householdAdults": "Adults in household",
           "householdChildren": "Children in household",
           "tier": "Tier (by name)",
+          "contributionAmount": "Committed contribution",
           "locale": "Language",
           "notes": "Notes",
           "serial": "Card serial",
@@ -1988,12 +2288,14 @@
         },
         "errors": {
           "missingRequiredMapping": "Map the required fields (first name, last name, email).",
+          "missingMatchKey": "Map the email column to identify which members to update.",
           "columnMissing": "A mapped column is missing from the CSV.",
           "empty": "No data rows found in the CSV."
         },
         "skip": {
           "missingName": "Missing first or last name.",
           "invalidEmail": "Invalid email.",
+          "noMatch": "No existing member with this email.",
           "error": "Could not import this row."
         },
         "fixedValuePlaceholder": "Set for all rows",
@@ -2009,22 +2311,31 @@
         "firstNameLabel": "First name",
         "lastNameLabel": "Last name",
         "emailLabel": "Email",
-        "phoneLabel": "Phone",
-        "ibanLabel": "IBAN",
+        "localeLabel": "Email language",
+        "localeDefault": "Fund default",
+        "localeHint": "The language this member's emails are sent in.",
         "addressLabel": "Address",
         "postalCodeLabel": "Postal code",
         "cityLabel": "City",
-        "householdAdultsLabel": "Adults in household",
-        "householdChildrenLabel": "Children in household",
+        "contributionAmountLabel": "Committed contribution",
+        "contributionAmountHint": "What we ask this member to contribute. Leave blank to use the tier target ({target}). Minimum: {min}.",
+        "contributionAmountHintNoTier": "What we ask this member to contribute. Leave blank to use the tier target once a tier is assigned.",
         "notesLabel": "Notes",
         "cancel": "Cancel",
         "confirm": "Save changes",
         "saving": "Saving…",
         "errors": {
           "tooLong": "This value is too long.",
-          "householdInvalid": "Enter a whole number of 0 or more."
+          "amountInvalid": "Enter a valid amount (up to 2 decimals).",
+          "amountBelowMin": "The amount can't be below the tier minimum ({min}).",
+          "localeInvalid": "Pick a supported language."
         }
       }
+    },
+    "builtinFields": {
+      "address": "Address",
+      "postalCode": "Postcode",
+      "city": "City"
     }
   },
   "cards": {
@@ -3106,6 +3417,38 @@
       "closed": "This period is already closed and can't be edited.",
       "monthMismatch": "The cutoff date must fall within the period's own month.",
       "notFixedPeriod": "Periods only apply when allocation is set to fixed period."
+    }
+  },
+  "cotisation": {
+    "title": "Monthly contribution payment",
+    "greeting": "Hello {name}, please make your monthly contribution using the details below",
+    "back": "Back to website",
+    "manual": {
+      "title": "Pay by bank transfer",
+      "beneficiary": "Beneficiary name",
+      "iban": "IBAN",
+      "reference": "Payment reference",
+      "amount": "Amount",
+      "referenceNotice": "Important: please include the payment reference {reference} with your transfer. It helps us correctly identify your payment."
+    },
+    "qr": {
+      "title": "Scan to pay",
+      "hint": "Scan with your banking app"
+    },
+    "instructions": {
+      "title": "Payment instructions",
+      "qrTitle": "Option 1: Scan the QR code",
+      "qrBody": "Open your banking app and use the QR scanner to automatically fill in all the payment details.",
+      "manualTitle": "Option 2: Manual transfer",
+      "manualBody": "Use the copy buttons above to copy each field and paste it into your banking app. Make sure to include the payment reference.",
+      "help": "If you have any questions or problems with your payment, please contact {fundName}."
+    },
+    "notConnected": "Bank details are not available yet. Please try again later or contact {fundName}."
+  },
+  "onboardingSteps": {
+    "errors": {
+      "titleRequired": "The title is required.",
+      "notFound": "Step not found."
     }
   }
 }

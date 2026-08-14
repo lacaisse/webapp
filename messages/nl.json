@@ -3,6 +3,7 @@
     "or": "of",
     "cancel": "Annuleren",
     "close": "Sluiten",
+    "save": "Opslaan",
     "delete": "Verwijderen",
     "back": "Terug",
     "backToHome": "Terug naar home",
@@ -11,8 +12,7 @@
     "copy": {
       "label": "Naar klembord kopiëren",
       "copied": "Gekopieerd"
-    },
-    "save": "Opslaan"
+    }
   },
   "locale": {
     "label": "Taal",
@@ -34,7 +34,9 @@
       "createAccount": "Account aanmaken",
       "passkeyButton": "Inloggen met passkey",
       "passkeyWaiting": "Wachten op passkey…",
-      "passkeyEmailRequired": "Voer uw e-mail in om met een passkey in te loggen."
+      "passkeyEmailRequired": "Voer uw e-mail in om met een passkey in te loggen.",
+      "waitlistPrompt": "Heeft u nog geen account?",
+      "joinWaitlist": "Aanmelden voor de wachtlijst"
     },
     "forgotPassword": {
       "title": "Wachtwoord opnieuw instellen",
@@ -71,6 +73,7 @@
       "passwordsDontMatch": "Wachtwoorden komen niet overeen.",
       "invalidCredentials": "Ongeldige inloggegevens.",
       "invalidInput": "Ongeldige invoer.",
+      "signupsClosed": "Registreren kan momenteel alleen op uitnodiging. Meld u aan voor de wachtlijst om toegang aan te vragen.",
       "passkeyStartFailed": "Kan passkey-inloggen niet starten.",
       "passkeyVerifyFailed": "Kan de passkey-respons niet verifiëren.",
       "signInFailed": "Inloggen mislukt.",
@@ -122,6 +125,7 @@
       "cards": "Kaarten",
       "allocations": "Allocaties",
       "token": "Token",
+      "accounts": "Rekeningen",
       "merchants": "Handelaars",
       "payments": "Betalingen",
       "bank": "Bank",
@@ -129,8 +133,139 @@
       "emails": "E-mails",
       "team": "Team",
       "settings": "Instellingen",
-      "backToApex": "Terug naar mijn fondsen",
-      "accounts": "Rekeningen"
+      "backToApex": "Terug naar mijn fondsen"
+    },
+    "annotations": {
+      "PAYOUT_BURN": "Uitbetaling vernietigd",
+      "PAYOUT_FEE": "Uitbetalingskosten",
+      "ACCOUNT_MINT": "Uitgifte",
+      "ACCOUNT_BURN": "Vernietiging",
+      "ACCOUNT_TRANSFER": "Overdracht",
+      "system": "Systeem",
+      "by": "door {name}",
+      "triggers": {
+        "ADMIN_MANUAL_MINT": "Handmatige uitgifte",
+        "ADMIN_DIRECT_MINT": "Directe uitgifte",
+        "ADMIN_DIRECT_BURN": "Directe vernietiging",
+        "CARD_TOPUP": "Kaart opwaarderen",
+        "CARD_WITHDRAWAL": "Kaartopname",
+        "ACCOUNT_MINT": "Uitgifte op rekening",
+        "ACCOUNT_BURN": "Vernietiging op rekening",
+        "ACCOUNT_TRANSFER": "Rekeningoverdracht",
+        "ORDER_SETTLEMENT_MINT": "Orderafwikkeling (uitgifte)",
+        "ORDER_SETTLEMENT_BURN": "Orderafwikkeling (vernietiging)",
+        "PAYOUT_BURN": "Uitbetaling vernietigd",
+        "PAYOUT_FEE": "Uitbetalingskosten",
+        "REFERRAL_REWARD": "Verwijzingsbeloning",
+        "BANK_SYNC": "Bankstorting (auto)",
+        "PERIOD_CLOSE": "Periodeafsluiting",
+        "ALLOCATION_RUN": "Allocatierun",
+        "CARD_TRANSFER": "Kaartoverboeking"
+      },
+      "edit": "Annoteren",
+      "title": "Transactie annoteren",
+      "noteLabel": "Notitie",
+      "notePlaceholder": "Waarvoor was dit?",
+      "errors": {
+        "invalidHash": "Ongeldige transactiehash.",
+        "noteTooLong": "Notitie is te lang (max. 280 tekens).",
+        "saveFailed": "Kon de annotatie niet opslaan. Probeer het zo opnieuw."
+      }
+    },
+    "accounts": {
+      "title": "Rekeningen",
+      "description": "Benoemde rekeningen afgeleid van de sleutel van het fonds. Bekijk per rekening het saldo en de transactiegeschiedenis.",
+      "notConnected": "Verbind dit fonds eerst met Citizen Pay om rekeningen aan te maken.",
+      "balancesError": "Kon de on-chain saldi niet laden. Probeer het zo opnieuw.",
+      "empty": "Nog geen rekeningen. Maak er een aan om te beginnen.",
+      "defaultName": "Hoofdrekening",
+      "defaultBadge": "Standaard",
+      "sourceBadge": "Bron",
+      "table": {
+        "name": "Naam",
+        "address": "Adres",
+        "serial": "Serie",
+        "balance": "Saldo"
+      },
+      "detail": {
+        "back": "Alle rekeningen",
+        "balance": "Saldo",
+        "serial": "Serienummer"
+      },
+      "create": {
+        "trigger": "Nieuwe rekening",
+        "title": "Rekening aanmaken",
+        "description": "Een nieuwe on-chain rekening afgeleid van de sleutel van het fonds.",
+        "name": "Naam",
+        "namePlaceholder": "bijv. Reserve, Kosten, Evenementen",
+        "sourceLabel": "Bronrekening voor kaarten",
+        "sourceHint": "Geeft de rekening een serienummer zodat ze kaarten als bron kan voeden. Deze rekeningen kunnen niet naar buiten overmaken.",
+        "confirm": "Rekening aanmaken"
+      },
+      "rename": {
+        "trigger": "Hernoemen",
+        "title": "Rekening hernoemen",
+        "name": "Naam"
+      },
+      "archive": {
+        "trigger": "Verwijderen",
+        "title": "Deze rekening verwijderen?",
+        "description": "De rekening wordt uit de lijst verwijderd. Het on-chain adres en de tokens blijven bestaan — je kunt de rekening later opnieuw aanmaken.",
+        "confirm": "Verwijderen"
+      },
+      "move": {
+        "inTrigger": "Tokens toevoegen",
+        "outTrigger": "Tokens verwijderen",
+        "inTitle": "Tokens toevoegen",
+        "outTitle": "Tokens verwijderen",
+        "inDescription": "Geef tokens uit naar deze rekening.",
+        "outDescription": "Verbrand tokens van deze rekening.",
+        "amount": "Bedrag",
+        "confirm": "Bevestigen",
+        "success": "Transactie ingediend."
+      },
+      "transfer": {
+        "trigger": "Overdragen",
+        "title": "Tokens overdragen",
+        "description": "Stuur tokens van deze rekening naar een andere rekening of een adres.",
+        "destination": "Bestemming",
+        "pickAccount": "Kies een rekening…",
+        "amount": "Bedrag",
+        "confirm": "Overdragen",
+        "success": "Transactie ingediend."
+      },
+      "transfers": {
+        "title": "Transactiegeschiedenis",
+        "empty": "Nog geen transacties.",
+        "direction": "Richting",
+        "counterparty": "Tegenpartij",
+        "trigger": "Trigger",
+        "date": "Datum",
+        "amount": "Bedrag",
+        "loadMore": "Meer tonen",
+        "loadError": "Kon de on-chain geschiedenis niet laden.",
+        "directions": {
+          "in": "Ontvangen",
+          "out": "Verzonden",
+          "self": "Intern"
+        }
+      },
+      "errors": {
+        "nameRequired": "Naam is verplicht.",
+        "nameTooLong": "Naam is te lang (max. 80 tekens).",
+        "notFound": "Rekening niet gevonden.",
+        "cannotRemoveDefault": "De hoofdrekening kan niet worden verwijderd.",
+        "notConnected": "Verbind dit fonds eerst met Citizen Pay.",
+        "deriveFailed": "Kon het rekeningadres niet afleiden. Probeer het zo opnieuw.",
+        "createFailed": "Kon de rekening niet aanmaken. Probeer het zo opnieuw.",
+        "registerFailed": "Kon de bronrekening niet registreren bij Citizen Pay. Probeer het zo weer.",
+        "amountInvalid": "Bedrag moet een geldig getal zijn.",
+        "amountPositive": "Bedrag moet groter dan nul zijn.",
+        "addressInvalid": "Voer een geldig 0x-adres in (40 hex-tekens).",
+        "transferFailed": "On-chain overdracht mislukt. Probeer het zo opnieuw.",
+        "cannotTransferSource": "Bronrekeningen voor kaarten kunnen niet naar buiten overmaken.",
+        "transfersFailed": "Kon de transacties niet laden. Probeer het zo opnieuw."
+      }
     },
     "team": {
       "title": "Team",
@@ -182,7 +317,9 @@
         "emptyRange": "Geen transacties in dit bereik.",
         "prev": "Vorige",
         "next": "Volgende",
-        "total": "{count, plural, =1 {# transactie} other {# transacties}}"
+        "total": "{count, plural, =1 {# transactie} other {# transacties}}",
+        "period": "Periode",
+        "periodLocked": "Al gebruikt door een uitgifte — de periode kan niet meer worden gewijzigd."
       },
       "fullSync": {
         "trigger": "Volledige synchronisatie",
@@ -191,11 +328,11 @@
         "confirmCancel": "Annuleren",
         "confirmRun": "Synchronisatie starten",
         "running": "Synchroniseren…",
-        "progress": "{ingested, plural, =1 {# transactie} other {# transacties}} gesynchroniseerd · {matched} gekoppeld · {minted} aangemaakt",
+        "progress": "{ingested, plural, =1 {# transactie gesynchroniseerd} other {# transacties gesynchroniseerd}} · {matched} gekoppeld · {skipped} overgeslagen",
         "pages": "{pages, plural, =1 {# pagina} other {# pagina's}}",
         "stop": "Stoppen",
         "completeTitle": "Volledige synchronisatie voltooid",
-        "completeSummary": "{ingested, plural, =1 {# transactie} other {# transacties}} gesynchroniseerd · {matched} gekoppeld · {minted} aangemaakt",
+        "completeSummary": "{ingested, plural, =1 {# transactie gesynchroniseerd} other {# transacties gesynchroniseerd}} · {matched} gekoppeld · {skipped} overgeslagen",
         "errorTitle": "Synchronisatie onderbroken",
         "error": "Kon de banksynchronisatie niet voltooien. Probeer het opnieuw.",
         "resume": "Hervatten",
@@ -212,6 +349,16 @@
         "custom": "Aangepast",
         "from": "Van",
         "to": "Tot"
+      },
+      "periodAssign": {
+        "none": "Geen periode",
+        "closedOption": "{label} (afgesloten)",
+        "errors": {
+          "notFound": "Transactie niet gevonden.",
+          "notIncoming": "Alleen inkomende transacties kunnen aan een periode worden gekoppeld.",
+          "periodNotFound": "Periode niet gevonden.",
+          "locked": "Deze storting is al gebruikt door een uitgifte — de periode kan niet meer worden gewijzigd."
+        }
       }
     },
     "dashboard": {
@@ -257,9 +404,12 @@
       "searchPlaceholder": "Zoek op naam of kaartnummer…",
       "tabs": {
         "all": "Alle",
-        "pending": "In afwachting",
+        "new": "Nieuw",
         "active": "Actief",
-        "inactive": "Inactief"
+        "inactive": "Inactief",
+        "paused": "Gepauzeerd",
+        "stopped": "Gestopt",
+        "rejected": "Afgewezen"
       },
       "columns": {
         "name": "Naam",
@@ -271,6 +421,7 @@
       },
       "contribution": {
         "target": "Doel",
+        "committed": "Afgesproken",
         "lastReceived": "Laatst ontvangen",
         "none": "—"
       },
@@ -283,23 +434,29 @@
           "title": "Identiteit",
           "description": "Contact en huishouden.",
           "address": "Adres",
-          "household": "Huishouden",
-          "householdValue": "{adults} volwassenen · {children} kinderen",
           "joined": "Lid sinds",
-          "left": "Vertrokken"
+          "left": "Vertrokken",
+          "notes": "Notities"
         },
         "banking": {
           "title": "Lidmaatschap",
           "description": "Niveau, bankgegevens en verwijzingskenmerken.",
           "tier": "Niveau",
-          "iban": "IBAN",
-          "reference": "Betalingskenmerk",
+          "committed": "Afgesproken bijdrage",
+          "committedDefault": "(streefbedrag van het niveau)",
           "referralCode": "Verwijzingscode",
           "primaryCard": "Hoofdkaart"
         },
         "applicationData": {
           "title": "Aanvraaggegevens",
-          "description": "Aangepaste onboardingvelden ingediend door het lid."
+          "description": "Aangepaste onboardingvelden ingediend door het lid.",
+          "empty": "Nog geen antwoorden vastgelegd.",
+          "edit": "Bewerken",
+          "editTitle": "Lidmaatschapsgegevens bewerken",
+          "editDescription": "Alleen vragen die het formulier nog stelt zijn bewerkbaar. Antwoorden op gearchiveerde vragen blijven behouden.",
+          "save": "Opslaan",
+          "saving": "Opslaan…",
+          "cancel": "Annuleren"
         },
         "cards": {
           "title": "Kaarten",
@@ -340,6 +497,14 @@
           "sponsoredDescription": "{count} aanmeldingen met de code van dit lid.",
           "sponsoredEmpty": "Nog geen verwijzingen."
         },
+        "emailSettings": {
+          "title": "E-mailinstellingen",
+          "description": "Bepaalt of dit lid automatische betalingsherinneringen per e-mail ontvangt.",
+          "optOutLabel": "Afgemeld voor herinneringsmails",
+          "subscribed": "Dit lid ontvangt automatische betalingsherinneringen.",
+          "optedOut": "Dit lid ontvangt geen automatische betalingsherinneringen.",
+          "optedOutSince": "Afgemeld op {date} — ontvangt geen automatische herinneringen."
+        },
         "emails": {
           "title": "E-mails",
           "date": "Datum",
@@ -369,7 +534,8 @@
         "status": "Status",
         "balance": "Saldo",
         "issued": "Uitgegeven",
-        "number": "Kaartnr."
+        "number": "Kaartnr.",
+        "source": "Bron"
       },
       "primary": "Primaire kaart",
       "badges": {
@@ -390,6 +556,8 @@
           "title": "Kaartinformatie",
           "description": "Serienummer, wallet en levensloopgebeurtenissen.",
           "serial": "Serienummer",
+          "tapLink": "Kaartinterface",
+          "tapLinkLabel": "Openen op CitizenPay",
           "holder": "Houder",
           "member": "Lid",
           "account": "Wallet",
@@ -397,7 +565,8 @@
           "blocked": "Geblokkeerd",
           "reportedLost": "Verloren gemeld",
           "lastTransaction": "Laatste transactie",
-          "number": "Kaartnummer"
+          "number": "Kaartnummer",
+          "source": "Bronkaart"
         },
         "transfers": {
           "title": "Transfers",
@@ -406,6 +575,8 @@
           "from": "Van",
           "to": "Naar",
           "amount": "Bedrag",
+          "trigger": "Trigger",
+          "note": "Notitie",
           "empty": "Nog geen transfers voor deze kaart.",
           "issued": "Uitgegeven",
           "retired": "Vernietigd",
@@ -414,9 +585,18 @@
           "self": "Deze kaart",
           "newer": "Nieuwer",
           "older": "Ouder",
-          "error": "Kon on-chain transfers niet laden.",
-          "trigger": "Trigger",
-          "note": "Notitie"
+          "error": "Kon on-chain transfers niet laden."
+        },
+        "source": {
+          "none": "Geen bron",
+          "placeholder": "Zoek op nummer, serie of naam…",
+          "empty": "Geen resultaten.",
+          "typeCard": "Kaart",
+          "typeAccount": "Rekening",
+          "unresolved": "Huidig: {serial}",
+          "clear": "Bron verwijderen",
+          "open": "Lijst openen",
+          "hint": "Als deze kaart een betaling niet kan dekken, wordt het ontbrekende bedrag van haar bron gehaald (een andere kaart of een bronrekening)."
         },
         "onboardingLetter": {
           "rowLabel": "Onboardingbrief",
@@ -449,23 +629,15 @@
       "title": "Allocaties",
       "description": "Verdeel tokens onder leden op basis van niveaus en banksynchronisatie.",
       "tabs": {
-        "history": "Geschiedenis",
         "tiers": "Niveaus",
         "schedule": "Planning"
       },
-      "history": {
-        "date": "Datum",
-        "member": "Lid",
-        "tier": "Niveau",
-        "source": "Bron",
-        "period": "Periode",
-        "amount": "Bedrag",
-        "status": "Status",
-        "empty": "Nog geen allocaties.",
-        "sources": {
-          "bankSync": "Bankstorting",
-          "referral": "Doorverwijzingsbonus",
-          "manual": "Handmatig"
+      "reconcile": {
+        "errors": {
+          "opNotFound": "Allocatie niet gevonden.",
+          "depositNotFound": "Storting niet gevonden.",
+          "alreadyLinked": "Deze allocatie is al aan een storting gekoppeld.",
+          "memberMismatch": "Die allocatie hoort bij een ander lid dan deze storting."
         }
       },
       "tiers": {
@@ -499,26 +671,18 @@
           "archiving": "Archiveren…"
         }
       },
-      "schedule": {
-        "title": "Allocatieplanning",
-        "description": "Batches per vaste periode. Pay-and-go-fondsen hebben geen periodes.",
-        "payAndGoDescription": "Dit fonds werkt op pay-and-go. Tokens worden onmiddellijk toegewezen bij detectie van een storting — er zijn geen periodes.",
-        "label": "Periode",
-        "startsAt": "Start",
-        "cutoffDate": "Sluitingsdatum",
-        "status": "Status",
-        "closedAt": "Gesloten op",
-        "empty": "Nog geen periodes.",
-        "newPeriod": "Nieuwe periode",
-        "edit": "Bewerken",
-        "actions": "Acties",
-        "disabledDescription": "Allocatie is uitgeschakeld voor dit fonds. Stortingen worden nog vastgelegd en aan leden gekoppeld, maar er worden geen tokens aangemaakt."
-      },
       "periodDetail": {
         "back": "Alle periodes",
         "range": "{starts} → {cutoff}",
         "closedAt": "Gesloten op {date}",
         "notes": "Notities",
+        "tabs": {
+          "ready": "Klaar",
+          "deposits": "Stortingen",
+          "mints": "Uitgiftes",
+          "missing": "Ontbrekend",
+          "belowMin": "Onder min."
+        },
         "kpi": {
           "deposits": "Geïnde stortingen",
           "depositsHint": "{count} banktransacties",
@@ -539,7 +703,48 @@
           "member": "Lid",
           "reference": "Kenmerk",
           "amount": "Bedrag",
+          "allocation": "Allocatie",
+          "allocated": "Gealloceerd",
+          "allocationPending": "Onderweg",
+          "allocationFailed": "Mislukt",
+          "notAllocated": "Niet gealloceerd",
           "empty": "Nog geen stortingen in deze periode."
+        },
+        "ready": {
+          "title": "{count, plural, =0 {Klaar om te alloceren} one {Klaar om te alloceren (#)} other {Klaar om te alloceren (#)}}",
+          "hint": "Leden van wie de stortingen het minimum van hun niveau bereiken en die de allocatie van deze periode nog niet hebben ontvangen — inclusief late betalingen die na de afsluiting zijn toegewezen.",
+          "member": "Lid",
+          "tier": "Niveau",
+          "deposited": "Gestort",
+          "allocation": "Allocatie",
+          "empty": "Niets in afwachting — elke in aanmerking komende storting is gealloceerd."
+        },
+        "allocateMember": {
+          "button": "Alloceren",
+          "title": "Deze allocatie uitvoeren?",
+          "description": "Mint {amount} tokens voor {name} voor periode {period}. De uitgifte gebeurt on-chain en kan niet ongedaan worden gemaakt. Er wordt geen e-mail naar het lid gestuurd.",
+          "cancel": "Annuleren",
+          "confirm": "Allocatie minten",
+          "minting": "Minten…"
+        },
+        "run": {
+          "trigger": "Alles alloceren ({count})",
+          "confirmTitle": "De tokenallocatie uitvoeren?",
+          "confirmDescription": "Dit mint de niveau-allocatie voor {count, plural, one {# lid} other {# leden}} ({total} tokens in totaal), in kleine batches. Leden onder het minimum van hun niveau blijven ter beoordeling staan. U kunt na elke batch stoppen; hervatten alloceert nooit twee keer hetzelfde lid. Er worden geen e-mails naar leden gestuurd.",
+          "confirmCancel": "Annuleren",
+          "confirmRun": "Allocatie uitvoeren",
+          "running": "Alloceren…",
+          "progress": "{minted} van {total} gemint · {submitted} ingediend",
+          "stop": "Stoppen",
+          "resume": "Hervatten",
+          "completeTitle": "Allocatierun voltooid",
+          "completeSummary": "{minted} allocaties gemint: {submitted} on-chain bevestigd, {failed} mislukt, {skipped} leden overgeslagen (onder het minimum). Mislukte leden blijven in de lijst \"klaar om te alloceren\" — voer opnieuw uit om het nog eens te proberen. Er worden voor deze allocaties geen e-mails naar leden gestuurd.",
+          "errorTitle": "Allocatierun gestopt",
+          "errors": {
+            "notEligible": "Dit lid kan voor deze periode niet worden gealloceerd — geen toereikend stortingstotaal, of de allocatie is al uitgevoerd.",
+            "alreadyAllocated": "Dit lid heeft de allocatie voor deze periode al ontvangen.",
+            "submitFailed": "De uitgifte kon niet bij CitizenPay worden ingediend — de operatie is als mislukt gemarkeerd. Het lid blijft in de lijst \"klaar om te alloceren\"; probeer het opnieuw."
+          }
         },
         "mints": {
           "title": "Uitgiftes",
@@ -549,7 +754,122 @@
           "amount": "Bedrag",
           "status": "Status",
           "empty": "Nog geen uitgiftes gebatcht."
+        },
+        "missing": {
+          "title": "{count, plural, =0 {Ontbrekende stortingen} one {Ontbrekende storting (#)} other {Ontbrekende stortingen (#)}}",
+          "hint": "Actieve leden met een niveau van wie deze periode een bijdrage werd verwacht, zonder gekoppelde storting.",
+          "member": "Lid",
+          "tier": "Niveau",
+          "empty": "Elk verwacht lid heeft gestort.",
+          "minimum": "Minimum"
+        },
+        "belowMin": {
+          "title": "{count, plural, one {Storting onder het minimum (#)} other {Stortingen onder het minimum (#)}}",
+          "hint": "Hebben gestort, maar het totaal ligt onder het minimum van hun niveau — er is geen allocatie aangemaakt.",
+          "member": "Lid",
+          "tier": "Niveau",
+          "deposited": "Gestort",
+          "minimum": "Minimum",
+          "empty": "Geen stortingen onder het minimum."
+        },
+        "removeDeposit": {
+          "button": "Uit de periode verwijderen",
+          "title": "Deze storting uit de periode verwijderen?",
+          "description": "De storting van {label} blijft in de bankgeschiedenis maar telt niet langer mee in deze periode (totalen en bijdragen).",
+          "cancel": "Annuleren",
+          "confirm": "Verwijderen",
+          "removing": "Verwijderen…"
+        },
+        "movePeriod": {
+          "placeholder": "Verplaatsen naar periode…"
+        },
+        "attachAllocation": {
+          "button": "Allocatie koppelen",
+          "title": "Een bestaande allocatie koppelen",
+          "description": "Koppel een handmatige allocatie die u al voor {member} heeft gedaan aan deze storting van {amount}.",
+          "loading": "Allocaties laden…",
+          "empty": "Geen handmatige allocaties om te koppelen voor dit lid.",
+          "inPeriod": "in {period}"
+        },
+        "notify": {
+          "column": "Melding",
+          "send": "Informeren",
+          "retry": "Opnieuw proberen",
+          "sending": "Versturen…",
+          "cancel": "Annuleren",
+          "confirmSend": "E-mail versturen",
+          "confirmTitle": "Allocatie-e-mail versturen?",
+          "confirmDescription": "De allocatiebevestiging naar {name} sturen voor {amount}?",
+          "status": {
+            "sent": "Verzonden",
+            "failed": "Mislukt",
+            "notSent": "Niet verzonden"
+          },
+          "allTrigger": "Iedereen informeren ({count})",
+          "allConfirmTitle": "Alle leden informeren?",
+          "allConfirmDescription": "Stuur de allocatiebevestiging naar {count} nog niet geïnformeerde leden. Al geïnformeerde allocaties worden overgeslagen.",
+          "allConfirmSend": "E-mails versturen",
+          "allDoneTitle": "Meldingen verzonden",
+          "allDoneSummary": "{sent} verzonden · {skipped} al geïnformeerd · {failed} mislukt.",
+          "errors": {
+            "notNotifiable": "Deze allocatie kan niet worden gemeld — het is geen bevestigde allocatie.",
+            "noEmail": "Dit lid heeft geen e-mailadres.",
+            "sendFailed": "De e-mail kon niet worden verzonden. Probeer het opnieuw."
+          }
+        },
+        "remind": {
+          "column": "Herinnering",
+          "send": "Herinneren",
+          "retry": "Opnieuw proberen",
+          "sending": "Versturen…",
+          "cancel": "Annuleren",
+          "confirmSend": "Herinnering versturen",
+          "confirmTitle": "Een betalingsherinnering versturen?",
+          "confirmDescription": "Een betalingsherinnering naar {name} sturen voor deze periode?",
+          "status": {
+            "noEmail": "Geen e-mail",
+            "optedOut": "Afgemeld",
+            "sent": "Verzonden",
+            "sentCount": "{count}× verzonden",
+            "failed": "Mislukt",
+            "notSent": "Niet verzonden"
+          },
+          "detail": {
+            "auto": "Automatisch",
+            "autoAndNudges": "Automatisch + {count, plural, one {# extra herinnering} other {# extra herinneringen}}",
+            "nudgesOnly": "{count, plural, one {# handmatige herinnering} other {# handmatige herinneringen}}"
+          },
+          "allTrigger": "Iedereen herinneren ({count})",
+          "allConfirmTitle": "Iedereen die nog niet heeft betaald herinneren?",
+          "allConfirmDescription": "Stuur een betalingsherinnering naar {count} leden die nog niet hebben betaald. Leden die al herinnerd zijn, geen e-mail hebben of afgemeld zijn, worden overgeslagen.",
+          "allConfirmSend": "Herinneringen versturen",
+          "allDoneTitle": "Herinneringen verzonden",
+          "allDoneSummary": "{sent} verzonden · {skipped} al herinnerd · {failed} mislukt.",
+          "errors": {
+            "notRemindable": "Dit lid kan niet worden herinnerd — het staat niet meer op de lijst van openstaande betalingen.",
+            "noEmail": "Dit lid heeft geen e-mailadres.",
+            "sendFailed": "De herinnering kon niet worden verzonden. Probeer het opnieuw."
+          },
+          "pausedConfirmTitle": "E-mails naar leden staan op pauze",
+          "pausedConfirmDescription": "Notificatiemails naar leden staan op pauze voor dit fonds. Deze herinnering naar {name} sturen overschrijft de pauze. Doorgaan?",
+          "allPausedConfirmDescription": "Notificatiemails naar leden staan op pauze voor dit fonds. Deze herinneringen naar {count} lid/leden sturen overschrijft de pauze. Doorgaan?",
+          "pausedConfirmSend": "Toch versturen"
         }
+      },
+      "schedule": {
+        "title": "Allocatieplanning",
+        "description": "Batches per vaste periode. Pay-and-go-fondsen hebben geen periodes.",
+        "payAndGoDescription": "Dit fonds werkt op pay-and-go. Tokens worden onmiddellijk toegewezen bij detectie van een storting — er zijn geen periodes.",
+        "label": "Periode",
+        "startsAt": "Start",
+        "cutoffDate": "Sluitingsdatum",
+        "status": "Status",
+        "closedAt": "Gesloten op",
+        "empty": "Nog geen periodes.",
+        "newPeriod": "Nieuwe periode",
+        "edit": "Bewerken",
+        "actions": "Acties",
+        "disabledDescription": "Allocatie is uitgeschakeld voor dit fonds. Stortingen worden nog vastgelegd en aan leden gekoppeld, maar er worden geen tokens aangemaakt."
       },
       "periods": {
         "dialog": {
@@ -613,6 +933,8 @@
         "from": "Van",
         "to": "Naar",
         "amount": "Bedrag",
+        "trigger": "Trigger",
+        "note": "Notitie",
         "empty": "Nog geen overdrachten.",
         "issued": "Uitgegeven",
         "retired": "Vernietigd",
@@ -620,9 +942,7 @@
         "unknown": "Externe portemonnee",
         "newer": "Nieuwer",
         "older": "Ouder",
-        "error": "Kan on-chain overdrachten niet laden.",
-        "trigger": "Trigger",
-        "note": "Notitie"
+        "error": "Kan on-chain overdrachten niet laden."
       },
       "holders": {
         "holder": "Portemonnee",
@@ -635,6 +955,37 @@
         "prev": "Vorige",
         "next": "Volgende",
         "error": "Kan portemonneesaldo's niet laden."
+      },
+      "account": {
+        "title": "Accountaudit",
+        "back": "Tokenverkenner",
+        "balance": "On-chain saldo",
+        "shareOfSupply": "{share}% van de totale voorraad",
+        "totalIn": "Totaal ontvangen",
+        "totalOut": "Totaal verzonden",
+        "transfersIn": "{count} inkomende overdrachten",
+        "transfersOut": "{count} uitgaande overdrachten",
+        "status": "Auditstatus",
+        "reconciled": "Sluitend",
+        "reconciledHint": "Ontvangen min verzonden komt exact overeen met het on-chain saldo.",
+        "unexplained": "Onverklaard verschil",
+        "unexplainedHint": "De geschiedenis komt niet overeen met het saldo: {amount} blijft onverklaard.",
+        "truncated": "Gedeeltelijke geschiedenis",
+        "truncatedHint": "Alleen de {count} meest recente overdrachten worden getoond. Het saldo vóór dit venster was {amount}.",
+        "date": "Wanneer",
+        "counterparty": "Tegenpartij",
+        "amount": "Bedrag",
+        "balanceAfter": "Saldo daarna",
+        "trigger": "Trigger",
+        "note": "Notitie",
+        "empty": "Nog geen overdrachten met deze portemonnee.",
+        "error": "Kan de on-chain geschiedenis van deze portemonnee niet laden.",
+        "prev": "Vorige",
+        "next": "Volgende",
+        "issued": "Uitgegeven",
+        "retired": "Vernietigd",
+        "treasury": "Treasury",
+        "unknown": "Externe portemonnee"
       }
     },
     "merchants": {
@@ -670,6 +1021,7 @@
         "unverified": "E-mail niet geverifieerd",
         "connected": "Citizen Pay verbonden",
         "notConnected": "Citizen Pay niet verbonden",
+        "hidden": "Verborgen",
         "invite": {
           "title": "Citizen Pay-uitnodiging",
           "description": "Status van de uitnodiging die naar de handelaar is gestuurd.",
@@ -694,6 +1046,7 @@
           "description": "Interne status en Citizen Pay-koppeling.",
           "joined": "Lid sinds",
           "position": "Positie in directory",
+          "publiclyVisible": "Openbare directory",
           "conditions": "Acceptatievoorwaarden",
           "citizenPayPlace": "Citizen Pay-plaats-ID",
           "citizenPayBusiness": "Citizen Pay-onderneming-ID",
@@ -750,21 +1103,9 @@
       "title": "Betalingen",
       "description": "Bankstortingen van leden en uitbetalingen aan handelaars.",
       "tabs": {
-        "transactions": "Transacties",
-        "unmatched": "Niet gekoppeld",
         "drafts": "Concepten",
         "pending": "In afwachting",
         "completed": "Afgehandeld"
-      },
-      "transactions": {
-        "date": "Datum",
-        "counterpart": "Tegenpartij",
-        "reference": "Referentie",
-        "member": "Lid",
-        "period": "Periode",
-        "amount": "Bedrag",
-        "unmatched": "Niet gekoppeld",
-        "empty": "Nog geen transacties."
       },
       "settlement": {
         "place": "Handelaar",
@@ -773,6 +1114,7 @@
         "total": "Totaal",
         "fees": "Kosten",
         "net": "Netto",
+        "manualDeduction": "Handmatige inhouding",
         "placeBalance": "Saldo handelaar",
         "placeBalanceEnough": "Genoeg om te verbranden",
         "placeBalanceLow": "Lager dan het nettobedrag",
@@ -858,8 +1200,11 @@
           "modeManual": "Handmatig invoeren",
           "modeBank": "Vanuit overboeking",
           "pickHint": "Kies een inkomende overboeking — de referentie wordt de omschrijving van de order.",
+          "searchPlaceholder": "Zoek op naam, kenmerk of bedrag…",
           "loadingTransactions": "Overboekingen laden…",
+          "loadMore": "Meer tonen",
           "noTransactions": "Geen inkomende overboekingen om te kiezen.",
+          "noMatches": "Geen overdrachten komen overeen met je zoekopdracht.",
           "unknownCounterpart": "Onbekende afzender",
           "amount": "Bedrag",
           "fee": "Kosten",
@@ -867,11 +1212,37 @@
           "descriptionPlaceholder": "Waarvoor deze order is",
           "net": "Netto",
           "confirm": "Order toevoegen",
-          "searchPlaceholder": "Zoek op naam, kenmerk of bedrag…",
-          "loadMore": "Meer tonen",
-          "noMatches": "Geen overdrachten komen overeen met je zoekopdracht.",
           "successMinted": "Bestelling toegevoegd en netto uitgegeven naar de plaats.",
           "mintFailed": "Bestelling toegevoegd, maar automatische uitgifte mislukt. Verwerk het via het tabblad Problemen."
+        },
+        "addOrders": {
+          "trigger": "Bestaande bestellingen toevoegen",
+          "title": "Bestaande bestellingen toevoegen",
+          "description": "Voeg bestellingen toe die al bestaan maar niet in deze uitbetaling zaten — kies een datumbereik en selecteer welke u wilt toevoegen.",
+          "from": "Van",
+          "to": "Tot",
+          "rangeHint": "Filtert op de aanmaakdatum van de bestelling. Alleen niet-toegewezen, uitbetaalbare bestellingen kunnen worden toegevoegd.",
+          "preview": "Voorbeeld",
+          "windowSummary": "{count, plural, =1 {# bestelling beschikbaar} other {# bestellingen beschikbaar}}",
+          "net": "Netto",
+          "loadMore": "Meer tonen",
+          "empty": "Geen bestellingen om toe te voegen in dit bereik.",
+          "confirm": "{count, plural, =0 {Bestellingen toevoegen} =1 {# bestelling toevoegen} other {# bestellingen toevoegen}}",
+          "success": "{count, plural, =1 {# bestelling toegevoegd aan de uitbetaling.} other {# bestellingen toegevoegd aan de uitbetaling.}}",
+          "rejectedTitle": "Sommige bestellingen konden niet worden toegevoegd en zijn overgeslagen. De lijst is vernieuwd — controleer en probeer opnieuw."
+        },
+        "deduction": {
+          "trigger": "Inhouding toevoegen",
+          "edit": "Inhouding bewerken",
+          "title": "Handmatige inhouding",
+          "description": "Een boekhoudkundige aanpassing die het netto bedrag aan de handelaar verlaagt. Geen on-chain effect.",
+          "amount": "Inhoudingsbedrag",
+          "amountHint": "Maximaal {max}. Voer 0 in om de inhouding te wissen.",
+          "comment": "Opmerking",
+          "commentPlaceholder": "Reden voor de aanpassing",
+          "net": "Netto na inhouding",
+          "confirm": "Opslaan",
+          "remove": "Verwijderen"
         },
         "pay": {
           "button": "Handelaar betalen",
@@ -887,6 +1258,11 @@
           "success": "Tokens verbrand. Transactiehash:",
           "feeSwept": "Kosten overgemaakt naar de fondsrekening: {amount}",
           "feeNotSwept": "Tokens verbrand, maar de kosten zijn nog niet overgemaakt."
+        },
+        "feeTransfer": {
+          "pending": "De kosten van deze uitbetaling zijn nog niet overgemaakt.",
+          "button": "Kosten overmaken",
+          "done": "Kosten overgemaakt. Transactiehash:"
         },
         "orders": {
           "title": "Bestellingen",
@@ -907,6 +1283,8 @@
           "range": "Toont {from}–{to}",
           "prev": "Vorige",
           "next": "Volgende",
+          "selectAll": "Alles selecteren",
+          "selectRow": "Bestelling selecteren",
           "receipt": {
             "success": "Bevestigd",
             "reverted": "Teruggedraaid",
@@ -933,13 +1311,43 @@
             "payerNoHistory": "Geen transacties gevonden voor dit account.",
             "bankMatch": "Dekkende overboeking",
             "bankMatchUnknown": "Onbekende afzender",
-            "bankMatchNone": "Nog geen overboeking gevonden die overeenkomt met {ref}."
+            "bankMatchNone": "Nog geen overboeking gevonden die overeenkomt met {ref}.",
+            "manualToggle": "In plaats daarvan een bestaande transactie registreren",
+            "manualLabel": "Hash van de afwikkelingstransactie",
+            "manualHint": "De bestelling wordt met deze hash als afgewikkeld gemarkeerd — er worden geen tokens verplaatst. Voer een transactiehash in die met 0x begint.",
+            "manualConfirm": "Registreren",
+            "manualConfirmAnyway": "Toch registreren",
+            "manualWarnReverted": "Deze transactie is on-chain teruggedraaid — ze heeft niets afgewikkeld. Toch registreren?",
+            "manualWarnPending": "Geen ontvangstbewijs gevonden voor deze transactie — mogelijk is ze nog niet gemined, of kent de node ze niet. Toch registreren?",
+            "manualWarnUnavailable": "Kon deze transactie niet on-chain verifiëren. Controleer de hash voordat u ze registreert.",
+            "payerPickHint": "Gebruik de hash van deze transactie"
           },
           "archive": {
             "button": "Archiveren",
             "title": "Deze bestelling archiveren?",
             "description": "De bestelling wordt uit de uitbetaling verwijderd en de totalen worden herberekend. Ze wordt in geen enkele toekomstige uitbetaling opgenomen.",
             "confirm": "Bestelling archiveren"
+          },
+          "bulk": {
+            "selectedCount": "{n} geselecteerd",
+            "autoMatch": "Automatisch matchen en herstellen",
+            "archive": "Archiveren",
+            "clear": "Wissen",
+            "running": "Bezig…",
+            "archiveTitle": "Geselecteerde bestellingen archiveren?",
+            "archiveDescription": "{n} bestellingen worden uit deze uitbetaling verwijderd en de totalen worden herberekend. Ze worden in geen enkele toekomstige uitbetaling opgenomen.",
+            "archiveConfirm": "Bestellingen archiveren",
+            "summary": {
+              "fixed": "{n} hersteld op basis van een overeenkomende overdracht van de betaler.",
+              "nomatch": "{n} over — geen overeenkomende overdracht van de betaler gevonden.",
+              "ambiguous": "{n} over — meerdere overdrachten kwamen overeen; herstel deze handmatig.",
+              "noaccount": "{n} overgeslagen — betaald per bankoverschrijving, herstel deze handmatig.",
+              "error": "{n} mislukt — konden niet worden geregistreerd. Probeer het zo weer.",
+              "unavailable": "{n} overgeslagen — on-chain overdrachten zijn niet beschikbaar voor dit fonds.",
+              "truncated": "{n} niet gecontroleerd — te veel overdrachten om te doorzoeken; verklein de selectie of probeer opnieuw.",
+              "archived": "{n} gearchiveerd.",
+              "archiveFailed": "{n} konden niet worden gearchiveerd. Probeer het zo weer."
+            }
           }
         },
         "details": "Details",
@@ -950,6 +1358,14 @@
         "errors": {
           "payFailed": "Kon de betaling niet aanmaken. Probeer het zo opnieuw.",
           "burnFailed": "Kon de tokens niet verbranden. Probeer het zo opnieuw.",
+          "notBurnable": "Deze uitbetaling is niet meer in de verbrandstap (al verbrand of afgewikkeld).",
+          "payoutNotFound": "Uitbetaling niet gevonden.",
+          "deductionFailed": "Kon de inhouding niet opslaan. Probeer het zo opnieuw.",
+          "deductionTooHigh": "De inhouding mag niet hoger zijn dan totaal min kosten.",
+          "deductionNotPending": "De handmatige inhouding kan alleen worden gewijzigd zolang de uitbetaling in behandeling is.",
+          "reportFailed": "Tokens on-chain verbrand, maar kon dit niet melden aan Citizen Pay. Niet opnieuw proberen — bewaar de transactiehash voor reconciliatie.",
+          "noFeeDestination": "Geen bestemmingsrekening voor kosten. Verbind het fonds eerst met Citizen Pay.",
+          "feeTransferFailed": "De kostenoverdracht is mislukt. Probeer het zo opnieuw.",
           "previewFailed": "Kon het voorbeeld niet laden. Probeer het zo opnieuw.",
           "createFailed": "Kon de uitbetaling niet aanmaken. Probeer het zo opnieuw.",
           "statusFailed": "Kon de status niet ophalen. Probeer het zo opnieuw.",
@@ -958,42 +1374,19 @@
           "rangeOrder": "De einddatum moet na de begindatum liggen.",
           "noPlaceAccount": "Deze handelaar heeft geen on-chain account om naartoe te minten.",
           "recordFailed": "On-chain gemint, maar kon het niet op de uitbetaling vastleggen.",
+          "txHashInvalid": "Voer een geldige transactiehash in (0x gevolgd door 64 hexadecimale tekens).",
           "archiveFailed": "Kon de bestelling niet archiveren. Probeer het zo opnieuw.",
           "payerFailed": "Kon het account van de betaler niet laden.",
           "createOrderFailed": "Kon de order niet toevoegen. Probeer het zo opnieuw.",
+          "addOrdersFailed": "Kon de bestellingen niet toevoegen. Probeer het zo weer.",
+          "addOrdersRejected": "Sommige geselecteerde bestellingen konden niet meer worden toegevoegd.",
+          "noOrdersSelected": "Selecteer minstens één bestelling om toe te voegen.",
           "amountInvalid": "Voer een geldig bedrag in.",
           "feeInvalid": "Voer geldige kosten in.",
           "amountPositive": "Het bedrag moet groter dan nul zijn.",
           "feeTooHigh": "De kosten mogen niet hoger zijn dan het bedrag.",
           "descriptionTooLong": "De omschrijving is te lang.",
-          "completeFailed": "Kon de uitbetaling niet als voltooid markeren. Probeer het zo opnieuw.",
-          "notBurnable": "Deze uitbetaling is niet meer in de verbrandstap (al verbrand of afgewikkeld).",
-          "payoutNotFound": "Uitbetaling niet gevonden.",
-          "deductionFailed": "Kon de inhouding niet opslaan. Probeer het zo opnieuw.",
-          "deductionTooHigh": "De inhouding mag niet hoger zijn dan totaal min kosten.",
-          "deductionNotPending": "De handmatige inhouding kan alleen worden gewijzigd zolang de uitbetaling in behandeling is.",
-          "reportFailed": "Tokens on-chain verbrand, maar kon dit niet melden aan Citizen Pay. Niet opnieuw proberen — bewaar de transactiehash voor reconciliatie.",
-          "noFeeDestination": "Geen bestemmingsrekening voor kosten. Verbind het fonds eerst met Citizen Pay.",
-          "feeTransferFailed": "De kostenoverdracht is mislukt. Probeer het zo opnieuw."
-        },
-        "manualDeduction": "Handmatige inhouding",
-        "deduction": {
-          "trigger": "Inhouding toevoegen",
-          "edit": "Inhouding bewerken",
-          "title": "Handmatige inhouding",
-          "description": "Een boekhoudkundige aanpassing die het netto bedrag aan de handelaar verlaagt. Geen on-chain effect.",
-          "amount": "Inhoudingsbedrag",
-          "amountHint": "Maximaal {max}. Voer 0 in om de inhouding te wissen.",
-          "comment": "Opmerking",
-          "commentPlaceholder": "Reden voor de aanpassing",
-          "net": "Netto na inhouding",
-          "confirm": "Opslaan",
-          "remove": "Verwijderen"
-        },
-        "feeTransfer": {
-          "pending": "De kosten van deze uitbetaling zijn nog niet overgemaakt.",
-          "button": "Kosten overmaken",
-          "done": "Kosten overgemaakt. Transactiehash:"
+          "completeFailed": "Kon de uitbetaling niet als voltooid markeren. Probeer het zo opnieuw."
         }
       },
       "admin": {
@@ -1002,9 +1395,9 @@
           "unlinkButton": "Ontkoppelen",
           "title": "Deze storting aan een lid koppelen",
           "description": "Voer de betalingsreferentie of het e-mailadres van het lid in. De storting telt mee voor hun allocatie.",
-          "identifierLabel": "Betalingsreferentie of e-mail",
-          "identifierPlaceholder": "ABCDEFGH of lid@voorbeeld.com",
-          "identifierHint": "Hoofdletterongevoelig. Betalingsreferenties zijn 8 tekens uit ons gegenereerde alfabet.",
+          "identifierLabel": "Kaartreferentie of e-mail",
+          "identifierPlaceholder": "04A2B7C9D1 of lid@voorbeeld.com",
+          "identifierHint": "Hoofdletterongevoelig. De kaartreferentie is de UID (serienummer) van de kaart, vermeld op de uitnodiging van het lid.",
           "identifierRequired": "Voer een referentie of e-mail in.",
           "cancel": "Annuleren",
           "confirm": "Koppelen",
@@ -1097,6 +1490,7 @@
         "terms": "Voorwaarden",
         "citizenpay": "Citizen Pay",
         "fees": "Kosten",
+        "emails": "E-mails",
         "documents": "Documenten"
       },
       "general": {
@@ -1167,7 +1561,11 @@
           "member": "Doorverwijs-URL voor leden",
           "memberHint": "Waar leden terechtkomen na hun laatste aanmeldstap (na e-mailverificatie, indien ingeschakeld).",
           "merchant": "Doorverwijs-URL voor handelaren",
-          "merchantHint": "Waar handelaren terechtkomen na hun laatste aanmeldstap (na e-mailverificatie, indien ingeschakeld)."
+          "merchantHint": "Waar handelaren terechtkomen na hun laatste aanmeldstap (na e-mailverificatie, indien ingeschakeld).",
+          "memberCancel": "Annuleer-URL — lid",
+          "memberCancelHint": "Waar leden terechtkomen als ze het formulier verlaten (na bevestiging). Standaard: de website van het fonds.",
+          "memberError": "Fout-URL — lid",
+          "memberErrorHint": "Waar leden terechtkomen als de inschrijving mislukt door een technische fout. Laat leeg om de fout in het formulier te tonen."
         },
         "fieldsTitle": "Aanvraagvelden",
         "fieldsDescription": "Voeg aangepaste vragen toe aan de aanmeldformulieren voor leden en handelaren. Ingebouwde velden (naam, e-mail) zijn altijd aanwezig.",
@@ -1186,7 +1584,8 @@
             "label": "Label",
             "key": "Sleutel",
             "type": "Type",
-            "required": "Verplicht"
+            "required": "Verplicht",
+            "step": "Stap"
           },
           "dialog": {
             "createTitle": "Een veld toevoegen",
@@ -1203,7 +1602,30 @@
             "optionsHint": "Eén optie per regel. Gebruik \"waarde:label\" om een andere opgeslagen waarde in te stellen, of alleen het label.",
             "save": "Opslaan",
             "saving": "Opslaan…",
-            "cancel": "Annuleren"
+            "cancel": "Annuleren",
+            "step": "Stap",
+            "firstStep": "Eerste stap",
+            "stepHint": "Op welke pagina van het formulier dit veld verschijnt.",
+            "builtin": "Soort veld",
+            "builtinCustom": "Aangepaste vraag",
+            "builtinHint": "Een gegeven uit de ledenfiche wordt in zijn eigen kolom bewaard en voedt zo brieven, herinneringen en niveautoewijzing. Een aangepaste vraag wordt apart bij de aanvraag bewaard.",
+            "builtinLocked": "Wordt in de ledenfiche bewaard ({key}). Het invoertype ligt vast; label, hulptekst, verplichting en positie kun je wel aanpassen.",
+            "visibleIf": {
+              "label": "Alleen tonen als",
+              "none": "Altijd zichtbaar",
+              "operatorLabel": "Vergelijking",
+              "valueLabel": "Waarde",
+              "valuePlaceholder": "bv. 1",
+              "hint": "Dit veld verschijnt (en is alleen verplicht) zodra het antwoord op het gekozen veld aan deze voorwaarde voldoet.",
+              "operators": {
+                "eq": "is gelijk aan",
+                "neq": "is niet gelijk aan",
+                "gt": "is groter dan",
+                "gte": "is groter dan of gelijk aan",
+                "lt": "is kleiner dan",
+                "lte": "is kleiner dan of gelijk aan"
+              }
+            }
           },
           "archive": {
             "button": "Archiveren",
@@ -1216,6 +1638,67 @@
             "restoreConfirm": "Herstellen",
             "saving": "Opslaan…",
             "cancel": "Annuleren"
+          },
+          "firstStep": "Eerste stap",
+          "builtinBadge": "Ledenfiche",
+          "visibleIfCaption": "Getoond als “{label}” {operator} {value}"
+        },
+        "stepsTitle": "Formulierstappen",
+        "stepsDescription": "Verdeel het inschrijfformulier over meerdere pagina's. Zonder stappen blijft het formulier één pagina.",
+        "steps": {
+          "memberTitle": "Stappen — leden",
+          "merchantTitle": "Stappen — handelaars",
+          "description": "Velden worden over deze pagina's verdeeld. Velden zonder stap verschijnen op de eerste.",
+          "add": "Stap toevoegen",
+          "edit": "Bewerken",
+          "archived": "Gearchiveerd",
+          "empty": "Geen stappen — het formulier is één pagina.",
+          "fieldCount": "{count, plural, =0 {geen velden} one {# veld} other {# velden}}",
+          "columns": {
+            "position": "#",
+            "title": "Titel",
+            "fields": "Velden"
+          },
+          "dialog": {
+            "createTitle": "Stap toevoegen",
+            "editTitle": "Stap bewerken",
+            "description": "Stappen worden getoond in de volgorde van hun positie. De titel is zichtbaar voor kandidaten.",
+            "title": "Titel",
+            "titleHint": "Wordt bovenaan deze pagina van het formulier getoond, in de taal van het fonds.",
+            "stepDescription": "Beschrijving",
+            "position": "Positie",
+            "positionHint": "Stappen worden oplopend op positie gesorteerd; de laagste is de eerste pagina.",
+            "save": "Opslaan",
+            "saving": "Opslaan…",
+            "cancel": "Annuleren"
+          },
+          "archive": {
+            "button": "Archiveren",
+            "restore": "Herstellen",
+            "title": "Deze stap archiveren?",
+            "description": "De stap verdwijnt uit het formulier. Er gaat geen reeds opgeslagen antwoord verloren.",
+            "fieldsMove": "{count, plural, one {# veld verhuist} other {# velden verhuizen}} naar de eerste stap van het formulier.",
+            "restoreTitle": "Deze stap herstellen?",
+            "restoreDescription": "De stap verschijnt weer in het formulier op zijn vorige positie.",
+            "confirm": "Archiveren",
+            "restoreConfirm": "Herstellen",
+            "saving": "Opslaan…",
+            "cancel": "Annuleren"
+          }
+        },
+        "integration": {
+          "title": "Website-integratie",
+          "description": "De link die je website gebruikt om mensen naar het inschrijfformulier te sturen, met gegevens al ingevuld.",
+          "urlLabel": "Formulier-URL",
+          "exampleLabel": "Voorbeeld met voorinvulling",
+          "exampleHint": "De kandidaat kan elke waarde aanpassen; ongeldige waarden worden genegeerd.",
+          "paramsLabel": "Geaccepteerde parameters",
+          "paramsHint": "Onbekende parameters worden genegeerd. “ref”, “step” en “error” zijn gereserveerd.",
+          "copy": "Kopiëren",
+          "columns": {
+            "param": "Parameter",
+            "field": "Veld",
+            "format": "Waarden"
           }
         }
       },
@@ -1263,63 +1746,130 @@
         "syncPending": "Lokaal opgeslagen, maar nog niet bevestigd door Citizen Pay. Sla opnieuw op om de synchronisatie te herhalen.",
         "syncFailed": "Tarief opgeslagen, maar de synchronisatie met Citizen Pay is mislukt. Sla opnieuw op om opnieuw te proberen."
       },
+      "emails": {
+        "title": "E-mails aan leden",
+        "description": "Automatische e-mails naar leden over hun stortingen en allocaties.",
+        "pause": {
+          "label": "Notificatie-e-mails aan leden pauzeren",
+          "description": "Tijdens de pauze ontvangen leden geen enkele notificatiemail: betalings- en toewijzingsbevestigingen, activering, uitnodiging, aanbrengbonus, “kaart onderweg” en bijdrageherinneringen worden allemaal overgeslagen — niet in de wachtrij gezet, dus er wordt niets met terugwerkende kracht verstuurd wanneer je hervat. Aanmeldmails (verificatie, welkom) en wachtwoordmails blijven werken. E-mails naar handelaren en het team worden niet beïnvloed."
+        },
+        "sender": {
+          "label": "Afzenderadres",
+          "description": "Van-adres voor e-mails aan leden. De weergavenaam is die van uw fonds. Het domein moet bij uw e-mailprovider geverifieerd zijn, anders mislukken de verzendingen. Laat leeg om het standaardadres van het platform te gebruiken. E-mails aan handelaars, het team en aanmeldmails worden niet beïnvloed.",
+          "placeholder": "noreply@uwfonds.org"
+        }
+      },
       "emailTemplates": {
-        "allocationTitle": "E-mail allocatiebevestiging",
-        "allocationDescription": "De e-mail die leden ontvangen wanneer een allocatie op hun kaart wordt gestort. Laat deze ongewijzigd voor de standaardtekst, of pas hem aan voor dit fonds.",
-        "cardAssignedTitle": "E-mail kaart onderweg",
-        "cardAssignedDescription": "De e-mail die een lid ontvangt wanneer zijn kaart is toegewezen en onderweg is. Laat deze ongewijzigd voor de standaardtekst, of pas hem aan voor dit fonds.",
-        "paymentReminderTitle": "E-mail bijdrageherinnering",
-        "paymentReminderDescription": "De maandelijkse herinnering die op de 1e wordt verzonden naar leden die nog niet hebben bijgedragen voor de periode. Laat deze ongewijzigd voor de standaardtekst, of pas hem aan voor dit fonds.",
+        "types": {
+          "ALLOCATION_CONFIRMATION": {
+            "title": "Toewijzingsbevestiging",
+            "description": "E-mail die het lid ontvangt wanneer een toewijzing op zijn kaart wordt bijgeschreven."
+          },
+          "CARD_ASSIGNED": {
+            "title": "Kaart onderweg",
+            "description": "E-mail die een lid ontvangt wanneer zijn kaart is toegewezen en verzonden."
+          },
+          "PAYMENT_REMINDER_FIRST": {
+            "title": "Bijdrageherinnering (eerste)",
+            "description": "Automatische herinnering die op de 1e van de maand wordt verstuurd naar leden die nog niet hebben bijgedragen voor de periode."
+          },
+          "PAYMENT_REMINDER_SECOND": {
+            "title": "Bijdrageherinnering (opvolging)",
+            "description": "Handmatige opvolging die vanaf de detailpagina van een periode wordt verstuurd naar leden die nog niet hebben betaald."
+          },
+          "MEMBER_WELCOME": {
+            "title": "Welkom voor lid",
+            "description": "Welkomstmail die naar een nieuw lid wordt verstuurd na de aanmelding."
+          },
+          "MEMBER_INVITED": {
+            "title": "Uitnodiging van lid",
+            "description": "E-mail die wordt verstuurd naar een lid dat een beheerder zojuist aan het fonds heeft toegevoegd."
+          },
+          "MEMBER_ACTIVATED": {
+            "title": "Account geactiveerd",
+            "description": "E-mail die een lid ontvangt wanneer zijn account is geactiveerd en zijn kaart klaar is."
+          },
+          "PAYMENT_CONFIRMATION": {
+            "title": "Betaling ontvangen",
+            "description": "E-mail die een lid ontvangt wanneer een betaling is ontvangen en verwerkt."
+          },
+          "REFERRAL_BONUS_AWARDED": {
+            "title": "Aanbrengbonus",
+            "description": "E-mail die de aanbrenger ontvangt wanneer een aanbrengbonus op zijn kaart wordt bijgeschreven."
+          }
+        },
+        "defaultName": "Standaardsjabloon",
+        "builtIn": "Ingebouwd",
+        "defaultReadOnly": "Het standaardsjabloon kan niet worden bewerkt. Dupliceer het om een aanpasbare versie te maken.",
+        "active": "Actief",
+        "makeActive": "Activeren",
+        "newTemplate": "Nieuw sjabloon",
+        "duplicate": "Dupliceren",
+        "rename": "Naam wijzigen",
+        "delete": "Verwijderen",
+        "editTemplate": "Sjabloon bewerken",
+        "editTemplateDescription": "Pas het onderwerp en de inhoud per taal aan, bekijk een voorbeeld en verstuur een test.",
+        "createTitle": "Nieuw sjabloon",
+        "createDescription": "Geef het sjabloon een naam en kies waarmee je begint.",
+        "nameLabel": "Naam",
+        "namePlaceholder": "bijv. Warme toon",
+        "sourceLabel": "Beginnen met",
+        "sourceDefault": "Standaardsjabloon",
+        "cancel": "Annuleren",
+        "create": "Aanmaken",
+        "save": "Opslaan",
+        "renameTitle": "Sjabloonnaam wijzigen",
+        "deleteTitle": "Sjabloon verwijderen?",
+        "deleteDescription": "Het sjabloon “{name}” wordt definitief verwijderd. Dit kan niet ongedaan worden gemaakt.",
+        "deleteActiveDescription": "“{name}” is het actieve sjabloon. Als je het verwijdert, keert deze e-mail terug naar het standaardsjabloon. Dit kan niet ongedaan worden gemaakt.",
+        "localeAuthored": "Aangepast voor deze taal.",
+        "loadDefault": "Standaardsjabloon laden",
         "subjectLabel": "Onderwerp",
-        "bodyLabel": "Inhoud",
-        "variablesHint": "Je kunt deze plaatshouders gebruiken — ze worden vervangen door de gegevens van elk lid wanneer de e-mail wordt verzonden:",
+        "htmlLabel": "Inhoud (HTML)",
+        "htmlHint": "Schrijf de inhoud in HTML — deze wordt in de lay-out van je fonds geplaatst (logo, voettekst). Gebruik de variabelen hieronder; ze worden bij verzending per lid vervangen.",
+        "variablesHint": "Je kunt deze variabelen gebruiken — ze worden bij verzending vervangen door de gegevens van elk lid:",
+        "previewLabel": "Voorbeeld",
+        "previewSubject": "Onderwerp:",
         "variables": {
           "firstName": "De voornaam van het lid",
           "fundName": "De naam van dit fonds",
           "amount": "Het toegewezen bedrag",
           "lastName": "De achternaam van het lid",
           "cardSerial": "Het serienummer van de kaart van het lid",
-          "shopList": "Opsomming van de actieve handelaars van het fonds",
+          "shopList": "Lijst met de actieve handelaren van het fonds",
           "address": "Het postadres van het lid",
           "cardLink": "Link naar de openbare kaartpagina van het lid",
           "cardNumber": "Het kaartnummer van het lid",
-          "paymentReference": "De mededeling die bij de overschrijving moet worden vermeld"
+          "paymentReference": "De mededeling die bij de overschrijving moet worden vermeld",
+          "paymentLink": "Link naar de openbare betaalpagina van het lid",
+          "occurredAt": "De datum van de betaling"
         },
-        "usingDefault": "Standaardsjabloon in gebruik.",
-        "usingOverride": "Aangepast sjabloon voor dit fonds in gebruik.",
-        "reset": "Terugzetten naar standaard",
-        "resetConfirmTitle": "Terugzetten naar standaardsjabloon?",
-        "resetConfirmDescription": "Hiermee verwijder je je aangepaste tekst en herstel je de standaard-e-mail. Dit kan niet ongedaan worden gemaakt.",
-        "resetConfirmCancel": "Annuleren",
-        "resetConfirmConfirm": "Terugzetten",
         "errors": {
           "subjectRequired": "Voer een onderwerp in.",
           "subjectTooLong": "Het onderwerp is te lang.",
-          "bodyRequired": "Voer een berichttekst in.",
-          "bodyTooLong": "De berichttekst is te lang.",
-          "unknownVariable": "Onbekende plaatshouder \"{name}\". Verwijder deze of gebruik een van de vermelde variabelen."
+          "bodyRequired": "Voer een bericht in.",
+          "bodyTooLong": "Het bericht is te lang.",
+          "unknownVariable": "Onbekende variabele “{name}”. Verwijder deze of gebruik een van de vermelde variabelen.",
+          "nameRequired": "Voer een naam in.",
+          "nameTooLong": "De naam is te lang.",
+          "nameTaken": "Er bestaat al een sjabloon met deze naam.",
+          "notFound": "Dit sjabloon kan niet worden gevonden."
         },
-        "htmlLabel": "Inhoud (HTML)",
-        "htmlHint": "Schrijf de inhoud in HTML — deze wordt in de huisstijl van je fonds geplaatst (logo, voettekst). Gebruik de plaatshouders hieronder; ze worden per lid vervangen wanneer de e-mail wordt verzonden.",
-        "previewLabel": "Voorbeeld",
-        "previewSubject": "Onderwerp:",
         "test": {
-          "title": "Stuur een test",
-          "description": "Kies een lid om de gegevens van de e-mail in te vullen en stuur een kopie naar een willekeurig adres — met de actuele gegevens van dat lid.",
-          "memberLabel": "Gegevens van dit lid gebruiken",
-          "emailLabel": "Verzenden naar",
+          "title": "Een test versturen",
+          "description": "Kies eventueel een lid om de gegevens in te vullen en stuur een kopie naar een adres naar keuze.",
+          "memberLabel": "Testgegevens",
+          "sampleData": "Voorbeeldgegevens",
+          "emailLabel": "Versturen naar",
           "emailPlaceholder": "jij@voorbeeld.com",
-          "send": "Test verzenden",
-          "sending": "Verzenden…",
-          "sent": "Test-e-mail verzonden.",
-          "noMembers": "Nog geen actieve leden met een allocatieniveau — voeg er een toe om een test te verzenden.",
+          "send": "Test versturen",
+          "sending": "Versturen…",
+          "sent": "Test-e-mail verstuurd.",
           "subjectPrefix": "[Test]",
           "errors": {
             "emailInvalid": "Voer een geldig e-mailadres in.",
-            "memberNotFound": "Dat lid kon niet worden gevonden.",
-            "noTier": "Dat lid heeft geen allocatieniveau, dus er is geen bedrag om te tonen.",
-            "noCard": "Dat lid heeft nog geen kaart, dus er is niets om naar te linken.",
-            "sendFailed": "De test-e-mail kon niet worden verzonden. Controleer het afzenderadres en probeer opnieuw."
+            "memberNotFound": "Dit lid kan niet worden gevonden.",
+            "sendFailed": "Kon de test-e-mail niet versturen. Controleer het afzenderadres en probeer het opnieuw."
           }
         }
       },
@@ -1345,137 +1895,13 @@
           "first_name": "De voornaam van het lid",
           "last_name": "De achternaam van het lid",
           "card_number": "Het kaartnummer van het lid",
-          "payment_reference": "De betalingsreferentie van het lid"
+          "payment_reference": "De betalingsreferentie van het lid (de UID van hun kaart)"
         },
         "errors": {
           "bodyRequired": "Voer de brieftekst in.",
           "bodyTooLong": "De brieftekst is te lang.",
           "unknownVariable": "Onbekende plaatshouder \"{name}\". Verwijder hem of gebruik een van de vermelde variabelen."
         }
-      }
-    },
-    "annotations": {
-      "PAYOUT_BURN": "Uitbetaling vernietigd",
-      "PAYOUT_FEE": "Uitbetalingskosten",
-      "ACCOUNT_MINT": "Uitgifte",
-      "ACCOUNT_BURN": "Vernietiging",
-      "ACCOUNT_TRANSFER": "Overdracht",
-      "system": "Systeem",
-      "by": "door {name}",
-      "triggers": {
-        "ADMIN_MANUAL_MINT": "Handmatige uitgifte",
-        "ADMIN_DIRECT_MINT": "Directe uitgifte",
-        "ADMIN_DIRECT_BURN": "Directe vernietiging",
-        "CARD_TOPUP": "Kaart opwaarderen",
-        "CARD_WITHDRAWAL": "Kaartopname",
-        "ACCOUNT_MINT": "Uitgifte op rekening",
-        "ACCOUNT_BURN": "Vernietiging op rekening",
-        "ACCOUNT_TRANSFER": "Rekeningoverdracht",
-        "ORDER_SETTLEMENT_MINT": "Orderafwikkeling (uitgifte)",
-        "ORDER_SETTLEMENT_BURN": "Orderafwikkeling (vernietiging)",
-        "PAYOUT_BURN": "Uitbetaling vernietigd",
-        "PAYOUT_FEE": "Uitbetalingskosten",
-        "REFERRAL_REWARD": "Verwijzingsbeloning",
-        "BANK_SYNC": "Bankstorting (auto)",
-        "PERIOD_CLOSE": "Periodeafsluiting",
-        "CARD_TRANSFER": "Kaartoverboeking"
-      },
-      "edit": "Annoteren",
-      "title": "Transactie annoteren",
-      "noteLabel": "Notitie",
-      "notePlaceholder": "Waarvoor was dit?",
-      "errors": {
-        "invalidHash": "Ongeldige transactiehash.",
-        "noteTooLong": "Notitie is te lang (max. 280 tekens).",
-        "saveFailed": "Kon de annotatie niet opslaan. Probeer het zo opnieuw."
-      }
-    },
-    "accounts": {
-      "title": "Rekeningen",
-      "description": "Benoemde rekeningen afgeleid van de sleutel van het fonds. Bekijk per rekening het saldo en de transactiegeschiedenis.",
-      "notConnected": "Verbind dit fonds eerst met Citizen Pay om rekeningen aan te maken.",
-      "balancesError": "Kon de on-chain saldi niet laden. Probeer het zo opnieuw.",
-      "empty": "Nog geen rekeningen. Maak er een aan om te beginnen.",
-      "defaultName": "Hoofdrekening",
-      "defaultBadge": "Standaard",
-      "table": {
-        "name": "Naam",
-        "address": "Adres",
-        "balance": "Saldo"
-      },
-      "detail": {
-        "back": "Alle rekeningen",
-        "balance": "Saldo"
-      },
-      "create": {
-        "trigger": "Nieuwe rekening",
-        "title": "Rekening aanmaken",
-        "description": "Een nieuwe on-chain rekening afgeleid van de sleutel van het fonds.",
-        "name": "Naam",
-        "namePlaceholder": "bijv. Reserve, Kosten, Evenementen",
-        "confirm": "Rekening aanmaken"
-      },
-      "rename": {
-        "trigger": "Hernoemen",
-        "title": "Rekening hernoemen",
-        "name": "Naam"
-      },
-      "archive": {
-        "trigger": "Verwijderen",
-        "title": "Deze rekening verwijderen?",
-        "description": "De rekening wordt uit de lijst verwijderd. Het on-chain adres en de tokens blijven bestaan — je kunt de rekening later opnieuw aanmaken.",
-        "confirm": "Verwijderen"
-      },
-      "move": {
-        "inTrigger": "Tokens toevoegen",
-        "outTrigger": "Tokens verwijderen",
-        "inTitle": "Tokens toevoegen",
-        "outTitle": "Tokens verwijderen",
-        "inDescription": "Geef tokens uit naar deze rekening.",
-        "outDescription": "Verbrand tokens van deze rekening.",
-        "amount": "Bedrag",
-        "confirm": "Bevestigen",
-        "success": "Transactie ingediend."
-      },
-      "transfer": {
-        "trigger": "Overdragen",
-        "title": "Tokens overdragen",
-        "description": "Stuur tokens van deze rekening naar een andere rekening of een adres.",
-        "destination": "Bestemming",
-        "pickAccount": "Kies een rekening…",
-        "amount": "Bedrag",
-        "confirm": "Overdragen",
-        "success": "Transactie ingediend."
-      },
-      "transfers": {
-        "title": "Transactiegeschiedenis",
-        "empty": "Nog geen transacties.",
-        "direction": "Richting",
-        "counterparty": "Tegenpartij",
-        "trigger": "Trigger",
-        "date": "Datum",
-        "amount": "Bedrag",
-        "loadMore": "Meer tonen",
-        "loadError": "Kon de on-chain geschiedenis niet laden.",
-        "directions": {
-          "in": "Ontvangen",
-          "out": "Verzonden",
-          "self": "Intern"
-        }
-      },
-      "errors": {
-        "nameRequired": "Naam is verplicht.",
-        "nameTooLong": "Naam is te lang (max. 80 tekens).",
-        "notFound": "Rekening niet gevonden.",
-        "cannotRemoveDefault": "De hoofdrekening kan niet worden verwijderd.",
-        "notConnected": "Verbind dit fonds eerst met Citizen Pay.",
-        "deriveFailed": "Kon het rekeningadres niet afleiden. Probeer het zo opnieuw.",
-        "createFailed": "Kon de rekening niet aanmaken. Probeer het zo opnieuw.",
-        "amountInvalid": "Bedrag moet een geldig getal zijn.",
-        "amountPositive": "Bedrag moet groter dan nul zijn.",
-        "addressInvalid": "Voer een geldig 0x-adres in (40 hex-tekens).",
-        "transferFailed": "On-chain overdracht mislukt. Probeer het zo opnieuw.",
-        "transfersFailed": "Kon de transacties niet laden. Probeer het zo opnieuw."
       }
     }
   },
@@ -1486,6 +1912,21 @@
       "orderingInvalid": "Minimum ≤ allocatie ≤ maximum.",
       "nameTaken": "Een ander niveau gebruikt deze naam al.",
       "notFound": "Niveau niet gevonden."
+    }
+  },
+  "onboardingFields": {
+    "errors": {
+      "keyRequired": "Sleutel is verplicht.",
+      "keyInvalid": "Sleutel moet uit kleine letters, cijfers of underscores bestaan en met een letter beginnen.",
+      "keyTaken": "Een ander veld gebruikt deze sleutel al.",
+      "labelRequired": "Label is verplicht.",
+      "optionEmpty": "Elke optie moet een waarde en een label hebben.",
+      "optionsRequired": "Voeg ten minste één optie toe.",
+      "notFound": "Veld niet gevonden.",
+      "builtinInvalid": "Dat lidgegeven is niet bekend.",
+      "builtinTaken": "Dat gegeven wordt al gevraagd op dit formulier (controleer ook gearchiveerde velden).",
+      "visibleIfInvalid": "Die zichtbaarheidsvoorwaarde is ongeldig — controleer het veld waarvan ze afhangt.",
+      "visibleIfValueRequired": "Vul een waarde in voor de zichtbaarheidsvoorwaarde."
     }
   },
   "tokenOps": {
@@ -1505,6 +1946,7 @@
   "settings": {
     "errors": {
       "nameMin": "Fondsnaam moet minstens 2 tekens hebben.",
+      "emailInvalid": "Voer een geldig e-mailadres in.",
       "localeUnsupported": "Niet-ondersteunde taal.",
       "timezoneRequired": "Tijdzone is verplicht.",
       "colorInvalid": "Gebruik een hexkleur met 6 tekens (bv. #1a73e8).",
@@ -1520,6 +1962,7 @@
     "roles": {
       "OWNER": "Eigenaar",
       "ADMIN": "Beheerder",
+      "OPERATOR": "Operator",
       "VIEWER": "Lezer"
     },
     "admin": {
@@ -1594,6 +2037,9 @@
       "allocationConfirmation": {
         "subject": "{amount} zijn zojuist op uw kaart gezet — {fundName}",
         "textBody": "Hallo {firstName},\n\nUw allocatie van {amount} is zojuist op uw {fundName}-kaart bijgeschreven. U kunt ze gebruiken bij elke partnerhandelaar.\n\nHet {fundName}-team"
+      },
+      "footer": {
+        "unsubscribe": "Afmelden voor betalingsherinneringen"
       }
     },
     "signup": {
@@ -1602,6 +2048,9 @@
       "firstName": "Voornaam",
       "lastName": "Achternaam",
       "email": "E-mail",
+      "contributionAmount": "Bedrag dat u wilt bijdragen (optioneel)",
+      "contributionAmountHint": "Laat leeg om het door uw niveau voorgestelde bedrag te gebruiken. U kunt met een beheerder een ander bedrag afspreken.",
+      "remindersOptOut": "Ik wil geen betalingsherinneringen per e-mail ontvangen.",
       "submit": "Aanvragen",
       "submitting": "Verzenden…",
       "errors": {
@@ -1609,8 +2058,11 @@
         "lastNameRequired": "Achternaam is verplicht.",
         "emailInvalid": "Voer een geldig e-mailadres in.",
         "emailTaken": "Er bestaat al een aanvraag met dit e-mailadres voor dit fonds.",
+        "amountInvalid": "Voer een geldig bedrag in (maximaal 2 decimalen).",
         "fieldRequired": "{label} is verplicht.",
-        "generic": "Er is iets misgegaan. Probeer opnieuw."
+        "generic": "Er is iets misgegaan. Probeer opnieuw.",
+        "required": "Dit veld is verplicht.",
+        "fieldInvalid": "{label} heeft geen geldige indeling."
       },
       "thanks": {
         "checkEmail": {
@@ -1632,8 +2084,20 @@
         },
         "welcome": {
           "subject": "Welkom bij {fundName}",
-          "textBody": "Hallo {firstName},\n\nWelkom bij {fundName}. Uw aanvraag wordt beoordeeld — een beheerder neemt binnenkort contact op.\n\nWanneer u klaar bent om bij te dragen, vermeld dan deze referentie op uw bankoverschrijving:\n  {paymentReference}\n\nBedankt,\nHet {fundName}-team"
+          "textBody": "Hallo {firstName},\n\nWelkom bij {fundName}. Uw aanvraag wordt beoordeeld — een beheerder neemt binnenkort contact op.\n\nU ontvangt uw betalingsreferentie samen met uw kaart.\n\nBedankt,\nHet {fundName}-team"
         }
+      },
+      "stepper": {
+        "progress": "Stap {current} van {total}",
+        "back": "Terug",
+        "next": "Doorgaan"
+      },
+      "cancel": {
+        "button": "Inschrijving annuleren",
+        "title": "Inschrijving verlaten?",
+        "description": "Je antwoorden worden niet opgeslagen en je verlaat dit formulier.",
+        "stay": "Doorgaan",
+        "confirm": "Verlaten"
       }
     },
     "admin": {
@@ -1669,9 +2133,12 @@
         "firstNameLabel": "Voornaam",
         "lastNameLabel": "Achternaam",
         "emailLabel": "E-mail",
+        "notifyLabel": "Lid per e-mail op de hoogte brengen",
         "cancel": "Annuleren",
         "confirm": "Lid uitnodigen",
-        "inviting": "Uitnodiging versturen…"
+        "confirmSilent": "Lid toevoegen",
+        "inviting": "Uitnodiging versturen…",
+        "adding": "Toevoegen…"
       },
       "addCard": {
         "button": "Kaart toevoegen",
@@ -1687,6 +2154,19 @@
         "adding": "Toevoegen…",
         "serialRequired": "Serienummer van de kaart is verplicht."
       },
+      "mint": {
+        "button": "Tokens uitgeven",
+        "title": "Tokens uitgeven",
+        "description": "Geef handmatig tokens uit naar de hoofdkaart van {memberName}. Gebruik dit voor correcties of eenmalige toevoegingen buiten de normale toewijzing.",
+        "amountLabel": "Bedrag",
+        "amountHint": "Aantal uit te geven tokens, met maximaal 2 decimalen.",
+        "amountRequired": "Bedrag is verplicht.",
+        "noteLabel": "Notitie (optioneel, intern)",
+        "notePlaceholder": "Waarom deze uitgifte? Vastgelegd voor controle.",
+        "cancel": "Annuleren",
+        "confirm": "Uitgeven",
+        "minting": "Bezig met uitgeven…"
+      },
       "email": {
         "activated": {
           "subject": "Uw account is actief — {fundName}",
@@ -1694,7 +2174,7 @@
         },
         "invited": {
           "subject": "U bent uitgenodigd bij {fundName}",
-          "textBody": "Hallo {firstName},\n\nEen beheerder van {fundName} heeft u zojuist als lid toegevoegd. U ontvangt uw kaart bij uw volgende contact met het team.\n\nWanneer u klaar bent om bij te dragen, vermeld dan deze referentie op uw bankoverschrijving zodat we uw kaart automatisch kunnen crediteren:\n\n  {paymentReference}\n\nHet {fundName}-team"
+          "textBody": "Hallo {firstName},\n\nEen beheerder van {fundName} heeft u zojuist als lid toegevoegd. U ontvangt uw kaart bij uw volgende contact met het team, samen met de referentie die u op uw bijdrageoverschrijvingen moet vermelden.\n\nHet {fundName}-team"
         },
         "referralBonusAwarded": {
           "subject": "Uw doorverwijzingsbonus is toegevoegd — {fundName}",
@@ -1724,31 +2204,57 @@
         "description": "{memberName} is momenteel {currentStatus}.",
         "targetLabel": "Nieuwe status",
         "values": {
+          "NEW": "Nieuw",
           "ACTIVE": "Actief",
           "INACTIVE": "Inactief",
-          "LEFT": "Vertrokken"
+          "PAUSED": "Gepauzeerd",
+          "STOPPED": "Gestopt",
+          "REJECTED": "Afgewezen"
         },
-        "leftWarning": "Markeren als Vertrokken legt een vertrekdatum vast. Gebruik Inactief voor tijdelijke pauzes.",
         "cancel": "Annuleren",
         "confirm": "Bijwerken",
-        "saving": "Opslaan…"
+        "saving": "Opslaan…",
+        "stoppedWarning": "Markeren als Gestopt legt een vertrekdatum vast. Gebruik Gepauzeerd voor een tijdelijke pauze."
       },
-      "mint": {
-        "button": "Tokens uitgeven",
-        "title": "Tokens uitgeven",
-        "description": "Geef handmatig tokens uit naar de hoofdkaart van {memberName}. Gebruik dit voor correcties of eenmalige toevoegingen buiten de normale toewijzing.",
-        "amountLabel": "Bedrag",
-        "amountHint": "Aantal uit te geven tokens, met maximaal 2 decimalen.",
-        "amountRequired": "Bedrag is verplicht.",
-        "noteLabel": "Notitie (optioneel, intern)",
-        "notePlaceholder": "Waarom deze uitgifte? Vastgelegd voor controle.",
+      "bulk": {
+        "selectAll": "Alle leden selecteren",
+        "selectRow": "Lid selecteren",
+        "selected": "{count} geselecteerd",
+        "clearSelection": "Wissen",
+        "edit": "Selectie bewerken",
+        "dialogTitle": "Geselecteerde leden bewerken",
+        "dialogDescription": "Eén wijziging toepassen op de {count} geselecteerde leden.",
+        "propertyLabel": "Eigenschap",
+        "property": {
+          "locale": "Taal",
+          "status": "Status",
+          "tier": "Niveau"
+        },
+        "valueLabel": "Nieuwe waarde",
+        "tierNone": "— Geen niveau —",
+        "statusHint": "Leden van wie de huidige status de overgang niet toelaat, worden overgeslagen.",
+        "stoppedWarning": "Markeren als Gestopt legt een vertrekdatum vast. Gebruik Gepauzeerd voor een tijdelijke pauze.",
+        "resultSkipped": "{updated} bijgewerkt, {skipped} overgeslagen (statuswijziging niet toegestaan vanuit hun huidige status).",
+        "done": "Klaar",
         "cancel": "Annuleren",
-        "confirm": "Uitgeven",
-        "minting": "Bezig met uitgeven…"
+        "apply": "Toepassen",
+        "applying": "Toepassen…",
+        "errors": {
+          "noSelection": "Selecteer eerst minstens één lid.",
+          "tooMany": "Te veel leden tegelijk geselecteerd.",
+          "invalidValue": "Die waarde is niet geldig."
+        }
       },
       "import": {
         "title": "Leden importeren",
         "description": "Upload of plak een CSV met kopregels en koppel elke kolom aan een ledenveld.",
+        "mode": {
+          "label": "Importmodus",
+          "upsert": "Toevoegen en bijwerken",
+          "updateOnly": "Alleen bijwerken (backfill)",
+          "upsertHint": "Maakt nieuwe leden aan en werkt bestaande leden bij (gematcht op e-mail).",
+          "updateOnlyHint": "Werkt alleen de gekoppelde kolommen van bestaande leden bij (gematcht op e-mail). Er worden geen leden aangemaakt; rijen zonder match worden overgeslagen."
+        },
         "fileLabel": "CSV-bestand",
         "pasteLabel": "Of plak rijen",
         "mapHeading": "Kolommen koppelen",
@@ -1773,22 +2279,63 @@
           "householdAdults": "Volwassenen in huishouden",
           "householdChildren": "Kinderen in huishouden",
           "tier": "Schijf (op naam)",
+          "contributionAmount": "Afgesproken bijdrage",
           "locale": "Taal",
           "notes": "Notities",
-          "serial": "Kaartserienummer"
+          "serial": "Kaartserienummer",
+          "status": "Status",
+          "cardNumber": "Kaartnr. (1…N)"
         },
         "errors": {
           "missingRequiredMapping": "Koppel de verplichte velden (voornaam, achternaam, e-mail).",
+          "missingMatchKey": "Koppel de e-mailkolom om te bepalen welke leden moeten worden bijgewerkt.",
           "columnMissing": "Een gekoppelde kolom ontbreekt in de CSV.",
           "empty": "Geen gegevensrijen in de CSV."
         },
         "skip": {
           "missingName": "Voornaam of achternaam ontbreekt.",
           "invalidEmail": "Ongeldig e-mailadres.",
+          "noMatch": "Geen bestaand lid met dit e-mailadres.",
           "error": "Kon deze rij niet importeren."
         },
-        "fixedValuePlaceholder": "Voor alle rijen instellen"
+        "fixedValuePlaceholder": "Voor alle rijen instellen",
+        "statusMapHeading": "Statustoewijzing",
+        "statusUnrecognized": "niet herkend",
+        "statusesDefaulted": "{count, plural, one {# statuswaarde niet herkend, ingesteld op Nieuw} other {# statuswaarden niet herkend, ingesteld op Nieuw}}:",
+        "cardNumbersNotFound": "{count, plural, one {# kaartnummer zonder bestaande kaart (niet gekoppeld)} other {# kaartnummers zonder bestaande kaart (niet gekoppeld)}}:"
+      },
+      "edit": {
+        "button": "Bewerken",
+        "title": "Lid bewerken",
+        "description": "Werk de contactgegevens, het huishouden en de notities van dit lid bij.",
+        "firstNameLabel": "Voornaam",
+        "lastNameLabel": "Achternaam",
+        "emailLabel": "E-mail",
+        "localeLabel": "Taal van de e-mails",
+        "localeDefault": "Standaard van het fonds",
+        "localeHint": "De taal waarin de e-mails van dit lid worden verzonden.",
+        "addressLabel": "Adres",
+        "postalCodeLabel": "Postcode",
+        "cityLabel": "Stad",
+        "contributionAmountLabel": "Afgesproken bijdrage",
+        "contributionAmountHint": "Wat we dit lid vragen bij te dragen. Laat leeg om het streefbedrag van het niveau te gebruiken ({target}). Minimum: {min}.",
+        "contributionAmountHintNoTier": "Wat we dit lid vragen bij te dragen. Laat leeg om het streefbedrag van het niveau te gebruiken zodra er een niveau is toegewezen.",
+        "notesLabel": "Notities",
+        "cancel": "Annuleren",
+        "confirm": "Opslaan",
+        "saving": "Opslaan…",
+        "errors": {
+          "tooLong": "Deze waarde is te lang.",
+          "amountInvalid": "Voer een geldig bedrag in (maximaal 2 decimalen).",
+          "amountBelowMin": "Het bedrag kan niet lager zijn dan het minimum van het niveau ({min}).",
+          "localeInvalid": "Kies een ondersteunde taal."
+        }
       }
+    },
+    "builtinFields": {
+      "address": "Adres",
+      "postalCode": "Postcode",
+      "city": "Stad"
     }
   },
   "cards": {
@@ -1831,10 +2378,74 @@
         "submitting": "Opnemen…",
         "success": "Opname bevestigd op de blockchain."
       },
+      "status": {
+        "button": "Status wijzigen",
+        "title": "Kaartstatus wijzigen",
+        "description": "Stel de status van de kaart van {holderLabel} in. De wijziging wordt doorgevoerd in Citizen Pay.",
+        "statusLabel": "Status",
+        "options": {
+          "ACTIVE": {
+            "label": "Actief",
+            "description": "De kaart is in gebruik. Een kaart wordt automatisch actief bij de eerste opwaardering."
+          },
+          "INACTIVE": {
+            "label": "Inactief",
+            "description": "Fabrieksinstelling — nog niet opgewaardeerd. Blokkeert niets; de kaart wordt actief bij de eerste opwaardering."
+          },
+          "BLOCKED": {
+            "label": "Geblokkeerd",
+            "description": "De terminal weigert deze kaart."
+          }
+        },
+        "lostLabel": "Als verloren gemeld",
+        "lostDescription": "Interne markering om verloren kaarten op te volgen. Heeft geen invloed op het gedrag van de terminal.",
+        "cancel": "Annuleren",
+        "confirm": "Opslaan",
+        "saving": "Opslaan…"
+      },
+      "notify": {
+        "rowLabel": "Melding",
+        "noEmail": "Geen e-mailadres",
+        "status": {
+          "sent": "Geïnformeerd",
+          "failed": "Versturen mislukt",
+          "unsent": "Niet geïnformeerd"
+        },
+        "send": "Lid informeren",
+        "retry": "Opnieuw proberen",
+        "resend": "Opnieuw versturen",
+        "confirmTitle": "Het lid informeren?",
+        "confirmDescription": "Stuur {name} de e-mail \"uw kaart is onderweg\".",
+        "cancel": "Annuleren",
+        "confirmSend": "E-mail versturen",
+        "sending": "Versturen…",
+        "errors": {
+          "notFound": "Kaart niet gevonden.",
+          "noMember": "Deze kaart is nog niet aan een lid toegewezen.",
+          "noEmail": "Dit lid heeft geen e-mailadres geregistreerd.",
+          "sendFailed": "De e-mail kon niet worden verzonden. Probeer het opnieuw."
+        }
+      },
+      "bulk": {
+        "selectAll": "Alle kaarten op deze pagina selecteren",
+        "selectRow": "{holder} selecteren",
+        "selected": "{count, plural, one {# kaart geselecteerd} other {# kaarten geselecteerd}}",
+        "changeStatus": "Status wijzigen",
+        "clear": "Wissen",
+        "dialogTitle": "Kaartstatus wijzigen",
+        "dialogDescription": "{count, plural, one {Stel de status van # geselecteerde kaart in.} other {Stel de status van de # geselecteerde kaarten in.}} Dit wordt doorgevoerd in Citizen Pay.",
+        "cancel": "Annuleren",
+        "apply": "Toepassen",
+        "applying": "Toepassen…",
+        "errors": {
+          "none": "Geen overeenkomende kaarten geselecteerd."
+        }
+      },
       "errors": {
         "notFound": "Kaart niet gevonden.",
         "alreadyBlocked": "Deze kaart is al geblokkeerd.",
         "alreadyActive": "Deze kaart is al actief.",
+        "invalidStatus": "Ongeldige kaartstatus.",
         "noAccount": "Deze kaart heeft nog geen on-chain adres — ze is niet volledig geregistreerd bij Citizen Pay.",
         "amountInvalid": "Het bedrag moet een getal zijn met maximaal 2 decimalen.",
         "amountPositive": "Het bedrag moet groter zijn dan nul.",
@@ -1877,6 +2488,14 @@
           "empty": "Geen geldige rijen in de CSV.",
           "noMatches": "Geen enkel serienummer komt overeen met een kaart in dit fonds.",
           "columnMissing": "Kies zowel een serienummer- als een nummerkolom."
+        }
+      },
+      "source": {
+        "errors": {
+          "notFound": "Kaart niet gevonden.",
+          "sourceNotFound": "Bronkaart niet gevonden.",
+          "self": "Een kaart kan niet haar eigen bron zijn.",
+          "failed": "Kon de bronkaart niet bijwerken. Probeer het zo weer."
         }
       },
       "unassign": {
@@ -2024,6 +2643,20 @@
         "rejectReasonPlaceholder": "Wordt gedeeld met de handelaar in de afwijzingsmail.",
         "reasonRequired": "Een reden is verplicht zodat de handelaar de beslissing begrijpt."
       },
+      "visibility": {
+        "visible": "Zichtbaar",
+        "hidden": "Verborgen"
+      },
+      "editName": {
+        "trigger": "Naam bewerken",
+        "title": "Naam van de handelaar bewerken",
+        "description": "Dit is de publieke naam van de handelaar — getoond in de directory, allocatie-e-mails en uitbetalingslabels.",
+        "label": "Naam",
+        "placeholder": "Naam van de handelaar",
+        "cancel": "Annuleren",
+        "save": "Opslaan",
+        "saving": "Opslaan…"
+      },
       "email": {
         "approved": {
           "subject": "Aanvraag goedgekeurd — {fundName}",
@@ -2041,7 +2674,9 @@
         "alreadyApproved": "Deze handelaar is al goedgekeurd.",
         "alreadyRejected": "Deze handelaar is al afgewezen.",
         "notRejected": "Alleen afgewezen handelaars kunnen heroverwogen worden.",
-        "reasonRequired": "Een reden is verplicht."
+        "reasonRequired": "Een reden is verplicht.",
+        "nameRequired": "Voer een naam in.",
+        "nameTaken": "Een andere handelaar in dit fonds gebruikt die naam al."
       },
       "sync": {
         "trigger": "Synchroniseren met Citizen Pay",
@@ -2159,6 +2794,21 @@
       "nextSteps": "Neem contact op met de beheerder van het fonds of dien een nieuwe aanvraag in om een nieuwe verificatie-e-mail te ontvangen."
     }
   },
+  "unsubscribe": {
+    "title": "Betalingsherinneringen",
+    "errorTitle": "Ongeldige link",
+    "description": "Hallo {firstName}, beheer hieronder uw voorkeuren voor betalingsherinneringen per e-mail.",
+    "status": {
+      "subscribed": "U ontvangt momenteel betalingsherinneringen per e-mail.",
+      "unsubscribed": "U ontvangt geen betalingsherinneringen per e-mail meer."
+    },
+    "unsubscribe": "Afmelden voor herinneringen",
+    "resubscribe": "Herinneringen opnieuw inschakelen",
+    "saving": "Opslaan…",
+    "errors": {
+      "invalidLink": "Deze afmeldlink is ongeldig of verlopen."
+    }
+  },
   "account": {
     "title": "Account",
     "backToFunds": "Uw fondsen",
@@ -2223,7 +2873,8 @@
       "features": "Functies",
       "getStarted": "Aan de slag",
       "signIn": "Inloggen",
-      "startFund": "Fonds starten"
+      "startFund": "Fonds starten",
+      "joinWaitlist": "Aanmelden voor de wachtlijst"
     },
     "hero": {
       "badge": "Open source · Multi-fonds · Gehost of zelf-gehost",
@@ -2249,8 +2900,7 @@
         "primaryColor": "Hoofdkleur",
         "tokenName": "Naam van het tegoed",
         "tokenNameHelper": "Hoe de munteenheid van uw fonds heet. Enkelvoud — wij regelen het meervoud.",
-        "tryWith": "Probeer met deze huisstijl",
-        "skipDemo": "Sla de demo over, start een fonds",
+        "joinWaitlist": "Aanmelden voor de wachtlijst",
         "swatchHelperDefault": "de standaardkleur van la caisse.",
         "swatchHelperOther": "gebruikt voor knoppen, accenten en uitlichtingen.",
         "errors": {
@@ -2540,6 +3190,25 @@
         "body": "Pull de image, draai de migratie, wijs een domein toe. AGPL-3.0 op GitHub."
       }
     },
+    "waitlist": {
+      "emailLabel": "E-mail",
+      "emailPlaceholder": "naam@voorbeeld.com",
+      "fundNameLabel": "Hoe zou u uw fonds noemen? (optioneel)",
+      "fundNamePlaceholder": "Caisse de Saint-Gilles",
+      "submit": "Uitnodiging aanvragen",
+      "submitting": "Aanmelden…",
+      "successTitle": "U staat op de lijst.",
+      "successBody": "Bedankt — we mailen u zodra uw uitnodiging klaar is.",
+      "errors": {
+        "fundNameMax": "Houd het onder {max} tekens."
+      },
+      "emails": {
+        "confirm": {
+          "subject": "U staat op de wachtlijst van La Caisse",
+          "text": "Hallo,\n\nBedankt voor uw interesse in La Caisse — u staat op de wachtlijst. We verwelkomen nieuwe fondsen in kleine groepen en sturen u een uitnodiging zodra er een plek vrijkomt.\n\nU hoeft voorlopig niets te doen.\n\nHet La Caisse-team"
+        }
+      }
+    },
     "footer": {
       "description": "Open-source infrastructuur voor lokale solidaire fondsen, clubs en gemeenschapsruimtes. Gehost door ons, of zelf-gehost op uw eigen server.",
       "explore": {
@@ -2740,17 +3409,6 @@
     "thirdPartyLink": "Zie /licenses",
     "viewOnGithub": "Bekijk op GitHub"
   },
-  "onboardingFields": {
-    "errors": {
-      "keyRequired": "Sleutel is verplicht.",
-      "keyInvalid": "Sleutel moet uit kleine letters, cijfers of underscores bestaan en met een letter beginnen.",
-      "keyTaken": "Een ander veld gebruikt deze sleutel al.",
-      "labelRequired": "Label is verplicht.",
-      "optionEmpty": "Elke optie moet een waarde en een label hebben.",
-      "optionsRequired": "Voeg ten minste één optie toe.",
-      "notFound": "Veld niet gevonden."
-    }
-  },
   "periods": {
     "errors": {
       "dateInvalid": "Voer een geldige datum in.",
@@ -2759,6 +3417,38 @@
       "closed": "Deze periode is al afgesloten en kan niet worden bewerkt.",
       "monthMismatch": "De afkapdatum moet binnen de maand van de periode vallen.",
       "notFixedPeriod": "Periodes gelden alleen wanneer allocatie op vaste periode staat."
+    }
+  },
+  "cotisation": {
+    "title": "Betaling van de maandelijkse bijdrage",
+    "greeting": "Hallo {name}, gelieve uw maandelijkse bijdrage te betalen met behulp van onderstaande gegevens",
+    "back": "Terug naar de website",
+    "manual": {
+      "title": "Betalen via overschrijving",
+      "beneficiary": "Naam begunstigde",
+      "iban": "IBAN",
+      "reference": "Betalingsreferentie",
+      "amount": "Bedrag",
+      "referenceNotice": "Belangrijk: vermeld de betalingsreferentie {reference} bij uw overschrijving. Zo kunnen wij uw betaling correct herkennen."
+    },
+    "qr": {
+      "title": "Scan om te betalen",
+      "hint": "Scan met uw bankapp"
+    },
+    "instructions": {
+      "title": "Betalingsinstructies",
+      "qrTitle": "Optie 1: Scan de QR-code",
+      "qrBody": "Open uw bankapp en gebruik de QR-scanner om alle betalingsgegevens automatisch in te vullen.",
+      "manualTitle": "Optie 2: Handmatige overschrijving",
+      "manualBody": "Gebruik de kopieerknoppen hierboven om elk veld te kopiëren en in uw bankapp te plakken. Vergeet niet de betalingsreferentie te vermelden.",
+      "help": "Als u vragen of problemen heeft met uw betaling, neem dan contact op met {fundName}."
+    },
+    "notConnected": "De bankgegevens zijn nog niet beschikbaar. Probeer het later opnieuw of neem contact op met {fundName}."
+  },
+  "onboardingSteps": {
+    "errors": {
+      "titleRequired": "De titel is verplicht.",
+      "notFound": "Stap niet gevonden."
     }
   }
 }

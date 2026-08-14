@@ -7,29 +7,30 @@ import { revalidatePath } from "next/cache";
 import { requireFundRole } from "@/services/auth/dal";
 import { prisma } from "@/services/db/prisma";
 
+import { contributionApplies, isBelowTierMinimum } from "./contribution";
 import { EditMemberProfileSchema } from "./schema";
 
 export type EditMemberProfileField =
   | "firstName"
   | "lastName"
   | "email"
-  | "phone"
+  | "locale"
   | "address"
   | "postalCode"
   | "city"
-  | "iban"
   | "notes"
-  | "householdAdults"
-  | "householdChildren";
+  | "contributionAmount";
 
 export type UpdateMemberProfileResult =
   | { ok: true }
   | { error: string; field?: EditMemberProfileField };
 
-// Admin edit of a member's core record (identity, address, household,
-// banking IBAN, notes). Tier and status are handled by their own actions —
-// not touched here. Email is per-fund unique, so a collision surfaces as a
-// field error rather than an unhandled P2002.
+// Admin edit of a member's core record: identity, postal address, preferred
+// language, staff notes and the committed contribution. Everything else a fund
+// collects is a custom question — edited through
+// updateMemberApplicationDataAction, not here. Tier and status have their own
+// actions. Email is per-fund unique, so a collision surfaces as a field error
+// rather than an unhandled P2002.
 export async function updateMemberProfileAction(
   input: unknown,
 ): Promise<UpdateMemberProfileResult> {
@@ -55,13 +56,40 @@ export async function updateMemberProfileAction(
 
   const member = await prisma.member.findFirst({
     where: { id: memberId, fundId: fund.id },
-    select: { id: true },
+    select: { id: true, tier: { select: { minContribution: true } } },
   });
   if (!member) return { error: t("members.admin.errors.notFound" as never) };
 
   // Normalise optional text: trimmed empty string → null so we don't store
   // empty strings that read as "set" downstream.
   const orNull = (v: string | undefined) => (v && v.length > 0 ? v : null);
+
+  // Committed contribution (issue #82): only applies to FIXED_PERIOD funds with
+  // tiers — drop any value otherwise. When it applies: empty → null (use the
+  // tier target), and a set value is floored against the member's current tier
+  // minimum (the schema can't do this since the tier lives outside the form).
+  // Tier-less members have no floor. See services/member/contribution.ts.
+  const tierCount = await prisma.allocationTier.count({
+    where: { fundId: fund.id, archivedAt: null },
+  });
+  const applies = contributionApplies(fund.allocationMode, tierCount);
+  const contributionAmount = applies
+    ? orNull(parsed.data.contributionAmount)
+    : null;
+  if (
+    contributionAmount !== null &&
+    isBelowTierMinimum(
+      Number(contributionAmount),
+      member.tier ? Number(member.tier.minContribution) : null,
+    )
+  ) {
+    return {
+      error: t("members.admin.edit.errors.amountBelowMin" as never, {
+        min: member.tier!.minContribution.toString(),
+      } as never),
+      field: "contributionAmount",
+    };
+  }
 
   try {
     await prisma.member.update({
@@ -70,14 +98,12 @@ export async function updateMemberProfileAction(
         firstName: parsed.data.firstName,
         lastName: parsed.data.lastName,
         email: parsed.data.email,
-        phone: orNull(parsed.data.phone),
+        locale: orNull(parsed.data.locale),
         address: orNull(parsed.data.address),
         postalCode: orNull(parsed.data.postalCode),
         city: orNull(parsed.data.city),
-        iban: orNull(parsed.data.iban),
         notes: orNull(parsed.data.notes),
-        householdAdults: parsed.data.householdAdults,
-        householdChildren: parsed.data.householdChildren,
+        contributionAmount,
       },
     });
   } catch (e) {

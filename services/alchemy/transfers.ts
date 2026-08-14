@@ -23,6 +23,10 @@ export type AlchemyTransfer = {
   from: string;
   to: string;
   rawValue: string; // hex string, before decimals
+  // Decimal amount Alchemy computed using the token's own on-chain decimals —
+  // independent of any cached decimals we hold. Null when Alchemy can't resolve
+  // it. Prefer this over formatting rawValue with a (possibly stale) decimals.
+  value: number | null;
   blockTimestamp: string | null; // ISO from metadata, optional
 };
 
@@ -33,6 +37,7 @@ type RpcTransferResponse = {
     hash: string;
     from: string;
     to: string;
+    value?: number | null;
     rawContract?: { value?: string };
     metadata?: { blockTimestamp?: string };
   }>;
@@ -167,14 +172,17 @@ async function fetchTransfersPage(
     pageKey?: string | null;
     fromAddress?: string;
     toAddress?: string;
+    fromBlock?: string;
+    toBlock?: string;
+    order?: "asc" | "desc";
   },
 ): Promise<{ transfers: AlchemyTransfer[]; pageKey?: string }> {
   const params: Record<string, unknown> = {
-    fromBlock: "0x0",
-    toBlock: "latest",
+    fromBlock: opts.fromBlock ?? "0x0",
+    toBlock: opts.toBlock ?? "latest",
     contractAddresses: [opts.contractAddress],
     category: ["erc20"],
-    order: "desc",
+    order: opts.order ?? "desc",
     withMetadata: true,
     excludeZeroValue: false,
     maxCount: "0x" + Math.min(Math.max(opts.pageSize, 1), 1000).toString(16),
@@ -196,6 +204,7 @@ async function fetchTransfersPage(
     from: t.from,
     to: t.to,
     rawValue: t.rawContract?.value ?? "0x0",
+    value: typeof t.value === "number" ? t.value : null,
     blockTimestamp: t.metadata?.blockTimestamp ?? null,
   }));
 
@@ -259,4 +268,109 @@ async function hydrateMissingTimestamps(
       if (ts) t.blockTimestamp = ts;
     }
   }
+}
+
+// Estimate the block-number range covering [fromMs, toMs] on a chain, by
+// sampling the chain's recent average block time. Approximate — callers should
+// widen with a margin and filter by the real block timestamp — but it lets us
+// bound a getAssetTransfers query to a past date window instead of walking the
+// whole history back from `latest` (infeasible for a very active account).
+export async function estimateBlockRange(opts: {
+  chainId: number;
+  fromMs: number;
+  toMs: number;
+  marginBlocks?: number;
+}): Promise<{ fromBlock: number; toBlock: number } | null> {
+  const network = alchemyNetwork(opts.chainId);
+  if (!network) return null;
+
+  const latest = await alchemyRpc<{ number: string; timestamp: string } | null>(
+    network,
+    "eth_getBlockByNumber",
+    ["latest", false],
+  );
+  if (!latest) return null;
+  const latestNum = Number.parseInt(latest.number, 16);
+  const latestMs = Number.parseInt(latest.timestamp, 16) * 1000;
+
+  // Sample a block well behind head to measure average block time over a span
+  // (robust to short-term jitter). Fall back to a nominal 5s if unavailable.
+  const sampleNum = Math.max(1, latestNum - 50_000);
+  const sample = await alchemyRpc<{ timestamp: string } | null>(
+    network,
+    "eth_getBlockByNumber",
+    ["0x" + sampleNum.toString(16), false],
+  );
+  const sampleMs = sample ? Number.parseInt(sample.timestamp, 16) * 1000 : NaN;
+  const blockTimeMs =
+    Number.isFinite(sampleMs) && latestNum > sampleNum
+      ? (latestMs - sampleMs) / (latestNum - sampleNum)
+      : 5000;
+
+  const margin = opts.marginBlocks ?? 1000;
+  const estimate = (ms: number) =>
+    Math.round(latestNum - (latestMs - ms) / blockTimeMs);
+  const fromBlock = Math.max(0, estimate(opts.fromMs) - margin);
+  const toBlock = Math.min(latestNum, estimate(opts.toMs) + margin);
+  return { fromBlock, toBlock: Math.max(toBlock, fromBlock) };
+}
+
+// One page of ERC-20 transfers INTO `toAccount` within a fixed block range,
+// oldest-first. Unlike listTransfersForAccount (which merges both directions and
+// walks all history from head), this is a single-direction, block-bounded query
+// — the right shape for "find the mints on this account during a past window".
+export async function listIncomingTransfersInRange(opts: {
+  chainId: number;
+  contractAddress: string;
+  toAccount: string;
+  fromBlock: number;
+  toBlock: number;
+  pageSize: number;
+  cursor?: string | null;
+}): Promise<ListTransfersResult> {
+  const network = alchemyNetwork(opts.chainId);
+  if (!network) {
+    throw new Error(`Alchemy: unsupported chain id ${opts.chainId}`);
+  }
+  const { transfers, pageKey } = await fetchTransfersPage(network, {
+    contractAddress: opts.contractAddress,
+    pageSize: opts.pageSize,
+    pageKey: opts.cursor,
+    toAddress: opts.toAccount,
+    fromBlock: "0x" + Math.max(0, opts.fromBlock).toString(16),
+    toBlock: "0x" + Math.max(opts.fromBlock, opts.toBlock).toString(16),
+    order: "asc",
+  });
+  await hydrateMissingTimestamps(network, transfers);
+  return { transfers, nextPageKey: pageKey ?? null };
+}
+
+// The outgoing counterpart of listIncomingTransfersInRange: one page of ERC-20
+// transfers OUT of `fromAccount` within a fixed block range, oldest-first. The
+// right shape for "find the burns leaving this account during a past window"
+// (e.g. `refund` orders settled by burning the place's tokens).
+export async function listOutgoingTransfersInRange(opts: {
+  chainId: number;
+  contractAddress: string;
+  fromAccount: string;
+  fromBlock: number;
+  toBlock: number;
+  pageSize: number;
+  cursor?: string | null;
+}): Promise<ListTransfersResult> {
+  const network = alchemyNetwork(opts.chainId);
+  if (!network) {
+    throw new Error(`Alchemy: unsupported chain id ${opts.chainId}`);
+  }
+  const { transfers, pageKey } = await fetchTransfersPage(network, {
+    contractAddress: opts.contractAddress,
+    pageSize: opts.pageSize,
+    pageKey: opts.cursor,
+    fromAddress: opts.fromAccount,
+    fromBlock: "0x" + Math.max(0, opts.fromBlock).toString(16),
+    toBlock: "0x" + Math.max(opts.fromBlock, opts.toBlock).toString(16),
+    order: "asc",
+  });
+  await hydrateMissingTimestamps(network, transfers);
+  return { transfers, nextPageKey: pageKey ?? null };
 }

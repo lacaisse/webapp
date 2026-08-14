@@ -2,7 +2,6 @@
 
 import { getTranslations } from "next-intl/server";
 import { revalidatePath } from "next/cache";
-import { parseUnits } from "viem";
 import { z } from "zod";
 
 import { requireFundRole } from "@/services/auth/dal";
@@ -10,17 +9,8 @@ import { getCitizenPayClient } from "@/services/citizenpay/client";
 import { prisma } from "@/services/db/prisma";
 import { ANNOTATION_TRIGGERS } from "@/services/transaction-annotation/annotate";
 import { resolveOrEnqueueAnnotation } from "@/services/transaction-annotation/pending";
-import {
-  burnFromToken,
-  mintToken,
-  UserOpError,
-  type FundMinterContext,
-} from "@/services/token/userop";
 
-import {
-  ManualBurnDirectSchema,
-  ManualMintDirectSchema,
-} from "./schemas";
+import { burnDirect, mintDirect, type DirectAudit } from "./direct";
 
 export type ManualMintResult =
   | { ok: true }
@@ -138,13 +128,11 @@ export type ManualMintDirectResult =
   | { ok: true; txHash: string; userOpHash: string }
   | { error: string; field?: "to" | "amount" | "note" };
 
-// Audit context for the centralised annotation written on success. `trigger`
-// is one of ANNOTATION_TRIGGERS; the acting admin is taken from the session.
-// Callers that wrap this action (account moves, order settlement, payouts) pass
-// their own trigger; a raw /token call defaults to ADMIN_DIRECT_*. When `audit`
-// is absent the call is an operator's manual mint/burn, which MUST carry a note.
-type DirectAudit = { trigger: string };
-
+// Host-scoped wrapper around `mintDirect` (services/token-operations/direct.ts),
+// which holds the actual implementation so MCP tools — where the fund is a
+// parameter, not the request host — run the exact same code path. `audit`
+// carries the caller's ANNOTATION_TRIGGERS entry; a raw /token call has none
+// and must supply a note instead.
 export async function manualMintDirectAction(
   input: {
     to: string;
@@ -155,79 +143,11 @@ export async function manualMintDirectAction(
 ): Promise<ManualMintDirectResult> {
   const t = await getTranslations();
   const { fund, user } = await requireFundRole("ADMIN");
-
-  const parsed = ManualMintDirectSchema.safeParse(input);
-  if (!parsed.success) {
-    const issue = parsed.error.issues[0];
-    return {
-      error: t(issue.message as never),
-      field: issue.path[0] as "to" | "amount" | undefined,
-    };
-  }
-
-  // Operator (manual) mints require an annotation note; internal callers carry
-  // their own audit trigger instead.
-  const note = input.note?.trim();
-  if (!audit && !note) {
-    return { error: t("tokenOps.errors.noteRequired" as never), field: "note" };
-  }
-
-  if (!fund.tokenAddress || fund.tokenDecimals == null) {
-    return { error: t("tokenOps.errors.tokenNotConfigured" as never) };
-  }
-
-  let amountUnits: bigint;
-  try {
-    amountUnits = parseUnits(parsed.data.amount, fund.tokenDecimals);
-  } catch {
-    return {
-      error: t("tokenOps.errors.amountInvalid" as never),
-      field: "amount",
-    };
-  }
-
-  const op = await prisma.tokenOperation.create({
-    data: {
-      fundId: fund.id,
-      type: "MINT",
-      account: parsed.data.to,
-      amount: parsed.data.amount,
-      status: "PENDING",
-    },
-  });
-
-  try {
-    const { txHash, userOpHash } = await mintToken({
-      fund: fund as FundMinterContext,
-      to: parsed.data.to as `0x${string}`,
-      amount: amountUnits,
-    });
-    await prisma.tokenOperation.update({
-      where: { id: op.id },
-      data: { status: "CONFIRMED", txHash, confirmedAt: new Date() },
-    });
-    const trigger = audit?.trigger ?? ANNOTATION_TRIGGERS.adminDirectMint;
-    await resolveOrEnqueueAnnotation({
-      fundId: fund.id,
-      chainId: fund.tokenChainId,
-      userOpHash,
-      kind: trigger,
-      note: note ?? null,
-      trigger,
-      triggeredByUserId: user.id,
-    });
-    revalidatePath("/token");
-    return { ok: true, txHash, userOpHash };
-  } catch (e) {
-    const errorMessage =
-      e instanceof UserOpError ? `${e.code}: ${e.message}` : String(e);
-    await prisma.tokenOperation.update({
-      where: { id: op.id },
-      data: { status: "FAILED", errorMessage },
-    });
-    console.error("[manualMintDirect] failed", op.id, e);
-    return { error: t("tokenOps.errors.submitFailed" as never) };
-  }
+  return mintDirect(
+    { fund, userId: user.id, t: (key) => t(key as never) },
+    input,
+    audit,
+  );
 }
 
 export type ManualBurnDirectResult =
@@ -244,77 +164,9 @@ export async function manualBurnDirectAction(
 ): Promise<ManualBurnDirectResult> {
   const t = await getTranslations();
   const { fund, user } = await requireFundRole("ADMIN");
-
-  const parsed = ManualBurnDirectSchema.safeParse(input);
-  if (!parsed.success) {
-    const issue = parsed.error.issues[0];
-    return {
-      error: t(issue.message as never),
-      field: issue.path[0] as "from" | "amount" | undefined,
-    };
-  }
-
-  // Operator (manual) burns require an annotation note; internal callers carry
-  // their own audit trigger instead.
-  const note = input.note?.trim();
-  if (!audit && !note) {
-    return { error: t("tokenOps.errors.noteRequired" as never), field: "note" };
-  }
-
-  if (!fund.tokenAddress || fund.tokenDecimals == null) {
-    return { error: t("tokenOps.errors.tokenNotConfigured" as never) };
-  }
-
-  let amountUnits: bigint;
-  try {
-    amountUnits = parseUnits(parsed.data.amount, fund.tokenDecimals);
-  } catch {
-    return {
-      error: t("tokenOps.errors.amountInvalid" as never),
-      field: "amount",
-    };
-  }
-
-  const op = await prisma.tokenOperation.create({
-    data: {
-      fundId: fund.id,
-      type: "BURN",
-      account: parsed.data.from,
-      amount: parsed.data.amount,
-      status: "PENDING",
-    },
-  });
-
-  try {
-    const { txHash, userOpHash } = await burnFromToken({
-      fund: fund as FundMinterContext,
-      from: parsed.data.from as `0x${string}`,
-      amount: amountUnits,
-    });
-    await prisma.tokenOperation.update({
-      where: { id: op.id },
-      data: { status: "CONFIRMED", txHash, confirmedAt: new Date() },
-    });
-    const trigger = audit?.trigger ?? ANNOTATION_TRIGGERS.adminDirectBurn;
-    await resolveOrEnqueueAnnotation({
-      fundId: fund.id,
-      chainId: fund.tokenChainId,
-      userOpHash,
-      kind: trigger,
-      note: note ?? null,
-      trigger,
-      triggeredByUserId: user.id,
-    });
-    revalidatePath("/token");
-    return { ok: true, txHash, userOpHash };
-  } catch (e) {
-    const errorMessage =
-      e instanceof UserOpError ? `${e.code}: ${e.message}` : String(e);
-    await prisma.tokenOperation.update({
-      where: { id: op.id },
-      data: { status: "FAILED", errorMessage },
-    });
-    console.error("[manualBurnDirect] failed", op.id, e);
-    return { error: t("tokenOps.errors.submitFailed" as never) };
-  }
+  return burnDirect(
+    { fund, userId: user.id, t: (key) => t(key as never) },
+    input,
+    audit,
+  );
 }

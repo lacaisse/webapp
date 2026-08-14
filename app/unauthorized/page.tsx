@@ -21,10 +21,10 @@ export default async function UnauthorizedPage() {
           <Link href="/" className={buttonVariants({ variant: "outline" })}>
             {t("common.goHome")}
           </Link>
-          {/* /auth/logout clears the local Supabase session and bounces
-              through auth.<APP_DOMAIN>/logout so the centralized session is
-              cleared too. POST so a navigation prefetch never accidentally
-              signs the user out. */}
+          {/* /auth/logout invalidates ALL of the user's Better Auth session
+              rows (so every fund subdomain and the apex are logged out) and
+              clears this host's local session cookie. POST so a navigation
+              prefetch never accidentally signs the user out. */}
           <form action="/auth/logout" method="post">
             <Button type="submit" variant="ghost">
               {t("common.signOut")}

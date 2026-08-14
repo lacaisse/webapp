@@ -244,6 +244,39 @@ export type CreatePayoutOrderWire = {
   };
 };
 
+// Response of GET /payouts/{id}/addable-orders — existing unassigned orders
+// eligible to be pulled into the pending payout, paginated, plus a `summary`
+// aggregating the WHOLE window (integer cents). `orders` is null on an empty
+// page. Each order reuses the payout-order wire shape (carries `date`, not
+// `completed_at`, on this endpoint — handled by `payoutOrderFromWire`).
+export type AddableOrdersWire = {
+  orders: PayoutOrderWire[] | null;
+  summary: {
+    orderCount: number;
+    total: number; // cents
+    fees: number; // cents
+    net: number; // cents
+  };
+  total: number;
+  limit: number;
+  offset: number;
+};
+
+// Response of POST /payouts/{id}/add-orders (200) — how many orders were
+// assigned plus the payout's recomputed totals (archive-style recompute).
+// A 422 (one or more ineligible) throws CitizenPayApiError with a body of
+// `{ error, rejected: [{ id, reason }] }` — nothing is added.
+export type AddOrdersWire = {
+  success: boolean;
+  assigned: number;
+  payout: {
+    payoutId: string;
+    total: number; // cents
+    fees: number; // cents
+    net: number; // cents
+  };
+};
+
 // Response of POST /payouts/{id}/manual-deduction — the recomputed totals,
 // here also carrying the deduction + its comment (net = total − fees − deduction).
 export type ManualDeductionWire = {
@@ -855,7 +888,7 @@ export const payouts = {
     return request(
       creds,
       "POST",
-      `/v2/treasury/payouts/${encodeURIComponent(payoutId)}/orders/${orderId}/tx-hash`,
+      `/v2/treasury/payouts/${encodeURIComponent(payoutId)}/orders/${encodeURIComponent(String(orderId))}/tx-hash`,
       { body: { txHash }, timeoutMs: 30_000 },
     );
   },
@@ -874,6 +907,38 @@ export const payouts = {
       creds,
       "POST",
       `/v2/treasury/payouts/${encodeURIComponent(payoutId)}/orders`,
+      { body, timeoutMs: 30_000 },
+    );
+  },
+  // Preview existing unassigned orders that could be added to a pending payout,
+  // over a required RFC3339 `[from, to]` window on the order's creation date.
+  // Paginated (limit max 50); `summary` aggregates the whole window. 400 on a
+  // missing/invalid range, 409 when the payout isn't pending.
+  addableOrders(
+    creds: CitizenPayApiCredentials,
+    payoutId: string,
+    query: { from: string; to: string; limit?: number; offset?: number },
+  ): Promise<AddableOrdersWire> {
+    return request(
+      creds,
+      "GET",
+      `/v2/treasury/payouts/${encodeURIComponent(payoutId)}/addable-orders`,
+      { query },
+    );
+  },
+  // Add the selected existing orders to a pending payout. All-or-nothing: if any
+  // id can't be added the whole call fails 422 (nothing applied) with a body of
+  // `{ error, rejected: [{ id, reason }] }`. Returns the recomputed totals on
+  // success. 409 when the payout is no longer pending.
+  addOrders(
+    creds: CitizenPayApiCredentials,
+    payoutId: string,
+    body: { orderIds: number[] },
+  ): Promise<AddOrdersWire> {
+    return request(
+      creds,
+      "POST",
+      `/v2/treasury/payouts/${encodeURIComponent(payoutId)}/add-orders`,
       { body, timeoutMs: 30_000 },
     );
   },
@@ -913,7 +978,7 @@ export const payouts = {
     return request(
       creds,
       "POST",
-      `/v2/treasury/payouts/${encodeURIComponent(payoutId)}/orders/${orderId}/archive`,
+      `/v2/treasury/payouts/${encodeURIComponent(payoutId)}/orders/${encodeURIComponent(String(orderId))}/archive`,
       { timeoutMs: 30_000 },
     );
   },

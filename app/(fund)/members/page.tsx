@@ -22,10 +22,17 @@ import { cn } from "@/lib/utils";
 import { MemberStatus } from "@/services/db/generated/enums";
 import { prisma } from "@/services/db/prisma";
 import { requireCurrentFund } from "@/services/fund/server";
+import { contributionApplies } from "@/services/member/contribution";
 import { AddCardDialog } from "./add-card-dialog";
+import { BulkActionsBar } from "./bulk-actions-bar";
 import { InviteMemberDialog } from "./invite-member-dialog";
 import { MemberImportDialog } from "./member-import-dialog";
 import { MemberRowActions } from "./member-row-actions";
+import {
+  MemberSelectionProvider,
+  RowCheckbox,
+  SelectAllCheckbox,
+} from "./selection";
 import { StatusChangeDialog } from "./status-change-dialog";
 import { MemberTierPicker } from "./tier-picker";
 
@@ -132,6 +139,10 @@ async function MembersHeader() {
         <MemberImportDialog
           triggerLabel={t("import.button")}
           tiers={tiers.map((tier) => tier.name)}
+          showContribution={contributionApplies(
+            fund.allocationMode,
+            tiers.length,
+          )}
         />
         <InviteMemberDialog triggerLabel={t("invite")} />
       </div>
@@ -153,7 +164,7 @@ async function MembersContent({
   const q = sp.q?.trim() || null;
 
   const status = statusFilterFor(active);
-  const [members, tiers] = await Promise.all([
+  const [members, tiers, statusCounts] = await Promise.all([
     prisma.member.findMany({
       where: {
         fundId: fund.id,
@@ -184,24 +195,62 @@ async function MembersContent({
       orderBy: [{ position: "asc" }, { createdAt: "asc" }],
       select: { id: true, name: true },
     }),
+    // Per-status counts for the tab badges (issue #104). Respects the active
+    // search query so counts match what each tab would actually show, but
+    // not the tab's own status filter — every tab needs every status's count.
+    prisma.member.groupBy({
+      by: ["status"],
+      where: {
+        fundId: fund.id,
+        ...(q ? memberSearchWhere(q) : {}),
+      },
+      _count: true,
+    }),
   ]);
 
+  // The committed-contribution line only applies to FIXED_PERIOD funds with
+  // tiers (issue #82).
+  const showContribution = contributionApplies(
+    fund.allocationMode,
+    tiers.length,
+  );
+
+  const countByStatus = new Map(
+    statusCounts.map((row) => [row.status, row._count]),
+  );
+  const totalMemberCount = statusCounts.reduce(
+    (sum, row) => sum + row._count,
+    0,
+  );
+  const countForTab = (tab: TabValue) => {
+    if (tab === "all") return totalMemberCount;
+    return countByStatus.get(statusFilterFor(tab) as MemberStatus) ?? 0;
+  };
+
   return (
-    <>
+    <MemberSelectionProvider
+      key={`${active}:${q ?? ""}`}
+      allIds={members.map((m) => m.id)}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Tabs
           active={active}
           items={TABS.map((tab) => ({
             value: tab.value,
-            label: t(`tabs.${tab.value}`),
+            label: `${t(`tabs.${tab.value}`)} (${format.number(countForTab(tab.value))})`,
           }))}
         />
         <TableSearch placeholder={t("searchPlaceholder")} />
       </div>
 
+      <BulkActionsBar tiers={tiers} />
+
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-10">
+              <SelectAllCheckbox />
+            </TableHead>
             <TableHead>{t("columns.name")}</TableHead>
             <TableHead>{t("columns.email")}</TableHead>
             <TableHead>{t("columns.status")}</TableHead>
@@ -213,12 +262,15 @@ async function MembersContent({
         </TableHeader>
         <TableBody>
           {members.length === 0 ? (
-            <TableEmpty colSpan={7}>{t("empty")}</TableEmpty>
+            <TableEmpty colSpan={8}>{t("empty")}</TableEmpty>
           ) : (
             members.map((m) => {
               const fullName = `${m.firstName} ${m.lastName}`.trim();
               return (
                 <TableRow key={m.id}>
+                  <TableCell className="w-10">
+                    <RowCheckbox id={m.id} />
+                  </TableCell>
                   <TableCell className="font-medium">
                     <Link
                       href={`/members/${m.id}`}
@@ -253,6 +305,14 @@ async function MembersContent({
                             : t("contribution.none")}
                         </dd>
                       </div>
+                      {showContribution && m.contributionAmount && (
+                        <div className="flex gap-1">
+                          <dt>{t("contribution.committed")}:</dt>
+                          <dd className="tabular-nums text-foreground">
+                            {m.contributionAmount.toString()}
+                          </dd>
+                        </div>
+                      )}
                       <div className="flex gap-1">
                         <dt>{t("contribution.lastReceived")}:</dt>
                         <dd className="tabular-nums text-foreground">
@@ -323,7 +383,7 @@ async function MembersContent({
           )}
         </TableBody>
       </Table>
-    </>
+    </MemberSelectionProvider>
   );
 }
 
@@ -377,7 +437,7 @@ function MembersToolbarSkeleton() {
         </div>
         <Skeleton className="h-9 w-48" />
       </div>
-      <TableSkeleton columns={7} alignRight={1} />
+      <TableSkeleton columns={8} alignRight={1} />
     </>
   );
 }

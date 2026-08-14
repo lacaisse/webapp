@@ -14,6 +14,7 @@ import { useState, useTransition } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -23,14 +24,18 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   archiveOrderAction,
+  checkOrderTxHashAction,
   findOrderBankTransactionAction,
   fixOrderAction,
   getPayerAccountAction,
   type OrderBankMatch,
   type PayerTransfer,
 } from "@/services/payout/admin-actions";
+import { TX_HASH } from "@/services/payout/schemas";
 import { cn } from "@/lib/utils";
 
 // Per-order reconciliation for a pending payout. Shown only on orders that
@@ -112,6 +117,16 @@ function FixDialog({
   const [error, setError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
 
+  // Manual mode: record an already-settled hash instead of minting/burning.
+  const [manual, setManual] = useState(false);
+  const [manualHash, setManualHash] = useState("");
+  // Sanity check before recording: `checking` while we resolve the receipt,
+  // `warn` holds a non-success status the operator must explicitly override.
+  const [checking, startChecking] = useTransition();
+  const [warn, setWarn] = useState<"reverted" | "pending" | "unavailable" | null>(
+    null,
+  );
+
   // Payer account context (balance + recent transfers), loaded when the
   // dialog opens for a burn (there's a payer account).
   const [payerPending, startPayer] = useTransition();
@@ -149,6 +164,9 @@ function FixDialog({
     if (!next) {
       setError(null);
       setTxHash(null);
+      setManual(false);
+      setManualHash("");
+      setWarn(null);
     }
   }
 
@@ -162,6 +180,7 @@ function FixDialog({
         placeAccount,
         total,
         net,
+        txHash: manual ? manualHash.trim() : null,
       });
       if ("error" in result) {
         setError(result.error);
@@ -169,6 +188,26 @@ function FixDialog({
       }
       setTxHash(result.txHash);
       onReconciled();
+    });
+  };
+
+  // Manual record: sanity-check the hash on-chain first. A confirmed success
+  // records straight away; anything else surfaces a warning and the button
+  // becomes an explicit "record anyway" override (a second click bypasses the
+  // check via `warn` already being set).
+  const onRecord = () => {
+    setError(null);
+    if (warn) {
+      onConfirm();
+      return;
+    }
+    startChecking(async () => {
+      const check = await checkOrderTxHashAction({ txHash: manualHash.trim() });
+      if (check.status === "success") {
+        onConfirm();
+        return;
+      }
+      setWarn(check.status);
     });
   };
 
@@ -242,28 +281,62 @@ function FixDialog({
             </div>
             {payer && payer.transfers.length > 0 && (
               <ul className="space-y-0.5 border-t border-border pt-2">
-                {payer.transfers.map((tx) => (
-                  <li
-                    key={tx.hash}
-                    className="flex items-center justify-between gap-2 text-xs"
-                  >
-                    <span className="text-muted-foreground">
-                      {tx.date
-                        ? format.dateTime(new Date(tx.date), {
-                            dateStyle: "medium",
-                          })
-                        : "—"}
-                    </span>
-                    <span className="inline-flex items-center gap-1 tabular-nums">
-                      {tx.direction === "in" ? (
-                        <ArrowDownLeft className="size-3 text-success" />
-                      ) : (
-                        <ArrowUpRight className="size-3 text-muted-foreground" />
-                      )}
-                      {fmt(tx.amount)}
-                    </span>
-                  </li>
-                ))}
+                {payer.transfers.map((tx) => {
+                  // Only outgoing transfers can settle a burn, so only those
+                  // are pickable: clicking one flips to manual mode, prefills
+                  // the hash, and clears any prior check. Incoming transfers
+                  // stay as plain, non-interactive rows.
+                  const row = (
+                    <>
+                      <span className="text-muted-foreground">
+                        {tx.date
+                          ? format.dateTime(new Date(tx.date), {
+                              dateStyle: "medium",
+                            })
+                          : "—"}
+                      </span>
+                      <span className="inline-flex items-center gap-1 tabular-nums">
+                        {tx.direction === "in" ? (
+                          <ArrowDownLeft className="size-3 text-success" />
+                        ) : (
+                          <ArrowUpRight className="size-3 text-muted-foreground" />
+                        )}
+                        {fmt(tx.amount)}
+                      </span>
+                    </>
+                  );
+                  if (tx.direction === "in") {
+                    return (
+                      <li
+                        key={tx.hash}
+                        className="flex items-center justify-between gap-2 px-1 py-0.5 text-xs"
+                      >
+                        {row}
+                      </li>
+                    );
+                  }
+                  const picked = manual && manualHash.trim() === tx.hash;
+                  return (
+                    <li key={tx.hash}>
+                      <button
+                        type="button"
+                        title={t("payerPickHint")}
+                        aria-pressed={picked}
+                        onClick={() => {
+                          setManual(true);
+                          setManualHash(tx.hash);
+                          setWarn(null);
+                        }}
+                        className={cn(
+                          "flex w-full items-center justify-between gap-2 rounded px-1 py-0.5 text-left text-xs transition-colors hover:bg-accent",
+                          picked && "bg-accent",
+                        )}
+                      >
+                        {row}
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             )}
             {payer && payer.transfers.length === 0 && !payerPending && (
@@ -321,12 +394,7 @@ function FixDialog({
           </div>
         )}
 
-        {!placeAccount ? (
-          <Alert variant="destructive">
-            <AlertTriangle className="size-4" />
-            <AlertDescription>{t("noPlaceAccount")}</AlertDescription>
-          </Alert>
-        ) : txHash ? (
+        {txHash ? (
           <div className="space-y-4">
             <Alert>
               <AlertDescription>
@@ -346,14 +414,67 @@ function FixDialog({
           </div>
         ) : (
           <div className="space-y-4">
-            <Alert variant="destructive">
-              <AlertTriangle className="size-4" />
-              <AlertDescription>
-                {insufficient
-                  ? t("insufficient", { total: fmt(total) })
-                  : t("warning")}
-              </AlertDescription>
-            </Alert>
+            {/* Record an existing on-chain settlement by hand instead of
+                minting/burning — available even with no place account, since
+                nothing moves. */}
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={manual}
+                disabled={pending || archiving}
+                onCheckedChange={(value) => setManual(value === true)}
+              />
+              {t("manualToggle")}
+            </label>
+
+            {manual ? (
+              <div className="space-y-2">
+                <Label htmlFor={`tx-hash-${orderId}`}>{t("manualLabel")}</Label>
+                <Input
+                  id={`tx-hash-${orderId}`}
+                  value={manualHash}
+                  onChange={(e) => {
+                    setManualHash(e.target.value);
+                    // Editing the hash invalidates any prior check.
+                    if (warn) setWarn(null);
+                  }}
+                  placeholder="0x…"
+                  className="font-mono"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                {warn ? (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="size-4" />
+                    <AlertDescription>
+                      {warn === "reverted"
+                        ? t("manualWarnReverted")
+                        : warn === "pending"
+                          ? t("manualWarnPending")
+                          : t("manualWarnUnavailable")}
+                    </AlertDescription>
+                  </Alert>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    {t("manualHint")}
+                  </p>
+                )}
+              </div>
+            ) : !placeAccount ? (
+              <Alert variant="destructive">
+                <AlertTriangle className="size-4" />
+                <AlertDescription>{t("noPlaceAccount")}</AlertDescription>
+              </Alert>
+            ) : (
+              <Alert variant="destructive">
+                <AlertTriangle className="size-4" />
+                <AlertDescription>
+                  {insufficient
+                    ? t("insufficient", { total: fmt(total) })
+                    : t("warning")}
+                </AlertDescription>
+              </Alert>
+            )}
+
             {error && (
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
@@ -368,7 +489,21 @@ function FixDialog({
               >
                 {tRoot("common.cancel")}
               </Button>
-              {insufficient ? (
+              {manual ? (
+                <Button
+                  type="button"
+                  variant={warn ? "destructive" : "default"}
+                  onClick={onRecord}
+                  disabled={
+                    pending || checking || !TX_HASH.test(manualHash.trim())
+                  }
+                >
+                  {(pending || checking) && (
+                    <Loader2 className="size-4 animate-spin" />
+                  )}
+                  {warn ? t("manualConfirmAnyway") : t("manualConfirm")}
+                </Button>
+              ) : !placeAccount ? null : insufficient ? (
                 <Button
                   type="button"
                   variant="destructive"

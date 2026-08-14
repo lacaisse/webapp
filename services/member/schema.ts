@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { z } from "zod";
 
+import { isSupportedLocale } from "@/services/i18n/config";
+
 // Built-in signup fields per the choice in design: only firstName / lastName
 // / email are hardcoded in the form. Custom fields (any per-fund extras)
 // live in OnboardingField rows; their values are validated server-side
@@ -8,6 +10,17 @@ import { z } from "zod";
 // array (MULTISELECT), or a boolean (CHECKBOX).
 
 export const NAME_MIN_LENGTH = 1;
+
+// A euro amount as a string: whole number with up to 2 decimals. Empty string
+// is allowed and means "unset" (the caller normalises it to null). Mirrors the
+// tier DecimalString pattern in services/allocation-tiers/admin-actions.ts.
+const OptionalMoney = (errorKey: string) =>
+  z
+    .union([
+      z.literal(""),
+      z.string().trim().regex(/^\d+(\.\d{1,2})?$/, { error: errorKey }),
+    ])
+    .optional();
 
 export const BuiltinSignupSchema = z.object({
   firstName: z.string().min(NAME_MIN_LENGTH, {
@@ -21,6 +34,11 @@ export const BuiltinSignupSchema = z.object({
   // Persists to Member.emailUnsubscribed; the member can flip it later via the
   // deregistration link. Defaults to opted-in.
   remindersOptOut: z.boolean().optional(),
+  // The amount the member commits to contribute (issue #82). Optional at
+  // signup — there's no tier yet to floor it against, so it's a free amount
+  // here; an admin can adjust once a tier is assigned. Empty → null (use the
+  // tier target). See services/member/contribution.ts.
+  contributionAmount: OptionalMoney("members.signup.errors.amountInvalid"),
 });
 
 // Admin-side edit of a member's core record from the detail view. Identity
@@ -41,22 +59,27 @@ export const EditMemberProfileSchema = z.object({
     error: "members.signup.errors.lastNameRequired",
   }),
   email: z.string().trim().email({ error: "members.signup.errors.emailInvalid" }),
-  phone: OptionalText,
+  // Preferred email language. Empty → null (fall back to the fund default). A
+  // non-empty value must be one of SUPPORTED_LOCALES; the select constrains
+  // this client-side, the refine guards a tampered request. See
+  // services/email/transactional.ts, which reads Member.locale first.
+  locale: z
+    .string()
+    .optional()
+    .refine((v) => !v || isSupportedLocale(v), {
+      error: "members.admin.edit.errors.localeInvalid",
+    }),
+  // Postal address stays a typed column: formatMemberAddress composes it into
+  // the {address} placeholder that card-assigned emails render.
   address: OptionalText,
   postalCode: OptionalText,
   city: OptionalText,
-  iban: OptionalText,
+  // Staff commentary — never asked of the applicant, so not a custom question.
   notes: OptionalText,
-  householdAdults: z.coerce
-    .number({ error: "members.admin.edit.errors.householdInvalid" })
-    .int({ error: "members.admin.edit.errors.householdInvalid" })
-    .min(0, { error: "members.admin.edit.errors.householdInvalid" })
-    .max(50, { error: "members.admin.edit.errors.householdInvalid" }),
-  householdChildren: z.coerce
-    .number({ error: "members.admin.edit.errors.householdInvalid" })
-    .int({ error: "members.admin.edit.errors.householdInvalid" })
-    .min(0, { error: "members.admin.edit.errors.householdInvalid" })
-    .max(50, { error: "members.admin.edit.errors.householdInvalid" }),
+  // Committed contribution amount (issue #82). Empty → null (use the tier
+  // target). The tier-minimum floor is enforced server-side in the action,
+  // where the member's current tier is known. See contribution.ts.
+  contributionAmount: OptionalMoney("members.admin.edit.errors.amountInvalid"),
 });
 
 export type EditMemberProfileInput = z.infer<typeof EditMemberProfileSchema>;

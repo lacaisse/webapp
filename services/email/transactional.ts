@@ -8,11 +8,7 @@ import { getFundUrl } from "@/services/fund/server";
 import { DEFAULT_LOCALE, isSupportedLocale } from "@/services/i18n/config";
 import { buildUnsubscribeToken } from "@/services/member/unsubscribe";
 import { renderBrandedEmail } from "./template";
-import {
-  resolveAllocationTemplate,
-  resolveCardAssignedTemplate,
-  resolvePaymentReminderTemplate,
-} from "./templates";
+import { resolveAllocationTemplate, resolveEmailTemplate } from "./templates";
 import { sendEmail } from "./resend";
 
 // One function per EmailType that renders the body, calls Resend, and updates
@@ -73,6 +69,7 @@ export async function sendMemberEmailVerification(args: {
 
 export async function sendMemberActivated(args: {
   emailId: string;
+  fundId: string;
   toEmail: string;
   fund: FundBranding;
   firstName: string;
@@ -82,21 +79,18 @@ export async function sendMemberActivated(args: {
   await dispatchTemplate({
     emailId: args.emailId,
     fund: args.fund,
-    render: async (locale) => {
-      const t = await getTranslations({
+    render: (locale) =>
+      resolveEmailTemplate({
+        fundId: args.fundId,
+        type: "MEMBER_ACTIVATED",
         locale,
-        namespace: "members.admin.email.activated",
-      });
-      return {
-        subject: t("subject", { fundName: args.fund.name }),
-        text: t("textBody", {
+        vars: {
           firstName: args.firstName,
           fundName: args.fund.name,
           cardSerial: args.cardSerial,
           paymentReference: args.paymentReference,
-        }),
-      };
-    },
+        },
+      }),
     to: args.toEmail,
   });
 }
@@ -143,18 +137,23 @@ export async function sendCardAssigned(args: {
   firstName: string;
   lastName: string;
   // Pre-resolved scalars (see services/email/templates.ts): formatted postal
-  // address, public tap URL, per-fund card number.
+  // address, public tap URL, per-fund card number, the bank-transfer reference
+  // (the card's serial — same value shown on MEMBER_ACTIVATED/reminders), and
+  // the fund's connected bank account IBAN ("" if not yet bank-connected).
   address: string;
   cardLink: string;
   cardNumber: string;
+  paymentReference: string;
+  iban: string;
 }): Promise<void> {
   await dispatchTemplate({
     emailId: args.emailId,
     fund: args.fund,
-    // Prefer the fund's editable override, falling back to the i18n default.
+    // The fund's active template (or the built-in default).
     render: (locale) =>
-      resolveCardAssignedTemplate({
+      resolveEmailTemplate({
         fundId: args.fundId,
+        type: "CARD_ASSIGNED",
         locale,
         vars: {
           firstName: args.firstName,
@@ -163,6 +162,8 @@ export async function sendCardAssigned(args: {
           address: args.address,
           cardLink: args.cardLink,
           cardNumber: args.cardNumber,
+          paymentReference: args.paymentReference,
+          iban: args.iban,
         },
       }),
     to: args.toEmail,
@@ -171,6 +172,7 @@ export async function sendCardAssigned(args: {
 
 export async function sendReferralBonusAwarded(args: {
   emailId: string;
+  fundId: string;
   toEmail: string;
   fund: FundBranding;
   firstName: string;
@@ -179,26 +181,24 @@ export async function sendReferralBonusAwarded(args: {
   await dispatchTemplate({
     emailId: args.emailId,
     fund: args.fund,
-    render: async (locale) => {
-      const t = await getTranslations({
+    render: (locale) =>
+      resolveEmailTemplate({
+        fundId: args.fundId,
+        type: "REFERRAL_BONUS_AWARDED",
         locale,
-        namespace: "members.admin.email.referralBonusAwarded",
-      });
-      return {
-        subject: t("subject", { fundName: args.fund.name }),
-        text: t("textBody", {
+        vars: {
           firstName: args.firstName,
           fundName: args.fund.name,
           amount: args.amount,
-        }),
-      };
-    },
+        },
+      }),
     to: args.toEmail,
   });
 }
 
 export async function sendPaymentConfirmation(args: {
   emailId: string;
+  fundId: string;
   toEmail: string;
   firstName: string;
   fund: FundBranding;
@@ -208,23 +208,31 @@ export async function sendPaymentConfirmation(args: {
   await dispatchTemplate({
     emailId: args.emailId,
     fund: args.fund,
-    render: async (locale) => {
-      const t = await getTranslations({
+    render: (locale) =>
+      resolveEmailTemplate({
+        fundId: args.fundId,
+        type: "PAYMENT_CONFIRMATION",
         locale,
-        namespace: "members.email.paymentConfirmation",
-      });
-      return {
-        subject: t("subject", { fundName: args.fund.name }),
-        text: t("textBody", {
+        vars: {
           firstName: args.firstName,
           fundName: args.fund.name,
           amount: args.amount,
-          occurredAt: args.occurredAt,
-        }),
-      };
-    },
+          occurredAt: formatEmailDate(args.occurredAt, locale),
+        },
+      }),
     to: args.toEmail,
   });
+}
+
+// `args.occurredAt` arrives as a raw ISO-8601 timestamp (from the bank feed,
+// via BankTransaction.occurredAt) — format it into the recipient's locale
+// instead of interpolating the ISO string verbatim into the email.
+function formatEmailDate(isoTimestamp: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(new Date(isoTimestamp));
 }
 
 export async function sendPaymentReminder(args: {
@@ -241,14 +249,20 @@ export async function sendPaymentReminder(args: {
   paymentReference: string;
   // Public account / tap URL ({cardLink}); "" when the member has no card.
   cardLink: string;
+  // Public /pay/<serial> page URL ({paymentLink}); "" when the member has no card.
+  paymentLink: string;
+  // Which reminder this is: the automatic first request (cron) or the admin's
+  // manual follow-up. Each has its own editable template + default.
+  type?: "PAYMENT_REMINDER_FIRST" | "PAYMENT_REMINDER_SECOND";
 }): Promise<void> {
   await dispatchTemplate({
     emailId: args.emailId,
     fund: args.fund,
-    // Prefer the fund's editable override, falling back to the HTML default.
+    // The fund's active template for this reminder type (or its built-in default).
     render: (locale) =>
-      resolvePaymentReminderTemplate({
+      resolveEmailTemplate({
         fundId: args.fundId,
+        type: args.type ?? "PAYMENT_REMINDER_FIRST",
         locale,
         vars: {
           firstName: args.firstName,
@@ -257,6 +271,7 @@ export async function sendPaymentReminder(args: {
           amount: args.amount,
           paymentReference: args.paymentReference,
           cardLink: args.cardLink,
+          paymentLink: args.paymentLink,
         },
       }),
     to: args.toEmail,
@@ -265,56 +280,48 @@ export async function sendPaymentReminder(args: {
 
 export async function sendMemberWelcome(args: {
   emailId: string;
+  fundId: string;
   toEmail: string;
   fund: FundBranding;
   firstName: string;
-  paymentReference: string;
 }): Promise<void> {
   await dispatchTemplate({
     emailId: args.emailId,
     fund: args.fund,
-    render: async (locale) => {
-      const t = await getTranslations({
+    render: (locale) =>
+      resolveEmailTemplate({
+        fundId: args.fundId,
+        type: "MEMBER_WELCOME",
         locale,
-        namespace: "members.signup.emailTemplates.welcome",
-      });
-      return {
-        subject: t("subject", { fundName: args.fund.name }),
-        text: t("textBody", {
+        vars: {
           firstName: args.firstName,
           fundName: args.fund.name,
-          paymentReference: args.paymentReference,
-        }),
-      };
-    },
+        },
+      }),
     to: args.toEmail,
   });
 }
 
 export async function sendMemberInvited(args: {
   emailId: string;
+  fundId: string;
   toEmail: string;
   fund: FundBranding;
   firstName: string;
-  paymentReference: string;
 }): Promise<void> {
   await dispatchTemplate({
     emailId: args.emailId,
     fund: args.fund,
-    render: async (locale) => {
-      const t = await getTranslations({
+    render: (locale) =>
+      resolveEmailTemplate({
+        fundId: args.fundId,
+        type: "MEMBER_INVITED",
         locale,
-        namespace: "members.admin.email.invited",
-      });
-      return {
-        subject: t("subject", { fundName: args.fund.name }),
-        text: t("textBody", {
+        vars: {
           firstName: args.firstName,
           fundName: args.fund.name,
-          paymentReference: args.paymentReference,
-        }),
-      };
-    },
+        },
+      }),
     to: args.toEmail,
   });
 }

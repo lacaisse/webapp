@@ -421,6 +421,7 @@
       },
       "contribution": {
         "target": "Cible",
+        "committed": "Convenu",
         "lastReceived": "Dernier reçu",
         "none": "—"
       },
@@ -433,8 +434,6 @@
           "title": "Identité",
           "description": "Coordonnées et ménage.",
           "address": "Adresse",
-          "household": "Ménage",
-          "householdValue": "{adults} adultes · {children} enfants",
           "joined": "Inscrit le",
           "left": "Parti le",
           "notes": "Notes"
@@ -443,13 +442,21 @@
           "title": "Adhésion",
           "description": "Palier, coordonnées bancaires et identifiants.",
           "tier": "Palier",
-          "iban": "IBAN",
+          "committed": "Contribution convenue",
+          "committedDefault": "(cible du palier)",
           "referralCode": "Code de parrainage",
           "primaryCard": "Carte principale"
         },
         "applicationData": {
           "title": "Données d'adhésion",
-          "description": "Champs personnalisés remplis par le membre."
+          "description": "Champs personnalisés remplis par le membre.",
+          "empty": "Aucune réponse enregistrée pour l'instant.",
+          "edit": "Modifier",
+          "editTitle": "Modifier les données d'adhésion",
+          "editDescription": "Seules les questions encore posées sur le formulaire sont modifiables. Les réponses aux questions archivées sont conservées.",
+          "save": "Enregistrer",
+          "saving": "Enregistrement…",
+          "cancel": "Annuler"
         },
         "cards": {
           "title": "Cartes",
@@ -549,6 +556,8 @@
           "title": "Informations de la carte",
           "description": "Numéro, portefeuille et événements du cycle de vie.",
           "serial": "Numéro de série",
+          "tapLink": "Interface de la carte",
+          "tapLinkLabel": "Ouvrir sur CitizenPay",
           "holder": "Porteur",
           "member": "Membre",
           "account": "Portefeuille",
@@ -771,6 +780,9 @@
           "confirm": "Retirer",
           "removing": "Retrait…"
         },
+        "movePeriod": {
+          "placeholder": "Déplacer vers une période…"
+        },
         "attachAllocation": {
           "button": "Associer une allocation",
           "title": "Associer une allocation existante",
@@ -837,7 +849,11 @@
             "notRemindable": "Ce membre ne peut pas être relancé — il n'est plus dans la liste des impayés.",
             "noEmail": "Ce membre n'a pas d'adresse e-mail.",
             "sendFailed": "Le rappel n'a pas pu être envoyé. Réessayez."
-          }
+          },
+          "pausedConfirmTitle": "Les e-mails aux membres sont en pause",
+          "pausedConfirmDescription": "Les e-mails de notification aux membres sont en pause pour cette caisse. Envoyer ce rappel à {name} passera outre la pause. Continuer ?",
+          "allPausedConfirmDescription": "Les e-mails de notification aux membres sont en pause pour cette caisse. Envoyer ces rappels à {count} membre(s) passera outre la pause. Continuer ?",
+          "pausedConfirmSend": "Envoyer quand même"
         }
       },
       "schedule": {
@@ -939,6 +955,37 @@
         "prev": "Précédent",
         "next": "Suivant",
         "error": "Impossible de charger les soldes des portefeuilles."
+      },
+      "account": {
+        "title": "Audit de compte",
+        "back": "Explorateur du jeton",
+        "balance": "Solde on-chain",
+        "shareOfSupply": "{share}% de l'offre totale",
+        "totalIn": "Total reçu",
+        "totalOut": "Total envoyé",
+        "transfersIn": "{count} transferts entrants",
+        "transfersOut": "{count} transferts sortants",
+        "status": "Statut de l'audit",
+        "reconciled": "Réconcilié",
+        "reconciledHint": "Reçu moins envoyé correspond exactement au solde on-chain.",
+        "unexplained": "Écart inexpliqué",
+        "unexplainedHint": "L'historique ne correspond pas au solde : {amount} reste inexpliqué.",
+        "truncated": "Historique partiel",
+        "truncatedHint": "Seuls les {count} transferts les plus récents sont affichés. Le solde avant cette fenêtre était de {amount}.",
+        "date": "Quand",
+        "counterparty": "Contrepartie",
+        "amount": "Montant",
+        "balanceAfter": "Solde après",
+        "trigger": "Déclencheur",
+        "note": "Note",
+        "empty": "Aucun transfert n'implique ce portefeuille pour le moment.",
+        "error": "Impossible de charger l'historique on-chain de ce portefeuille.",
+        "prev": "Précédent",
+        "next": "Suivant",
+        "issued": "Émis",
+        "retired": "Détruit",
+        "treasury": "Trésor",
+        "unknown": "Portefeuille externe"
       }
     },
     "merchants": {
@@ -1069,8 +1116,8 @@
         "net": "Net",
         "manualDeduction": "Déduction manuelle",
         "placeBalance": "Solde du commerce",
-        "placeBalanceEnough": "Suffisant pour brûler",
-        "placeBalanceLow": "Inférieur au montant net",
+        "placeBalanceEnough": "Suffisant pour le règlement",
+        "placeBalanceLow": "Inférieur au total du virement",
         "status": "Statut",
         "burnTx": "Tx de burn",
         "loadError": "Impossible de charger les virements depuis CitizenPay. Réessayez bientôt.",
@@ -1168,6 +1215,22 @@
           "successMinted": "Commande ajoutée et net émis vers le commerce.",
           "mintFailed": "Commande ajoutée, mais l’émission automatique a échoué. Réconciliez-la depuis l’onglet Problèmes."
         },
+        "addOrders": {
+          "trigger": "Ajouter des commandes existantes",
+          "title": "Ajouter des commandes existantes",
+          "description": "Ajoutez des commandes déjà existantes mais non incluses dans ce versement — choisissez une période, puis sélectionnez celles à ajouter.",
+          "from": "Du",
+          "to": "Au",
+          "rangeHint": "Filtre sur la date de création de la commande. Seules les commandes payables et non affectées peuvent être ajoutées.",
+          "preview": "Prévisualiser",
+          "windowSummary": "{count, plural, =1 {# commande disponible} other {# commandes disponibles}}",
+          "net": "Net",
+          "loadMore": "Afficher plus",
+          "empty": "Aucune commande à ajouter pour cette période.",
+          "confirm": "{count, plural, =0 {Ajouter les commandes} =1 {Ajouter # commande} other {Ajouter # commandes}}",
+          "success": "{count, plural, =1 {# commande ajoutée au versement.} other {# commandes ajoutées au versement.}}",
+          "rejectedTitle": "Certaines commandes n’ont pas pu être ajoutées et ont été ignorées. La liste a été actualisée — vérifiez et réessayez."
+        },
         "deduction": {
           "trigger": "Ajouter une déduction",
           "edit": "Modifier la déduction",
@@ -1220,6 +1283,8 @@
           "range": "Affichage {from}–{to}",
           "prev": "Précédent",
           "next": "Suivant",
+          "selectAll": "Tout sélectionner",
+          "selectRow": "Sélectionner la commande",
           "receipt": {
             "success": "Confirmé",
             "reverted": "Échec",
@@ -1246,13 +1311,43 @@
             "payerNoHistory": "Aucune transaction trouvée pour ce compte.",
             "bankMatch": "Virement de couverture",
             "bankMatchUnknown": "Expéditeur inconnu",
-            "bankMatchNone": "Aucun virement correspondant à {ref} pour le moment."
+            "bankMatchNone": "Aucun virement correspondant à {ref} pour le moment.",
+            "manualToggle": "Enregistrer une transaction existante à la place",
+            "manualLabel": "Hash de la transaction de règlement",
+            "manualHint": "La commande est marquée réglée avec ce hash — aucun jeton n’est déplacé. Saisissez un hash de transaction préfixé par 0x.",
+            "manualConfirm": "Enregistrer",
+            "manualConfirmAnyway": "Enregistrer quand même",
+            "manualWarnReverted": "Cette transaction a échoué on-chain — elle n’a rien réglé. L’enregistrer quand même ?",
+            "manualWarnPending": "Aucun reçu trouvé pour cette transaction — elle n’est peut-être pas encore minée, ou inconnue du nœud. L’enregistrer quand même ?",
+            "manualWarnUnavailable": "Impossible de vérifier cette transaction on-chain. Vérifiez le hash avant de l’enregistrer.",
+            "payerPickHint": "Utiliser le hash de cette transaction"
           },
           "archive": {
             "button": "Archiver",
             "title": "Archiver cette commande ?",
             "description": "La commande est retirée du virement et les totaux sont recalculés. Elle ne sera incluse dans aucun virement futur.",
             "confirm": "Archiver la commande"
+          },
+          "bulk": {
+            "selectedCount": "{n} sélectionnée(s)",
+            "autoMatch": "Rapprocher et corriger",
+            "archive": "Archiver",
+            "clear": "Effacer",
+            "running": "En cours…",
+            "archiveTitle": "Archiver les commandes sélectionnées ?",
+            "archiveDescription": "{n} commandes seront retirées de ce virement et leurs totaux recalculés. Elles ne seront incluses dans aucun virement futur.",
+            "archiveConfirm": "Archiver les commandes",
+            "summary": {
+              "fixed": "{n} corrigée(s) à partir d’un virement du payeur correspondant.",
+              "nomatch": "{n} restante(s) — aucun virement du payeur correspondant.",
+              "ambiguous": "{n} restante(s) — plusieurs virements correspondent ; à corriger à la main.",
+              "noaccount": "{n} ignorée(s) — payées par virement bancaire, à corriger à la main.",
+              "error": "{n} en échec — impossible d’enregistrer. Réessayez bientôt.",
+              "unavailable": "{n} ignorée(s) — les transactions on-chain sont indisponibles pour cette caisse.",
+              "truncated": "{n} non vérifiée(s) — trop de transactions à parcourir ; réduisez la sélection ou réessayez.",
+              "archived": "{n} archivée(s).",
+              "archiveFailed": "{n} n’ont pas pu être archivées. Réessayez bientôt."
+            }
           }
         },
         "details": "Détails",
@@ -1279,9 +1374,13 @@
           "rangeOrder": "La date de fin doit être postérieure à la date de début.",
           "noPlaceAccount": "Ce commerce n’a pas de compte on-chain pour recevoir l’émission.",
           "recordFailed": "Émis on-chain mais impossible de l’enregistrer sur le virement.",
+          "txHashInvalid": "Saisissez un hash de transaction valide (0x suivi de 64 caractères hexadécimaux).",
           "archiveFailed": "Impossible d’archiver la commande. Réessayez bientôt.",
           "payerFailed": "Impossible de charger le compte du payeur.",
           "createOrderFailed": "Impossible d'ajouter la commande. Réessayez bientôt.",
+          "addOrdersFailed": "Impossible d'ajouter les commandes. Réessayez bientôt.",
+          "addOrdersRejected": "Certaines commandes sélectionnées ne pouvaient plus être ajoutées.",
+          "noOrdersSelected": "Sélectionnez au moins une commande à ajouter.",
           "amountInvalid": "Saisissez un montant valide.",
           "feeInvalid": "Saisissez des frais valides.",
           "amountPositive": "Le montant doit être supérieur à zéro.",
@@ -1296,9 +1395,9 @@
           "unlinkButton": "Délier",
           "title": "Lier ce dépôt à un membre",
           "description": "Saisissez la référence de paiement ou l'email du membre. Le dépôt comptera dans son allocation.",
-          "identifierLabel": "Référence de paiement ou email",
-          "identifierPlaceholder": "ABCDEFGH ou membre@exemple.com",
-          "identifierHint": "Insensible à la casse. Les références de paiement font 8 caractères depuis notre alphabet généré.",
+          "identifierLabel": "Référence de carte ou email",
+          "identifierPlaceholder": "04A2B7C9D1 ou membre@exemple.com",
+          "identifierHint": "Insensible à la casse. La référence de carte est l'UID (numéro de série) de la carte, indiqué sur l'invitation du membre.",
           "identifierRequired": "Saisissez une référence ou un email.",
           "cancel": "Annuler",
           "confirm": "Lier",
@@ -1462,7 +1561,11 @@
           "member": "URL de redirection — membre",
           "memberHint": "Où atterrissent les membres après la dernière étape d'inscription (après la vérification email, si activée).",
           "merchant": "URL de redirection — commerce",
-          "merchantHint": "Où atterrissent les commerces après la dernière étape d'inscription (après la vérification email, si activée)."
+          "merchantHint": "Où atterrissent les commerces après la dernière étape d'inscription (après la vérification email, si activée).",
+          "memberCancel": "URL d'annulation — membre",
+          "memberCancelHint": "Où atterrissent les membres qui abandonnent le formulaire (après confirmation). Par défaut : le site web de la caisse.",
+          "memberError": "URL d'erreur — membre",
+          "memberErrorHint": "Où atterrissent les membres si l'inscription échoue pour une raison technique. Laissez vide pour afficher l'erreur dans le formulaire."
         },
         "fieldsTitle": "Champs d'inscription",
         "fieldsDescription": "Ajoutez des questions personnalisées aux formulaires d'inscription. Les champs de base (nom, email) sont toujours présents.",
@@ -1481,7 +1584,8 @@
             "label": "Libellé",
             "key": "Clé",
             "type": "Type",
-            "required": "Requis"
+            "required": "Requis",
+            "step": "Étape"
           },
           "dialog": {
             "createTitle": "Ajouter un champ",
@@ -1498,7 +1602,30 @@
             "optionsHint": "Une option par ligne. Utilisez \"valeur:libellé\" pour stocker une valeur différente, ou juste le libellé.",
             "save": "Enregistrer",
             "saving": "Enregistrement…",
-            "cancel": "Annuler"
+            "cancel": "Annuler",
+            "step": "Étape",
+            "firstStep": "Première étape",
+            "stepHint": "Page du formulaire sur laquelle ce champ apparaît.",
+            "builtin": "Type de champ",
+            "builtinCustom": "Question personnalisée",
+            "builtinHint": "Une information de la fiche membre est enregistrée dans sa colonne dédiée — elle alimente les courriers, les rappels et l'attribution de palier. Une question personnalisée est stockée à part, avec la candidature.",
+            "builtinLocked": "Enregistré dans la fiche membre ({key}). Le type de saisie est imposé ; vous pouvez adapter le libellé, l'aide, l'obligation et la position.",
+            "visibleIf": {
+              "label": "Afficher seulement si",
+              "none": "Toujours affiché",
+              "operatorLabel": "Comparaison",
+              "valueLabel": "Valeur",
+              "valuePlaceholder": "ex. 1",
+              "hint": "Ce champ n'apparaît (et n'est requis) que si la réponse au champ choisi satisfait cette condition.",
+              "operators": {
+                "eq": "est égal à",
+                "neq": "est différent de",
+                "gt": "est supérieur à",
+                "gte": "est supérieur ou égal à",
+                "lt": "est inférieur à",
+                "lte": "est inférieur ou égal à"
+              }
+            }
           },
           "archive": {
             "button": "Archiver",
@@ -1511,6 +1638,67 @@
             "restoreConfirm": "Restaurer",
             "saving": "Enregistrement…",
             "cancel": "Annuler"
+          },
+          "firstStep": "Première étape",
+          "builtinBadge": "Fiche membre",
+          "visibleIfCaption": "Affiché si « {label} » {operator} {value}"
+        },
+        "stepsTitle": "Étapes du formulaire",
+        "stepsDescription": "Découpez le formulaire d'inscription en plusieurs pages. Sans étape, le formulaire tient sur une seule page.",
+        "steps": {
+          "memberTitle": "Étapes — membres",
+          "merchantTitle": "Étapes — commerces",
+          "description": "Les champs sont répartis sur ces pages. Les champs sans étape s'affichent sur la première.",
+          "add": "Ajouter une étape",
+          "edit": "Modifier",
+          "archived": "Archivée",
+          "empty": "Aucune étape — le formulaire tient sur une seule page.",
+          "fieldCount": "{count, plural, =0 {aucun champ} one {# champ} other {# champs}}",
+          "columns": {
+            "position": "#",
+            "title": "Titre",
+            "fields": "Champs"
+          },
+          "dialog": {
+            "createTitle": "Ajouter une étape",
+            "editTitle": "Modifier l'étape",
+            "description": "Les étapes sont affichées dans l'ordre défini par leur position. Le titre est visible par les candidats.",
+            "title": "Titre",
+            "titleHint": "Affiché en haut de cette page du formulaire, dans la langue de la caisse.",
+            "stepDescription": "Description",
+            "position": "Position",
+            "positionHint": "Les étapes sont triées par position croissante ; la plus basse est la première page.",
+            "save": "Enregistrer",
+            "saving": "Enregistrement…",
+            "cancel": "Annuler"
+          },
+          "archive": {
+            "button": "Archiver",
+            "restore": "Restaurer",
+            "title": "Archiver cette étape ?",
+            "description": "L'étape disparaît du formulaire. Aucune réponse déjà enregistrée n'est perdue.",
+            "fieldsMove": "{count, plural, one {# champ sera déplacé} other {# champs seront déplacés}} vers la première étape du formulaire.",
+            "restoreTitle": "Restaurer cette étape ?",
+            "restoreDescription": "L'étape réapparaît dans le formulaire à sa position précédente.",
+            "confirm": "Archiver",
+            "restoreConfirm": "Restaurer",
+            "saving": "Enregistrement…",
+            "cancel": "Annuler"
+          }
+        },
+        "integration": {
+          "title": "Intégration site web",
+          "description": "Le lien que votre site utilise pour envoyer des candidats vers le formulaire, avec des informations déjà remplies.",
+          "urlLabel": "URL du formulaire",
+          "exampleLabel": "Exemple avec pré-remplissage",
+          "exampleHint": "Le candidat peut modifier chaque valeur ; toute valeur invalide est ignorée.",
+          "paramsLabel": "Paramètres acceptés",
+          "paramsHint": "Les paramètres inconnus sont ignorés. « ref », « step » et « error » sont réservés.",
+          "copy": "Copier",
+          "columns": {
+            "param": "Paramètre",
+            "field": "Champ",
+            "format": "Valeurs"
           }
         }
       },
@@ -1563,7 +1751,7 @@
         "description": "E-mails automatiques envoyés aux membres concernant leurs dépôts et allocations.",
         "pause": {
           "label": "Suspendre les e-mails de notification aux membres",
-          "description": "Pendant la pause, les membres ne reçoivent aucun e-mail de notification : confirmations de dépôt et d'allocation, activation, invitations et primes de parrainage sont tous ignorés — pas mis en attente, donc rien n'est envoyé rétroactivement à la reprise. Les e-mails d'inscription (vérification, bienvenue) et de mot de passe continuent de fonctionner. Les e-mails aux commerçants et à l'équipe ne sont pas concernés."
+          "description": "En pause, les membres ne reçoivent aucun e-mail de notification : confirmations de paiement et d'allocation, activation, invitation, bonus de parrainage, « carte en route » et rappels de cotisation sont tous ignorés — non mis en file, donc rien n'est envoyé rétroactivement à la reprise. Les e-mails d'inscription (vérification, bienvenue) et de mot de passe continuent de fonctionner. Les e-mails aux commerçants et à l'équipe ne sont pas affectés."
         },
         "sender": {
           "label": "Adresse d'expéditeur",
@@ -1572,15 +1760,76 @@
         }
       },
       "emailTemplates": {
-        "allocationTitle": "E-mail de confirmation d'allocation",
-        "allocationDescription": "L'e-mail que reçoivent les membres lorsqu'une allocation est créditée sur leur carte. Laissez-le tel quel pour conserver le texte par défaut, ou personnalisez-le pour cette caisse.",
-        "cardAssignedTitle": "E-mail « carte en route »",
-        "cardAssignedDescription": "L'e-mail qu'un membre reçoit lorsque sa carte lui est attribuée et est en route. Laissez-le tel quel pour conserver le texte par défaut, ou personnalisez-le pour cette caisse.",
-        "paymentReminderTitle": "E-mail de rappel de cotisation",
-        "paymentReminderDescription": "Le rappel mensuel envoyé le 1er du mois aux membres qui n'ont pas encore cotisé pour la période. Laissez-le tel quel pour conserver le texte par défaut, ou personnalisez-le pour cette caisse.",
+        "types": {
+          "ALLOCATION_CONFIRMATION": {
+            "title": "Confirmation d'allocation",
+            "description": "E-mail envoyé au membre lorsqu'une allocation est créditée sur sa carte."
+          },
+          "CARD_ASSIGNED": {
+            "title": "Carte en route",
+            "description": "E-mail envoyé au membre lorsque sa carte lui est attribuée et expédiée."
+          },
+          "PAYMENT_REMINDER_FIRST": {
+            "title": "Rappel de cotisation (1er)",
+            "description": "Rappel automatique envoyé le 1er du mois aux membres qui n'ont pas encore cotisé pour la période."
+          },
+          "PAYMENT_REMINDER_SECOND": {
+            "title": "Rappel de cotisation (relance)",
+            "description": "Relance manuelle envoyée depuis le détail d'une période aux membres toujours en attente de paiement."
+          },
+          "MEMBER_WELCOME": {
+            "title": "Bienvenue au membre",
+            "description": "E-mail de bienvenue envoyé à un nouveau membre après son inscription."
+          },
+          "MEMBER_INVITED": {
+            "title": "Invitation d'un membre",
+            "description": "E-mail envoyé à un membre qu'un administrateur vient d'ajouter à la caisse."
+          },
+          "MEMBER_ACTIVATED": {
+            "title": "Compte activé",
+            "description": "E-mail envoyé au membre lorsque son compte est activé et sa carte prête."
+          },
+          "PAYMENT_CONFIRMATION": {
+            "title": "Paiement reçu",
+            "description": "E-mail envoyé au membre lorsqu'un paiement est reçu et rapproché."
+          },
+          "REFERRAL_BONUS_AWARDED": {
+            "title": "Bonus de parrainage",
+            "description": "E-mail envoyé au parrain lorsqu'un bonus de parrainage est crédité sur sa carte."
+          }
+        },
+        "defaultName": "Modèle par défaut",
+        "builtIn": "Intégré",
+        "defaultReadOnly": "Le modèle par défaut ne peut pas être modifié. Dupliquez-le pour créer une version personnalisable.",
+        "active": "Actif",
+        "makeActive": "Activer",
+        "newTemplate": "Nouveau modèle",
+        "duplicate": "Dupliquer",
+        "rename": "Renommer",
+        "delete": "Supprimer",
+        "editTemplate": "Modifier le modèle",
+        "editTemplateDescription": "Personnalisez l'objet et le corps pour chaque langue, prévisualisez et envoyez un test.",
+        "createTitle": "Nouveau modèle",
+        "createDescription": "Donnez un nom au modèle et choisissez son point de départ.",
+        "nameLabel": "Nom",
+        "namePlaceholder": "ex. Ton chaleureux",
+        "sourceLabel": "Partir de",
+        "sourceDefault": "Modèle par défaut",
+        "cancel": "Annuler",
+        "create": "Créer",
+        "save": "Enregistrer",
+        "renameTitle": "Renommer le modèle",
+        "deleteTitle": "Supprimer le modèle ?",
+        "deleteDescription": "Le modèle « {name} » sera définitivement supprimé. Action irréversible.",
+        "deleteActiveDescription": "« {name} » est le modèle actif. En le supprimant, cet e-mail reviendra au modèle par défaut. Action irréversible.",
+        "localeAuthored": "Personnalisé pour cette langue.",
+        "loadDefault": "Charger le modèle par défaut",
         "subjectLabel": "Objet",
-        "bodyLabel": "Message",
+        "htmlLabel": "Corps (HTML)",
+        "htmlHint": "Rédigez le corps en HTML — il est intégré à la mise en page de votre caisse (logo, pied de page). Utilisez les variables ci-dessous ; elles sont remplacées pour chaque membre à l'envoi.",
         "variablesHint": "Vous pouvez utiliser ces variables — elles sont remplacées par les informations de chaque membre à l'envoi :",
+        "previewLabel": "Aperçu",
+        "previewSubject": "Objet :",
         "variables": {
           "firstName": "Le prénom du membre",
           "fundName": "Le nom de cette caisse",
@@ -1591,42 +1840,35 @@
           "address": "L'adresse postale du membre",
           "cardLink": "Lien vers la page publique de la carte du membre",
           "cardNumber": "Le numéro de carte du membre",
-          "paymentReference": "La communication à indiquer sur le virement bancaire"
+          "paymentReference": "La communication à indiquer sur le virement bancaire",
+          "paymentLink": "Lien vers la page de paiement publique du membre",
+          "occurredAt": "La date du paiement"
         },
-        "usingDefault": "Modèle par défaut utilisé.",
-        "usingOverride": "Modèle personnalisé utilisé pour cette caisse.",
-        "reset": "Réinitialiser",
-        "resetConfirmTitle": "Réinitialiser le modèle par défaut ?",
-        "resetConfirmDescription": "Cette action supprime votre texte personnalisé et rétablit l'e-mail de confirmation d'allocation par défaut. Irréversible.",
-        "resetConfirmCancel": "Annuler",
-        "resetConfirmConfirm": "Réinitialiser",
         "errors": {
           "subjectRequired": "Saisissez un objet.",
           "subjectTooLong": "L'objet est trop long.",
           "bodyRequired": "Saisissez un message.",
           "bodyTooLong": "Le message est trop long.",
-          "unknownVariable": "Variable inconnue « {name} ». Supprimez-la ou utilisez l'une des variables listées."
+          "unknownVariable": "Variable inconnue « {name} ». Supprimez-la ou utilisez l'une des variables listées.",
+          "nameRequired": "Saisissez un nom.",
+          "nameTooLong": "Le nom est trop long.",
+          "nameTaken": "Un modèle porte déjà ce nom.",
+          "notFound": "Ce modèle est introuvable."
         },
-        "htmlLabel": "Corps (HTML)",
-        "htmlHint": "Rédigez le corps en HTML — il est intégré à la mise en page de votre caisse (logo, pied de page). Utilisez les variables ci-dessous ; elles sont remplacées pour chaque membre à l'envoi.",
-        "previewLabel": "Aperçu",
-        "previewSubject": "Objet :",
         "test": {
           "title": "Envoyer un test",
-          "description": "Choisissez un membre pour renseigner les détails de l'e-mail, puis envoyez une copie à l'adresse de votre choix — avec les données réelles de ce membre.",
-          "memberLabel": "Utiliser les données de ce membre",
+          "description": "Choisissez éventuellement un membre pour renseigner les données, puis envoyez une copie à l'adresse de votre choix.",
+          "memberLabel": "Données de test",
+          "sampleData": "Données d'exemple",
           "emailLabel": "Envoyer à",
           "emailPlaceholder": "vous@exemple.com",
           "send": "Envoyer le test",
           "sending": "Envoi…",
           "sent": "E-mail de test envoyé.",
-          "noMembers": "Aucun membre actif avec un palier d'allocation pour le moment — ajoutez-en un pour envoyer un test.",
           "subjectPrefix": "[Test]",
           "errors": {
             "emailInvalid": "Saisissez une adresse e-mail valide.",
             "memberNotFound": "Ce membre est introuvable.",
-            "noTier": "Ce membre n'a pas de palier d'allocation, il n'y a donc aucun montant à afficher.",
-            "noCard": "Ce membre n'a pas encore de carte, il n'y a donc aucun lien à inclure.",
             "sendFailed": "Impossible d'envoyer l'e-mail de test. Vérifiez l'adresse d'expéditeur et réessayez."
           }
         }
@@ -1653,7 +1895,7 @@
           "first_name": "Le prénom du membre",
           "last_name": "Le nom du membre",
           "card_number": "Le numéro de carte du membre",
-          "payment_reference": "La référence de paiement du membre"
+          "payment_reference": "La référence de paiement du membre (l'UID de sa carte)"
         },
         "errors": {
           "bodyRequired": "Saisissez le corps du courrier.",
@@ -1680,7 +1922,11 @@
       "labelRequired": "Le libellé est requis.",
       "optionEmpty": "Chaque option doit avoir une valeur et un libellé.",
       "optionsRequired": "Ajoutez au moins une option.",
-      "notFound": "Champ introuvable."
+      "notFound": "Champ introuvable.",
+      "builtinInvalid": "Cette information de membre est inconnue.",
+      "builtinTaken": "Cette information est déjà demandée sur ce formulaire (vérifiez aussi les champs archivés).",
+      "visibleIfInvalid": "La condition d'affichage n'est pas valide — vérifiez le champ dont elle dépend.",
+      "visibleIfValueRequired": "Indiquez la valeur de la condition d'affichage."
     }
   },
   "tokenOps": {
@@ -1802,6 +2048,8 @@
       "firstName": "Prénom",
       "lastName": "Nom",
       "email": "Email",
+      "contributionAmount": "Montant que vous souhaitez contribuer (optionnel)",
+      "contributionAmountHint": "Laissez vide pour utiliser le montant proposé par votre palier. Vous pourrez convenir d'un autre montant avec un administrateur.",
       "remindersOptOut": "Je ne souhaite pas recevoir les rappels de paiement par email.",
       "submit": "Envoyer",
       "submitting": "Envoi…",
@@ -1810,8 +2058,11 @@
         "lastNameRequired": "Le nom est requis.",
         "emailInvalid": "Saisissez une adresse email valide.",
         "emailTaken": "Une demande avec cet email existe déjà pour cette caisse.",
+        "amountInvalid": "Saisissez un montant valide (jusqu'à 2 décimales).",
         "fieldRequired": "{label} est requis.",
-        "generic": "Une erreur s'est produite. Réessayez."
+        "generic": "Une erreur s'est produite. Réessayez.",
+        "required": "Ce champ est obligatoire.",
+        "fieldInvalid": "{label} n'a pas un format valide."
       },
       "emailTemplates": {
         "verify": {
@@ -1821,7 +2072,7 @@
         },
         "welcome": {
           "subject": "Bienvenue chez {fundName}",
-          "textBody": "Bonjour {firstName},\n\nBienvenue chez {fundName}. Votre demande est en cours d'examen — un administrateur vous contactera bientôt.\n\nLorsque vous serez prêt à contribuer, indiquez cette référence sur votre virement bancaire :\n  {paymentReference}\n\nMerci,\nL'équipe {fundName}"
+          "textBody": "Bonjour {firstName},\n\nBienvenue chez {fundName}. Votre demande est en cours d'examen — un administrateur vous contactera bientôt.\n\nVous recevrez votre référence de paiement en même temps que votre carte.\n\nMerci,\nL'équipe {fundName}"
         }
       },
       "thanks": {
@@ -1835,6 +2086,18 @@
           "description": "Merci pour votre demande auprès de {fundName}.",
           "nextSteps": "Un administrateur examinera votre demande et vous contactera par email."
         }
+      },
+      "stepper": {
+        "progress": "Étape {current} sur {total}",
+        "back": "Retour",
+        "next": "Continuer"
+      },
+      "cancel": {
+        "button": "Annuler l'inscription",
+        "title": "Abandonner l'inscription ?",
+        "description": "Vos réponses ne seront pas enregistrées et vous quitterez ce formulaire.",
+        "stay": "Continuer l'inscription",
+        "confirm": "Quitter"
       }
     },
     "admin": {
@@ -1911,7 +2174,7 @@
         },
         "invited": {
           "subject": "Vous êtes invité chez {fundName}",
-          "textBody": "Bonjour {firstName},\n\nUn administrateur de {fundName} vient de vous ajouter comme membre. Vous recevrez votre carte lors de votre prochain contact avec l'équipe.\n\nLorsque vous serez prêt à contribuer, indiquez cette référence sur votre virement bancaire pour que nous puissions créditer votre carte automatiquement :\n\n  {paymentReference}\n\nL'équipe {fundName}"
+          "textBody": "Bonjour {firstName},\n\nUn administrateur de {fundName} vient de vous ajouter comme membre. Vous recevrez votre carte lors de votre prochain contact avec l'équipe, ainsi que la référence à indiquer sur vos virements de cotisation.\n\nL'équipe {fundName}"
         },
         "referralBonusAwarded": {
           "subject": "Votre bonus de parrainage a été ajouté — {fundName}",
@@ -1953,9 +2216,45 @@
         "saving": "Enregistrement…",
         "stoppedWarning": "Marquer comme Arrêté enregistre une date de départ. Utilisez En pause pour une pause temporaire."
       },
+      "bulk": {
+        "selectAll": "Sélectionner tous les membres",
+        "selectRow": "Sélectionner le membre",
+        "selected": "{count} sélectionné(s)",
+        "clearSelection": "Effacer",
+        "edit": "Modifier la sélection",
+        "dialogTitle": "Modifier les membres sélectionnés",
+        "dialogDescription": "Appliquer une modification aux {count} membre(s) sélectionné(s).",
+        "propertyLabel": "Propriété",
+        "property": {
+          "locale": "Langue",
+          "status": "Statut",
+          "tier": "Palier"
+        },
+        "valueLabel": "Nouvelle valeur",
+        "tierNone": "— Aucun palier —",
+        "statusHint": "Les membres dont le statut actuel ne permet pas la transition sont ignorés.",
+        "stoppedWarning": "Marquer comme Arrêté enregistre une date de départ. Utilisez En pause pour une pause temporaire.",
+        "resultSkipped": "{updated} mis à jour, {skipped} ignoré(s) (changement de statut non autorisé depuis leur statut actuel).",
+        "done": "Terminé",
+        "cancel": "Annuler",
+        "apply": "Appliquer",
+        "applying": "Application…",
+        "errors": {
+          "noSelection": "Sélectionnez d'abord au moins un membre.",
+          "tooMany": "Trop de membres sélectionnés à la fois.",
+          "invalidValue": "Cette valeur n'est pas valide."
+        }
+      },
       "import": {
         "title": "Importer des membres",
         "description": "Importez ou collez un CSV avec en-têtes, puis associez chaque colonne à un champ membre.",
+        "mode": {
+          "label": "Mode d'import",
+          "upsert": "Ajouter et mettre à jour",
+          "updateOnly": "Mettre à jour uniquement (backfill)",
+          "upsertHint": "Crée les nouveaux membres et met à jour les membres existants (correspondance par e-mail).",
+          "updateOnlyHint": "Met à jour uniquement les colonnes associées des membres existants (correspondance par e-mail). Aucun membre n'est créé ; les lignes sans correspondance sont ignorées."
+        },
         "fileLabel": "Fichier CSV",
         "pasteLabel": "Ou collez les lignes",
         "mapHeading": "Associer les colonnes",
@@ -1980,6 +2279,7 @@
           "householdAdults": "Adultes du foyer",
           "householdChildren": "Enfants du foyer",
           "tier": "Palier (par nom)",
+          "contributionAmount": "Contribution convenue",
           "locale": "Langue",
           "notes": "Notes",
           "serial": "Serial de carte",
@@ -1988,12 +2288,14 @@
         },
         "errors": {
           "missingRequiredMapping": "Associez les champs requis (prénom, nom, e-mail).",
+          "missingMatchKey": "Associez la colonne e-mail pour identifier les membres à mettre à jour.",
           "columnMissing": "Une colonne associée est absente du CSV.",
           "empty": "Aucune ligne de données dans le CSV."
         },
         "skip": {
           "missingName": "Prénom ou nom manquant.",
           "invalidEmail": "E-mail invalide.",
+          "noMatch": "Aucun membre existant avec cet e-mail.",
           "error": "Impossible d'importer cette ligne."
         },
         "fixedValuePlaceholder": "Définir pour toutes les lignes",
@@ -2009,22 +2311,31 @@
         "firstNameLabel": "Prénom",
         "lastNameLabel": "Nom",
         "emailLabel": "E-mail",
-        "phoneLabel": "Téléphone",
-        "ibanLabel": "IBAN",
+        "localeLabel": "Langue des e-mails",
+        "localeDefault": "Défaut de la caisse",
+        "localeHint": "La langue dans laquelle les e-mails de ce membre sont envoyés.",
         "addressLabel": "Adresse",
         "postalCodeLabel": "Code postal",
         "cityLabel": "Ville",
-        "householdAdultsLabel": "Adultes dans le foyer",
-        "householdChildrenLabel": "Enfants dans le foyer",
+        "contributionAmountLabel": "Contribution convenue",
+        "contributionAmountHint": "Ce que nous demandons à ce membre de contribuer. Laissez vide pour utiliser la cible du palier ({target}). Minimum : {min}.",
+        "contributionAmountHintNoTier": "Ce que nous demandons à ce membre de contribuer. Laissez vide pour utiliser la cible du palier une fois celui-ci attribué.",
         "notesLabel": "Notes",
         "cancel": "Annuler",
         "confirm": "Enregistrer",
         "saving": "Enregistrement…",
         "errors": {
           "tooLong": "Cette valeur est trop longue.",
-          "householdInvalid": "Saisissez un nombre entier supérieur ou égal à 0."
+          "amountInvalid": "Saisissez un montant valide (jusqu'à 2 décimales).",
+          "amountBelowMin": "Le montant ne peut pas être inférieur au minimum du palier ({min}).",
+          "localeInvalid": "Choisissez une langue prise en charge."
         }
       }
+    },
+    "builtinFields": {
+      "address": "Adresse",
+      "postalCode": "Code postal",
+      "city": "Ville"
     }
   },
   "cards": {
@@ -3106,6 +3417,38 @@
       "closed": "Cette période est déjà clôturée et ne peut pas être modifiée.",
       "monthMismatch": "La date limite doit se situer dans le mois de la période.",
       "notFixedPeriod": "Les périodes ne s'appliquent que lorsque l'allocation est en mode période fixe."
+    }
+  },
+  "cotisation": {
+    "title": "Paiement de la cotisation mensuelle",
+    "greeting": "Bonjour {name}, veuillez effectuer votre cotisation mensuelle en utilisant les informations ci-dessous",
+    "back": "Retour au site web",
+    "manual": {
+      "title": "Payer par virement",
+      "beneficiary": "Nom du bénéficiaire",
+      "iban": "IBAN",
+      "reference": "Référence de paiement",
+      "amount": "Montant",
+      "referenceNotice": "Important : veuillez inclure la référence de paiement {reference} lors de votre virement. Cela nous aide à identifier correctement votre paiement."
+    },
+    "qr": {
+      "title": "Scanner pour payer",
+      "hint": "Scannez avec votre application bancaire"
+    },
+    "instructions": {
+      "title": "Instructions de paiement",
+      "qrTitle": "Option 1 : Scanner le code QR",
+      "qrBody": "Ouvrez votre application bancaire et utilisez le scanner QR pour remplir automatiquement tous les détails du paiement.",
+      "manualTitle": "Option 2 : Virement manuel",
+      "manualBody": "Utilisez les boutons de copie ci-dessus pour copier chaque champ et les coller dans votre application bancaire. Assurez-vous d'inclure la référence de paiement.",
+      "help": "Si vous avez des questions ou des problèmes avec votre paiement, veuillez contacter {fundName}."
+    },
+    "notConnected": "Les coordonnées bancaires ne sont pas encore disponibles. Veuillez réessayer plus tard ou contacter {fundName}."
+  },
+  "onboardingSteps": {
+    "errors": {
+      "titleRequired": "Le titre est requis.",
+      "notFound": "Étape introuvable."
     }
   }
 }

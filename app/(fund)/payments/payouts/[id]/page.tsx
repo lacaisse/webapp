@@ -21,6 +21,7 @@ import { requireFundRole } from "@/services/auth/dal";
 import { requireCurrentFund } from "@/services/fund/server";
 import { cn } from "@/lib/utils";
 
+import { AddOrdersDialog } from "./add-orders-dialog";
 import { CreateOrderDialog } from "./create-order-dialog";
 import { ManualDeductionDialog } from "./manual-deduction-dialog";
 import { OrdersExplorer } from "./orders-explorer";
@@ -142,7 +143,7 @@ export default async function PayoutDetailPage({
               citizenPayApiKeyId={fund.citizenPayApiKeyId}
               citizenPayApiKeyEnc={fund.citizenPayApiKeyEnc}
               placeId={payout.placeId}
-              net={payout.net}
+              required={payout.totalAmount}
               symbol={fund.tokenSymbol}
               tokenAddress={fund.tokenAddress}
               tokenChainId={fund.tokenChainId}
@@ -197,8 +198,14 @@ export default async function PayoutDetailPage({
           <h2 className="font-heading text-lg font-medium">
             {t("orders.title")}
           </h2>
-          {/* Manual order creation is only meaningful before settlement runs. */}
-          {liveStatus === "pending" && <CreateOrderDialog payoutId={id} />}
+          {/* Adding orders (existing or manual) is only meaningful before
+              settlement runs. */}
+          {liveStatus === "pending" && (
+            <div className="flex items-center gap-2">
+              <AddOrdersDialog payoutId={id} />
+              <CreateOrderDialog payoutId={id} />
+            </div>
+          )}
         </div>
         <Suspense fallback={<OrdersSkeleton />}>
           <OrdersPanel
@@ -296,14 +303,25 @@ function Stat({
   );
 }
 
-// The place's live on-chain balance vs the net to burn — green when the
-// account holds enough, amber when it's short (the burn would revert).
+// The place's live on-chain balance vs what settling this payout takes out of
+// that account — green when it holds enough, amber when it's short.
+//
+// `required` is the payout TOTAL, not the net: settlement removes the net (the
+// burn) *and* the retained cut (the sweep of fees + manual deduction), and
+// net + fees + deduction === total. Comparing against the net alone reads green
+// on a payout whose burn succeeds and whose sweep then fails with a 402, which
+// is how a payout ends up burnt with its cut still stranded in the merchant's
+// account.
+//
+// Caveat this can't express: the balance is the place's whole wallet, not a
+// per-payout pot. A place with two pending payouts needs the sum of both, so
+// green here is necessary, not sufficient.
 async function PlaceBalanceStat({
   fundId,
   citizenPayApiKeyId,
   citizenPayApiKeyEnc,
   placeId,
-  net,
+  required,
   symbol,
   tokenAddress,
   tokenChainId,
@@ -313,7 +331,7 @@ async function PlaceBalanceStat({
   citizenPayApiKeyId: string | null;
   citizenPayApiKeyEnc: string | null;
   placeId: string;
-  net: string;
+  required: string;
   symbol: string | null;
   tokenAddress: string | null;
   tokenChainId: number | null;
@@ -339,7 +357,7 @@ async function PlaceBalanceStat({
     );
   }
 
-  const enough = Number(balance) >= Number(net);
+  const enough = Number(balance) >= Number(required);
   return (
     <div className="rounded-lg border border-border p-3">
       <dt className="text-xs text-muted-foreground">{t("placeBalance")}</dt>

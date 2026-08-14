@@ -8,6 +8,8 @@ import { decryptSecret } from "@/services/crypto/secret";
 import type { CitizenPayClient } from "./client-interface";
 import { LiveCitizenPayClient } from "./live-client";
 import type {
+  AddableOrdersPage,
+  AddOrdersResult,
   ArchivedPayout,
   BankBalance,
   BankingStatus,
@@ -308,6 +310,7 @@ class MockCitizenPayClient implements CitizenPayClient {
         txHash: `0x${randomBytes(32).toString("hex")}`,
         account: `0x${randomBytes(20).toString("hex")}`,
         completedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
       },
       {
         id: 44791,
@@ -323,6 +326,7 @@ class MockCitizenPayClient implements CitizenPayClient {
         txHash: null,
         account: `0x${randomBytes(20).toString("hex")}`,
         completedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
       },
       {
         id: 44792,
@@ -338,6 +342,7 @@ class MockCitizenPayClient implements CitizenPayClient {
         txHash: null,
         account: null,
         completedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
       },
     ];
     return {
@@ -380,8 +385,73 @@ class MockCitizenPayClient implements CitizenPayClient {
         txHash: null,
         account: null,
         completedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
       },
       payout: { payoutId, total: total.toFixed(2), fees: fees.toFixed(2), net },
+    };
+  }
+
+  async getAddableOrders(
+    payoutId: string,
+    query: { from: string; to: string; limit?: number; offset?: number },
+  ): Promise<AddableOrdersPage> {
+    this.log("getAddableOrders", { payoutId, ...query });
+    // A couple of existing, unassigned orders that fell outside the payout's
+    // original window. Amounts are EUR decimal strings like the live client.
+    const orders: PayoutOrder[] = [
+      {
+        id: 45210,
+        total: "18.99",
+        fees: "0.95",
+        net: "18.04",
+        due: "18.04",
+        status: "paid",
+        type: "web",
+        description: "Late-arriving order",
+        items: [],
+        txHash: `0x${randomBytes(32).toString("hex")}`,
+        account: `0x${randomBytes(20).toString("hex")}`,
+        completedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: 45211,
+        total: "7.50",
+        fees: "0.38",
+        net: "7.12",
+        due: "7.12",
+        status: "paid",
+        type: "pos",
+        description: null,
+        items: [],
+        txHash: `0x${randomBytes(32).toString("hex")}`,
+        account: `0x${randomBytes(20).toString("hex")}`,
+        completedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+      },
+    ];
+    return {
+      orders,
+      summary: {
+        orderCount: orders.length,
+        total: "26.49",
+        fees: "1.33",
+        net: "25.16",
+      },
+      total: orders.length,
+      limit: query.limit ?? 50,
+      offset: query.offset ?? 0,
+    };
+  }
+
+  async addOrdersToPayout(
+    payoutId: string,
+    orderIds: number[],
+  ): Promise<AddOrdersResult> {
+    this.log("addOrdersToPayout", { payoutId, orderIds });
+    return {
+      assigned: orderIds.length,
+      payout: { payoutId, total: "126.49", fees: "3.33", net: "123.16" },
     };
   }
 

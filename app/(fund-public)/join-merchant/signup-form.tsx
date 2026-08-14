@@ -4,7 +4,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslations } from "next-intl";
 import { useTransition } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import {
   MerchantSignupFormSchema,
   type MerchantSignupFormInput,
 } from "@/services/merchant/schema";
+import { isFieldVisible } from "@/services/onboarding/visibility";
 import {
   OnboardingFieldInput,
   type FieldValue,
@@ -102,6 +103,14 @@ export function MerchantSignupForm({
     return msg;
   };
 
+  // See the matching comment in app/(fund-public)/join/signup-form.tsx —
+  // UX only, signupMerchantAction re-checks visibility server-side.
+  const extrasValues = (useWatch({ control: form.control, name: "extras" }) ??
+    {}) as Record<string, unknown>;
+  const visibleFields = fields.filter((field) =>
+    isFieldVisible(field.visibleIf, extrasValues),
+  );
+
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
       {BUILTIN_FIELDS.map((spec) => {
@@ -131,7 +140,7 @@ export function MerchantSignupForm({
         );
       })}
 
-      {fields.map((field) => (
+      {visibleFields.map((field) => (
         <Controller
           key={field.id}
           control={form.control}

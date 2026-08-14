@@ -2,7 +2,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Coins, Download } from "lucide-react";
+import { ArrowLeft, Coins, Download, ExternalLink } from "lucide-react";
 import { getFormatter, getTranslations } from "next-intl/server";
 
 import { Badge } from "@/components/ui/badge";
@@ -18,10 +18,12 @@ import { CopyButton } from "@/components/copy-button";
 import { getBalances } from "@/services/alchemy/balances";
 import { formatTokenAmount, shortAddress } from "@/services/alchemy/format";
 import { getCitizenPayClient } from "@/services/citizenpay/client";
+import { resolveTreasurySlug } from "@/services/citizenpay/treasury-slug";
 import {
   type CardStatus as CardStatusEnum,
 } from "@/services/db/generated/enums";
 import { prisma } from "@/services/db/prisma";
+import { buildCardLink } from "@/services/email/templates";
 import { requireCurrentFund } from "@/services/fund/server";
 
 import { CardRowActions } from "../card-row-actions";
@@ -89,6 +91,7 @@ export default async function CardDetailPage({
     fund.tokenAddress != null &&
     fund.tokenDecimals != null &&
     card.account != null;
+  const tapLink = buildCardLink(card.serialNumber, await resolveTreasurySlug(fund));
 
   return (
     <>
@@ -177,6 +180,20 @@ export default async function CardDetailPage({
             <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
               <DtDd label={t("info.serial")} mono>
                 {card.serialNumber}
+              </DtDd>
+              <DtDd label={t("info.tapLink")}>
+                <span className="inline-flex items-center gap-1">
+                  <a
+                    href={tapLink}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="inline-flex items-center gap-1 hover:underline"
+                  >
+                    {t("info.tapLinkLabel")}
+                    <ExternalLink className="size-3" />
+                  </a>
+                  <CopyButton value={tapLink} />
+                </span>
               </DtDd>
               <DtDd label={t("info.number")}>
                 <CardNumberEdit cardId={card.id} initial={card.number} />

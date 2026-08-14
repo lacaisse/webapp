@@ -5,6 +5,8 @@ import type { FundBranding } from "@/services/email/transactional";
 import { prisma } from "@/services/db/prisma";
 import { sendPaymentReminder } from "@/services/email/transactional";
 import { buildCardLink } from "@/services/email/templates";
+import { buildPaymentPageUrl } from "@/services/payment/pay-link";
+import { resolveRequestedContribution } from "./contribution";
 import { REMINDER_ELIGIBLE_STATUS } from "./eligibility";
 
 // Monthly payment-request reminder (issue #39). Driven by the
@@ -24,7 +26,11 @@ import { REMINDER_ELIGIBLE_STATUS } from "./eligibility";
 //     each deposit to the right period window)
 //
 // PAY_AND_GO funds top up on demand and have no monthly request concept — they
-// are skipped entirely.
+// are skipped entirely. Funds with member emails paused
+// (Fund.confirmationEmailsPausedAt) are skipped too: the pause promises members
+// receive no notification emails, and this is the most visible automatic one.
+// Like the other paused sends, it's skipped and NOT queued — resuming does not
+// fire last month's request retroactively.
 
 const FUND_SELECT = {
   id: true,
@@ -32,6 +38,8 @@ const FUND_SELECT = {
   primaryColor: true,
   logoUrl: true,
   senderEmail: true,
+  // Canonical host — used to build the public /pay/<serial> {paymentLink}.
+  domain: true,
   // Cached treasury slug for the public card/account link in the email body.
   citizenPayTreasurySlug: true,
 } as const;
@@ -52,7 +60,11 @@ export async function sendMonthlyPaymentReminders(): Promise<
 > {
   const now = new Date();
   const funds = await prisma.fund.findMany({
-    where: { allocationMode: "FIXED_PERIOD" },
+    where: {
+      allocationMode: "FIXED_PERIOD",
+      // Member emails paused → send nothing for this fund this run.
+      confirmationEmailsPausedAt: null,
+    },
     select: FUND_SELECT,
   });
 
@@ -75,6 +87,7 @@ type ReminderFund = {
   primaryColor: string | null;
   logoUrl: string | null;
   senderEmail: string | null;
+  domain: string;
   citizenPayTreasurySlug: string | null;
 };
 
@@ -111,7 +124,7 @@ async function remindFund(
       email: true,
       firstName: true,
       lastName: true,
-      paymentReference: true,
+      contributionAmount: true,
       tier: { select: { allocationAmount: true } },
       primaryCard: { select: { serialNumber: true } },
     },
@@ -151,7 +164,7 @@ type ReminderMember = {
   email: string;
   firstName: string;
   lastName: string;
-  paymentReference: string | null;
+  contributionAmount: { toString(): string } | null;
   tier: { allocationAmount: { toString(): string } } | null;
   primaryCard: { serialNumber: string } | null;
 };
@@ -208,6 +221,10 @@ async function remindOne(
   const cardLink = member.primaryCard
     ? buildCardLink(member.primaryCard.serialNumber, fund.citizenPayTreasurySlug)
     : "";
+  // Public "how to pay this contribution" page, keyed on the card UID.
+  const paymentLink = member.primaryCard
+    ? buildPaymentPageUrl(fund.domain, member.primaryCard.serialNumber)
+    : "";
 
   await sendPaymentReminder({
     emailId,
@@ -216,9 +233,15 @@ async function remindOne(
     fund: branding,
     firstName: member.firstName,
     lastName: member.lastName,
-    amount: member.tier ? member.tier.allocationAmount.toString() : "",
-    paymentReference: member.paymentReference ?? "",
+    amount: resolveRequestedContribution(
+      member.contributionAmount,
+      member.tier?.allocationAmount,
+    ),
+    // The bank-transfer reference is the card UID — the only value bank-sync
+    // matches an incoming deposit on (see services/bank-sync/matching/match.ts).
+    paymentReference: member.primaryCard?.serialNumber ?? "",
     cardLink,
+    paymentLink,
   });
 
   const after = await prisma.email.findUnique({

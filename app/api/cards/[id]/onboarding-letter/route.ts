@@ -22,8 +22,9 @@ export async function GET(
     select: {
       id: true,
       number: true,
+      serialNumber: true,
       member: {
-        select: { firstName: true, lastName: true, paymentReference: true },
+        select: { firstName: true, lastName: true },
       },
     },
   });
@@ -44,7 +45,9 @@ export async function GET(
       first_name: card.member.firstName,
       last_name: card.member.lastName,
       card_number: card.number != null ? String(card.number) : "",
-      payment_reference: card.member.paymentReference ?? "",
+      // The payment reference is the card's UID (serialNumber) — the same value
+      // the public /pay/[serial] page and CitizenPay bank-sync match on (#111).
+      payment_reference: card.serialNumber ?? "",
     },
   });
 

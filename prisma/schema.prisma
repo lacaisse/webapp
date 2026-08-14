@@ -70,6 +70,11 @@ model User {
   triggeredAnnotations        TransactionAnnotation[] @relation("AnnotationTriggeredBy")
   triggeredPendingAnnotations PendingAnnotation[]     @relation("PendingAnnotationTriggeredBy")
 
+  // MCP OAuth provider (agents operating the dashboard via /api/mcp)
+  oauthApplications OauthApplication[]
+  oauthAccessTokens OauthAccessToken[]
+  oauthConsents     OauthConsent[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -161,6 +166,75 @@ model Passkey {
 
   createdAt DateTime @default(now())
 
+  @@index([userId])
+}
+
+// =============================================================================
+// MCP OAuth provider tables (Better Auth `mcp` plugin)
+// =============================================================================
+// The app acts as an OAuth 2.1 authorization server for MCP clients (agents
+// operating the dashboard via /api/mcp). Shapes are dictated by the plugin —
+// same "don't rename fields" rule as the core Better Auth tables above.
+// Clients self-register (dynamic client registration), users authorize on the
+// auth host, and short-lived bearer tokens land in OauthAccessToken.
+
+model OauthApplication {
+  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String
+  icon         String?
+  metadata     String?
+  clientId     String  @unique
+  clientSecret String?
+  redirectUrls String // comma-separated redirect URIs, exact-match checked
+  type         String // "web" | "native" — set by the registration endpoint
+  disabled     Boolean @default(false)
+  userId       String? @db.Uuid // registering user, when known
+
+  user         User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessTokens OauthAccessToken[]
+  consents     OauthConsent[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model OauthAccessToken {
+  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accessToken           String   @unique
+  refreshToken          String   @unique
+  accessTokenExpiresAt  DateTime
+  refreshTokenExpiresAt DateTime
+  clientId              String
+  userId                String?  @db.Uuid
+  scopes                String // space-separated OAuth scopes
+
+  client OauthApplication @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
+  user   User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clientId])
+  @@index([userId])
+  @@index([accessTokenExpiresAt])
+}
+
+model OauthConsent {
+  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId     String
+  userId       String  @db.Uuid
+  scopes       String
+  consentGiven Boolean
+
+  client OauthApplication @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
+  user   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clientId])
   @@index([userId])
 }
 
@@ -275,10 +349,18 @@ model Fund {
   requireMemberEmailVerification   Boolean @default(true)
   requireMerchantEmailVerification Boolean @default(true)
 
-  // When set, member-facing confirmation emails (PAYMENT_CONFIRMATION at
-  // bank-sync ingest, ALLOCATION_CONFIRMATION when a sourced mint confirms)
-  // are skipped — not queued: resuming does not send them retroactively.
-  // Other emails (invites, verification, referral bonus) are unaffected.
+  // When set, member-facing notification emails are skipped — not queued, so
+  // resuming does not send them retroactively. Covers PAYMENT_CONFIRMATION
+  // (bank-sync ingest), ALLOCATION_CONFIRMATION (sourced mint confirms),
+  // REFERRAL_BONUS_AWARDED, MEMBER_ACTIVATED, MEMBER_INVITED, CARD_ASSIGNED and
+  // the automatic payment reminder (the monthly cron skips paused funds).
+  // The manual payment reminder is gated but overridable: it returns
+  // `pausedConfirmRequired` so the UI can ask the admin to confirm sending
+  // anyway, rather than bypassing the pause silently or refusing outright.
+  // NOT covered — deliberately: signup emails (MEMBER_EMAIL_VERIFICATION,
+  // MEMBER_WELCOME) and password emails, which are functional rather than
+  // notifications; the manual allocation notify, where an explicit admin click
+  // overrides the pause; and all merchant / team emails.
   confirmationEmailsPausedAt DateTime?
 
   // Custom From address for member-facing transactional emails (verification,
@@ -298,6 +380,15 @@ model Fund {
   memberSignupSuccessUrl   String?
   merchantSignupSuccessUrl String?
 
+  // Where the member signup form sends the visitor when they abandon it
+  // (after an in-app confirmation) or when it fails terminally. Both are
+  // fund-admin config, never accepted as request params — a public form that
+  // redirects wherever the query string says is an open redirect. Cancel
+  // falls back to `websiteUrl`, then to hiding the button; an unset error URL
+  // keeps the failure inline in the form.
+  memberSignupCancelUrl String?
+  memberSignupErrorUrl  String?
+
   staff              FundMember[] // staff with admin access (OWNER/ADMIN/VIEWER)
   invites            FundInvite[] // pending staff invitations
   members            Member[] // demand-side recipients of allocations
@@ -305,14 +396,16 @@ model Fund {
   tiers              AllocationTier[] // contribution/allocation tiers
   merchants          Merchant[] // shops in the fund's network
   onboardingFields   OnboardingField[] // per-fund extras on the signup forms
+  onboardingSteps    OnboardingStep[] // optional multi-step grouping of those extras
   bankTransactions   BankTransaction[] // bank-sync mirror (incoming + outgoing)
   tokenOperations    TokenOperation[] // mint/burn/transfer audit log
   allocationPeriods  AllocationPeriod[] // FIXED_PERIOD scheduling windows
   linkedBankAccounts LinkedBankAccount[] // learned IBAN → member mappings
   referrals          Referral[] // referral programme records (5.3.4)
-  emails             Email[] // transactional email outbox/log
-  emailTemplates     EmailTemplate[] // per-fund overrides of the default email wording
-  documentTemplates  DocumentTemplate[] // per-fund overrides of printable document wording (PDF letters)
+  emails                   Email[] // transactional email outbox/log
+  emailTemplates           EmailTemplate[] // per-fund library of custom email templates
+  emailTemplateAssignments EmailTemplateAssignment[] // which library template (if any) is active per email type
+  documentTemplates        DocumentTemplate[] // per-fund overrides of printable document wording (PDF letters)
 
   citizenPayConnectAttempts CitizenPayConnectAttempt[] // in-flight CP connect handoffs
   addressProfiles           AddressProfileCache[] // CP profile cache (token explorer / transfers)
@@ -497,11 +590,12 @@ model Member {
   fundId String
   fund   Fund   @relation(fields: [fundId], references: [id], onDelete: Cascade)
 
-  // Identity (CitizenPay never sees these — only we do)
+  // Identity (CitizenPay never sees these — only we do). These three are the
+  // BASE fields: everything else a fund collects about a member is a custom
+  // question stored in `applicationData`, per-fund and admin-configurable.
   email     String
   firstName String
   lastName  String
-  phone     String?
 
   // Preferred language, captured from the request locale at self-signup so
   // every email we send them is in the language they registered in. Null for
@@ -515,19 +609,19 @@ model Member {
   userId String? @db.Uuid
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  // Address (reporting + printed correspondence)
+  // Address (reporting + printed correspondence). Stays a typed column rather
+  // than a custom question because formatMemberAddress composes it into the
+  // {address} placeholder that card-assigned emails render — a value in
+  // `applicationData` would never reach that.
   address    String?
   postalCode String?
   city       String?
 
-  // Household composition — input to tier assignment
-  householdAdults   Int @default(1)
-  householdChildren Int @default(0)
-
-  // Banking. `paymentReference` is the string the member writes on their
-  // bank transfer; bank-sync matches contributions by it. Per-fund unique.
-  // Generated in the create action — Prisma can't default this from a fn.
-  iban             String?
+  // `paymentReference` is the string the member writes on their bank transfer;
+  // bank-sync matches contributions by it. Per-fund unique. Generated in the
+  // create action — Prisma can't default this from a fn. (A member's own IBAN
+  // is not stored here: bank-sync matches through LinkedBankAccount, and the
+  // pay page's EPC QR uses the FUND's banking IBAN.)
   paymentReference String?
 
   // Tier assignment — drives the auto-allocation amount on bank-sync. La
@@ -535,6 +629,17 @@ model Member {
   // their own external data; we only store the assignment.
   tierId String?
   tier   AllocationTier? @relation(fields: [tierId], references: [id], onDelete: SetNull)
+
+  // The amount this member has committed to contribute — what we ASK them for
+  // in payment-reminder emails (issue #82). NULL means "use the tier target":
+  // the requested amount then resolves to the tier's allocationAmount, so it
+  // auto-tracks tier changes until an admin/member sets an explicit value. A
+  // member may commit to a different amount, floored at the tier's
+  // minContribution. This does NOT change how many tokens are minted (always
+  // the tier's allocationAmount) nor the minimum-hit check (always the tier's
+  // minContribution) — it only drives the requested contribution shown to the
+  // member. See services/member/contribution.ts.
+  contributionAmount Decimal? @db.Decimal(10, 2)
 
   // Responses to per-fund custom onboarding fields. Built-in fields
   // (firstName/lastName/email for members) are written to their typed
@@ -895,8 +1000,21 @@ model OnboardingField {
   target OnboardingTarget
 
   // Stable JSON key for `applicationData`. Once set, changing it would
-  // orphan historical answers — admin UI prevents editing.
+  // orphan historical answers — admin UI prevents editing. For a built-in
+  // field this equals `builtinKey`, so the existing (fundId, target, key)
+  // unique constraint also stops the same attribute being added twice.
   key String
+
+  // When set, this field collects a TYPED Member column (address, phone,
+  // householdAdults, …) rather than a custom `applicationData` entry. It is
+  // rendered, ordered, stepped, prefilled and validated identically — only
+  // the write target differs. See services/member/builtin-fields.ts.
+  //
+  // Deliberately an explicit column rather than inferring "is this key one of
+  // the built-in names?": funds already have custom fields, and one of them
+  // keyed `address` must keep writing to applicationData exactly as before
+  // instead of silently retargeting a real Member column.
+  builtinKey String?
 
   type     OnboardingFieldType
   label    String // shown to the applicant
@@ -905,12 +1023,28 @@ model OnboardingField {
   required Boolean @default(false)
   position Int     @default(0)
 
+  // Optional multi-step grouping. NULL = the field renders in the first
+  // (implicit) step, which is also what every field looks like for a fund
+  // that never configured steps. SetNull rather than Cascade: deleting a step
+  // must not delete the answers' field definitions.
+  stepId String?
+  step   OnboardingStep? @relation(fields: [stepId], references: [id], onDelete: SetNull)
+
   // Type-specific config validated app-side, e.g.
   //   SELECT/MULTISELECT: { "options": [{ value, label }] }
   //   NUMBER:             { "min": 1, "max": 100, "step": 0.5 }
   //   TEXT/TEXTAREA:      { "minLength": 1, "maxLength": 500, "pattern": "..." }
   //   DATE:               { "minDate": "...", "maxDate": "..." }
   config Json?
+
+  // Optional conditional-visibility rule: { fieldKey, operator, value }.
+  // Shown (and required) only when the named field's submitted answer
+  // satisfies the comparison — e.g. show `householdincome` only when
+  // `householdAdults` > 1. null = always shown. `fieldKey` must reference
+  // another active CUSTOM field of this (fundId, target) — never a
+  // built-in — enforced app-side in services/onboarding/admin-actions.ts.
+  // See services/onboarding/visibility.ts for the shape and evaluation.
+  visibleIf Json?
 
   // Soft-delete: archived fields don't appear in new forms but historical
   // applicationData referencing the field's key keeps its context.
@@ -920,6 +1054,35 @@ model OnboardingField {
   updatedAt DateTime @updatedAt
 
   @@unique([fundId, target, key])
+  @@index([fundId, target])
+  @@index([stepId])
+}
+
+// An optional page in the public signup form. A fund with zero steps renders
+// the classic single-page form; with steps, the built-in identity fields lead
+// and each step then shows the OnboardingFields assigned to it, ordered by
+// `position`. Titles are admin-authored free text (like field labels), not
+// i18n keys — the fund writes them in its own language.
+model OnboardingStep {
+  id     String @id @default(cuid())
+  fundId String
+  fund   Fund   @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  target OnboardingTarget
+
+  title       String
+  description String?
+  position    Int     @default(0)
+
+  // Soft-delete, mirroring OnboardingField: an archived step disappears from
+  // the form and its fields fall back to the first step.
+  archivedAt DateTime?
+
+  fields OnboardingField[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([fundId, target])
 }
 
@@ -1448,29 +1611,71 @@ model Email {
   @@index([status])
 }
 
-// Per-fund override of an email's wording. Absence of a row for a (fund, type)
-// pair = use the built-in i18n default (messages/*.json); a row replaces the
-// default subject/body for that fund. Bodies use {placeholder} tokens
-// interpolated at send time — the allowed set per type lives in
-// services/email/template-config.ts and is validated on save. Only
-// ALLOCATION_CONFIRMATION is wired today; the model is type-generic so more
-// templates can be made editable without a schema change.
+// A named, per-fund email template — one of possibly several the admins have
+// authored for a given email type. The built-in default (messages/*.json for
+// text types, TS constants for HTML types) is NEVER stored here and never
+// mutated: admins create a template by duplicating the default (or another
+// template), so the originals can't be broken. Which template — if any — is
+// actually sent for a type is decided by EmailTemplateAssignment; a type with
+// no assignment falls back to the built-in default. Content lives per language
+// in EmailTemplateLocalization. The allowed {placeholder} set per type lives in
+// services/email/template-config.ts and is validated on save.
 model EmailTemplate {
   id     String @id @default(cuid())
   fundId String
   fund   Fund   @relation(fields: [fundId], references: [id], onDelete: Cascade)
 
-  type     EmailType
-  locale   String // recipient language this override applies to (SUPPORTED_LOCALES); each language is edited independently
-  subject  String
-  bodyText String // plain-text body / text-MIME part (derived from bodyHtml when an HTML body is authored)
-  bodyHtml String? // rich-HTML body, injected into the branded shell; null = use bodyText as plain text
-  ctaLabel String? // for templates that render a CTA button (unused by ALLOCATION_CONFIRMATION)
+  type EmailType // the email type this template can be assigned to
+  name String // admin-facing label, unique within (fund, type)
+
+  localizations EmailTemplateLocalization[]
+  assignments   EmailTemplateAssignment[] // 0..1 — the assignment(s) pointing here
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([fundId, type, locale])
+  @@unique([fundId, type, name])
+  @@index([fundId])
+}
+
+// One language's content for an EmailTemplate. Each supported locale is authored
+// independently; a missing locale falls back to the built-in default for that
+// language at send time. Bodies use {placeholder} tokens interpolated at send.
+model EmailTemplateLocalization {
+  id         String        @id @default(cuid())
+  templateId String
+  template   EmailTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  locale   String // SUPPORTED_LOCALES
+  subject  String
+  bodyText String // plain-text / text-MIME part (derived from bodyHtml)
+  bodyHtml String? // rich-HTML body, injected into the branded shell; null = use bodyText
+  ctaLabel String? // reserved for CTA-bearing templates; unused by the current editable set
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([templateId, locale])
+}
+
+// Which library template (if any) a fund sends for a given email type. Exactly
+// one row per (fund, type). A null templateId — or no row at all — means "use
+// the built-in default". onDelete: SetNull means deleting the active template
+// cleanly reverts the type to its default without leaving a dangling pointer.
+model EmailTemplateAssignment {
+  id     String @id @default(cuid())
+  fundId String
+  fund   Fund   @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  type       EmailType
+  templateId String?
+  template   EmailTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([fundId, type])
+  @@index([fundId])
 }
 
 // Per-fund override of a printable document's wording (e.g. the card

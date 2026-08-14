@@ -11,6 +11,7 @@ import type {
   PayoutOrder,
   PayoutStatusDetail,
 } from "@/services/citizenpay/types";
+import { loadAllPayoutOrders } from "@/services/payout/operations";
 
 // Loaders for the Payments → Payouts views. Each is wrapped in React's
 // `cache()` so repeat reads in one render pass share a single CP round-trip,
@@ -147,9 +148,6 @@ export type AllPayoutOrdersData = {
   error: boolean;
 };
 
-const ORDERS_PAGE_LIMIT = 50; // CP caps the orders endpoint at 50
-const MAX_ORDER_PAGES = 40; // safety cap → up to 2000 orders
-
 // All of a payout's orders, paged through to completion. Needed to partition
 // orders into confirmed vs. issues for the detail tabs — the server doesn't
 // expose that split, so the dashboard fetches the lot and classifies.
@@ -161,23 +159,11 @@ export const getAllPayoutOrders = cache(
     payoutId: string,
   ): Promise<AllPayoutOrdersData> => {
     try {
-      const c = client(fundId, citizenPayApiKeyId, citizenPayApiKeyEnc);
-      const orders: PayoutOrder[] = [];
-      let placeAccountAddress: string | null = null;
-      let offset = 0;
-      let truncated = false;
-      for (let i = 0; i < MAX_ORDER_PAGES; i++) {
-        const page = await c.getPayoutOrders(payoutId, {
-          limit: ORDERS_PAGE_LIMIT,
-          offset,
-        });
-        orders.push(...page.orders);
-        placeAccountAddress = page.placeAccountAddress ?? placeAccountAddress;
-        offset += page.orders.length;
-        if (page.orders.length < ORDERS_PAGE_LIMIT) break;
-        if (i === MAX_ORDER_PAGES - 1) truncated = true;
-      }
-      return { orders, placeAccountAddress, truncated, error: false };
+      const loaded = await loadAllPayoutOrders(
+        client(fundId, citizenPayApiKeyId, citizenPayApiKeyEnc),
+        payoutId,
+      );
+      return { ...loaded, error: false };
     } catch (e) {
       console.warn("[payments] getAllPayoutOrders failed", e);
       return {

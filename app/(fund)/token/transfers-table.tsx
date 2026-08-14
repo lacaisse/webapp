@@ -17,7 +17,11 @@ import { formatTokenAmount, isZeroAddress } from "@/services/alchemy/format";
 import { listTransfers } from "@/services/alchemy/transfers";
 import { getAnnotations } from "@/services/transaction-annotation/annotate";
 
-import { AddressLabel, buildAddressDirectory } from "./address-label";
+import {
+  AddressLabel,
+  AddressLink,
+  buildAddressDirectory,
+} from "./address-label";
 import { getPlacesForFund, getProfile } from "./data";
 import { Pagination } from "./pagination";
 
@@ -199,23 +203,27 @@ export async function TransfersTable({
                     : "—"}
                 </TableCell>
                 <TableCell>
-                  <AddressLabel
-                    address={tx.from}
-                    directory={directory}
-                    side="from"
-                    labels={labelDict}
-                  />
+                  <AddressLink address={tx.from}>
+                    <AddressLabel
+                      address={tx.from}
+                      directory={directory}
+                      side="from"
+                      labels={labelDict}
+                    />
+                  </AddressLink>
                 </TableCell>
                 <TableCell className="text-muted-foreground">
                   <ArrowRight className="size-3.5" />
                 </TableCell>
                 <TableCell>
-                  <AddressLabel
-                    address={tx.to}
-                    directory={directory}
-                    side="to"
-                    labels={labelDict}
-                  />
+                  <AddressLink address={tx.to}>
+                    <AddressLabel
+                      address={tx.to}
+                      directory={directory}
+                      side="to"
+                      labels={labelDict}
+                    />
+                  </AddressLink>
                 </TableCell>
                 <TableCell className="text-right font-medium tabular-nums">
                   {formatTokenAmount(tx.rawValue, decimals)}

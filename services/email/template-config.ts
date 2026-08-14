@@ -41,7 +41,11 @@ export const EDITABLE_EMAIL_TEMPLATES = {
     defaultIsHtml: true,
     // All plain scalars, resolved by the caller (notify action / test send):
     // {address} is the member's formatted postal address, {cardLink} the public
-    // tap URL, {cardNumber} the per-fund card number. See templates.ts.
+    // tap URL, {cardNumber} the per-fund card number, {paymentReference} the
+    // card's serial (the bank-transfer reference bank-sync matches on — same
+    // value as the MEMBER_ACTIVATED/PAYMENT_REMINDER templates), {iban} the
+    // fund's connected bank account IBAN (blank if not yet bank-connected).
+    // See templates.ts.
     variables: [
       "firstName",
       "lastName",
@@ -49,6 +53,8 @@ export const EDITABLE_EMAIL_TEMPLATES = {
       "address",
       "cardLink",
       "cardNumber",
+      "paymentReference",
+      "iban",
     ],
   },
   PAYMENT_REMINDER_FIRST: {
@@ -58,9 +64,10 @@ export const EDITABLE_EMAIL_TEMPLATES = {
     hasCta: false,
     defaultIsHtml: true,
     // Plain scalars resolved by the caller (cron / test send): {amount} is the
-    // member's monthly contribution (tier minimum), {paymentReference} the bank
-    // transfer communication that bank-sync matches on, {cardLink} the public
-    // account/tap URL. See templates.ts.
+    // member's monthly contribution, {paymentReference} the bank transfer
+    // communication that bank-sync matches on (the card UID), {cardLink} the
+    // public account/tap URL, {paymentLink} the public /pay/<serial> page that
+    // shows the member how to pay this contribution. See templates.ts.
     variables: [
       "firstName",
       "lastName",
@@ -68,7 +75,58 @@ export const EDITABLE_EMAIL_TEMPLATES = {
       "amount",
       "paymentReference",
       "cardLink",
+      "paymentLink",
     ],
+  },
+  // The admin's manual follow-up nudge (services/allocation-periods). Shares the
+  // FIRST reminder's variables but has its own HTML default so admins can give
+  // it a distinct, firmer tone. See PAYMENT_REMINDER_SECOND_DEFAULTS.
+  PAYMENT_REMINDER_SECOND: {
+    i18nKey: "members.email.paymentReminder",
+    hasCta: false,
+    defaultIsHtml: true,
+    variables: [
+      "firstName",
+      "lastName",
+      "fundName",
+      "amount",
+      "paymentReference",
+      "cardLink",
+      "paymentLink",
+    ],
+  },
+  // Text-defaulted informational emails. Each variable set matches exactly what
+  // the corresponding sender in services/email/transactional.ts passes — adding
+  // a token outside this set is rejected on save (it would render literally).
+  MEMBER_WELCOME: {
+    i18nKey: "members.signup.emailTemplates.welcome",
+    hasCta: false,
+    defaultIsHtml: false,
+    variables: ["firstName", "fundName"],
+  },
+  MEMBER_INVITED: {
+    i18nKey: "members.admin.email.invited",
+    hasCta: false,
+    defaultIsHtml: false,
+    variables: ["firstName", "fundName"],
+  },
+  MEMBER_ACTIVATED: {
+    i18nKey: "members.admin.email.activated",
+    hasCta: false,
+    defaultIsHtml: false,
+    variables: ["firstName", "fundName", "cardSerial", "paymentReference"],
+  },
+  PAYMENT_CONFIRMATION: {
+    i18nKey: "members.email.paymentConfirmation",
+    hasCta: false,
+    defaultIsHtml: false,
+    variables: ["firstName", "fundName", "amount", "occurredAt"],
+  },
+  REFERRAL_BONUS_AWARDED: {
+    i18nKey: "members.admin.email.referralBonusAwarded",
+    hasCta: false,
+    defaultIsHtml: false,
+    variables: ["firstName", "fundName", "amount"],
   },
 } as const;
 
@@ -95,14 +153,55 @@ export const PREVIEW_SAMPLE_VALUES: Record<
     address: "Rue de l'Exemple 12, 1000 Bruxelles",
     cardLink: "https://tap.citizenpay.xyz/card/04A2B7C9D1?network=demo",
     cardNumber: "42",
+    // The reference is the card UID (serialNumber); mirror the sample serial.
+    paymentReference: "04A2B7C9D1",
+    // Illustrative only — the real send resolves the fund's actual connected
+    // bank account IBAN (blank if not yet bank-connected).
+    iban: "BE71 0961 2345 6769",
   },
   PAYMENT_REMINDER_FIRST: {
     firstName: "Alex",
     lastName: "Dupont",
     fundName: "Your fund",
     amount: "25",
-    paymentReference: "ABCD2345",
+    // The reference is the card UID (serialNumber); mirror the sample serial.
+    paymentReference: "04A2B7C9D1",
     cardLink: "https://tap.citizenpay.xyz/card/04A2B7C9D1?network=demo",
+    paymentLink: "https://demo.lacaisse.eu/pay/04A2B7C9D1",
+  },
+  PAYMENT_REMINDER_SECOND: {
+    firstName: "Alex",
+    lastName: "Dupont",
+    fundName: "Your fund",
+    amount: "25",
+    paymentReference: "04A2B7C9D1",
+    cardLink: "https://tap.citizenpay.xyz/card/04A2B7C9D1?network=demo",
+    paymentLink: "https://demo.lacaisse.eu/pay/04A2B7C9D1",
+  },
+  MEMBER_WELCOME: {
+    firstName: "Alex",
+    fundName: "Your fund",
+  },
+  MEMBER_INVITED: {
+    firstName: "Alex",
+    fundName: "Your fund",
+  },
+  MEMBER_ACTIVATED: {
+    firstName: "Alex",
+    fundName: "Your fund",
+    cardSerial: "04A2B7C9D1",
+    paymentReference: "04A2B7C9D1",
+  },
+  PAYMENT_CONFIRMATION: {
+    firstName: "Alex",
+    fundName: "Your fund",
+    amount: "25",
+    occurredAt: "24/07/2026",
+  },
+  REFERRAL_BONUS_AWARDED: {
+    firstName: "Alex",
+    fundName: "Your fund",
+    amount: "10",
   },
 };
 
@@ -114,17 +213,33 @@ export function isEditableEmailType(value: string): value is EditableEmailType {
   return value in EDITABLE_EMAIL_TEMPLATES;
 }
 
-// Zod schema for the save action. Subject one line, body is rich HTML; both
-// required. `type` is constrained to the editable set. Error messages are
-// i18n keys (resolved by the caller), matching the settings-actions pattern.
-export const SaveEmailTemplateSchema = z.object({
-  type: z.enum(
-    EDITABLE_EMAIL_TYPES as [EditableEmailType, ...EditableEmailType[]],
-  ),
-  // The language this override applies to. Each language is edited independently.
-  locale: z.enum(
-    SUPPORTED_LOCALES as unknown as [string, ...string[]],
-  ),
+const editableTypeEnum = z.enum(
+  EDITABLE_EMAIL_TYPES as [EditableEmailType, ...EditableEmailType[]],
+);
+const localeEnum = z.enum(SUPPORTED_LOCALES as unknown as [string, ...string[]]);
+
+// Create a new library template for a type, either from the built-in default
+// (sourceTemplateId null) or by duplicating an existing template's content.
+export const CreateEmailTemplateSchema = z.object({
+  type: editableTypeEnum,
+  name: z
+    .string()
+    .trim()
+    .min(1, { error: "fund.settings.emailTemplates.errors.nameRequired" })
+    .max(80, { error: "fund.settings.emailTemplates.errors.nameTooLong" }),
+  // The template to copy content from; null seeds from the built-in default.
+  sourceTemplateId: z.string().min(1).nullable(),
+});
+
+export type CreateEmailTemplateInput = z.infer<typeof CreateEmailTemplateSchema>;
+
+// Save one language's content of a library template. Subject one line, body is
+// rich HTML; both required. Error messages are i18n keys (resolved by the
+// caller), matching the settings-actions pattern.
+export const SaveTemplateLocalizationSchema = z.object({
+  templateId: z.string().min(1),
+  type: editableTypeEnum,
+  locale: localeEnum,
   subject: z
     .string()
     .trim()
@@ -137,7 +252,33 @@ export const SaveEmailTemplateSchema = z.object({
     .max(20000, { error: "fund.settings.emailTemplates.errors.bodyTooLong" }),
 });
 
-export type SaveEmailTemplateInput = z.infer<typeof SaveEmailTemplateSchema>;
+export type SaveTemplateLocalizationInput = z.infer<
+  typeof SaveTemplateLocalizationSchema
+>;
+
+export const RenameEmailTemplateSchema = z.object({
+  templateId: z.string().min(1),
+  name: z
+    .string()
+    .trim()
+    .min(1, { error: "fund.settings.emailTemplates.errors.nameRequired" })
+    .max(80, { error: "fund.settings.emailTemplates.errors.nameTooLong" }),
+});
+
+export type RenameEmailTemplateInput = z.infer<
+  typeof RenameEmailTemplateSchema
+>;
+
+// Set which template is active for a type. templateId null = revert to the
+// built-in default.
+export const AssignEmailTemplateSchema = z.object({
+  type: editableTypeEnum,
+  templateId: z.string().min(1).nullable(),
+});
+
+export type AssignEmailTemplateInput = z.infer<
+  typeof AssignEmailTemplateSchema
+>;
 
 // Input shape for the live preview (no length constraints — it's transient).
 export const PreviewEmailTemplateSchema = z.object({

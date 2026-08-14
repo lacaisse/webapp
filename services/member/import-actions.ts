@@ -7,7 +7,9 @@ import { revalidatePath } from "next/cache";
 import { requireFundRole } from "@/services/auth/dal";
 import { normalizeSerial } from "@/services/card/serial";
 import { parseCsv } from "@/services/csv/parse";
+import type { Prisma } from "@/services/db/generated/client";
 import { prisma } from "@/services/db/prisma";
+import { contributionApplies } from "./contribution";
 
 import type { MemberStatus } from "@/services/db/generated/enums";
 
@@ -24,7 +26,16 @@ import {
 import { generatePaymentReference } from "./payment-reference";
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const MONEY_RE = /^\d+(\.\d{1,2})?$/;
 const REFERENCE_RETRIES = 5;
+
+// A committed-contribution cell → a valid amount string, or null when empty or
+// malformed. Import is forgiving (like household counts): a bad value is
+// dropped, not an error.
+function parseMoney(raw: string): string | null {
+  const v = raw.trim();
+  return v && MONEY_RE.test(v) ? v : null;
+}
 
 // Bulk member import from a CSV with headers. The admin maps each built-in
 // field to a column (firstName/lastName/email required). On a duplicate email
@@ -46,10 +57,16 @@ export async function importMembersAction(input: {
   // interactive mapping step. Re-validated here; values still unresolved fall
   // back to DEFAULT_IMPORT_STATUS and are reported in `statusesDefaulted`.
   statusValueMap?: StatusValueMap;
+  // Backfill mode: match existing members by email and update ONLY the mapped
+  // columns; never create, and don't require name columns. A row whose email
+  // matches no member is reported (skip.noMatch), not created. Used to bulk-fill
+  // one field (e.g. the commitment amount) without re-supplying full records.
+  updateOnly?: boolean;
 }): Promise<MemberImportResult> {
   const t = await getTranslations("members.admin.import");
   const { fund } = await requireFundRole("OPERATOR");
   const defaults = input.defaults ?? {};
+  const updateOnly = input.updateOnly ?? false;
 
   // Trust nothing from the client: rebuild the status map with lower-cased keys
   // and only enum-valid values.
@@ -66,11 +83,19 @@ export async function importMembersAction(input: {
     if (VALID_STATUSES.has(status)) statusValueMap[raw.trim().toLowerCase()] = status;
   }
 
-  const required = MEMBER_IMPORT_FIELDS.filter((f) => f.required).map(
-    (f) => f.key,
-  );
-  if (required.some((key) => !input.mapping[key])) {
-    return { error: t("errors.missingRequiredMapping") };
+  // Update-only backfill just needs the email match key; a full import needs
+  // the name columns too (they're written on create).
+  if (updateOnly) {
+    if (!input.mapping.email) {
+      return { error: t("errors.missingMatchKey") };
+    }
+  } else {
+    const required = MEMBER_IMPORT_FIELDS.filter((f) => f.required).map(
+      (f) => f.key,
+    );
+    if (required.some((key) => !input.mapping[key])) {
+      return { error: t("errors.missingRequiredMapping") };
+    }
   }
 
   const { headers, rows } = parseCsv(input.csv);
@@ -92,6 +117,19 @@ export async function importMembersAction(input: {
       select: { id: true, name: true },
     });
     for (const tier of tiers) tierByName.set(tier.name.toLowerCase(), tier.id);
+  }
+
+  // Committed contribution only imports for FIXED_PERIOD funds with tiers
+  // (issue #82). Resolve the gate once; below-min isn't enforced on import
+  // (bulk + forgiving) — only the format is validated per row.
+  const importsContribution =
+    colIndex.contributionAmount !== undefined || !!defaults.contributionAmount;
+  let contributionAllowed = false;
+  if (importsContribution) {
+    const tierCount = await prisma.allocationTier.count({
+      where: { fundId: fund.id, archivedAt: null },
+    });
+    contributionAllowed = contributionApplies(fund.allocationMode, tierCount);
   }
 
   let created = 0;
@@ -130,7 +168,9 @@ export async function importMembersAction(input: {
     const firstName = valueFor("firstName");
     const lastName = valueFor("lastName");
     const email = valueFor("email").toLowerCase();
-    if (!firstName || !lastName) {
+    // Names are only mandatory when we might create the member. In update-only
+    // backfill we match on email and touch just the mapped columns.
+    if (!updateOnly && (!firstName || !lastName)) {
       skipped.push({ row: rowNum, reason: t("skip.missingName") });
       continue;
     }
@@ -139,25 +179,41 @@ export async function importMembersAction(input: {
       continue;
     }
 
-    // Optional scalar fields — only overwrite when mapped AND non-empty.
+    // Optional typed columns — only overwrite when mapped AND non-empty.
     const optional: Record<string, string> = {};
-    for (const key of ["phone", "address", "postalCode", "city", "notes"] as const) {
+    for (const key of ["address", "postalCode", "city", "notes"] as const) {
       const v = valueFor(key);
       if (v) optional[key] = v;
     }
-    const iban = valueFor("iban") || null;
-    if (iban) optional.iban = iban;
 
-    const household: Record<string, number> = {};
+    // Everything beyond the base identity, the postal address and the
+    // allocation fields is a custom question now, so these columns land in
+    // `applicationData` keyed exactly as the signup form would store them —
+    // strings, including the counts, since form inputs produce strings.
+    // The IBAN still seeds LinkedBankAccount further down; that is the part
+    // bank-sync actually reads.
+    const extras: Record<string, string> = {};
+    for (const key of ["phone", "iban"] as const) {
+      const v = valueFor(key);
+      if (v) extras[key] = v;
+    }
     for (const key of ["householdAdults", "householdChildren"] as const) {
       const raw = valueFor(key);
       if (raw === "") continue;
       const n = Number(raw);
-      if (Number.isInteger(n) && n >= 0) household[key] = n;
+      if (Number.isInteger(n) && n >= 0) extras[key] = String(n);
     }
+
+    const iban = valueFor("iban") || null;
 
     const tierName = valueFor("tier");
     const tierId = tierName ? tierByName.get(tierName.toLowerCase()) : undefined;
+
+    // Committed contribution: only when the fund qualifies and the cell is a
+    // valid amount; empty/malformed → left unchanged (like the optionals).
+    const contributionAmount = contributionAllowed
+      ? parseMoney(valueFor("contributionAmount"))
+      : null;
 
     // Language: from a mapped column or a fixed default, resolved to a supported
     // code. Unrecognized → left unset (emails fall back to the fund default).
@@ -169,25 +225,42 @@ export async function importMembersAction(input: {
     try {
       const existing = await prisma.member.findUnique({
         where: { fundId_email: { fundId: fund.id, email } },
-        select: { id: true },
+        select: { id: true, applicationData: true },
       });
 
       let memberId: string;
       if (existing) {
-        await prisma.member.update({
-          where: { id: existing.id },
-          data: {
-            firstName,
-            lastName,
-            ...optional,
-            ...household,
-            ...(tierId ? { tierId } : {}),
-            ...(locale ? { locale } : {}),
-            ...(status ? { status } : {}),
-          },
-        });
+        // Typed explicitly: `tierId` only exists on the *unchecked* input, and
+        // an inline `applicationData` object is enough to make inference pick
+        // the checked branch instead.
+        const data: Prisma.MemberUncheckedUpdateInput = {
+          // Only overwrite names when actually provided — a partial backfill
+          // (e.g. commitment-only) leaves the existing name untouched.
+          ...(firstName ? { firstName } : {}),
+          ...(lastName ? { lastName } : {}),
+          ...optional,
+          ...(tierId ? { tierId } : {}),
+          ...(locale ? { locale } : {}),
+          ...(status ? { status } : {}),
+          ...(contributionAmount ? { contributionAmount } : {}),
+        };
+        // Merge rather than replace: a partial backfill must not wipe answers
+        // to questions this CSV has no column for.
+        if (Object.keys(extras).length > 0) {
+          data.applicationData = {
+            ...((existing.applicationData as Record<string, string> | null) ??
+              {}),
+            ...extras,
+          } satisfies Prisma.InputJsonValue;
+        }
+
+        await prisma.member.update({ where: { id: existing.id }, data });
         memberId = existing.id;
         updated++;
+      } else if (updateOnly) {
+        // Backfill never creates — the email matched no member.
+        skipped.push({ row: rowNum, reason: t("skip.noMatch") });
+        continue;
       } else {
         memberId = await createMember({
           fundId: fund.id,
@@ -195,10 +268,11 @@ export async function importMembersAction(input: {
           firstName,
           lastName,
           optional,
-          household,
+          extras,
           tierId,
           locale,
           status,
+          contributionAmount,
         });
         created++;
       }
@@ -299,10 +373,11 @@ async function createMember(args: {
   firstName: string;
   lastName: string;
   optional: Record<string, string>;
-  household: Record<string, number>;
+  extras: Record<string, string>;
   tierId: string | undefined;
   locale: string | undefined;
   status: MemberStatus | undefined;
+  contributionAmount: string | null;
 }): Promise<string> {
   // Retry on the (fundId, paymentReference) unique collision — same pattern as
   // the single-member invite.
@@ -318,9 +393,14 @@ async function createMember(args: {
           paymentReference: generatePaymentReference(),
           emailVerifiedAt: new Date(), // admin vouches for identity
           ...args.optional,
-          ...args.household,
+          ...(Object.keys(args.extras).length > 0
+            ? { applicationData: args.extras }
+            : {}),
           ...(args.tierId ? { tierId: args.tierId } : {}),
           ...(args.locale ? { locale: args.locale } : {}),
+          ...(args.contributionAmount
+            ? { contributionAmount: args.contributionAmount }
+            : {}),
         },
         select: { id: true },
       });
@@ -350,12 +430,14 @@ async function linkCardToMember(
   name: { firstName: string; lastName: string },
   statusOverride: MemberStatus | undefined,
 ): Promise<void> {
+  const holderName = `${name.firstName} ${name.lastName}`.trim();
   await prisma.$transaction(async (tx) => {
     await tx.card.update({
       where: { id: cardId },
       data: {
         memberId,
-        holderName: `${name.firstName} ${name.lastName}`.trim(),
+        // Don't blank an existing holder name during a nameless backfill.
+        ...(holderName ? { holderName } : {}),
       },
     });
     await tx.member.update({

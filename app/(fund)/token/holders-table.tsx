@@ -18,7 +18,11 @@ import { getBalances, type WalletBalance } from "@/services/alchemy/balances";
 import { formatTokenAmount } from "@/services/alchemy/format";
 import { cn } from "@/lib/utils";
 
-import { AddressLabel, buildAddressDirectory } from "./address-label";
+import {
+  AddressLabel,
+  AddressLink,
+  buildAddressDirectory,
+} from "./address-label";
 import { getPlacesForFund } from "./data";
 
 // Alchemy has no "list all holders" endpoint for ERC-20. Instead we look up
@@ -181,12 +185,14 @@ export async function HoldersTable({
                   {start + idx + 1}
                 </TableCell>
                 <TableCell>
-                  <AddressLabel
-                    address={h.address}
-                    directory={directory}
-                    side="to"
-                    labels={labelDict}
-                  />
+                  <AddressLink address={h.address}>
+                    <AddressLabel
+                      address={h.address}
+                      directory={directory}
+                      side="to"
+                      labels={labelDict}
+                    />
+                  </AddressLink>
                 </TableCell>
                 <TableCell className="text-right font-medium tabular-nums">
                   {formatTokenAmount(h.rawBalance, decimals)}

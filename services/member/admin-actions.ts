@@ -57,7 +57,6 @@ export async function activateMemberAction(input: {
       postalCode: true,
       city: true,
       status: true,
-      paymentReference: true,
       primaryCardId: true,
     },
   });
@@ -230,6 +229,7 @@ export async function activateMemberAction(input: {
   if (tx.emailId) {
     await sendMemberActivated({
       emailId: tx.emailId,
+      fundId: fund.id,
       toEmail: member.email,
       fund: {
         name: fund.name,
@@ -239,7 +239,9 @@ export async function activateMemberAction(input: {
       },
       firstName: member.firstName,
       cardSerial: tx.cardSerial,
-      paymentReference: member.paymentReference ?? "",
+      // The bank-transfer reference is the card UID (bank-sync's match key) —
+      // the same serial the member's card carries, just above.
+      paymentReference: tx.cardSerial,
     });
   }
 
@@ -470,6 +472,7 @@ export async function inviteMemberAction(input: {
     if (notify && result.emailId) {
       await sendMemberInvited({
         emailId: result.emailId,
+        fundId: fund.id,
         toEmail: parsed.data.email,
         fund: {
           name: fund.name,
@@ -478,7 +481,6 @@ export async function inviteMemberAction(input: {
           senderEmail: fund.senderEmail,
         },
         firstName: parsed.data.firstName,
-        paymentReference,
       });
     }
 

@@ -8,7 +8,8 @@ import { passkeyClient } from "@better-auth/passkey/client";
 // is mounted at /api/auth on the same origin, the client defaults to the
 // current origin, which lets the same client code run on every fund subdomain
 // without rewiring (the request goes to that subdomain's /api/auth/* route,
-// which sets cookies scoped to .APP_DOMAIN via crossSubDomainCookies).
+// which sets a host-only session cookie for that host — cross-host handoff
+// goes through /auth/exchange, not a shared .APP_DOMAIN cookie).
 //
 // Use this from "use client" components: signIn.email, signUp.email,
 // signIn.passkey, passkey.addPasskey, passkey.deletePasskey, signOut, etc.

@@ -53,7 +53,9 @@ export const DOCUMENT_PREVIEW_SAMPLE_VALUES: Record<
     first_name: "Alex",
     last_name: "Dupont",
     card_number: "42",
-    payment_reference: "+++123/4567/89012+++",
+    // The payment reference is the card's UID (serialNumber) — see the
+    // onboarding-letter route.
+    payment_reference: "04A1B2C3D4E580",
   },
 };
 
