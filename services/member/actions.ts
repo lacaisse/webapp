@@ -79,10 +79,15 @@ export async function signupMemberAction(input: {
 
   // Commitment amount only applies to FIXED_PERIOD funds with tiers — ignore a
   // submitted value otherwise (the field isn't shown, but don't trust that).
-  const tierCount = await prisma.allocationTier.count({
+  // The id set doubles as the allowlist for a submitted tierId builtin answer
+  // below — a live, non-archived tier of THIS fund, same rule as the admin
+  // tier picker (services/member/admin-tier-actions.ts).
+  const liveTiers = await prisma.allocationTier.findMany({
     where: { fundId: fund.id, archivedAt: null },
+    select: { id: true },
   });
-  const contributionAmount = contributionApplies(fund.allocationMode, tierCount)
+  const liveTierIds = new Set(liveTiers.map((t) => t.id));
+  const contributionAmount = contributionApplies(fund.allocationMode, liveTiers.length)
     ? parsed.data.contributionAmount || null
     : null;
 
@@ -137,6 +142,17 @@ export async function signupMemberAction(input: {
       // A null here means "answered blank"; leave the column at its default
       // rather than writing null over a non-nullable count.
       if (coerced.value !== null) {
+        // coerceBuiltinValue only checks the answer's shape (builtin-fields.ts
+        // has no Prisma access) — for tierId specifically, confirm it names a
+        // tier this fund actually has live today, so a tampered id can't
+        // link a member to another fund's tier (or an archived one).
+        if (field.builtinKey === "tierId" && !liveTierIds.has(coerced.value)) {
+          return {
+            error: t("members.signup.errors.fieldInvalid" as never, {
+              label: field.label,
+            } as never),
+          };
+        }
         builtinColumns[field.builtinKey] = coerced.value;
       }
       continue;

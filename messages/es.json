@@ -2358,7 +2358,8 @@
     "builtinFields": {
       "address": "Dirección",
       "postalCode": "Código postal",
-      "city": "Ciudad"
+      "city": "Ciudad",
+      "tier": "Nivel de asignación"
     }
   },
   "cards": {
