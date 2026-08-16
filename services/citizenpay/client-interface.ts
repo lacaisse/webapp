@@ -293,10 +293,12 @@ export interface CitizenPayClient {
   /**
    * Manually add an order to a pending payout — for an amount that exists
    * off-CP (a bank transfer reconciled by hand, a manual adjustment, …).
-   * EUR decimal amounts; `description` carries the bank-transfer reference
-   * when created from a transaction. Returns the created order + the payout's
-   * recomputed totals. Only valid while the payout is pending (CP returns 409
-   * otherwise). Backed by `POST /v2/treasury/payouts/{id}/orders`.
+   * EUR decimal amounts: `fees` is the processor cut withheld at source (0 for
+   * a bank transfer), `payoutFee` the platform cut on this order; CP validates
+   * `fees + payoutFee ≤ total`. `description` carries the bank-transfer
+   * reference when created from a transaction. Returns the created order + the
+   * payout's recomputed totals. Only valid while the payout is pending (CP
+   * returns 409 otherwise). Backed by `POST /v2/treasury/payouts/{id}/orders`.
    */
   createPayoutOrder(
     payoutId: string,
@@ -354,7 +356,8 @@ export interface CitizenPayClient {
 
   /**
    * Set a payout's manual deduction (+ comment), recomputing `net`
-   * (total − fees − deduction). EUR decimal `amount`; "0" clears it. Only
+   * (total − fees − payoutFees − deduction). EUR decimal `amount`; "0" clears
+   * it, and CP rejects anything above total − fees − payoutFees. Only
    * valid while the payout isn't complete (CP rejects otherwise). Returns the
    * recomputed totals so the UI can update the header in place. Backed by
    * POST /v2/treasury/payouts/{id}/manual-deduction.
@@ -366,7 +369,8 @@ export interface CitizenPayClient {
 
   /**
    * Clear a payout's manual deduction + comment (resets to 0 / null), with
-   * `net` back to total − fees. Same `pending`-only gate as setManualDeduction.
+   * `net` back to total − fees − payoutFees. Same `pending`-only gate as
+   * setManualDeduction.
    * Returns the recomputed totals. Backed by DELETE
    * /v2/treasury/payouts/{id}/manual-deduction.
    */
@@ -409,8 +413,9 @@ export interface CitizenPayClient {
   listCompletedPayouts(): Promise<Payout[]>;
 
   /**
-   * Full detail for one payout — total / fees / manual deduction (+ comment) /
-   * net. Backed by GET /v2/treasury/payouts/{id}. Carries the stored status
+   * Full detail for one payout — total / source-withheld fees / platform
+   * payout fees / manual deduction (+ comment) / net.
+   * Backed by GET /v2/treasury/payouts/{id}. Carries the stored status
    * only (use getPayoutStatus for the live lifecycle). Throws (404) when the
    * id isn't found — callers degrade.
    */
@@ -442,9 +447,10 @@ export interface CitizenPayClient {
    * place's tokens (the payout `net`) with its own minter wallet, then hands
    * CP the resulting tx hash; CP marks the payout `burnt`. CP no longer burns
    * server-side. When `destination` is supplied, CP also sweeps the retained
-   * cut (fees + manualDeduction) from the place account to it and returns the
-   * transfer hash + amount. Irreversible — confirm with the admin before the
-   * burn.
+   * cut (payoutFees + manualDeduction) from the place account to it and returns
+   * the transfer hash + amount — the source-withheld `fees` are not part of it,
+   * they never entered the place's wallet. Irreversible — confirm with the
+   * admin before the burn.
    */
   burnPayout(
     payoutId: string,
@@ -476,8 +482,8 @@ export interface CitizenPayClient {
    * converts it to integer basis points on the wire) and the cadence at which
    * CP collects it (`collectionFrequency`). Both go in one call because CP
    * takes them in a single PATCH. We are canonical for both values — they're
-   * persisted locally first, then synced here. ⚠️ ASSUMED CP endpoint
-   * (PATCH /v2/treasury) until CP ships it.
+   * persisted locally first, then synced here. This is the rate behind a
+   * payout's `payoutFees`, not the processor commission withheld at source.
    */
   setPayoutFeeConfig(config: PayoutFeeConfig): Promise<void>;
 }

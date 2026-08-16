@@ -4,6 +4,13 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 
 import { decryptSecret } from "@/services/crypto/secret";
+import {
+  fromCents,
+  orderWalletCredit,
+  payoutNet,
+  suggestPayoutFee,
+  toCents,
+} from "@/services/payout/money";
 
 import type { CitizenPayClient } from "./client-interface";
 import { LiveCitizenPayClient } from "./live-client";
@@ -227,27 +234,30 @@ class MockCitizenPayClient implements CitizenPayClient {
     query: { from?: string; to?: string } = {},
   ): Promise<PayoutDraft[]> {
     this.log("listPayoutDrafts", query);
+    // Two connectors side by side, so dev exercises both fee shapes: the
+    // grocer takes card payments (a processor withheld 10.00 at source), the
+    // bakery is bank-paid (nothing withheld). Both owe the platform cut, which
+    // IS in their wallet until the sweep. `net` is derived, never hand-typed —
+    // that's what keeps the fixtures honest.
     return [
-      {
+      draft({
         businessId: "mock-business-1",
         placeId: "mock-place-1",
         placeName: "Mock Grocer",
-        placeImage: null,
         orderCount: 42,
         total: "510.00",
         fees: "10.00",
-        net: "500.00",
-      },
-      {
+        payoutFees: "12.50",
+      }),
+      draft({
         businessId: "mock-business-2",
         placeId: "mock-place-2",
         placeName: "Mock Bakery",
-        placeImage: null,
         orderCount: 7,
         total: "84.00",
         fees: "0.00",
-        net: "84.00",
-      },
+        payoutFees: "2.10",
+      }),
     ];
   }
 
@@ -258,14 +268,15 @@ class MockCitizenPayClient implements CitizenPayClient {
   }): Promise<PayoutDraftPreview> {
     this.log("previewPayoutDraft", args);
     return {
-      businessId: "mock-business-1",
-      placeId: args.placeId,
-      placeName: "Mock Grocer",
-      placeImage: null,
-      orderCount: 18,
-      total: "204.00",
-      fees: "4.00",
-      net: "200.00",
+      ...draft({
+        businessId: "mock-business-1",
+        placeId: args.placeId,
+        placeName: "Mock Grocer",
+        orderCount: 18,
+        total: "204.00",
+        fees: "4.00",
+        payoutFees: "5.00",
+      }),
       from: args.from,
       to: args.to,
     };
@@ -277,13 +288,18 @@ class MockCitizenPayClient implements CitizenPayClient {
     to: string;
   }): Promise<CreatedPayout> {
     this.log("createPayout", args);
+    // Same figures the preview above just showed the operator.
+    const total = "204.00";
+    const fees = "4.00";
+    const payoutFees = "5.00";
     return {
       payoutId: `mock-payout-${randomBytes(4).toString("hex")}`,
       status: "pending",
       orderCount: 18,
-      total: "204.00",
-      fees: "4.00",
-      net: "200.00",
+      total,
+      fees,
+      payoutFees,
+      net: payoutNet({ total, fees, payoutFees }),
       startDate: args.from,
       endDate: args.to,
     };
@@ -294,12 +310,17 @@ class MockCitizenPayClient implements CitizenPayClient {
     query: { limit?: number; offset?: number } = {},
   ): Promise<PayoutOrdersPage> {
     this.log("getPayoutOrders", { payoutId, ...query });
+    // `net` is the wallet credit (total − fees), NOT total − fees − payoutFee:
+    // the platform cut was minted with the credit and only leaves at the
+    // payout-level sweep. Order 44790 came through a processor (1.42 withheld
+    // at source); the other two didn't, so their whole total hit the wallet.
     const orders: PayoutOrder[] = [
       {
         id: 44790,
         total: "28.32",
         fees: "1.42",
-        net: "26.90",
+        payoutFee: "0.71",
+        net: orderWalletCredit({ total: "28.32", fees: "1.42" }),
         due: "26.90",
         status: "paid",
         type: "web",
@@ -318,7 +339,8 @@ class MockCitizenPayClient implements CitizenPayClient {
         id: 44791,
         total: "12.00",
         fees: "0.00",
-        net: "12.00",
+        payoutFee: "0.30",
+        net: orderWalletCredit({ total: "12.00", fees: "0.00" }),
         due: "12.00",
         status: "paid",
         type: "pos",
@@ -334,7 +356,8 @@ class MockCitizenPayClient implements CitizenPayClient {
         id: 44792,
         total: "5.50",
         fees: "0.00",
-        net: "5.50",
+        payoutFee: "0.14",
+        net: orderWalletCredit({ total: "5.50", fees: "0.00" }),
         due: "5.50",
         status: "paid",
         type: "pos",
@@ -369,16 +392,21 @@ class MockCitizenPayClient implements CitizenPayClient {
     input: CreatePayoutOrderInput,
   ): Promise<CreatedPayoutOrder> {
     this.log("createPayoutOrder", { payoutId, ...input });
-    const total = Number(input.total);
-    const fees = Number(input.fees);
-    const net = (total - fees).toFixed(2);
+    // Normalise the operator's raw input to 2dp, the way CP echoes it back.
+    const total = fromCents(toCents(input.total));
+    const fees = fromCents(toCents(input.fees));
+    const payoutFee = fromCents(toCents(input.payoutFee));
+    // The order credits the place `total − fees`; the payout's net is what's
+    // left after the platform cut comes back out at the sweep.
+    const credit = orderWalletCredit({ total, fees });
     return {
       order: {
         id: parseInt(randomBytes(4).toString("hex"), 16),
-        total: total.toFixed(2),
-        fees: fees.toFixed(2),
-        net,
-        due: net,
+        total,
+        fees,
+        payoutFee,
+        net: credit,
+        due: credit,
         status: "paid",
         type: "manual",
         description: input.description,
@@ -389,7 +417,13 @@ class MockCitizenPayClient implements CitizenPayClient {
         completedAt: new Date().toISOString(),
         createdAt: new Date().toISOString(),
       },
-      payout: { payoutId, total: total.toFixed(2), fees: fees.toFixed(2), net },
+      payout: {
+        payoutId,
+        total,
+        fees,
+        payoutFees: payoutFee,
+        net: payoutNet({ total, fees, payoutFees: payoutFee }),
+      },
     };
   }
 
@@ -405,7 +439,8 @@ class MockCitizenPayClient implements CitizenPayClient {
         id: 45210,
         total: "18.99",
         fees: "0.95",
-        net: "18.04",
+        payoutFee: "0.47",
+        net: orderWalletCredit({ total: "18.99", fees: "0.95" }),
         due: "18.04",
         status: "paid",
         type: "web",
@@ -420,7 +455,8 @@ class MockCitizenPayClient implements CitizenPayClient {
         id: 45211,
         total: "7.50",
         fees: "0.38",
-        net: "7.12",
+        payoutFee: "0.19",
+        net: orderWalletCredit({ total: "7.50", fees: "0.38" }),
         due: "7.12",
         status: "paid",
         type: "pos",
@@ -438,7 +474,8 @@ class MockCitizenPayClient implements CitizenPayClient {
         orderCount: orders.length,
         total: "26.49",
         fees: "1.33",
-        net: "25.16",
+        payoutFees: "0.66",
+        net: payoutNet({ total: "26.49", fees: "1.33", payoutFees: "0.66" }),
       },
       total: orders.length,
       limit: query.limit ?? 50,
@@ -453,7 +490,7 @@ class MockCitizenPayClient implements CitizenPayClient {
     this.log("addOrdersToPayout", { payoutId, orderIds });
     return {
       assigned: orderIds.length,
-      payout: { payoutId, total: "126.49", fees: "3.33", net: "123.16" },
+      payout: recomputed(payoutId, "126.49", "3.33", "3.16"),
     };
   }
 
@@ -462,7 +499,7 @@ class MockCitizenPayClient implements CitizenPayClient {
     orderId: number,
   ): Promise<ArchivedPayout> {
     this.log("archiveOrder", { payoutId, orderId });
-    return { payoutId, total: "100.00", fees: "2.00", net: "98.00" };
+    return recomputed(payoutId, "100.00", "2.00", "2.50");
   }
 
   async getBankingStatus(): Promise<BankingStatus> {
@@ -634,30 +671,12 @@ class MockCitizenPayClient implements CitizenPayClient {
   ): Promise<PayoutDeduction> {
     this.log("setManualDeduction", { payoutId, ...input });
     const base = await this.getPayout(payoutId);
-    const deduction = Number(input.amount);
-    const net = Number(base.totalAmount) - Number(base.totalFees) - deduction;
-    return {
-      payoutId,
-      total: base.totalAmount,
-      fees: base.totalFees,
-      manualDeduction: deduction.toFixed(2),
-      manualDeductionComment: input.comment,
-      net: net.toFixed(2),
-    };
+    return mockDeduction(base, fromCents(toCents(input.amount)), input.comment);
   }
 
   async clearManualDeduction(payoutId: string): Promise<PayoutDeduction> {
     this.log("clearManualDeduction", { payoutId });
-    const base = await this.getPayout(payoutId);
-    const net = Number(base.totalAmount) - Number(base.totalFees);
-    return {
-      payoutId,
-      total: base.totalAmount,
-      fees: base.totalFees,
-      manualDeduction: "0.00",
-      manualDeductionComment: null,
-      net: net.toFixed(2),
-    };
+    return mockDeduction(await this.getPayout(payoutId), "0.00", null);
   }
 
   async getPayoutStatus(
@@ -759,12 +778,77 @@ const completedMockPayouts = new Set<string>();
 // MockCitizenPayClient per call.
 const mockCardSources = new Map<string, string>();
 
+// Every mock money fixture derives `net` from its parts rather than carrying a
+// fourth hand-typed number, so dev mode can't drift from
+// `net = total − fees − payoutFees` the way a stale literal would.
+
+// A draft row, with `net` derived from the split.
+function draft(d: {
+  businessId: string;
+  placeId: string;
+  placeName: string;
+  orderCount: number;
+  total: string;
+  fees: string;
+  payoutFees: string;
+}): PayoutDraft {
+  return {
+    ...d,
+    placeImage: null,
+    net: payoutNet({ total: d.total, fees: d.fees, payoutFees: d.payoutFees }),
+  };
+}
+
+// The totals block the contents-changing endpoints echo back.
+function recomputed(
+  payoutId: string,
+  total: string,
+  fees: string,
+  payoutFees: string,
+): ArchivedPayout {
+  return {
+    payoutId,
+    total,
+    fees,
+    payoutFees,
+    net: payoutNet({ total, fees, payoutFees }),
+  };
+}
+
+// Recomputed money after a deduction change — net drops by the deduction on
+// top of both fee figures.
+function mockDeduction(
+  base: Payout,
+  amount: string,
+  comment: string | null,
+): PayoutDeduction {
+  return {
+    payoutId: base.id,
+    total: base.totalAmount,
+    fees: base.totalFees,
+    payoutFees: base.totalPayoutFees,
+    manualDeduction: amount,
+    manualDeductionComment: comment,
+    net: payoutNet({
+      total: base.totalAmount,
+      fees: base.totalFees,
+      payoutFees: base.totalPayoutFees,
+      manualDeduction: amount,
+    }),
+  };
+}
+
 // Plausible dev payout. The place id is arbitrary — the mock `listPlaces`
 // returns no places, so the settlement view falls back to showing the raw
-// place id when it can't resolve a local Merchant.
+// place id when it can't resolve a local Merchant. `amount` is the GROSS
+// total; the fees below are what the fee split takes off it, so the header
+// stats and the place-balance check have something non-zero to render.
 function mockPayout(id: string, status: PayoutStatus, amount: string): Payout {
   const end = new Date();
   const start = new Date(end.getTime() - 14 * 24 * 60 * 60 * 1000);
+  // A processor withheld 1% at source; the platform charges 2.5% at payout.
+  const totalFees = suggestPayoutFee(amount, "1");
+  const totalPayoutFees = suggestPayoutFee(amount, "2.5");
   return {
     id,
     businessId: "mock-business-1",
@@ -775,10 +859,15 @@ function mockPayout(id: string, status: PayoutStatus, amount: string): Payout {
     startDate: start.toISOString(),
     endDate: end.toISOString(),
     totalAmount: amount,
-    totalFees: "0.00",
+    totalFees,
+    totalPayoutFees,
     manualDeduction: "0.00",
     manualDeductionComment: null,
-    net: amount,
+    net: payoutNet({
+      total: amount,
+      fees: totalFees,
+      payoutFees: totalPayoutFees,
+    }),
     status,
     burnTxHashes: [],
     feeTransferPending: false,

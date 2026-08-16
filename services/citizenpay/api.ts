@@ -108,12 +108,36 @@ export type PaginatedOrders = {
   offset: number;
 };
 
+// =============================================================================
+// FEE SEMANTICS — `fees` vs `payoutFees`
+// =============================================================================
+// Every payout-shaped payload below carries TWO fee figures, and conflating
+// them is the bug this split exists to prevent:
+//
+//   • `fees` — SOURCE-WITHHELD fees: the processor's commission (Viva, Stripe)
+//     taken before the money ever reached us. The place's wallet was credited
+//     `total − fees`, so these tokens were never minted and are never swept.
+//   • `payoutFees` — PLATFORM fees charged at payout time (our own %, plus the
+//     Ponto/CP method fee). They WERE minted into the place's wallet and stay
+//     there until the fee sweep moves them to the treasury.
+//
+//   net = total − fees − payoutFees − manualDeduction
+//
+// `net` is computed server-side and is both the burn amount and the SEPA
+// amount. The sweep (`burn` with a destination, or `fee-transfer`) moves
+// `payoutFees + manualDeduction` — never `fees`.
+//
+// Payouts created before the split may omit `payoutFees` or send 0; the
+// normalisers in live-client.ts COALESCE to 0.
+
 // A payout as returned by the LIST endpoints (`/payouts/pending` and
 // `/payouts/completed`). camelCase + integer cents, with `net` precomputed
 // and the place/business labels denormalised. The list only ever carries
 // the STORED status (`pending` | `complete`) — the live lifecycle (`burnt`,
 // `payment-pending`) comes from `/status`. Burn tx hashes / ponto payment
 // id / emails are NOT in the list shape.
+//
+// ⚠️ TWO fee fields, two different meanings (see FEE SEMANTICS below).
 export type PayoutListWire = {
   payoutId: string;
   businessId: string;
@@ -123,7 +147,8 @@ export type PayoutListWire = {
   placeImage?: string | null;
   status: "pending" | "complete";
   total?: number | null; // cents
-  fees?: number | null; // cents
+  fees?: number | null; // cents — withheld at source, never in the wallet
+  payoutFees?: number | null; // cents — platform cut, swept from the wallet
   manualDeduction?: number | null; // cents
   net?: number | null; // cents — what the merchant is paid
   tokens?: string[];
@@ -156,7 +181,7 @@ export type PayoutDetailWire = PayoutListWire & {
 
 // A draft payout: a computed summary of paid/refunded orders for one place
 // that don't yet belong to a payout. Not stored — recomputed on every read.
-// camelCase + integer cents on the wire. `net = total - fees`.
+// camelCase + integer cents on the wire. `net = total − fees − payoutFees`.
 export type PayoutDraftWire = {
   businessId: string;
   placeId: string;
@@ -164,7 +189,8 @@ export type PayoutDraftWire = {
   placeImage?: string | null;
   orderCount: number;
   total: number; // cents
-  fees: number; // cents
+  fees: number; // cents — withheld at source
+  payoutFees?: number | null; // cents — platform cut charged at payout
   net: number; // cents
 };
 
@@ -180,17 +206,22 @@ export type CreatedPayoutWire = {
   status: "pending";
   orderCount: number;
   total: number; // cents
-  fees: number; // cents
+  fees: number; // cents — withheld at source
+  payoutFees?: number | null; // cents — platform cut charged at payout
   net: number; // cents
   startDate: string;
   endDate: string;
 };
 
 // An order inside a payout (snake_case; `completed_at`, not `date`).
+// `fees` was withheld at source, so the wallet credit for this order is
+// `total − fees`; `payoutFee` is this order's share of the platform cut,
+// which sits in the wallet until the payout-level sweep.
 export type PayoutOrderWire = {
   id: number;
   total: number; // cents
-  fees: number; // cents
+  fees: number; // cents — withheld at source
+  payoutFee?: number | null; // cents — platform cut on this order
   due: number; // cents (total - fees)
   status: string; // paid | refund | refunded | correction | …
   type: string; // web | pos | terminal | …
@@ -223,12 +254,19 @@ export type PaginatedPayoutOrders = {
 // payout totals so the dashboard can update without a refetch.
 export type ArchiveOrderWire = {
   success: boolean;
-  payout: {
-    payoutId: string;
-    total: number; // cents
-    fees: number; // cents
-    net: number; // cents
-  };
+  payout: RecomputedPayoutWire;
+};
+
+// The totals block every "we changed the payout's contents" endpoint echoes
+// back (archive / create-order / add-orders). Same fee split as everywhere
+// else: `net = total − fees − payoutFees` (a deduction, when set, is folded in
+// by the manual-deduction endpoints, which return their own shape).
+export type RecomputedPayoutWire = {
+  payoutId: string;
+  total: number; // cents
+  fees: number; // cents — withheld at source
+  payoutFees?: number | null; // cents — platform cut charged at payout
+  net: number; // cents
 };
 
 // Response of POST /payouts/{id}/orders (201) — the manually-created order
@@ -236,12 +274,7 @@ export type ArchiveOrderWire = {
 export type CreatePayoutOrderWire = {
   success: boolean;
   order: PayoutOrderWire;
-  payout: {
-    payoutId: string;
-    total: number; // cents
-    fees: number; // cents
-    net: number; // cents
-  };
+  payout: RecomputedPayoutWire;
 };
 
 // Response of GET /payouts/{id}/addable-orders — existing unassigned orders
@@ -254,7 +287,8 @@ export type AddableOrdersWire = {
   summary: {
     orderCount: number;
     total: number; // cents
-    fees: number; // cents
+    fees: number; // cents — withheld at source
+    payoutFees?: number | null; // cents — platform cut charged at payout
     net: number; // cents
   };
   total: number;
@@ -269,12 +303,7 @@ export type AddableOrdersWire = {
 export type AddOrdersWire = {
   success: boolean;
   assigned: number;
-  payout: {
-    payoutId: string;
-    total: number; // cents
-    fees: number; // cents
-    net: number; // cents
-  };
+  payout: RecomputedPayoutWire;
 };
 
 // Response of PATCH /payouts/{id} — the stored period after the update. No
@@ -289,13 +318,16 @@ export type PayoutPeriodWire = {
 };
 
 // Response of POST /payouts/{id}/manual-deduction — the recomputed totals,
-// here also carrying the deduction + its comment (net = total − fees − deduction).
+// here also carrying the deduction + its comment
+// (net = total − fees − payoutFees − deduction). The server rejects a
+// deduction above `total − fees − payoutFees` with a 400.
 export type ManualDeductionWire = {
   success: boolean;
   payout: {
     payoutId: string;
     total: number; // cents
-    fees: number; // cents
+    fees: number; // cents — withheld at source
+    payoutFees?: number | null; // cents — platform cut charged at payout
     manualDeduction: number; // cents
     manualDeductionComment: string | null;
     net: number; // cents
@@ -465,9 +497,8 @@ export const treasury = {
   // ("per_payment" on every payment, "monthly" once at month end). Both
   // travel in one PATCH so a fund's fee config lands atomically.
   // Treasury-level (per fund); per-business overrides are future work.
-  // ⚠️ ASSUMED endpoint — CP has not shipped this yet; confirm the path and
-  // BOTH body field names (`feePercentageBps`, `feeCollectionFrequency`)
-  // when they do and adjust here only.
+  // This is the rate behind a payout's `payoutFees` — the cut CP charges at
+  // settlement, not the processor commission withheld at source.
   updateFee(
     creds: CitizenPayApiCredentials,
     feePercentageBps: number,
@@ -849,7 +880,9 @@ export const payouts = {
   // (the payout `net`) with its own minter, then reports the resulting on-chain
   // hash here. CP records it and flips the payout to `burnt`. When a
   // `destination` is supplied, CP also *attempts* to sweep the platform's
-  // retained cut (`fees + manualDeduction`) to that address.
+  // retained cut (`payoutFees + manualDeduction`) to that address. Note the
+  // source-withheld `fees` are NOT part of the sweep — they never entered the
+  // place's wallet.
   //
   // ⚠️ This endpoint now returns 200 as soon as the BURN is recorded — even if
   // the sweep fails. A non-2xx means the burn itself failed. On 200 you MUST
@@ -873,7 +906,8 @@ export const payouts = {
       timeoutMs: 30_000,
     });
   },
-  // Standalone, idempotent sweep of the retained cut to `destination`. Run it
+  // Standalone, idempotent sweep of the retained cut (`payoutFees +
+  // manualDeduction`) to `destination`. Run it
   // to retry a burn whose sweep failed, or to sweep later. Unlike `burn`, this
   // DOES surface sweep failures as HTTP status (402 insufficient, 409 not-burnt
   // / in-progress, 422 config, 503 bundler, 400 bad destination) — they throw
@@ -938,14 +972,22 @@ export const payouts = {
   },
   // Manually add an order to a pending payout — for amounts that exist
   // off-CP (a bank transfer reconciled by hand, a manual adjustment, …).
-  // Integer cents on the wire like every other money field. The order is
-  // created payable (status=paid, type=manual) with no on-chain settlement
-  // yet; the response carries the archive-style totals recompute. 400 on a
-  // bad amount, 409 when the payout isn't pending.
+  // Integer cents on the wire like every other money field. `fees` is the
+  // source-withheld processor commission (0 for a bank transfer) and the
+  // optional `payoutFee` is the platform cut on this order (default 0); the
+  // server validates `fees + payoutFee ≤ total`. The order is created payable
+  // (status=paid, type=manual) with no on-chain settlement yet; the response
+  // carries the archive-style totals recompute. 400 on a bad amount, 409 when
+  // the payout isn't pending.
   createOrder(
     creds: CitizenPayApiCredentials,
     payoutId: string,
-    body: { total: number; fees: number; description?: string | null },
+    body: {
+      total: number;
+      fees: number;
+      payoutFee?: number;
+      description?: string | null;
+    },
   ): Promise<CreatePayoutOrderWire> {
     return request(
       creds,
@@ -1001,7 +1043,7 @@ export const payouts = {
     );
   },
   // Clear a payout's manual deduction + comment (resets to 0 / null), with net
-  // back to total − fees. Same `pending`-only gate as setting it.
+  // back to total − fees − payoutFees. Same `pending`-only gate as setting it.
   clearManualDeduction(
     creds: CitizenPayApiCredentials,
     payoutId: string,
