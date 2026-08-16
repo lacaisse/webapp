@@ -55,7 +55,7 @@
     "license-checker-rseidelsohn": "^5.0.1",
     "prisma": "^7.9.1",
     "tailwindcss": "^4",
-    "typescript": "^6",
+    "typescript": "^7",
     "vitest": "^4.1.10"
   }
 }
