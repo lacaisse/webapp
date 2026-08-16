@@ -736,7 +736,6 @@ class MockCitizenPayClient implements CitizenPayClient {
     this.log("setPayoutFeeConfig", {
       percent: config.percent,
       collectionFrequency: config.collectionFrequency,
-      timezone: config.timezone,
     });
   }
 }

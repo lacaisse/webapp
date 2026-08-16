@@ -1765,8 +1765,7 @@
         "frequencyPerPayment": "En cada pago",
         "frequencyMonthly": "Mensual (fin de mes)",
         "syncPending": "Guardado localmente, pero aún no confirmado por Citizen Pay. Guarda de nuevo para reintentar la sincronización.",
-        "syncFailed": "Tasa guardada, pero la sincronización con Citizen Pay falló. Guarda de nuevo para reintentar.",
-        "timezoneSyncFailed": "Zona horaria guardada, pero la sincronización de las comisiones con Citizen Pay falló. Guarda de nuevo la pestaña Comisiones para reintentar."
+        "syncFailed": "Tasa guardada, pero la sincronización con Citizen Pay falló. Guarda de nuevo para reintentar."
       },
       "emails": {
         "title": "Correos a los miembros",

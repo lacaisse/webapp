@@ -474,11 +474,10 @@ export interface CitizenPayClient {
    * Push the platform fee config to CitizenPay (treasury-level): the rate
    * (`percent`, a decimal-percent string — "2.5" = 2.5%; the live client
    * converts it to integer basis points on the wire) and the cadence at which
-   * CP collects it (`collectionFrequency`), plus the fund's IANA `timezone`
-   * — the zone the month-end boundary is evaluated in. All three go in one
-   * call because CP takes them in a single PATCH. We are canonical for every
-   * one of them — they're persisted locally first, then synced here.
-   * ⚠️ ASSUMED CP endpoint (PATCH /v2/treasury) until CP ships it.
+   * CP collects it (`collectionFrequency`). Both go in one call because CP
+   * takes them in a single PATCH. We are canonical for both values — they're
+   * persisted locally first, then synced here. ⚠️ ASSUMED CP endpoint
+   * (PATCH /v2/treasury) until CP ships it.
    */
   setPayoutFeeConfig(config: PayoutFeeConfig): Promise<void>;
 }

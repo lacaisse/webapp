@@ -1765,8 +1765,7 @@
         "frequencyPerPayment": "On every payment",
         "frequencyMonthly": "Monthly (end of month)",
         "syncPending": "Saved locally, but not yet confirmed by Citizen Pay. Save again to retry the sync.",
-        "syncFailed": "Rate saved, but the sync to Citizen Pay failed. Save again to retry.",
-        "timezoneSyncFailed": "Timezone saved, but syncing the fees to Citizen Pay failed. Save the Fees tab again to retry."
+        "syncFailed": "Rate saved, but the sync to Citizen Pay failed. Save again to retry."
       },
       "emails": {
         "title": "Member emails",

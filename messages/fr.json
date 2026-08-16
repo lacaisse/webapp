@@ -1765,8 +1765,7 @@
         "frequencyPerPayment": "À chaque paiement",
         "frequencyMonthly": "Mensuel (fin de mois)",
         "syncPending": "Enregistré localement, mais pas encore confirmé par Citizen Pay. Enregistrez à nouveau pour réessayer la synchronisation.",
-        "syncFailed": "Taux enregistré, mais la synchronisation avec Citizen Pay a échoué. Enregistrez à nouveau pour réessayer.",
-        "timezoneSyncFailed": "Fuseau horaire enregistré, mais la synchronisation des frais avec Citizen Pay a échoué. Enregistrez à nouveau l'onglet Frais pour réessayer."
+        "syncFailed": "Taux enregistré, mais la synchronisation avec Citizen Pay a échoué. Enregistrez à nouveau pour réessayer."
       },
       "emails": {
         "title": "E-mails aux membres",
