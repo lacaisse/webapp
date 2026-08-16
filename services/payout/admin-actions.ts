@@ -349,8 +349,11 @@ export async function recordOrderHashesAction(input: {
 
 export async function createPayoutOrderAction(input: {
   payoutId: string;
-  total: string;
+  /** Processor commission withheld at source — "0" for a bank transfer. */
   fees: string;
+  /** The platform's cut on this order; omitted reads as "0". */
+  payoutFee?: string;
+  total: string;
   description: string | null;
 }): Promise<ops.CreatePayoutOrderResult> {
   return ops.createPayoutOrder(await ctx(), input);

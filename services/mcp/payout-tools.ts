@@ -30,6 +30,15 @@ import { FUND_PARAM, fail, guarded, ok, TX_HASH } from "./tool-kit";
 // Money-moving tools (fix mode "settle", add_payout_order, burn_payout) say so
 // in their description and require an explicit `confirm` — burn_payout above
 // all, since it is irreversible from the dashboard too.
+//
+// Every result below reports BOTH fee figures, because they are different money
+// and an agent that adds them up gets the wrong answer:
+//   • `fees` / `payoutFee` on an order, `fees` on a payout — the payment
+//     processor's commission, withheld at source. Never in the wallet, never
+//     swept.
+//   • `payoutFees` — the platform's cut, charged at payout. It IS in the
+//     place's wallet and the fee sweep moves it to the treasury.
+//   net = total − fees − payoutFees − manualDeduction
 
 const PAYOUT_ID = z.string().min(1).describe("Payout id from list_payouts");
 const DATE = z
@@ -77,7 +86,10 @@ function orderRow(o: ops.ClassifiedOrder) {
     status: o.status,
     type: o.type,
     total: o.total,
+    // Withheld at source by the processor — the wallet credit is total − fees.
     fees: o.fees,
+    // This order's share of the platform cut; in the wallet until the sweep.
+    payoutFee: o.payoutFee,
     net: o.net,
     description: o.description,
     payerAccount: o.account,
@@ -93,7 +105,7 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
     "list_payout_drafts",
     {
       description:
-        "How much each merchant place is currently owed but not yet in a payout — the fund's pending settlement liability, grouped by place, with the order count and the gross / fees / net split. This is the answer to \"what's pending for <place>?\": pass `place` to filter to one merchant by name or place id. Only places with a positive net appear. Nothing is created or mutated. Requires ADMIN.",
+        "How much each merchant place is currently owed but not yet in a payout — the fund's pending settlement liability, grouped by place, with the order count and the gross / processor fees / platform fees / net split (net = total − fees − payoutFees). This is the answer to \"what's pending for <place>?\": pass `place` to filter to one merchant by name or place id. Only places with a positive net appear. Nothing is created or mutated. Requires ADMIN.",
       inputSchema: {
         fund: FUND_PARAM,
         place: z
@@ -137,6 +149,7 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
           orderCount: d.orderCount,
           total: d.total,
           fees: d.fees,
+          payoutFees: d.payoutFees,
           net: d.net,
         })),
         ...(needle && drafts.length === 0
@@ -195,6 +208,7 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
           period: { from: p.startDate, to: p.endDate },
           total: p.totalAmount,
           fees: p.totalFees,
+          payoutFees: p.totalPayoutFees,
           manualDeduction: p.manualDeduction,
           net: p.net,
           feeTransferPending: p.feeTransferPending,
@@ -235,7 +249,7 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
     "get_payout",
     {
       description:
-        "Everything about one payout: totals (gross / fees / manual deduction / net), the live lifecycle status, the bank signing link while it is awaiting signature, whether the retained fee sweep is still outstanding, and how many of its orders are confirmed on-chain vs. sitting in Issues. Reading the status also nudges settlement forward on CitizenPay's side (a signed payment finalises here). Requires ADMIN.",
+        "Everything about one payout: totals (gross / processor fees withheld at source / platform payout fees / manual deduction / net, where net = total − fees − payoutFees − manualDeduction), the live lifecycle status, the bank signing link while it is awaiting signature, whether the retained fee sweep is still outstanding, and how many of its orders are confirmed on-chain vs. sitting in Issues. Reading the status also nudges settlement forward on CitizenPay's side (a signed payment finalises here). Requires ADMIN.",
       inputSchema: {
         fund: FUND_PARAM,
         payoutId: PAYOUT_ID,
@@ -283,6 +297,7 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
         currency: "EUR",
         total: p.totalAmount,
         fees: p.totalFees,
+        payoutFees: p.totalPayoutFees,
         manualDeduction: p.manualDeduction,
         manualDeductionComment: p.manualDeductionComment,
         net: p.net,
@@ -497,7 +512,7 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
     "set_payout_deduction",
     {
       description:
-        "Set or clear a payout's manual deduction — a ledger adjustment that lowers the net the merchant is paid (net = total − fees − deduction), with a comment explaining why. Pure bookkeeping: nothing moves on-chain. Pass amount \"0\" to clear it. Only while the payout is pending, and never more than total − fees. To adjust the payout UPWARDS, add an order with add_payout_order instead. Requires ADMIN.",
+        "Set or clear a payout's manual deduction — a ledger adjustment that lowers the net the merchant is paid (net = total − fees − payoutFees − deduction), with a comment explaining why. Pure bookkeeping on the payout's ledger; the deducted tokens leave the merchant's wallet with the platform fees at the settlement sweep. Pass amount \"0\" to clear it. Only while the payout is pending, and never more than total − fees − payoutFees. To adjust the payout UPWARDS, add an order with add_payout_order instead. Requires ADMIN.",
       inputSchema: {
         fund: FUND_PARAM,
         payoutId: PAYOUT_ID,
@@ -528,6 +543,7 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
         currency: "EUR",
         total: res.payout.total,
         fees: res.payout.fees,
+        payoutFees: res.payout.payoutFees,
         manualDeduction: res.payout.manualDeduction,
         manualDeductionComment: res.payout.manualDeductionComment,
         net: res.payout.net,
@@ -539,7 +555,7 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
     "add_payout_order",
     {
       description:
-        "Add a manual order to a pending payout — an amount that exists outside CitizenPay (a bank transfer reconciled by hand, an agreed correction). It raises the payout's total, and MOVES TOKENS: the order's net is immediately minted to the place's wallet, mirroring how a real order settles. Only while the payout is pending. To lower a payout instead, use set_payout_deduction. Requires ADMIN.",
+        "Add a manual order to a pending payout — an amount that exists outside CitizenPay (a bank transfer reconciled by hand, an agreed correction). It raises the payout's total, and MOVES TOKENS: the order's wallet credit (total − fees) is immediately minted to the place's wallet, mirroring how a real order settles. `payoutFee` is not withheld now — it is minted with the credit and swept to the treasury at settlement. Only while the payout is pending. To lower a payout instead, use set_payout_deduction. Requires ADMIN.",
       inputSchema: {
         fund: FUND_PARAM,
         payoutId: PAYOUT_ID,
@@ -551,7 +567,16 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
           .string()
           .regex(/^\d+(\.\d{1,2})?$/, "EUR amount, up to 2 decimals")
           .default("0")
-          .describe("Platform fee withheld from the total (may be \"0\")"),
+          .describe(
+            "Processor commission already withheld at source, so it never reached the wallet. \"0\" for a bank transfer or any amount received in full.",
+          ),
+        payoutFee: z
+          .string()
+          .regex(/^\d+(\.\d{1,2})?$/, "EUR amount, up to 2 decimals")
+          .default("0")
+          .describe(
+            "The platform's own cut on this order, charged at payout and swept from the place's wallet at settlement. Together with `fees` it cannot exceed `total`.",
+          ),
         description: z
           .string()
           .max(500)
@@ -563,7 +588,7 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
           .describe("Required (true): creating the order mints tokens to the place."),
       },
     },
-    guarded(async ({ fund: fundDomain, payoutId, total, fees, description, confirm }) => {
+    guarded(async ({ fund: fundDomain, payoutId, total, fees, payoutFee, description, confirm }) => {
       if (confirm !== true) {
         return fail(
           "Adding an order mints real tokens to the place — re-run with `confirm: true` once the operator has agreed.",
@@ -574,16 +599,24 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
         payoutId,
         total,
         fees,
+        payoutFee,
         description: description ?? null,
       });
       if ("error" in res) return fail(res.error);
       return ok({
         orderId: res.order.id,
         currency: "EUR",
-        order: { total: res.order.total, fees: res.order.fees, net: res.order.net },
+        order: {
+          total: res.order.total,
+          fees: res.order.fees,
+          payoutFee: res.order.payoutFee,
+          // What was minted to the place: total − fees.
+          net: res.order.net,
+        },
         payoutTotals: {
           total: res.payout.total,
           fees: res.payout.fees,
+          payoutFees: res.payout.payoutFees,
           net: res.payout.net,
         },
         ...("txHash" in res
@@ -625,7 +658,7 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
     "burn_payout",
     {
       description:
-        "IRREVERSIBLE. Burn the tokens backing a payout: destroys the payout's net from the merchant place's wallet with the fund's minter, reports the burn to CitizenPay (which marks the payout burnt), and sweeps the retained cut (fees + manual deduction) to the fund's treasury account. Run this once the fiat leg is paid — burning before the merchant is paid destroys their balance with nothing sent. Only valid while the payout is pending; a second call is rejected. Requires ADMIN.",
+        "IRREVERSIBLE. Burn the tokens backing a payout: destroys the payout's net from the merchant place's wallet with the fund's minter, reports the burn to CitizenPay (which marks the payout burnt), and sweeps the retained cut — the platform payout fees plus any manual deduction — to the fund's treasury account. Processor fees withheld at source are in neither figure; they never entered the wallet. Run this once the fiat leg is paid — burning before the merchant is paid destroys their balance with nothing sent. Only valid while the payout is pending; a second call is rejected. Requires ADMIN.",
       inputSchema: {
         fund: FUND_PARAM,
         payoutId: PAYOUT_ID,
@@ -658,7 +691,7 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
     "sweep_payout_fees",
     {
       description:
-        "Run (or retry) just the fee sweep on an already-burnt payout — moves the retained cut (fees + manual deduction) from the place's wallet to the fund's treasury account. Idempotent: if an earlier sweep already went through you get that transfer back instead of a second one. Use it when burn_payout reported `feeTransferPending`. Requires ADMIN.",
+        "Run (or retry) just the fee sweep on an already-burnt payout — moves the retained cut (the platform payout fees plus any manual deduction) from the place's wallet to the fund's treasury account. Idempotent: if an earlier sweep already went through you get that transfer back instead of a second one. Use it when burn_payout reported `feeTransferPending`. Requires ADMIN.",
       inputSchema: { fund: FUND_PARAM, payoutId: PAYOUT_ID },
     },
     guarded(async ({ fund: fundDomain, payoutId }) => {

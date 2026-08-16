@@ -29,6 +29,7 @@ import { ANNOTATION_TRIGGERS } from "@/services/transaction-annotation/annotate"
 import { resolveOrEnqueueAnnotation } from "@/services/transaction-annotation/pending";
 import { burnDirect, mintDirect, type Translate } from "@/services/token-operations/direct";
 
+import { maxManualDeductionCents, toCents } from "./money";
 import {
   assignPlaceBurns,
   assignPlaceMints,
@@ -422,11 +423,21 @@ export async function classifyPayoutOrders(
 // Order reconciliation — fix unsettled orders, then tell CP
 // =============================================================================
 // CP does NOT mint/burn. When a pending payout has an order with no settled
-// on-chain tx, we fix it with the fund's own minter wallet, mirroring a real
-// payment: the payer is debited the full `total`, the place is credited the
-// `net` (total − fee), and the treasury keeps the fee.
+// on-chain tx, we fix it with the fund's own minter wallet, reproducing exactly
+// what a real payment would have left behind:
 //   - payer account     → burn `total` from the payer, then mint `net` to the place;
 //   - no payer account  → mint `net` to the place (nothing to burn).
+//
+// `net` here is the order's WALLET CREDIT — `total − fees`, where `fees` is the
+// processor's commission withheld at source. Those tokens are never minted
+// because that money never reached us: the payer's `total` includes them, the
+// place's credit doesn't, and the difference is the processor's, not ours.
+//
+// The platform's own cut (`payoutFee`) is deliberately NOT withheld here. It is
+// minted into the place's wallet along with the rest of the credit and stays
+// there until the payout-level fee sweep moves it to the treasury — so the
+// treasury keeps nothing at mint time. See burnPayout below for the other half.
+//
 // We then POST the resulting mint tx hash back so CP re-runs its confirmation
 // lifecycle.
 
@@ -440,7 +451,7 @@ export async function fixOrder(
     account: string | null; // payer; null ⇒ mint-only
     placeAccount: string | null; // mint destination
     total: string; // EUR decimal — burned from the payer
-    net: string; // EUR decimal (total − fee) — minted to the place
+    net: string; // EUR decimal (total − source-withheld fees) — minted to the place
     // When set, the order is already settled on-chain: skip the burn/mint and
     // just record this operator-supplied hash on the order. No place account or
     // payer balance is needed in this mode.
@@ -477,9 +488,9 @@ export async function fixOrder(
   const direct = { fund: ctx.fund, userId: ctx.userId, t: ctx.t };
 
   // Burn the full total from the payer first (when there is one), then credit
-  // the place its net. The fee is the difference, retained by the treasury.
-  // A mint failure after a successful burn is surfaced with the hash so the
-  // operator can recover.
+  // the place its net. The difference is the processor's commission, which
+  // never existed as tokens on our side. A mint failure after a successful burn
+  // is surfaced with the hash so the operator can recover.
   if (input.account) {
     const burn = await burnDirect(
       direct,
@@ -1093,7 +1104,10 @@ export async function createPayoutOrder(
   input: {
     payoutId: string;
     total: string;
+    /** Processor commission withheld at source — 0 for a bank transfer. */
     fees: string;
+    /** The platform's cut on this order. Defaults to 0 when omitted. */
+    payoutFee?: string;
     description: string | null;
   },
 ): Promise<CreatePayoutOrderResult> {
@@ -1114,6 +1128,7 @@ export async function createPayoutOrder(
     ({ order, payout } = await c.createPayoutOrder(parsed.data.payoutId, {
       total: parsed.data.total,
       fees: parsed.data.fees,
+      payoutFee: parsed.data.payoutFee,
       description: parsed.data.description?.trim() || null,
     }));
   } catch (e) {
@@ -1122,8 +1137,11 @@ export async function createPayoutOrder(
   }
 
   // The order now exists. Reconcile it the same way the per-order "Fix" does:
-  // mint the net to the place and record the hash. A manual order has no payer
-  // account, so this is mint-only (no burn). Past this point we never return a
+  // mint the net to the place and record the hash. `order.net` is the wallet
+  // credit (total − fees), so the platform cut is minted here too and comes
+  // back out at the payout's fee sweep — not withheld now.
+  // A manual order has no payer account, so this is mint-only (no burn). Past
+  // this point we never return a
   // bare { error } — the order is created, so any mint failure comes back as
   // { ok, mintError } to avoid duplicate creates.
   revalidatePath(`/payments/payouts/${parsed.data.payoutId}`);
@@ -1286,7 +1304,7 @@ export type BurnPayoutResult =
       ok: true;
       txHash: string;
       // Sweep outcome. The burn itself succeeded; the sweep of the retained cut
-      // (fees + manualDeduction) is decoupled. `feeTransferTxHash` is set when
+      // (payoutFees + manualDeduction) is decoupled. `feeTransferTxHash` is set when
       // it ran inline; `feeTransferPending` is true when it still needs running
       // (retry via `feeTransfer`), with the reason in `feeTransferError`.
       feeAmount?: string | null;
@@ -1315,8 +1333,9 @@ export async function burnPayout(
     const { status } = await c.getPayoutStatus(payoutId);
     if (status !== "pending") return { error: err(ctx, "notBurnable") };
 
-    // Amount = the payout `net` (total − fees − manualDeduction): the tokens
-    // the place holds for this payout. Read straight from the detail endpoint.
+    // Amount = the payout `net` (total − fees − payoutFees − manualDeduction):
+    // what the merchant actually keeps, and the same figure the SEPA transfer
+    // pays them. Read straight from the detail endpoint — the API computes it.
     let payout;
     try {
       payout = await c.getPayout(payoutId);
@@ -1331,8 +1350,16 @@ export async function burnPayout(
     if (!placeAccount) return { error: err(ctx, "noPlaceAccount") };
 
     // Burn only the `net` on-chain with our minter (records a TokenOperation).
-    // The place account also holds the retained cut (fees + manualDeduction);
-    // CP sweeps that to our minter account when we pass `destination` below.
+    //
+    // The place's wallet holds more than the net: every order was credited
+    // `total − fees`, so the platform's cut (`payoutFees`) is sitting in there
+    // too, along with anything a manual deduction claws back. That surplus is
+    // exactly `payoutFees + manualDeduction`, and CP sweeps it to our minter
+    // account when we pass `destination` below — burn takes the merchant's
+    // share out of circulation, the sweep moves ours to the treasury.
+    //
+    // The source-withheld `fees` are in neither figure: the processor kept that
+    // money before it reached us, so no token for it was ever minted.
     const burn = await burnDirect(
       { fund, userId: ctx.userId, t: ctx.t },
       { from: placeAccount, amount: payout.net },
@@ -1532,9 +1559,16 @@ export async function setManualDeduction(
   }
   if (status !== "pending") return { error: err(ctx, "deductionNotPending") };
 
-  // A deduction larger than (total − fees) would drive net negative.
-  const maxDeduction = Number(payout.totalAmount) - Number(payout.totalFees);
-  if (Number(parsed.data.amount) > maxDeduction) {
+  // A deduction larger than (total − fees − payoutFees) would drive net
+  // negative: both fee figures are already out of the merchant's share before
+  // any adjustment. CP enforces the same bound with a 400; we pre-check for a
+  // clearer message.
+  const maxDeductionCents = maxManualDeductionCents({
+    total: payout.totalAmount,
+    fees: payout.totalFees,
+    payoutFees: payout.totalPayoutFees,
+  });
+  if (toCents(parsed.data.amount) > maxDeductionCents) {
     return { error: err(ctx, "deductionTooHigh") };
   }
 
@@ -1552,7 +1586,10 @@ export async function setManualDeduction(
   }
 }
 
-/** Clear the deduction + comment, net back to total − fees. Same pending gate. */
+/**
+ * Clear the deduction + comment, net back to total − fees − payoutFees. Same
+ * pending gate.
+ */
 export async function clearManualDeduction(
   ctx: PayoutContext,
   payoutId: string,
