@@ -131,6 +131,7 @@ async function SettingsContent({
     referralBonusAmount: fund.referralBonusAmount?.toString() ?? null,
     payoutFeePercentage: fund.payoutFeePercentage?.toString() ?? null,
     payoutFeeSynced: fund.payoutFeeSynced,
+    feeCollectionFrequency: fund.feeCollectionFrequency,
     memberSignupSuccessUrl: fund.memberSignupSuccessUrl,
     merchantSignupSuccessUrl: fund.merchantSignupSuccessUrl,
     memberSignupCancelUrl: fund.memberSignupCancelUrl,

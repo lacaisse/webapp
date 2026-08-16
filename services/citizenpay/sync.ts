@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import "server-only";
 
+import type { FeeCollectionFrequency } from "@/services/db/generated/enums";
+
 import {
   treasury as treasuryApi,
   type CitizenPayApiCredentials,
@@ -16,10 +18,11 @@ import {
 //   tokenAddress, tokenDecimals, tokenName, tokenSymbol, tokenChainId.
 // We do NOT expose these as editable in the UI.
 //
-// The one EXCEPTION is `payoutFeePercentage`: that value is canonical on our
-// side (admin sets it in settings → we push it to CP). We surface CP's echo
-// here only so the caller can reconcile (confirm sync / seed) — it must NOT
-// blindly overwrite a locally-set fee. See consumeConnect in connect.ts.
+// The one EXCEPTION is the fee pair `payoutFeePercentage` /
+// `feeCollectionFrequency`: those values are canonical on our side (admin sets
+// them in settings → we push them to CP). We surface CP's echo here only so
+// the caller can reconcile (confirm sync / seed) — it must NOT blindly
+// overwrite a locally-set fee or cadence. See consumeConnect in connect.ts.
 
 const CHAIN_IDS: Record<string, number> = {
   gnosis: 100,
@@ -49,6 +52,10 @@ export type TokenInfo = {
   // CP's echo of the platform fee, normalised to a 2-decimal percent string
   // (e.g. "2.50"). Canonical on our side — reconciled, not cached. See header.
   payoutFeePercentage: string | null;
+  // CP's echo of the fee collection cadence, normalised to the Prisma
+  // `FeeCollectionFrequency` spelling. Null when CP reports nothing (or
+  // something we don't recognise). Same reconcile-don't-cache rule as above.
+  feeCollectionFrequency: FeeCollectionFrequency | null;
 };
 
 /**
@@ -111,6 +118,24 @@ function normaliseTreasury(wire: TreasuryWire): TokenInfo {
     payoutFeePercentage = wire.fee_percentage.toFixed(2);
   }
 
+  // Cadence: snake_case preferred, camelCase accepted (CP hasn't confirmed
+  // the field name). Anything we don't recognise reads as "CP said nothing"
+  // so the caller leaves the local value alone.
+  const frequencyRaw = (wire.fee_collection_frequency ?? wire.feeCollectionFrequency ?? "")
+    .toString()
+    .toLowerCase()
+    .trim();
+  let feeCollectionFrequency: FeeCollectionFrequency | null = null;
+  if (frequencyRaw === "monthly") {
+    feeCollectionFrequency = "MONTHLY";
+  } else if (frequencyRaw === "per_payment") {
+    feeCollectionFrequency = "PER_PAYMENT";
+  } else if (frequencyRaw) {
+    console.warn(
+      `[citizenpay-sync] unknown fee collection frequency "${frequencyRaw}" — leaving the local value unchanged`,
+    );
+  }
+
   return {
     tokenAddress,
     tokenChainId,
@@ -124,5 +149,6 @@ function normaliseTreasury(wire: TreasuryWire): TokenInfo {
     citizenPayPaymasterType: wire.paymaster_type ?? null,
     citizenPayTreasurySlug: wire.slug ?? null,
     payoutFeePercentage,
+    feeCollectionFrequency,
   };
 }

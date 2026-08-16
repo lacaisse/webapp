@@ -1760,8 +1760,13 @@
         "description": "Commission prélevée sur les paiements aux commerces. Configurée ici, puis transmise à Citizen Pay.",
         "rate": "Taux de commission (%)",
         "rateHint": "Pourcentage prélevé sur chaque paiement (ex. 2,5 pour 2,5 %). Laissez vide pour utiliser le taux par défaut de Citizen Pay.",
+        "frequency": "Fréquence de prélèvement",
+        "frequencyHint": "À chaque paiement, ou une seule fois en fin de mois. Le prélèvement lui-même est effectué par Citizen Pay.",
+        "frequencyPerPayment": "À chaque paiement",
+        "frequencyMonthly": "Mensuel (fin de mois)",
         "syncPending": "Enregistré localement, mais pas encore confirmé par Citizen Pay. Enregistrez à nouveau pour réessayer la synchronisation.",
-        "syncFailed": "Taux enregistré, mais la synchronisation avec Citizen Pay a échoué. Enregistrez à nouveau pour réessayer."
+        "syncFailed": "Taux enregistré, mais la synchronisation avec Citizen Pay a échoué. Enregistrez à nouveau pour réessayer.",
+        "timezoneSyncFailed": "Fuseau horaire enregistré, mais la synchronisation des frais avec Citizen Pay a échoué. Enregistrez à nouveau l'onglet Frais pour réessayer."
       },
       "emails": {
         "title": "E-mails aux membres",

@@ -197,6 +197,7 @@ type Fund = {
   referralBonusAmount: string | null;
   payoutFeePercentage: string | null;
   payoutFeeSynced: boolean;
+  feeCollectionFrequency: "PER_PAYMENT" | "MONTHLY";
   memberSignupSuccessUrl: string | null;
   merchantSignupSuccessUrl: string | null;
   memberSignupCancelUrl: string | null;
@@ -434,10 +435,19 @@ export function FeeForm({ fund }: { fund: Fund }) {
       <SettingsForm
         saveLabel={tRoot("save")}
         savingLabel={tRoot("saving")}
-        initial={{ payoutFeePercentage: fund.payoutFeePercentage ?? "" }}
+        initial={{
+          payoutFeePercentage: fund.payoutFeePercentage ?? "",
+          feeCollectionFrequency: fund.feeCollectionFrequency,
+        }}
         action={async (v) =>
           updatePayoutFeeAction({
             payoutFeePercentage: v.payoutFeePercentage,
+            // The SettingsForm state holds plain `string`; the action's
+            // schema narrows this to the FeeCollectionFrequency enum, so
+            // cast back at the call boundary.
+            feeCollectionFrequency: v.feeCollectionFrequency as
+              | "PER_PAYMENT"
+              | "MONTHLY",
           })
         }
         fields={[
@@ -446,6 +456,16 @@ export function FeeForm({ fund }: { fund: Fund }) {
             label: t("rate"),
             hint: t("rateHint"),
             type: "decimal",
+          },
+          {
+            key: "feeCollectionFrequency",
+            label: t("frequency"),
+            hint: t("frequencyHint"),
+            type: "select",
+            options: [
+              { value: "PER_PAYMENT", label: t("frequencyPerPayment") },
+              { value: "MONTHLY", label: t("frequencyMonthly") },
+            ],
           },
         ]}
       />

@@ -1760,8 +1760,13 @@
         "description": "Commissie op betalingen aan handelaren. Hier ingesteld en vervolgens naar Citizen Pay gestuurd.",
         "rate": "Kostentarief (%)",
         "rateHint": "Percentage dat op elke betaling wordt ingehouden (bijv. 2,5 voor 2,5%). Laat leeg om het standaardtarief van Citizen Pay te gebruiken.",
+        "frequency": "Inningsfrequentie",
+        "frequencyHint": "Bij elke betaling, of één keer aan het einde van de maand. De inning zelf gebeurt door Citizen Pay.",
+        "frequencyPerPayment": "Bij elke betaling",
+        "frequencyMonthly": "Maandelijks (einde van de maand)",
         "syncPending": "Lokaal opgeslagen, maar nog niet bevestigd door Citizen Pay. Sla opnieuw op om de synchronisatie te herhalen.",
-        "syncFailed": "Tarief opgeslagen, maar de synchronisatie met Citizen Pay is mislukt. Sla opnieuw op om opnieuw te proberen."
+        "syncFailed": "Tarief opgeslagen, maar de synchronisatie met Citizen Pay is mislukt. Sla opnieuw op om opnieuw te proberen.",
+        "timezoneSyncFailed": "Tijdzone opgeslagen, maar de synchronisatie van de kosten met Citizen Pay is mislukt. Sla het tabblad Kosten opnieuw op om opnieuw te proberen."
       },
       "emails": {
         "title": "E-mails aan leden",

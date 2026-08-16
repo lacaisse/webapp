@@ -1760,8 +1760,13 @@
         "description": "Commission taken on payments to merchants. Configured here, then pushed to Citizen Pay.",
         "rate": "Fee rate (%)",
         "rateHint": "Percentage taken on each payment (e.g. 2.5 for 2.5%). Leave empty to use Citizen Pay's default rate.",
+        "frequency": "Collection frequency",
+        "frequencyHint": "On every payment, or once at the end of the month. The collection itself is handled by Citizen Pay.",
+        "frequencyPerPayment": "On every payment",
+        "frequencyMonthly": "Monthly (end of month)",
         "syncPending": "Saved locally, but not yet confirmed by Citizen Pay. Save again to retry the sync.",
-        "syncFailed": "Rate saved, but the sync to Citizen Pay failed. Save again to retry."
+        "syncFailed": "Rate saved, but the sync to Citizen Pay failed. Save again to retry.",
+        "timezoneSyncFailed": "Timezone saved, but syncing the fees to Citizen Pay failed. Save the Fees tab again to retry."
       },
       "emails": {
         "title": "Member emails",

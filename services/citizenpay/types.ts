@@ -489,3 +489,18 @@ export type CreatePayoutPaymentResult =
   | { alreadyCreated: true }
   | { alreadyCreated: false; paymentId: string; signingUrl: string };
 
+// Fee configuration pushed to CP (treasury-level). `percent` is a
+// decimal-percent string (e.g. "2.5" = 2.5%) — the live client converts it to
+// integer basis points on the wire. `collectionFrequency` mirrors the Prisma
+// `FeeCollectionFrequency` enum: PER_PAYMENT debits the fee on each merchant
+// payment, MONTHLY accrues it and collects once at month end. Kept as a
+// literal union here (like `CardStatus`) so the shared types module stays
+// free of generated-client imports.
+export type PayoutFeeConfig = {
+  percent: string;
+  collectionFrequency: "PER_PAYMENT" | "MONTHLY";
+  // IANA name (`Fund.timezone`) — the zone CP evaluates the MONTHLY
+  // boundary in. Always sent, even for PER_PAYMENT, so CP never holds a
+  // stale zone for a fund that switches cadence later.
+  timezone: string;
+};
