@@ -36,6 +36,7 @@ import type {
   PayoutDeduction,
   PayoutDraft,
   PayoutDraftPreview,
+  PayoutFeeConfig,
   PayoutOrder,
   PayoutOrdersPage,
   PayoutPeriod,
@@ -731,8 +732,12 @@ class MockCitizenPayClient implements CitizenPayClient {
     completedMockPayouts.add(payoutId);
   }
 
-  async setPayoutFeePercentage(percent: string): Promise<void> {
-    this.log("setPayoutFeePercentage", { percent });
+  async setPayoutFeeConfig(config: PayoutFeeConfig): Promise<void> {
+    this.log("setPayoutFeeConfig", {
+      percent: config.percent,
+      collectionFrequency: config.collectionFrequency,
+      timezone: config.timezone,
+    });
   }
 }
 

@@ -1760,8 +1760,13 @@
         "description": "Comisión cobrada sobre los pagos a comercios. Se configura aquí y luego se envía a Citizen Pay.",
         "rate": "Tasa de comisión (%)",
         "rateHint": "Porcentaje cobrado en cada pago (p. ej. 2.5 para 2.5%). Déjalo vacío para usar la tasa predeterminada de Citizen Pay.",
+        "frequency": "Frecuencia de cobro",
+        "frequencyHint": "En cada pago, o una sola vez a fin de mes. El cobro lo realiza Citizen Pay.",
+        "frequencyPerPayment": "En cada pago",
+        "frequencyMonthly": "Mensual (fin de mes)",
         "syncPending": "Guardado localmente, pero aún no confirmado por Citizen Pay. Guarda de nuevo para reintentar la sincronización.",
-        "syncFailed": "Tasa guardada, pero la sincronización con Citizen Pay falló. Guarda de nuevo para reintentar."
+        "syncFailed": "Tasa guardada, pero la sincronización con Citizen Pay falló. Guarda de nuevo para reintentar.",
+        "timezoneSyncFailed": "Zona horaria guardada, pero la sincronización de las comisiones con Citizen Pay falló. Guarda de nuevo la pestaña Comisiones para reintentar."
       },
       "emails": {
         "title": "Correos a los miembros",

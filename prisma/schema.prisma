@@ -304,6 +304,16 @@ model Fund {
   payoutFeePercentage Decimal? @db.Decimal(5, 2)
   payoutFeeSynced     Boolean  @default(true)
 
+  // When the platform fee above is actually collected. PER_PAYMENT (the
+  // historical behaviour, hence the default) debits the fee on each merchant
+  // payment; MONTHLY accrues it and collects once at month end. The
+  // collection itself runs CP-side — we only mirror the choice. We stay
+  // canonical, exactly like the rate: the settings UI writes here first, then
+  // pushes rate + cadence together in the SAME PATCH /v2/treasury call, so
+  // `payoutFeeSynced` covers both (false = something local hasn't landed on
+  // CP yet).
+  feeCollectionFrequency FeeCollectionFrequency @default(PER_PAYMENT)
+
   // Defaults
   defaultLocale String @default("fr")
   timezone      String @default("Europe/Brussels")
@@ -421,6 +431,11 @@ enum AllocationMode {
   FIXED_PERIOD // attribute tokens at the end of each period (monthly etc.)
   PAY_AND_GO // mint immediately when CP reports a deposit
   DISABLED // no automatic allocation: deposits are still mirrored/matched, but no minting and no periods
+}
+
+enum FeeCollectionFrequency {
+  PER_PAYMENT // debit the platform fee on every merchant payment (CP default)
+  MONTHLY // accrue the fee and collect it once, at the end of the month
 }
 
 // Per-fund annotation of an on-chain transaction, keyed by tx hash. Lets us

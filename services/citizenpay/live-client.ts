@@ -25,6 +25,7 @@ import {
   type PayoutListWire,
   type PayoutOrderWire,
   type BankTransactionWire,
+  type FeeCollectionFrequencyWire,
 } from "./api";
 import type { CitizenPayClient } from "./client-interface";
 import type {
@@ -59,6 +60,7 @@ import type {
   PayoutDeduction,
   PayoutDraft,
   PayoutDraftPreview,
+  PayoutFeeConfig,
   PayoutOrder,
   PayoutOrdersPage,
   PayoutPeriod,
@@ -250,6 +252,17 @@ function inviteFromWire(w: InviteWire): CitizenPayInvite {
     acceptedBusinessId: w.accepted_business_id ?? null,
   };
 }
+
+// Prisma `FeeCollectionFrequency` → CP wire spelling. Exhaustive by type, so
+// adding a value to the enum breaks the build here rather than silently
+// pushing an unknown cadence.
+const FEE_FREQUENCY_WIRE: Record<
+  PayoutFeeConfig["collectionFrequency"],
+  FeeCollectionFrequencyWire
+> = {
+  PER_PAYMENT: "per_payment",
+  MONTHLY: "monthly",
+};
 
 export class LiveCitizenPayClient implements CitizenPayClient {
   constructor(private readonly creds: CitizenPayApiCredentials) {}
@@ -949,12 +962,17 @@ export class LiveCitizenPayClient implements CitizenPayClient {
     await apiPayouts.complete(this.creds, payoutId);
   }
 
-  async setPayoutFeePercentage(percent: string): Promise<void> {
+  async setPayoutFeeConfig(config: PayoutFeeConfig): Promise<void> {
     // Decimal percent → integer basis points (2.5% → 250). The local column
     // caps at 2 decimals, so the result is always integral; round anyway to
     // shed any float dust from the multiply.
-    const bps = Math.round(Number(percent) * 100);
-    await apiTreasury.updateFee(this.creds, bps);
+    const bps = Math.round(Number(config.percent) * 100);
+    await apiTreasury.updateFee(
+      this.creds,
+      bps,
+      FEE_FREQUENCY_WIRE[config.collectionFrequency],
+      config.timezone,
+    );
   }
 }
 
