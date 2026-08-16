@@ -1247,6 +1247,18 @@
           "confirm": "Guardar",
           "remove": "Eliminar"
         },
+        "editPeriod": {
+          "trigger": "Editar el periodo",
+          "title": "Periodo de liquidación",
+          "description": "Cambia el periodo que cubre este pago. Solo cambia la etiqueta: los pedidos ya están asignados y ningún importe se modifica.",
+          "month": "Mes completo",
+          "monthHint": "Elige un mes para rellenar ambas fechas con ese mes natural.",
+          "from": "Desde",
+          "to": "Hasta (excluido)",
+          "covers": "Cubre desde el {from} hasta el {to} (excluido)",
+          "ordersHint": "Los pedidos no cambian: ampliar el periodo no incorpora pedidos ajenos al pago, y siguen disponibles para el siguiente.",
+          "confirm": "Guardar el periodo"
+        },
         "pay": {
           "button": "Pagar al comercio",
           "openSigning": "Abrir página de firma",
@@ -1389,7 +1401,9 @@
           "amountPositive": "El importe debe ser mayor que cero.",
           "feeTooHigh": "La comisión no puede ser mayor que el importe.",
           "descriptionTooLong": "La descripción es demasiado larga.",
-          "completeFailed": "No se pudo marcar el pago como completado. Vuelve a intentarlo en breve."
+          "completeFailed": "No se pudo marcar el pago como completado. Vuelve a intentarlo en breve.",
+          "periodFailed": "No se ha podido actualizar el periodo de liquidación. Inténtalo de nuevo.",
+          "periodNotPending": "El periodo solo puede cambiarse mientras el pago está pendiente."
         }
       },
       "admin": {

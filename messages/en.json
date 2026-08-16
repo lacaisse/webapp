@@ -1247,6 +1247,18 @@
           "confirm": "Save",
           "remove": "Remove"
         },
+        "editPeriod": {
+          "trigger": "Edit period",
+          "title": "Settlement period",
+          "description": "Change the period this payout covers. This only relabels it — the orders are already assigned and no amount changes.",
+          "month": "Whole month",
+          "monthHint": "Pick a month to fill both dates with that calendar month.",
+          "from": "From",
+          "to": "To (excluded)",
+          "covers": "Covers {from} up to (excluding) {to}",
+          "ordersHint": "Orders stay as they are: widening the period pulls in no orders from outside the payout, and they remain available for the next one.",
+          "confirm": "Save period"
+        },
         "pay": {
           "button": "Pay merchant",
           "openSigning": "Open signing page",
@@ -1389,7 +1401,9 @@
           "amountPositive": "The amount must be greater than zero.",
           "feeTooHigh": "The fee can't be more than the amount.",
           "descriptionTooLong": "The description is too long.",
-          "completeFailed": "Couldn't mark the payout as completed. Try again shortly."
+          "completeFailed": "Couldn't mark the payout as completed. Try again shortly.",
+          "periodFailed": "Could not update the settlement period. Please try again.",
+          "periodNotPending": "The settlement period can only be changed while the payout is pending."
         }
       },
       "admin": {

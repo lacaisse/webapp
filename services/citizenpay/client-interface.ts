@@ -33,6 +33,7 @@ import type {
   PayoutDraft,
   PayoutDraftPreview,
   PayoutOrdersPage,
+  PayoutPeriod,
   PayoutStatusDetail,
   RegisteredCard,
   RegisterCardInput,
@@ -333,6 +334,22 @@ export interface CitizenPayClient {
    * Returns the payout's recomputed totals so the UI can update in place.
    */
   archiveOrder(payoutId: string, orderId: number): Promise<ArchivedPayout>;
+
+  /**
+   * Rewrite a pending payout's settlement window. Both fields are optional —
+   * an omitted one keeps its stored value — but at least one is required.
+   *
+   * The window is a label, not a filter: the orders were claimed when the
+   * payout was created and stay linked, so widening the period pulls in no new
+   * orders (they stay in the next draft) and no total, fee or net moves. Use it
+   * when a payout covers a named period — "July" — but was created over the
+   * range that happened to contain orders, e.g. 1–28 July. Pending-only, like
+   * setManualDeduction. Backed by PATCH /v2/treasury/payouts/{id}.
+   */
+  updatePayoutPeriod(
+    payoutId: string,
+    input: { startDate?: string; endDate?: string },
+  ): Promise<PayoutPeriod>;
 
   /**
    * Set a payout's manual deduction (+ comment), recomputing `net`

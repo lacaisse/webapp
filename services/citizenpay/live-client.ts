@@ -61,6 +61,7 @@ import type {
   PayoutDraftPreview,
   PayoutOrder,
   PayoutOrdersPage,
+  PayoutPeriod,
   PayoutStatusDetail,
   RegisteredCard,
   RegisterCardInput,
@@ -672,6 +673,18 @@ export class LiveCitizenPayClient implements CitizenPayClient {
       net: centsToDecimal(w.net),
       startDate: w.startDate,
       endDate: w.endDate,
+    };
+  }
+
+  async updatePayoutPeriod(
+    payoutId: string,
+    input: { startDate?: string; endDate?: string },
+  ): Promise<PayoutPeriod> {
+    const { payout } = await apiPayouts.updatePeriod(this.creds, payoutId, input);
+    return {
+      payoutId: payout.payoutId,
+      startDate: payout.startDate,
+      endDate: payout.endDate,
     };
   }
 

@@ -20,6 +20,7 @@ import type {
   PayoutDeduction,
   PayoutDraft,
   PayoutOrder,
+  PayoutPeriod,
   PayoutStatus,
   PayoutStatusDetail,
 } from "@/services/citizenpay/types";
@@ -46,6 +47,7 @@ import {
   SetManualDeductionSchema,
   toRfc3339,
   TX_HASH,
+  UpdatePayoutPeriodSchema,
 } from "./schemas";
 
 // =============================================================================
@@ -1445,6 +1447,54 @@ export async function feeTransfer(
 export type SetManualDeductionResult =
   | { error: string }
   | { ok: true; payout: PayoutDeduction };
+
+export type UpdatePayoutPeriodResult =
+  | { error: string }
+  | { ok: true; period: PayoutPeriod };
+
+/**
+ * Relabel a pending payout's settlement window.
+ *
+ * Purely cosmetic by design: CP claims a payout's orders when it's created and
+ * keeps them linked by id, so widening 1–28 July to the full month makes the
+ * payout read as "July" without pulling in the orders that landed after the
+ * 28th — those stay unassigned and turn up in the next draft. No total, fee,
+ * deduction or net moves. Same live-status pending gate as setManualDeduction:
+ * once settlement starts the period is on the merchant's report.
+ */
+export async function updatePayoutPeriod(
+  ctx: PayoutContext,
+  input: { payoutId: string; from: string; to: string },
+): Promise<UpdatePayoutPeriodResult> {
+  const parsed = UpdatePayoutPeriodSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: ctx.t(parsed.error.issues[0]?.message ?? `${ERR}.periodFailed`) };
+  }
+
+  const c = client(ctx);
+
+  let status;
+  try {
+    ({ status } = await c.getPayoutStatus(parsed.data.payoutId));
+  } catch (e) {
+    console.error("[payout] period status read failed", logSafe(input), e);
+    return { error: toMessage(e, err(ctx, "statusFailed")) };
+  }
+  if (status !== "pending") return { error: err(ctx, "periodNotPending") };
+
+  try {
+    const period = await c.updatePayoutPeriod(parsed.data.payoutId, {
+      startDate: toRfc3339(parsed.data.from),
+      endDate: toRfc3339(parsed.data.to),
+    });
+    revalidatePath("/payments");
+    revalidatePath(`/payments/payouts/${parsed.data.payoutId}`);
+    return { ok: true, period };
+  } catch (e) {
+    console.error("[payout] updatePayoutPeriod failed", logSafe(input), e);
+    return { error: toMessage(e, err(ctx, "periodFailed")) };
+  }
+}
 
 /**
  * Set/clear a payout's manual deduction (+ comment). A pure ledger adjustment
