@@ -38,6 +38,7 @@ import type {
   PayoutDraftPreview,
   PayoutOrder,
   PayoutOrdersPage,
+  PayoutPeriod,
   PayoutStatus,
   PayoutStatusDetail,
   RegisteredCard,
@@ -608,6 +609,22 @@ class MockCitizenPayClient implements CitizenPayClient {
     // Unknown id — synthesize a plausible pending payout so the detail page
     // still renders in dev.
     return mockPayout(payoutId, "pending", "150.00");
+  }
+
+  // Echoes the merged window the way CP does: an omitted field keeps the
+  // payout's stored value. No totals in the reply — moving the dates never
+  // moves money (the orders stay linked by id, not by date).
+  async updatePayoutPeriod(
+    payoutId: string,
+    input: { startDate?: string; endDate?: string },
+  ): Promise<PayoutPeriod> {
+    this.log("updatePayoutPeriod", { payoutId, ...input });
+    const base = await this.getPayout(payoutId);
+    return {
+      payoutId,
+      startDate: input.startDate ?? base.startDate,
+      endDate: input.endDate ?? base.endDate,
+    };
   }
 
   async setManualDeduction(

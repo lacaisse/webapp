@@ -592,6 +592,21 @@ export async function feeTransferAction(input: {
 }
 
 // =============================================================================
+// Settlement period
+// =============================================================================
+
+export async function updatePayoutPeriodAction(input: {
+  payoutId: string;
+  from: string;
+  to: string;
+}): Promise<ops.UpdatePayoutPeriodResult> {
+  const res = await ops.updatePayoutPeriod(await ctx(), input);
+  // Re-render the detail header, where the period sits under the place name.
+  if ("ok" in res) refresh();
+  return res;
+}
+
+// =============================================================================
 // Manual deduction
 // =============================================================================
 

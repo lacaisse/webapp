@@ -277,6 +277,17 @@ export type AddOrdersWire = {
   };
 };
 
+// Response of PATCH /payouts/{id} — the stored period after the update. No
+// money figures: rewriting the window never moves a total (see updatePeriod).
+export type PayoutPeriodWire = {
+  success: boolean;
+  payout: {
+    payoutId: string;
+    startDate: string; // RFC3339
+    endDate: string; // RFC3339
+  };
+};
+
 // Response of POST /payouts/{id}/manual-deduction — the recomputed totals,
 // here also carrying the deduction + its comment (net = total − fees − deduction).
 export type ManualDeductionWire = {
@@ -765,6 +776,23 @@ export const payouts = {
       creds,
       "GET",
       `/v2/treasury/payouts/${encodeURIComponent(payoutId)}`,
+    );
+  },
+  // Rewrite a pending payout's settlement window. Both fields are optional —
+  // an omitted one keeps its stored value — but at least one is required and
+  // the result must stay half-open. The window is a label, not a filter: CP
+  // claimed the orders at creation and keeps them linked, so moving the dates
+  // shifts no money and pulls in no orders. 409 when the payout isn't pending.
+  updatePeriod(
+    creds: CitizenPayApiCredentials,
+    payoutId: string,
+    body: { startDate?: string; endDate?: string },
+  ): Promise<PayoutPeriodWire> {
+    return request(
+      creds,
+      "PATCH",
+      `/v2/treasury/payouts/${encodeURIComponent(payoutId)}`,
+      { body, timeoutMs: 30_000 },
     );
   },
   // Live lifecycle status (unlike the list endpoints, which only ever

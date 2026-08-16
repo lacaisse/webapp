@@ -1247,6 +1247,18 @@
           "confirm": "Opslaan",
           "remove": "Verwijderen"
         },
+        "editPeriod": {
+          "trigger": "Periode wijzigen",
+          "title": "Afrekenperiode",
+          "description": "Wijzig de periode die deze uitbetaling dekt. Dit past alleen het label aan — de bestellingen zijn al toegewezen en geen enkel bedrag verandert.",
+          "month": "Volledige maand",
+          "monthHint": "Kies een maand om beide datums met die kalendermaand te vullen.",
+          "from": "Van",
+          "to": "Tot (exclusief)",
+          "covers": "Dekt {from} tot (exclusief) {to}",
+          "ordersHint": "Bestellingen blijven ongewijzigd: de periode verbreden haalt geen bestellingen van buiten de uitbetaling binnen, ze blijven beschikbaar voor de volgende.",
+          "confirm": "Periode opslaan"
+        },
         "pay": {
           "button": "Handelaar betalen",
           "openSigning": "Ondertekenpagina openen",
@@ -1389,7 +1401,9 @@
           "amountPositive": "Het bedrag moet groter dan nul zijn.",
           "feeTooHigh": "De kosten mogen niet hoger zijn dan het bedrag.",
           "descriptionTooLong": "De omschrijving is te lang.",
-          "completeFailed": "Kon de uitbetaling niet als voltooid markeren. Probeer het zo opnieuw."
+          "completeFailed": "Kon de uitbetaling niet als voltooid markeren. Probeer het zo opnieuw.",
+          "periodFailed": "Kon de afrekenperiode niet bijwerken. Probeer het opnieuw.",
+          "periodNotPending": "De periode kan alleen worden gewijzigd zolang de uitbetaling in behandeling is."
         }
       },
       "admin": {

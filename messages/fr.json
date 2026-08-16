@@ -1247,6 +1247,18 @@
           "confirm": "Enregistrer",
           "remove": "Supprimer"
         },
+        "editPeriod": {
+          "trigger": "Modifier la période",
+          "title": "Période de versement",
+          "description": "Modifiez la période couverte par ce virement. Cela ne change que le libellé — les commandes sont déjà affectées et aucun montant ne bouge.",
+          "month": "Mois entier",
+          "monthHint": "Choisissez un mois pour remplir les deux dates avec ce mois calendaire.",
+          "from": "Du",
+          "to": "Au (exclu)",
+          "covers": "Couvre du {from} jusqu’au {to} (exclu)",
+          "ordersHint": "Les commandes ne bougent pas : élargir la période n’intègre aucune commande extérieure au virement, elles restent disponibles pour le suivant.",
+          "confirm": "Enregistrer la période"
+        },
         "pay": {
           "button": "Payer le commerce",
           "openSigning": "Ouvrir la page de signature",
@@ -1389,7 +1401,9 @@
           "amountPositive": "Le montant doit être supérieur à zéro.",
           "feeTooHigh": "Les frais ne peuvent pas dépasser le montant.",
           "descriptionTooLong": "La description est trop longue.",
-          "completeFailed": "Impossible de marquer le versement comme terminé. Réessayez bientôt."
+          "completeFailed": "Impossible de marquer le versement comme terminé. Réessayez bientôt.",
+          "periodFailed": "Impossible de modifier la période de versement. Veuillez réessayer.",
+          "periodNotPending": "La période ne peut être modifiée que tant que le virement est en attente."
         }
       },
       "admin": {

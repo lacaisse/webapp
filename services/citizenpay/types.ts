@@ -412,6 +412,15 @@ export type SetManualDeductionInput = {
   comment: string | null;
 };
 
+// A pending payout's settlement window as stored after an edit. Deliberately
+// carries no money: the window labels the payout, it doesn't select its orders
+// (CP claims those at creation), so rewriting it can't move a total.
+export type PayoutPeriod = {
+  payoutId: string;
+  startDate: string; // ISO 8601
+  endDate: string; // ISO 8601
+};
+
 // Recomputed payout money after a manual-deduction change: the ArchivedPayout
 // trio plus the deduction and its comment (net = total − fees − deduction).
 export type PayoutDeduction = {

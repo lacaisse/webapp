@@ -25,6 +25,7 @@ import { AddOrdersDialog } from "./add-orders-dialog";
 import { CreateOrderDialog } from "./create-order-dialog";
 import { ManualDeductionDialog } from "./manual-deduction-dialog";
 import { OrdersExplorer } from "./orders-explorer";
+import { PayoutPeriodDialog } from "./period-dialog";
 
 import { getBankingStatus } from "../../../bank/data";
 import {
@@ -123,9 +124,20 @@ export default async function PayoutDetailPage({
               <h1 className="font-heading text-2xl font-medium">
                 {payout.placeName ?? t("detail.untitled")}
               </h1>
-              <p className="text-sm text-muted-foreground">
-                {periodLabel(format, payout)}
-              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm text-muted-foreground">
+                  {periodLabel(format, payout)}
+                </p>
+                {/* Relabelling only — the orders are already claimed, so this
+                    moves no money. Pending-gated like every other edit here. */}
+                {liveStatus === "pending" && (
+                  <PayoutPeriodDialog
+                    payoutId={payout.id}
+                    startDate={payout.startDate}
+                    endDate={payout.endDate}
+                  />
+                )}
+              </div>
             </div>
           </div>
           <Badge variant={STATUS_VARIANT[liveStatus]}>
