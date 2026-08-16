@@ -499,8 +499,4 @@ export type CreatePayoutPaymentResult =
 export type PayoutFeeConfig = {
   percent: string;
   collectionFrequency: "PER_PAYMENT" | "MONTHLY";
-  // IANA name (`Fund.timezone`) — the zone CP evaluates the MONTHLY
-  // boundary in. Always sent, even for PER_PAYMENT, so CP never holds a
-  // stale zone for a fund that switches cadence later.
-  timezone: string;
 };

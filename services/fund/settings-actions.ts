@@ -6,11 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireFundRole } from "@/services/auth/dal";
-import {
-  getCitizenPayClient,
-  type FundCredentials,
-} from "@/services/citizenpay/client";
-import type { PayoutFeeConfig } from "@/services/citizenpay/types";
+import { getCitizenPayClient } from "@/services/citizenpay/client";
 import { prisma } from "@/services/db/prisma";
 import { isSupportedLocale } from "@/services/i18n/config";
 
@@ -123,37 +119,8 @@ const GeneralSchema = z.object({
 
 export async function updateGeneralSettingsAction(
   input: z.infer<typeof GeneralSchema>,
-): Promise<FeeSettingsResult> {
-  const t = await getTranslations();
-  const { fund } = await requireFundRole("ADMIN");
-  const parsed = GeneralSchema.safeParse(input);
-  if (!parsed.success) {
-    return { error: t(parsed.error.issues[0].message as never) };
-  }
-
-  await prisma.fund.update({ where: { id: fund.id }, data: parsed.data });
-
-  // The timezone isn't only ours: CP evaluates the MONTHLY fee boundary in
-  // it, so a month "ends" at a different instant per fund. Re-push the fee
-  // config here or the new zone wouldn't reach CP until someone happens to
-  // save the Fees tab. Only worth a call once the fund has credentials and a
-  // rate — without those there's no fee config on CP's side to correct.
-  const timezoneChanged = parsed.data.timezone !== fund.timezone;
-  const currentFee = fund.payoutFeePercentage;
-  if (timezoneChanged && currentFee != null && fund.citizenPayApiKeyId != null) {
-    const landed = await pushFeeConfigToCitizenPay(fund, {
-      percent: currentFee.toString(),
-      collectionFrequency: fund.feeCollectionFrequency,
-      timezone: parsed.data.timezone,
-    });
-    if (!landed) {
-      revalidatePath("/settings");
-      return { ok: true, warning: t("fund.settings.fees.timezoneSyncFailed") };
-    }
-  }
-
-  revalidatePath("/settings");
-  return { ok: true };
+): Promise<SettingsResult> {
+  return runUpdate(GeneralSchema, input, "/settings");
 }
 
 // --- Branding ------------------------------------------------------------
@@ -287,8 +254,7 @@ export async function updateReferralSettingsAction(
 // which CitizenPay collects it (per payment, or once at month end — the
 // collection itself runs CP-side, we only mirror the choice). We are
 // canonical for both: persist locally first (the DB may lead CP), then push
-// rate + cadence — plus the fund's timezone, which is what makes "month end"
-// a definite instant — together in one call. A failed push leaves
+// rate + cadence together in one call. A failed push leaves
 // `payoutFeeSynced = false` and returns a warning so the admin can retry by
 // saving again. Clearing the rate stores null (keeping the cadence locally)
 // and skips the push — the assumed CP endpoint takes a concrete bps value,
@@ -344,45 +310,27 @@ export async function updatePayoutFeeAction(
     return { ok: true };
   }
 
-  const landed = await pushFeeConfigToCitizenPay(fund, {
-    percent: value,
-    collectionFrequency: frequency,
-    // CP evaluates the month-end boundary in the fund's own zone.
-    timezone: fund.timezone,
-  });
-
-  revalidatePath("/settings");
-  return landed
-    ? { ok: true }
-    : { ok: true, warning: t("fund.settings.fees.syncFailed") };
-}
-
-// --- Helpers -------------------------------------------------------------
-
-// Push a fund's fee config (rate + cadence + timezone) to CitizenPay and
-// record whether it landed in `payoutFeeSynced`. Best-effort by contract: the
-// local row is canonical, so a failure is not an error for the caller — it
-// returns false and the caller surfaces a retry hint in its own words.
-async function pushFeeConfigToCitizenPay(
-  fund: FundCredentials,
-  config: PayoutFeeConfig,
-): Promise<boolean> {
   try {
-    await getCitizenPayClient(fund).setPayoutFeeConfig(config);
+    const client = getCitizenPayClient(fund);
+    await client.setPayoutFeeConfig({
+      percent: value,
+      collectionFrequency: frequency,
+    });
     await prisma.fund.update({
       where: { id: fund.id },
       data: { payoutFeeSynced: true },
     });
-    return true;
   } catch (e) {
-    console.error("[settings] fee config CP sync failed", fund.id, e);
-    await prisma.fund.update({
-      where: { id: fund.id },
-      data: { payoutFeeSynced: false },
-    });
-    return false;
+    console.error("[settings] payout fee CP sync failed", fund.id, e);
+    revalidatePath("/settings");
+    return { ok: true, warning: t("fund.settings.fees.syncFailed") };
   }
+
+  revalidatePath("/settings");
+  return { ok: true };
 }
+
+// --- Helpers -------------------------------------------------------------
 
 async function runUpdate<T extends z.ZodType>(
   schema: T,

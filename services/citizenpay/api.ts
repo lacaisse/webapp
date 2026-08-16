@@ -449,10 +449,6 @@ export type TreasuryWire = {
   // CP confirms the contract.
   fee_collection_frequency?: string;
   feeCollectionFrequency?: string;
-  // Echo of the IANA timezone we set alongside the cadence — the zone CP
-  // evaluates the month-end fee boundary in. Canonical on our side
-  // (`Fund.timezone`), read back only for confirmation.
-  timezone?: string;
 };
 
 // Wire spelling of the fee collection cadence. Maps 1:1 to the Prisma
@@ -465,23 +461,20 @@ export const treasury = {
     return request(creds, "GET", "/v2/treasury");
   },
   // Set the platform fee on merchant payments: the rate in integer basis
-  // points (250 = 2.5%), the cadence at which CP collects it ("per_payment"
-  // on every payment, "monthly" once at month end), and the IANA timezone
-  // the month-end boundary is evaluated in (the fund's own — a month ends at
-  // a different instant in Europe/Brussels than in UTC). All three travel in
-  // one PATCH so a fund's fee config lands atomically.
+  // points (250 = 2.5%) and the cadence at which CP collects it
+  // ("per_payment" on every payment, "monthly" once at month end). Both
+  // travel in one PATCH so a fund's fee config lands atomically.
   // Treasury-level (per fund); per-business overrides are future work.
   // ⚠️ ASSUMED endpoint — CP has not shipped this yet; confirm the path and
-  // ALL THREE body field names (`feePercentageBps`, `feeCollectionFrequency`,
-  // `timezone`) when they do and adjust here only.
+  // BOTH body field names (`feePercentageBps`, `feeCollectionFrequency`)
+  // when they do and adjust here only.
   updateFee(
     creds: CitizenPayApiCredentials,
     feePercentageBps: number,
     feeCollectionFrequency: FeeCollectionFrequencyWire,
-    timezone: string,
   ): Promise<{ success: boolean }> {
     return request(creds, "PATCH", "/v2/treasury", {
-      body: { feePercentageBps, feeCollectionFrequency, timezone },
+      body: { feePercentageBps, feeCollectionFrequency },
     });
   },
 };

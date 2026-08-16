@@ -971,7 +971,6 @@ export class LiveCitizenPayClient implements CitizenPayClient {
       this.creds,
       bps,
       FEE_FREQUENCY_WIRE[config.collectionFrequency],
-      config.timezone,
     );
   }
 }
