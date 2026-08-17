@@ -28,6 +28,7 @@ import { contributionApplies } from "@/services/member/contribution";
 import type { ExtraValue } from "@/services/member/schema";
 import { prisma } from "@/services/db/prisma";
 import { requireCurrentFund } from "@/services/fund/server";
+import { formatOnboardingAnswer } from "@/services/onboarding/format";
 import { parseVisibleIf } from "@/services/onboarding/visibility";
 
 import { UnassignCardButton } from "../../cards/unassign-card-button";
@@ -120,15 +121,21 @@ async function MemberDetail({
         config: true,
         visibleIf: true,
         archivedAt: true,
+        builtinKey: true,
       },
     }),
   ]);
 
-  // Only questions the fund still asks are editable. Answers to archived ones
-  // stay listed below (and are preserved by the action) but can't be changed —
-  // editing a question that no longer exists on the form would be misleading.
+  // Only questions the fund still asks are editable, and only the ones that
+  // are actually stored in `applicationData`. Builtin fields (address,
+  // postalCode, city, tierId) look like ordinary questions but write to a
+  // typed Member column instead — they already have their own editor
+  // (EditProfileDialog / MemberTierPicker above) and must never be routed
+  // into this JSON-answer dialog, or an edit here would silently write to
+  // applicationData while the typed column (and everything that reads it,
+  // like the address on card-assigned emails) stays untouched.
   const editableFields = onboardingFields
-    .filter((f) => f.archivedAt === null)
+    .filter((f) => f.archivedAt === null && f.builtinKey === null)
     .map((f) => {
       const config =
         (f.config as { options?: { value: string; label: string }[] } | null) ??
@@ -328,9 +335,18 @@ async function MemberDetail({
               <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
                 {Object.entries(appData).map(([key, value]) => {
                   const field = onboardingFields.find((f) => f.key === key);
+                  const config =
+                    (field?.config as
+                      | { options?: { value: string; label: string }[] }
+                      | null) ?? null;
                   return (
                     <DtDd key={key} label={field?.label ?? key}>
-                      {formatAppValue(value)}
+                      {formatOnboardingAnswer(
+                        value,
+                        field
+                          ? { type: field.type, options: config?.options ?? [] }
+                          : undefined,
+                      )}
                     </DtDd>
                   );
                 })}
@@ -636,13 +652,6 @@ function formatAddress(
     .filter((p) => p && p.length > 0)
     .join(", ");
   return parts || "—";
-}
-
-function formatAppValue(value: unknown): string {
-  if (value === null || value === undefined || value === "") return "—";
-  if (Array.isArray(value)) return value.join(", ");
-  if (typeof value === "object") return JSON.stringify(value);
-  return String(value);
 }
 
 function StatusBadge({ status, label }: { status: string; label: string }) {

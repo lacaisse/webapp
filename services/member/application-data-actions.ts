@@ -47,8 +47,19 @@ export async function updateMemberApplicationDataAction(input: {
   // are deliberately excluded from the schema but their stored answers are
   // preserved below — an archived question's history shouldn't be editable,
   // nor silently destroyed by saving the form that no longer shows it.
+  // Builtin fields (address, postalCode, city, tierId) are excluded too —
+  // they write to a typed Member column via EditProfileDialog/
+  // MemberTierPicker, not to this JSON blob (see builtin-fields.ts). Without
+  // this filter a submission naming a builtin's key would get merged into
+  // applicationData while the typed column — and everything that reads it,
+  // like the address on card-assigned emails — stayed untouched.
   const fields = await prisma.onboardingField.findMany({
-    where: { fundId: fund.id, target: "MEMBER", archivedAt: null },
+    where: {
+      fundId: fund.id,
+      target: "MEMBER",
+      archivedAt: null,
+      builtinKey: null,
+    },
     select: {
       key: true,
       type: true,
