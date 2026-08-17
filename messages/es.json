@@ -1108,7 +1108,8 @@
       "tabs": {
         "drafts": "Borradores",
         "pending": "Pendientes",
-        "completed": "Completados"
+        "completed": "Completados",
+        "export": "Exportar"
       },
       "settlement": {
         "place": "Lugar",
@@ -1410,7 +1411,43 @@
           "descriptionTooLong": "La descripción es demasiado larga.",
           "completeFailed": "No se pudo marcar el pago como completado. Vuelve a intentarlo en breve.",
           "periodFailed": "No se ha podido actualizar el periodo de liquidación. Inténtalo de nuevo.",
-          "periodNotPending": "El periodo solo puede cambiarse mientras el pago está pendiente."
+          "periodNotPending": "El periodo solo puede cambiarse mientras el pago está pendiente.",
+          "exportFailed": "No se pudo generar la exportación. Vuelve a intentarlo en breve."
+        }
+      },
+      "export": {
+        "description": "Resumen contable de los pagos a comercios: un CSV que detalla, comercio por comercio, lo recaudado y lo abonado en el periodo elegido. UTF-8 con punto y coma, se abre directamente en Excel.",
+        "presets": {
+          "thisMonth": "Este mes",
+          "lastMonth": "El mes pasado",
+          "thisQuarter": "Este trimestre",
+          "lastQuarter": "El trimestre pasado",
+          "thisYear": "Este año",
+          "lastYear": "El año pasado"
+        },
+        "from": "Desde",
+        "to": "Hasta",
+        "download": "Descargar CSV",
+        "rangeInvalid": "La fecha de inicio debe ser anterior a la de fin.",
+        "summary": "{count, plural, =0 {No hay pagos en este periodo.} one {1 pago en este periodo, {net} neto.} other {# pagos en este periodo, {net} neto.}}",
+        "byMerchant": "Por comercio",
+        "payoutCount": "Pagos",
+        "empty": "No hay pagos en este periodo.",
+        "columnsHint": "Columnas del archivo: {columns}.",
+        "columns": {
+          "periodStart": "Inicio del periodo",
+          "periodEnd": "Fin del periodo (incluido)",
+          "merchant": "Comercio",
+          "business": "Empresa",
+          "gross": "Importe bruto",
+          "processorFees": "Comisiones de origen",
+          "platformFee": "Comisión de la plataforma",
+          "manualDeduction": "Deducción manual",
+          "deductionComment": "Motivo de la deducción",
+          "net": "Neto abonado",
+          "status": "Estado",
+          "createdAt": "Fecha de creación (UTC)",
+          "reference": "Referencia"
         }
       },
       "admin": {
