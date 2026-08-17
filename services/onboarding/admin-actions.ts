@@ -7,6 +7,7 @@ import { requireFundRole } from "@/services/auth/dal";
 import { Prisma } from "@/services/db/generated/client";
 import { prisma } from "@/services/db/prisma";
 import {
+  findShadowedBuiltinKey,
   getBuiltinField,
   type BuiltinFieldDef,
 } from "@/services/member/builtin-fields";
@@ -30,6 +31,9 @@ import { NUMERIC_ONLY_OPERATORS, type VisibleIf } from "./visibility";
 export async function createOnboardingFieldAction(input: {
   target: "MEMBER" | "MERCHANT";
   data: FieldData;
+  // Set once the admin has been shown, and dismissed, the warning that this
+  // custom key shadows a built-in member attribute. See the check below.
+  confirmShadowsBuiltin?: boolean;
 }): Promise<OnboardingFieldResult> {
   const t = await getTranslations();
   const { fund } = await requireFundRole("ADMIN");
@@ -66,6 +70,27 @@ export async function createOnboardingFieldAction(input: {
     return {
       error: t("onboardingFields.errors.builtinInvalid" as never),
       field: "builtinKey",
+    };
+  }
+
+  // A CUSTOM key that spells a built-in attribute's name is almost always a
+  // mistake: the answers go to `applicationData` and the typed Member column
+  // stays NULL, so the profile header and the {address} placeholder on
+  // card-assigned emails render blank (issue #178 — the fund had typed
+  // `postalcode`, which the lowercase-only key rule forces, and which is not
+  // the built-in `postalCode`). Almost always, not always — a fund may
+  // genuinely mean something else by "city" — so this asks for confirmation
+  // and offers the built-in instead, rather than refusing outright.
+  const shadowed = builtin
+    ? null
+    : findShadowedBuiltinKey(parsed.data.key);
+  if (shadowed && input.target === "MEMBER" && !input.confirmShadowsBuiltin) {
+    return {
+      error: t("onboardingFields.errors.keyShadowsBuiltin" as never, {
+        key: shadowed,
+      } as never),
+      field: "key",
+      needsConfirm: "shadowsBuiltin",
     };
   }
 

@@ -89,9 +89,18 @@ export const UpdateFieldDataSchema = FieldDataObjectSchema.omit({
 
 export type FieldData = z.infer<typeof FieldDataSchema>;
 
+// `needsConfirm` marks a refusal the admin is allowed to override rather than
+// a hard error: the UI re-offers the action with the matching confirm flag set
+// (or with the better alternative applied). A plain `error` has no override.
+export type OnboardingFieldConfirmable = "shadowsBuiltin";
+
 export type OnboardingFieldResult =
   | { ok: true }
-  | { error: string; field?: keyof FieldData };
+  | {
+      error: string;
+      field?: keyof FieldData;
+      needsConfirm?: OnboardingFieldConfirmable;
+    };
 
 // --- Steps -----------------------------------------------------------------
 // A step is one page of the public signup form. Title/description are

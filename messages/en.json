@@ -1636,6 +1636,10 @@
             "builtinCustom": "Custom question",
             "builtinHint": "A member-record detail is saved to its own column, so it feeds letters, reminders and tier assignment. A custom question is stored separately, alongside the application.",
             "builtinLocked": "Saved to the member record ({key}). The input type is fixed; you can still adjust the label, help text, whether it's required, and its position.",
+            "shadowTitle": "Use the member-record field?",
+            "shadowBody": "Pick “{label}” so the answer is stored on the member's record. A custom question is still fine if you really are asking something else.",
+            "shadowUseBuiltin": "Use “{label}”",
+            "shadowKeepCustom": "Create a custom question anyway",
             "visibleIf": {
               "label": "Only show when",
               "none": "Always shown",
@@ -1963,6 +1967,7 @@
       "notFound": "Field not found.",
       "builtinInvalid": "That member detail is not a known one.",
       "builtinTaken": "That detail is already asked for on this form (check archived fields too).",
+      "keyShadowsBuiltin": "“{key}” is the name of a member-record field. Saved as a custom question, the answer won't feed the member's address, the letters, or tier assignment.",
       "visibleIfInvalid": "That visibility condition isn't valid — check the field it depends on.",
       "visibleIfValueRequired": "Enter a value for the visibility condition."
     }

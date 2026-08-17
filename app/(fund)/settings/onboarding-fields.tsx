@@ -32,7 +32,10 @@ import {
   restoreOnboardingFieldAction,
   updateOnboardingFieldAction,
 } from "@/services/onboarding/admin-actions";
-import { MEMBER_BUILTIN_FIELDS } from "@/services/member/builtin-fields";
+import {
+  findShadowedBuiltinKey,
+  MEMBER_BUILTIN_FIELDS,
+} from "@/services/member/builtin-fields";
 import type { FieldData, FieldOption } from "@/services/onboarding/schema";
 import {
   NUMERIC_ONLY_OPERATORS,
@@ -274,6 +277,10 @@ function FieldDialog({
     edit?.visibleIf?.value ?? "",
   );
   const [error, setError] = useState<string | null>(null);
+  // Set to the built-in attribute this custom key shadows once the server has
+  // asked for confirmation. Renders the choice below rather than refusing —
+  // the fund may genuinely mean a different thing by "city".
+  const [shadowPrompt, setShadowPrompt] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const isBuiltin = builtinKey !== "";
@@ -320,37 +327,65 @@ function FieldDialog({
     setOperator("eq");
     setConditionValue("");
     setError(null);
+    setShadowPrompt(null);
   };
 
   // Picking an attribute fills in its standard label — the admin just told us
   // what this is, so making them retype "Postcode" is busywork. Still editable.
   const onPickBuiltin = (next: string) => {
     setBuiltinKey(next);
-    const choice = MEMBER_BUILTIN_FIELDS.find((b) => b.key === next);
-    setLabel(choice ? tRoot(choice.labelKey as never) : "");
+    setLabel(next ? builtinLabel(next) : "");
   };
 
-  const onSubmit = () => {
+  // The registry's suggested label for an attribute, for prose that names it.
+  // Falls back to the raw key so an unknown one still reads sensibly.
+  const builtinLabel = (key: string): string => {
+    const choice = MEMBER_BUILTIN_FIELDS.find((b) => b.key === key);
+    return choice ? tRoot(choice.labelKey as never) : key;
+  };
+
+  // `override` lets the shadow-key prompt below re-submit in one click —
+  // either switching to the built-in it offered, or insisting on the custom
+  // question. Reading the choice from the argument rather than from state
+  // avoids waiting a render for the setter to land.
+  const onSubmit = (override?: {
+    builtinKey?: string;
+    confirmShadowsBuiltin?: boolean;
+  }) => {
     setError(null);
-    if (!edit && !isBuiltin && existingKeys.includes(key.trim())) {
+    setShadowPrompt(null);
+    const effectiveBuiltinKey = override?.builtinKey ?? builtinKey;
+    const useBuiltin = effectiveBuiltinKey !== "";
+    if (!edit && !useBuiltin && existingKeys.includes(key.trim())) {
       setError(tRoot("onboardingFields.errors.keyTaken" as never));
       return;
     }
     startTransition(async () => {
+      const builtinChoice = MEMBER_BUILTIN_FIELDS.find(
+        (b) => b.key === effectiveBuiltinKey,
+      );
+      // A built-in's type is fixed by its column, and it never carries
+      // options. Send the registry's type rather than whatever the type
+      // select happens to show, or switching an in-progress SELECT over to a
+      // built-in would trip the "options required" refinement server-side.
+      const effectiveType = useBuiltin ? (builtinChoice?.type ?? type) : type;
       const data: FieldData = {
         // For a built-in the server overrides both of these from its registry;
         // sending the attribute name keeps the payload honest either way.
-        key: isBuiltin ? builtinKey : key.trim(),
-        builtinKey: isBuiltin ? builtinKey : null,
-        type,
+        key: useBuiltin ? effectiveBuiltinKey : key.trim(),
+        builtinKey: useBuiltin ? effectiveBuiltinKey : null,
+        type: effectiveType,
         label: label.trim(),
         helpText: helpText.trim() || null,
         required,
         position,
         stepId: stepId || null,
-        options: needsOptions ? parseOptions(optionsText) : undefined,
+        options:
+          !useBuiltin && TYPES_NEEDING_OPTIONS.includes(effectiveType)
+            ? parseOptions(optionsText)
+            : undefined,
         visibleIf:
-          !isBuiltin && dependsOnKey
+          !useBuiltin && dependsOnKey
             ? {
                 fieldKey: dependsOnKey,
                 operator,
@@ -360,9 +395,19 @@ function FieldDialog({
       };
       const result = edit
         ? await updateOnboardingFieldAction({ fieldId: edit.id, data })
-        : await createOnboardingFieldAction({ target, data });
+        : await createOnboardingFieldAction({
+            target,
+            data,
+            confirmShadowsBuiltin: override?.confirmShadowsBuiltin,
+          });
       if ("error" in result) {
         setError(result.error);
+        // An overridable refusal: offer the built-in it shadows, or let the
+        // admin insist. The key it collides with is derived from the same
+        // pure registry the server checked against.
+        if ("needsConfirm" in result && result.needsConfirm === "shadowsBuiltin") {
+          setShadowPrompt(findShadowedBuiltinKey(key.trim()));
+        }
         return;
       }
       setOpen(false);
@@ -587,6 +632,34 @@ function FieldDialog({
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
+        {shadowPrompt && (
+          <div className="space-y-2 rounded-md border border-foreground/15 p-3">
+            <p className="text-sm font-medium">{t("shadowTitle")}</p>
+            <p className="text-xs text-muted-foreground">
+              {t("shadowBody", { label: builtinLabel(shadowPrompt) })}
+            </p>
+            <div className="flex flex-wrap gap-2 pt-1">
+              <Button
+                size="sm"
+                disabled={pending}
+                onClick={() => {
+                  onPickBuiltin(shadowPrompt);
+                  onSubmit({ builtinKey: shadowPrompt });
+                }}
+              >
+                {t("shadowUseBuiltin", { label: builtinLabel(shadowPrompt) })}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={pending}
+                onClick={() => onSubmit({ confirmShadowsBuiltin: true })}
+              >
+                {t("shadowKeepCustom")}
+              </Button>
+            </div>
+          </div>
+        )}
         <DialogFooter>
           <Button
             variant="outline"
@@ -595,7 +668,7 @@ function FieldDialog({
           >
             {t("cancel")}
           </Button>
-          <Button onClick={onSubmit} disabled={pending}>
+          <Button onClick={() => onSubmit()} disabled={pending}>
             {pending ? t("saving") : t("save")}
           </Button>
         </DialogFooter>

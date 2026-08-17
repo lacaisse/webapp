@@ -1636,6 +1636,10 @@
             "builtinCustom": "Aangepaste vraag",
             "builtinHint": "Een gegeven uit de ledenfiche wordt in zijn eigen kolom bewaard en voedt zo brieven, herinneringen en niveautoewijzing. Een aangepaste vraag wordt apart bij de aanvraag bewaard.",
             "builtinLocked": "Wordt in de ledenfiche bewaard ({key}). Het invoertype ligt vast; label, hulptekst, verplichting en positie kun je wel aanpassen.",
+            "shadowTitle": "Het veld van de ledenfiche gebruiken?",
+            "shadowBody": "Kies “{label}” zodat het antwoord op de ledenfiche wordt bewaard. Een aangepaste vraag blijft prima als u echt iets anders vraagt.",
+            "shadowUseBuiltin": "“{label}” gebruiken",
+            "shadowKeepCustom": "Toch een aangepaste vraag maken",
             "visibleIf": {
               "label": "Alleen tonen als",
               "none": "Altijd zichtbaar",
@@ -1963,6 +1967,7 @@
       "notFound": "Veld niet gevonden.",
       "builtinInvalid": "Dat lidgegeven is niet bekend.",
       "builtinTaken": "Dat gegeven wordt al gevraagd op dit formulier (controleer ook gearchiveerde velden).",
+      "keyShadowsBuiltin": "“{key}” is de naam van een veld op de ledenfiche. Opgeslagen als aangepaste vraag voedt het antwoord noch het adres van het lid, noch de brieven, noch de niveautoewijzing.",
       "visibleIfInvalid": "Die zichtbaarheidsvoorwaarde is ongeldig — controleer het veld waarvan ze afhangt.",
       "visibleIfValueRequired": "Vul een waarde in voor de zichtbaarheidsvoorwaarde."
     }
