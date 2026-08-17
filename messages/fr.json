@@ -1634,6 +1634,10 @@
             "builtinCustom": "Question personnalisée",
             "builtinHint": "Une information de la fiche membre est enregistrée dans sa colonne dédiée — elle alimente les courriers, les rappels et l'attribution de palier. Une question personnalisée est stockée à part, avec la candidature.",
             "builtinLocked": "Enregistré dans la fiche membre ({key}). Le type de saisie est imposé ; vous pouvez adapter le libellé, l'aide, l'obligation et la position.",
+            "shadowTitle": "Utiliser le champ de la fiche membre ?",
+            "shadowBody": "Choisissez « {label} » pour que la réponse soit enregistrée dans la fiche du membre. Une question personnalisée reste possible si vous demandez vraiment autre chose.",
+            "shadowUseBuiltin": "Utiliser « {label} »",
+            "shadowKeepCustom": "Créer quand même une question personnalisée",
             "visibleIf": {
               "label": "Afficher seulement si",
               "none": "Toujours affiché",
@@ -1961,6 +1965,7 @@
       "notFound": "Champ introuvable.",
       "builtinInvalid": "Cette information de membre est inconnue.",
       "builtinTaken": "Cette information est déjà demandée sur ce formulaire (vérifiez aussi les champs archivés).",
+      "keyShadowsBuiltin": "« {key} » est le nom d'un champ de la fiche membre. Enregistrée comme question personnalisée, la réponse n'alimentera ni l'adresse du membre, ni les courriers, ni l'attribution de palier.",
       "visibleIfInvalid": "La condition d'affichage n'est pas valide — vérifiez le champ dont elle dépend.",
       "visibleIfValueRequired": "Indiquez la valeur de la condition d'affichage."
     }

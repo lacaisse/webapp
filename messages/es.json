@@ -1634,6 +1634,10 @@
             "builtinCustom": "Pregunta personalizada",
             "builtinHint": "Un dato de la ficha de miembro se guarda en su propia columna, así alimenta cartas, recordatorios y la asignación de nivel. Una pregunta personalizada se guarda aparte, junto a la candidatura.",
             "builtinLocked": "Se guarda en la ficha de miembro ({key}). El tipo de entrada es fijo; puedes ajustar la etiqueta, la ayuda, si es obligatorio y su posición.",
+            "shadowTitle": "¿Usar el campo de la ficha del miembro?",
+            "shadowBody": "Elija «{label}» para que la respuesta se guarde en la ficha del miembro. Una pregunta personalizada sigue siendo válida si realmente pregunta otra cosa.",
+            "shadowUseBuiltin": "Usar «{label}»",
+            "shadowKeepCustom": "Crear igualmente una pregunta personalizada",
             "visibleIf": {
               "label": "Mostrar solo si",
               "none": "Siempre visible",
@@ -1961,6 +1965,7 @@
       "notFound": "Campo no encontrado.",
       "builtinInvalid": "Ese dato de miembro no es válido.",
       "builtinTaken": "Ese dato ya se pide en este formulario (revisa también los campos archivados).",
+      "keyShadowsBuiltin": "«{key}» es el nombre de un campo de la ficha del miembro. Guardada como pregunta personalizada, la respuesta no alimentará la dirección del miembro, ni las cartas, ni la asignación de nivel.",
       "visibleIfInvalid": "Esa condición de visibilidad no es válida — revisa el campo del que depende.",
       "visibleIfValueRequired": "Indica el valor de la condición de visibilidad."
     }
