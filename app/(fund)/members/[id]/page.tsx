@@ -28,7 +28,10 @@ import { contributionApplies } from "@/services/member/contribution";
 import type { ExtraValue } from "@/services/member/schema";
 import { prisma } from "@/services/db/prisma";
 import { requireCurrentFund } from "@/services/fund/server";
-import { formatOnboardingAnswer } from "@/services/onboarding/format";
+import {
+  formatOnboardingAnswer,
+  type AnswerFormatters,
+} from "@/services/onboarding/format";
 import { parseVisibleIf } from "@/services/onboarding/visibility";
 
 import { UnassignCardButton } from "../../cards/unassign-card-button";
@@ -64,7 +67,15 @@ async function MemberDetail({
 }) {
   const t = await getTranslations("fund.members.detail");
   const tStatus = await getTranslations("members.admin.status.values");
+  const tCommon = await getTranslations("common");
   const format = await getFormatter();
+  // Injected into formatOnboardingAnswer so the pure helper can render
+  // CHECKBOX / DATE answers in the admin's language without importing
+  // next-intl itself. See services/onboarding/format.ts.
+  const answerFormatters: AnswerFormatters = {
+    boolean: (v) => (v ? tCommon("yes") : tCommon("no")),
+    date: (v) => format.dateTime(new Date(v), { dateStyle: "medium" }),
+  };
   const fund = await requireCurrentFund();
   const { id } = await params;
 
@@ -346,6 +357,7 @@ async function MemberDetail({
                         field
                           ? { type: field.type, options: config?.options ?? [] }
                           : undefined,
+                        answerFormatters,
                       )}
                     </DtDd>
                   );

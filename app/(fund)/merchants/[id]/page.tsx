@@ -38,7 +38,10 @@ import { getCitizenPayClient } from "@/services/citizenpay/client";
 import { prisma } from "@/services/db/prisma";
 import { requireFundRole } from "@/services/auth/dal";
 import { requireCurrentFund } from "@/services/fund/server";
-import { formatOnboardingAnswer } from "@/services/onboarding/format";
+import {
+  formatOnboardingAnswer,
+  type AnswerFormatters,
+} from "@/services/onboarding/format";
 
 import { AddressLabel, buildAddressDirectory } from "../../token/address-label";
 import { getPlacesForFund, getProfile } from "../../token/data";
@@ -78,7 +81,13 @@ async function MerchantDetail({
 }) {
   await requireFundRole("ADMIN");
   const t = await getTranslations("fund.merchants.detail");
+  const tCommon = await getTranslations("common");
   const format = await getFormatter();
+  // See the matching block in app/(fund)/members/[id]/page.tsx.
+  const answerFormatters: AnswerFormatters = {
+    boolean: (v) => (v ? tCommon("yes") : tCommon("no")),
+    date: (v) => format.dateTime(new Date(v), { dateStyle: "medium" }),
+  };
   const fund = await requireCurrentFund();
   const { id } = await params;
   const { cursor } = await searchParams;
@@ -98,6 +107,10 @@ async function MerchantDetail({
 
   if (!merchant) notFound();
 
+  // No `builtinKey` filter here, unlike the member page: resolveBuiltin in
+  // services/onboarding/admin-actions.ts rejects a builtinKey on any non-MEMBER
+  // target, so a MERCHANT field can never carry one. Adding the filter would
+  // match every row and mislead the next reader — don't "fix" this asymmetry.
   const onboardingFields = await prisma.onboardingField.findMany({
     where: { fundId: fund.id, target: "MERCHANT" },
     orderBy: [{ archivedAt: "asc" }, { position: "asc" }],
@@ -437,6 +450,7 @@ async function MerchantDetail({
                       field
                         ? { type: field.type, options: config?.options ?? [] }
                         : undefined,
+                      answerFormatters,
                     )}
                   </DtDd>
                 );

@@ -53,6 +53,13 @@ export async function updateMemberApplicationDataAction(input: {
   // this filter a submission naming a builtin's key would get merged into
   // applicationData while the typed column — and everything that reads it,
   // like the address on card-assigned emails — stayed untouched.
+  //
+  // Answers ALREADY sitting under a now-builtin key are deliberately not
+  // cleaned up here: mergeApplicationData preserves keys outside the editable
+  // set on purpose, and clearing them on save would destroy data the admin
+  // can't see in the dialog. That migration is
+  // scripts/promote-builtin-onboarding-fields.ts, which moves such answers
+  // into the typed column and then drops the JSON key.
   const fields = await prisma.onboardingField.findMany({
     where: {
       fundId: fund.id,

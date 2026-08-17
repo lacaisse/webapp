@@ -1,6 +1,8 @@
 {
   "common": {
     "or": "of",
+    "yes": "Ja",
+    "no": "Nee",
     "cancel": "Annuleren",
     "close": "Sluiten",
     "save": "Opslaan",
