@@ -1147,6 +1147,19 @@
           "burnt": "Burnt",
           "complete": "Complete"
         },
+        "orderTypes": {
+          "app": "App",
+          "manual": "Manual",
+          "pos": "Point of sale",
+          "terminal": "Terminal",
+          "web": "Web"
+        },
+        "orderStatuses": {
+          "paid": "Paid",
+          "refund": "Refund",
+          "refunded": "Refunded",
+          "correction": "Correction"
+        },
         "signed": {
           "title": "Payment signed",
           "description": "Your bank transfer has been signed.",
@@ -1414,11 +1427,13 @@
           "completeFailed": "Couldn't mark the payout as completed. Try again shortly.",
           "periodFailed": "Could not update the settlement period. Please try again.",
           "periodNotPending": "The settlement period can only be changed while the payout is pending.",
-          "exportFailed": "Couldn't generate the export. Try again shortly."
+          "exportFailed": "Couldn't generate the export. Try again shortly.",
+          "exportOrdersFailed": "Could not load the transactions of one of the payouts. The export was not generated — try again shortly.",
+          "exportOrdersTruncated": "One of the payouts holds too many transactions to export in one go. Narrow the period and try again."
         }
       },
       "export": {
-        "description": "Accounting recap of merchant payouts: a CSV detailing, merchant by merchant, what was collected and paid out over the period you pick. Semicolon-separated UTF-8, so it opens straight in Excel.",
+        "description": "Two accounting exports of merchant payouts for the period you pick: the recap (one row per payout) and the transaction detail (one row per order inside those payouts). Semicolon-separated UTF-8, so both open straight in Excel.",
         "presets": {
           "thisMonth": "This month",
           "lastMonth": "Last month",
@@ -1429,13 +1444,16 @@
         },
         "from": "From",
         "to": "To",
-        "download": "Download CSV",
+        "downloadRecap": "Recap (CSV)",
+        "downloadDetail": "Transaction detail (CSV)",
         "rangeInvalid": "The start date must come before the end date.",
         "summary": "{count, plural, =0 {No payouts in this period.} one {1 payout in this period, {net} net.} other {# payouts in this period, {net} net.}}",
         "byMerchant": "By merchant",
         "payoutCount": "Payouts",
         "empty": "No payouts in this period.",
         "columnsHint": "File columns: {columns}.",
+        "recapHint": "one row per payout to a merchant.",
+        "detailHint": "one row per transaction inside those payouts, with where it came from.",
         "columns": {
           "periodStart": "Period start",
           "periodEnd": "Period end (inclusive)",
@@ -1450,6 +1468,24 @@
           "status": "Status",
           "createdAt": "Created at (UTC)",
           "reference": "Reference"
+        },
+        "orderColumns": {
+          "periodStart": "Period start",
+          "periodEnd": "Period end (inclusive)",
+          "merchant": "Merchant",
+          "business": "Business",
+          "reference": "Payout reference",
+          "payoutStatus": "Payout status",
+          "orderId": "Transaction ID",
+          "orderDate": "Transaction date (UTC)",
+          "source": "Source",
+          "gross": "Gross amount",
+          "processorFees": "Source fees",
+          "platformFeeShare": "Platform fee share",
+          "netCredit": "Net credited",
+          "orderStatus": "Transaction status",
+          "description": "Description",
+          "txHash": "Transaction hash"
         }
       },
       "admin": {

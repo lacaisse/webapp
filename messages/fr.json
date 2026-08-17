@@ -1147,6 +1147,19 @@
           "burnt": "Brûlé",
           "complete": "Terminé"
         },
+        "orderTypes": {
+          "app": "Application",
+          "manual": "Manuel",
+          "pos": "Caisse",
+          "terminal": "Terminal",
+          "web": "Web"
+        },
+        "orderStatuses": {
+          "paid": "Payée",
+          "refund": "Remboursement",
+          "refunded": "Remboursée",
+          "correction": "Correction"
+        },
         "signed": {
           "title": "Paiement signé",
           "description": "Votre virement bancaire a été signé.",
@@ -1414,11 +1427,13 @@
           "completeFailed": "Impossible de marquer le versement comme terminé. Réessayez bientôt.",
           "periodFailed": "Impossible de modifier la période de versement. Veuillez réessayer.",
           "periodNotPending": "La période ne peut être modifiée que tant que le virement est en attente.",
-          "exportFailed": "Impossible de générer l'export. Réessayez bientôt."
+          "exportFailed": "Impossible de générer l'export. Réessayez bientôt.",
+          "exportOrdersFailed": "Impossible de charger les transactions d'un des virements. L'export n'a pas été généré — réessayez bientôt.",
+          "exportOrdersTruncated": "Un des virements contient trop de transactions pour être exporté d'un seul bloc. Réduisez la période et réessayez."
         }
       },
       "export": {
-        "description": "Récapitulatif comptable des virements aux commerçants : un fichier CSV détaillant, commerçant par commerçant, les montants perçus et reversés sur la période choisie. Séparateur point-virgule et encodage UTF-8, ouvrable directement dans Excel.",
+        "description": "Deux exports comptables des virements aux commerçants sur la période choisie : le récapitulatif (une ligne par virement) et le détail des transactions (une ligne par commande contenue dans ces virements). Séparateur point-virgule et encodage UTF-8, ouvrables directement dans Excel.",
         "presets": {
           "thisMonth": "Ce mois-ci",
           "lastMonth": "Le mois dernier",
@@ -1429,13 +1444,16 @@
         },
         "from": "Du",
         "to": "Au",
-        "download": "Télécharger le CSV",
+        "downloadRecap": "Récapitulatif (CSV)",
+        "downloadDetail": "Détail des transactions (CSV)",
         "rangeInvalid": "La date de début doit précéder la date de fin.",
         "summary": "{count, plural, =0 {Aucun virement sur cette période.} one {1 virement sur cette période, {net} net.} other {# virements sur cette période, {net} net.}}",
         "byMerchant": "Par commerçant",
         "payoutCount": "Virements",
         "empty": "Aucun virement sur cette période.",
         "columnsHint": "Colonnes du fichier : {columns}.",
+        "recapHint": "une ligne par virement à un commerçant.",
+        "detailHint": "une ligne par transaction contenue dans ces virements, avec sa provenance.",
         "columns": {
           "periodStart": "Début de période",
           "periodEnd": "Fin de période (incluse)",
@@ -1450,6 +1468,24 @@
           "status": "Statut",
           "createdAt": "Date de création (UTC)",
           "reference": "Référence"
+        },
+        "orderColumns": {
+          "periodStart": "Début de période",
+          "periodEnd": "Fin de période (incluse)",
+          "merchant": "Commerçant",
+          "business": "Enseigne",
+          "reference": "Référence du virement",
+          "payoutStatus": "Statut du virement",
+          "orderId": "ID transaction",
+          "orderDate": "Date de la transaction (UTC)",
+          "source": "Provenance",
+          "gross": "Montant brut",
+          "processorFees": "Frais source",
+          "platformFeeShare": "Part de commission plateforme",
+          "netCredit": "Net crédité",
+          "orderStatus": "Statut de la transaction",
+          "description": "Description",
+          "txHash": "Hash de transaction"
         }
       },
       "admin": {
