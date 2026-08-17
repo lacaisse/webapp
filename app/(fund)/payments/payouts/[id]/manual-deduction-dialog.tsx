@@ -22,23 +22,32 @@ import {
   clearManualDeductionAction,
   setManualDeductionAction,
 } from "@/services/payout/admin-actions";
+import {
+  fromCents,
+  maxManualDeductionCents,
+  payoutNet,
+  toCents,
+} from "@/services/payout/money";
 
 // Set/clear a payout's manual deduction — a ledger adjustment that lowers the
-// net the merchant is paid (no on-chain effect). Pre-filled with the current
-// value; the projected net updates live. The server re-validates and is the
-// final authority on the bound + the "not complete" rule.
+// net the merchant is paid. Nothing moves now: the deducted tokens leave the
+// place's wallet alongside the platform fees at the settlement sweep.
+// Pre-filled with the current value; the projected net updates live. The server
+// re-validates and is the final authority on the bound + the "not complete" rule.
 export function ManualDeductionDialog({
   payoutId,
   amount,
   comment,
   total,
   fees,
+  payoutFees,
 }: {
   payoutId: string;
   amount: string; // current deduction, EUR decimal
   comment: string | null;
   total: string; // EUR decimal
-  fees: string; // EUR decimal
+  fees: string; // EUR decimal — processor cut withheld at source
+  payoutFees: string; // EUR decimal — platform cut charged at payout
 }) {
   const t = useTranslations("fund.payments.settlement.deduction");
   const tRoot = useTranslations();
@@ -63,13 +72,17 @@ export function ManualDeductionDialog({
     format.number(Number(v), { style: "currency", currency: "EUR" });
 
   const amountNum = Number(value || "0");
-  const maxDeduction = Number(total) - Number(fees);
+  // Both fee figures are already out of the merchant's share, so the deduction
+  // can only eat into what's left — mirrors the bound the action re-checks.
+  const maxDeduction = maxManualDeductionCents({ total, fees, payoutFees });
   const valid =
     value.trim() !== "" &&
     Number.isFinite(amountNum) &&
     amountNum >= 0 &&
-    amountNum <= maxDeduction;
-  const projectedNet = valid ? (maxDeduction - amountNum).toFixed(2) : null;
+    toCents(value) <= maxDeduction;
+  const projectedNet = valid
+    ? payoutNet({ total, fees, payoutFees, manualDeduction: value })
+    : null;
   const hasDeduction = Number(amount) > 0;
 
   const onConfirm = () => {
@@ -133,7 +146,7 @@ export function ManualDeductionDialog({
               placeholder="0.00"
             />
             <p className="text-xs text-muted-foreground">
-              {t("amountHint", { max: euro(maxDeduction.toFixed(2)) })}
+              {t("amountHint", { max: euro(fromCents(maxDeduction)) })}
             </p>
           </div>
 

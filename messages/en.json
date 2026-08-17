@@ -1116,11 +1116,13 @@
         "orderCount": "Orders",
         "total": "Total",
         "fees": "Fees",
+        "processorFees": "Processor fees",
+        "platformFee": "Platform fee",
         "net": "Net",
         "manualDeduction": "Manual deduction",
         "placeBalance": "Place balance",
         "placeBalanceEnough": "Enough to settle",
-        "placeBalanceLow": "Below the payout total",
+        "placeBalanceLow": "Below what settlement removes",
         "status": "Status",
         "burnTx": "Burn tx",
         "loadError": "Couldn't load payouts from CitizenPay. Try again shortly.",
@@ -1157,7 +1159,7 @@
             "complete": "Complete"
           },
           "burn": {
-            "hint": "Burns the net amount from the place's account on-chain."
+            "hint": "Burns the merchant's net from the place's account; the platform fees and deduction are swept to the fund."
           },
           "pay": {
             "hint": "Create the bank payment to the merchant; you'll sign the transfer at your bank.",
@@ -1210,10 +1212,13 @@
           "noMatches": "No transfers match your search.",
           "unknownCounterpart": "Unknown sender",
           "amount": "Amount",
-          "fee": "Fee",
+          "feeProcessor": "Processor fee",
+          "feeProcessorHint": "Withheld at source by the payment processor. Leave 0 for a bank transfer.",
+          "feePlatform": "Platform fee",
+          "feePlatformHint": "Your cut, swept from the place's account at settlement. Suggested from your fee rate.",
           "descriptionLabel": "Description",
           "descriptionPlaceholder": "What this order is for",
-          "net": "Net",
+          "net": "Minted to the place",
           "confirm": "Add order",
           "successMinted": "Order added and net minted to the place.",
           "mintFailed": "Order added, but automatic minting failed. Reconcile it from the Issues tab."
@@ -1238,7 +1243,7 @@
           "trigger": "Add deduction",
           "edit": "Edit deduction",
           "title": "Manual deduction",
-          "description": "A ledger adjustment that lowers the net paid to the merchant. No on-chain effect.",
+          "description": "A ledger adjustment that lowers the net paid to the merchant. Nothing moves now — the amount leaves the place's account with the platform fees at settlement.",
           "amount": "Deduction amount",
           "amountHint": "Maximum {max}. Enter 0 to clear the deduction.",
           "comment": "Comment",
@@ -1267,17 +1272,17 @@
         "burn": {
           "button": "Burn tokens",
           "title": "Burn payout tokens?",
-          "description": "This burns the on-chain tokens backing this payout. Burn and bank payment are independent — do them in either order.",
+          "description": "This burns the on-chain tokens behind the merchant's net; the platform fees and any deduction are swept to the fund account. Burn and bank payment are independent — do them in either order.",
           "warning": "This is irreversible. The tokens for this payout will be permanently burned.",
           "confirm": "Burn tokens",
           "success": "Tokens burned. Transaction hash:",
-          "feeSwept": "Fees transferred to the fund account: {amount}",
-          "feeNotSwept": "Tokens burned, but the fees haven't been transferred yet."
+          "feeSwept": "Platform fees and deduction transferred to the fund account: {amount}",
+          "feeNotSwept": "Tokens burned, but the platform fees haven't been transferred yet."
         },
         "feeTransfer": {
-          "pending": "This payout's fees haven't been transferred yet.",
-          "button": "Transfer fees",
-          "done": "Fees transferred. Transaction hash:"
+          "pending": "This payout's platform fees and deduction haven't been transferred yet.",
+          "button": "Transfer platform fees",
+          "done": "Platform fees transferred. Transaction hash:"
         },
         "orders": {
           "title": "Orders",
@@ -1376,7 +1381,7 @@
           "notBurnable": "This payout is no longer at the burn step (already burnt or settled).",
           "payoutNotFound": "Payout not found.",
           "deductionFailed": "Couldn't save the deduction. Try again shortly.",
-          "deductionTooHigh": "The deduction can't exceed total minus fees.",
+          "deductionTooHigh": "The deduction can't exceed total minus processor fees and platform fees.",
           "deductionNotPending": "The manual deduction can only be changed while the payout is pending.",
           "reportFailed": "Tokens burned on-chain, but couldn't report it to Citizen Pay. Don't retry — keep the transaction hash for reconciliation.",
           "noFeeDestination": "No fee destination account. Connect the fund to Citizen Pay first.",
@@ -1400,6 +1405,8 @@
           "feeInvalid": "Enter a valid fee.",
           "amountPositive": "The amount must be greater than zero.",
           "feeTooHigh": "The fee can't be more than the amount.",
+          "payoutFeeInvalid": "Enter a valid platform fee.",
+          "feesTooHigh": "The processor fee and platform fee together can't exceed the amount.",
           "descriptionTooLong": "The description is too long.",
           "completeFailed": "Couldn't mark the payout as completed. Try again shortly.",
           "periodFailed": "Could not update the settlement period. Please try again.",
