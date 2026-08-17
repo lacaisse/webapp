@@ -1116,11 +1116,13 @@
         "orderCount": "Commandes",
         "total": "Total",
         "fees": "Frais",
+        "processorFees": "Frais source",
+        "platformFee": "Commission plateforme",
         "net": "Net",
         "manualDeduction": "Déduction manuelle",
         "placeBalance": "Solde du commerce",
         "placeBalanceEnough": "Suffisant pour le règlement",
-        "placeBalanceLow": "Inférieur au total du virement",
+        "placeBalanceLow": "Inférieur au montant prélevé au règlement",
         "status": "Statut",
         "burnTx": "Tx de burn",
         "loadError": "Impossible de charger les virements depuis CitizenPay. Réessayez bientôt.",
@@ -1157,7 +1159,7 @@
             "complete": "Terminé"
           },
           "burn": {
-            "hint": "Brûle le montant net du compte du commerce on-chain."
+            "hint": "Brûle le net du commerce depuis son compte ; la commission plateforme et la déduction sont transférées à la caisse."
           },
           "pay": {
             "hint": "Crée le paiement bancaire au commerce ; vous signerez le virement à votre banque.",
@@ -1210,10 +1212,13 @@
           "noMatches": "Aucun virement ne correspond à votre recherche.",
           "unknownCounterpart": "Expéditeur inconnu",
           "amount": "Montant",
-          "fee": "Frais",
+          "feeProcessor": "Frais processeur",
+          "feeProcessorHint": "Retenus à la source par le processeur de paiement. Laissez 0 pour un virement bancaire.",
+          "feePlatform": "Commission plateforme",
+          "feePlatformHint": "Votre part, prélevée du compte du commerce au règlement. Suggérée d’après votre taux.",
           "descriptionLabel": "Description",
           "descriptionPlaceholder": "Objet de la commande",
-          "net": "Net",
+          "net": "Émis vers le commerce",
           "confirm": "Ajouter la commande",
           "successMinted": "Commande ajoutée et net émis vers le commerce.",
           "mintFailed": "Commande ajoutée, mais l’émission automatique a échoué. Réconciliez-la depuis l’onglet Problèmes."
@@ -1238,7 +1243,7 @@
           "trigger": "Ajouter une déduction",
           "edit": "Modifier la déduction",
           "title": "Déduction manuelle",
-          "description": "Ajustement comptable qui diminue le net versé au commerce. Sans effet on-chain.",
+          "description": "Ajustement comptable qui diminue le net versé au commerce. Rien ne bouge maintenant : le montant quitte le compte du commerce avec la commission, au règlement.",
           "amount": "Montant de la déduction",
           "amountHint": "Maximum {max}. Saisissez 0 pour supprimer la déduction.",
           "comment": "Commentaire",
@@ -1267,17 +1272,17 @@
         "burn": {
           "button": "Brûler les jetons",
           "title": "Brûler les jetons du virement ?",
-          "description": "Cette action brûle les jetons on-chain correspondant à ce virement. Le burn et le paiement bancaire sont indépendants — dans n’importe quel ordre.",
+          "description": "Cette action brûle les jetons on-chain correspondant au net du commerce ; la commission plateforme et la déduction sont transférées à la caisse. Le burn et le paiement bancaire sont indépendants — dans n’importe quel ordre.",
           "warning": "Cette action est irréversible. Les jetons de ce virement seront définitivement brûlés.",
           "confirm": "Brûler les jetons",
           "success": "Jetons brûlés. Hash de transaction :",
-          "feeSwept": "Commission transférée vers le compte de la caisse : {amount}",
-          "feeNotSwept": "Jetons brûlés, mais la commission n'a pas encore été transférée."
+          "feeSwept": "Commission plateforme et déduction transférées vers le compte de la caisse : {amount}",
+          "feeNotSwept": "Jetons brûlés, mais la commission plateforme n’a pas encore été transférée."
         },
         "feeTransfer": {
-          "pending": "La commission de ce virement n'a pas encore été transférée.",
+          "pending": "La commission plateforme et la déduction de ce virement n’ont pas encore été transférées.",
           "button": "Transférer la commission",
-          "done": "Commission transférée. Hash de transaction :"
+          "done": "Commission plateforme transférée. Hash de transaction :"
         },
         "orders": {
           "title": "Commandes",
@@ -1376,7 +1381,7 @@
           "notBurnable": "Ce virement n’est plus à l’étape de brûlage (déjà brûlé ou réglé).",
           "payoutNotFound": "Virement introuvable.",
           "deductionFailed": "Impossible d’enregistrer la déduction. Réessayez bientôt.",
-          "deductionTooHigh": "La déduction ne peut pas dépasser le total moins les frais.",
+          "deductionTooHigh": "La déduction ne peut pas dépasser le total moins les frais processeur et la commission plateforme.",
           "deductionNotPending": "La déduction manuelle ne peut être modifiée que tant que le virement est en attente.",
           "reportFailed": "Jetons brûlés on-chain, mais impossible de le signaler à Citizen Pay. Ne réessayez pas — conservez le hash de transaction pour réconciliation.",
           "noFeeDestination": "Aucun compte de destination pour la commission. Connectez d'abord la caisse à Citizen Pay.",
@@ -1400,6 +1405,8 @@
           "feeInvalid": "Saisissez des frais valides.",
           "amountPositive": "Le montant doit être supérieur à zéro.",
           "feeTooHigh": "Les frais ne peuvent pas dépasser le montant.",
+          "payoutFeeInvalid": "Saisissez une commission plateforme valide.",
+          "feesTooHigh": "Les frais processeur et la commission plateforme ne peuvent pas dépasser le montant.",
           "descriptionTooLong": "La description est trop longue.",
           "completeFailed": "Impossible de marquer le versement comme terminé. Réessayez bientôt.",
           "periodFailed": "Impossible de modifier la période de versement. Veuillez réessayer.",

@@ -19,6 +19,7 @@ import {
 import type { Payout, PayoutStatus } from "@/services/citizenpay/types";
 import { requireFundRole } from "@/services/auth/dal";
 import { requireCurrentFund } from "@/services/fund/server";
+import { orderWalletCredit } from "@/services/payout/money";
 import { cn } from "@/lib/utils";
 
 import { AddOrdersDialog } from "./add-orders-dialog";
@@ -145,9 +146,19 @@ export default async function PayoutDetailPage({
           </Badge>
         </div>
 
-        <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {/* Total → the two fee figures → Net, in the order the money leaves:
+            the processor took its cut before we saw it, the platform takes
+            its own at the sweep, the merchant keeps the rest. */}
+        <dl className="grid grid-cols-2 gap-3 lg:grid-cols-5">
           <Stat label={t("total")} value={euro(format, payout.totalAmount)} />
-          <Stat label={t("fees")} value={euro(format, payout.totalFees)} />
+          <Stat
+            label={t("processorFees")}
+            value={euro(format, payout.totalFees)}
+          />
+          <Stat
+            label={t("platformFee")}
+            value={euro(format, payout.totalPayoutFees)}
+          />
           <Stat label={t("net")} value={euro(format, payout.net)} emphasis />
           <Suspense fallback={<StatSkeleton label={t("placeBalance")} />}>
             <PlaceBalanceStat
@@ -155,7 +166,7 @@ export default async function PayoutDetailPage({
               citizenPayApiKeyId={fund.citizenPayApiKeyId}
               citizenPayApiKeyEnc={fund.citizenPayApiKeyEnc}
               placeId={payout.placeId}
-              required={payout.totalAmount}
+              required={walletOutflow(payout)}
               symbol={fund.tokenSymbol}
               tokenAddress={fund.tokenAddress}
               tokenChainId={fund.tokenChainId}
@@ -190,6 +201,7 @@ export default async function PayoutDetailPage({
                 comment={payout.manualDeductionComment}
                 total={payout.totalAmount}
                 fees={payout.totalFees}
+                payoutFees={payout.totalPayoutFees}
               />
             )}
           </div>
@@ -215,7 +227,14 @@ export default async function PayoutDetailPage({
           {liveStatus === "pending" && (
             <div className="flex items-center gap-2">
               <AddOrdersDialog payoutId={id} />
-              <CreateOrderDialog payoutId={id} />
+              {/* The fund's own rate seeds the platform-fee suggestion; it's a
+                  Decimal column, so hand the client a plain string. */}
+              <CreateOrderDialog
+                payoutId={id}
+                payoutFeePercentage={
+                  fund.payoutFeePercentage?.toString() ?? null
+                }
+              />
             </div>
           )}
         </div>
@@ -318,12 +337,15 @@ function Stat({
 // The place's live on-chain balance vs what settling this payout takes out of
 // that account — green when it holds enough, amber when it's short.
 //
-// `required` is the payout TOTAL, not the net: settlement removes the net (the
-// burn) *and* the retained cut (the sweep of fees + manual deduction), and
-// net + fees + deduction === total. Comparing against the net alone reads green
-// on a payout whose burn succeeds and whose sweep then fails with a 402, which
-// is how a payout ends up burnt with its cut still stranded in the merchant's
-// account.
+// `required` is `total − fees` (see walletOutflow): settlement removes the net
+// (the burn) *and* the retained cut (the sweep of payoutFees + manualDeduction),
+// which together are exactly what the place's wallet was credited for these
+// orders. It is NOT the payout total — the processor's commission was withheld
+// at source, so those tokens were never minted and asking the wallet to hold
+// them reads amber on a perfectly fundable payout. Nor is it the net alone,
+// which reads green on a payout whose burn succeeds and whose sweep then fails
+// with a 402 — that's how a payout ends up burnt with the platform's cut still
+// stranded in the merchant's account.
 //
 // Caveat this can't express: the balance is the place's whole wallet, not a
 // per-payout pot. A place with two pending payouts needs the sum of both, so
@@ -448,4 +470,13 @@ function euro(
   decimal: string,
 ): string {
   return format.number(Number(decimal), { style: "currency", currency: "EUR" });
+}
+
+/**
+ * What settling this payout takes out of the place's wallet: the burn (`net`)
+ * plus the sweep (`payoutFees + manualDeduction`) — which is `total − fees`,
+ * the sum every order credited the wallet in the first place.
+ */
+function walletOutflow(p: Payout): string {
+  return orderWalletCredit({ total: p.totalAmount, fees: p.totalFees });
 }

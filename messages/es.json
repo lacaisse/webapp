@@ -1116,11 +1116,13 @@
         "orderCount": "Pedidos",
         "total": "Total",
         "fees": "Comisiones",
+        "processorFees": "Comisiones de origen",
+        "platformFee": "Comisión de la plataforma",
         "net": "Neto",
         "manualDeduction": "Deducción manual",
         "placeBalance": "Saldo del lugar",
-        "placeBalanceEnough": "Suficiente para quemar",
-        "placeBalanceLow": "Inferior al importe neto",
+        "placeBalanceEnough": "Suficiente para liquidar",
+        "placeBalanceLow": "Inferior a lo que retira la liquidación",
         "status": "Estado",
         "burnTx": "Tx de quema",
         "loadError": "No se pudieron cargar los pagos desde CitizenPay. Vuelve a intentarlo en breve.",
@@ -1157,7 +1159,7 @@
             "complete": "Completado"
           },
           "burn": {
-            "hint": "Quema el importe neto de la cuenta del lugar en la cadena."
+            "hint": "Quema el neto del comercio desde la cuenta del lugar; las comisiones de la plataforma y la deducción se transfieren al fondo."
           },
           "pay": {
             "hint": "Crea el pago bancario al comercio; firmarás la transferencia en tu banco.",
@@ -1210,10 +1212,13 @@
           "noMatches": "Ninguna transferencia coincide con tu búsqueda.",
           "unknownCounterpart": "Remitente desconocido",
           "amount": "Importe",
-          "fee": "Comisión",
+          "feeProcessor": "Comisión del procesador",
+          "feeProcessorHint": "Retenida en origen por la pasarela de pago. Deja 0 para una transferencia bancaria.",
+          "feePlatform": "Comisión de la plataforma",
+          "feePlatformHint": "Tu parte, retirada de la cuenta del lugar en la liquidación. Sugerida según tu tasa.",
           "descriptionLabel": "Descripción",
           "descriptionPlaceholder": "Para qué es este pedido",
-          "net": "Neto",
+          "net": "Acuñado al lugar",
           "confirm": "Añadir pedido",
           "successMinted": "Pedido añadido y neto acuñado para el lugar.",
           "mintFailed": "Pedido añadido, pero la acuñación automática falló. Concílialo desde la pestaña Incidencias."
@@ -1238,7 +1243,7 @@
           "trigger": "Añadir deducción",
           "edit": "Editar deducción",
           "title": "Deducción manual",
-          "description": "Un ajuste contable que reduce el neto pagado al comercio. Sin efecto en la cadena.",
+          "description": "Un ajuste contable que reduce el neto pagado al comercio. Ahora no se mueve nada: el importe sale de la cuenta del lugar junto con las comisiones de la plataforma en la liquidación.",
           "amount": "Importe de la deducción",
           "amountHint": "Máximo {max}. Introduce 0 para eliminar la deducción.",
           "comment": "Comentario",
@@ -1267,17 +1272,17 @@
         "burn": {
           "button": "Quemar tokens",
           "title": "¿Quemar los tokens del pago?",
-          "description": "Esto quema los tokens en la cadena que respaldan este pago. La quema y el pago bancario son independientes: hazlos en cualquier orden.",
+          "description": "Esto quema los tokens en la cadena que respaldan el neto del comercio; las comisiones de la plataforma y cualquier deducción se transfieren a la cuenta del fondo. La quema y el pago bancario son independientes: hazlos en cualquier orden.",
           "warning": "Esto es irreversible. Los tokens de este pago se quemarán de forma permanente.",
           "confirm": "Quemar tokens",
           "success": "Tokens quemados. Hash de la transacción:",
-          "feeSwept": "Comisiones transferidas a la cuenta del fondo: {amount}",
-          "feeNotSwept": "Tokens quemados, pero las comisiones aún no se han transferido."
+          "feeSwept": "Comisiones de la plataforma y deducción transferidas a la cuenta del fondo: {amount}",
+          "feeNotSwept": "Tokens quemados, pero las comisiones de la plataforma aún no se han transferido."
         },
         "feeTransfer": {
-          "pending": "Las comisiones de este pago aún no se han transferido.",
-          "button": "Transferir comisiones",
-          "done": "Comisiones transferidas. Hash de la transacción:"
+          "pending": "Las comisiones de la plataforma y la deducción de este pago aún no se han transferido.",
+          "button": "Transferir comisiones de la plataforma",
+          "done": "Comisiones de la plataforma transferidas. Hash de la transacción:"
         },
         "orders": {
           "title": "Pedidos",
@@ -1376,7 +1381,7 @@
           "notBurnable": "Este pago ya no está en el paso de quema (ya fue quemado o liquidado).",
           "payoutNotFound": "Pago no encontrado.",
           "deductionFailed": "No se pudo guardar la deducción. Vuelve a intentarlo en breve.",
-          "deductionTooHigh": "La deducción no puede superar el total menos las comisiones.",
+          "deductionTooHigh": "La deducción no puede superar el total menos las comisiones de origen y las de la plataforma.",
           "deductionNotPending": "La deducción manual solo se puede cambiar mientras el pago está pendiente.",
           "reportFailed": "Tokens quemados en la cadena, pero no se pudo notificar a Citizen Pay. No reintentes: conserva el hash de la transacción para la conciliación.",
           "noFeeDestination": "No hay cuenta de destino para las comisiones. Conecta primero el fondo a Citizen Pay.",
@@ -1400,6 +1405,8 @@
           "feeInvalid": "Introduce una comisión válida.",
           "amountPositive": "El importe debe ser mayor que cero.",
           "feeTooHigh": "La comisión no puede ser mayor que el importe.",
+          "payoutFeeInvalid": "Introduce una comisión de la plataforma válida.",
+          "feesTooHigh": "La comisión del procesador y la de la plataforma juntas no pueden superar el importe.",
           "descriptionTooLong": "La descripción es demasiado larga.",
           "completeFailed": "No se pudo marcar el pago como completado. Vuelve a intentarlo en breve.",
           "periodFailed": "No se ha podido actualizar el periodo de liquidación. Inténtalo de nuevo.",

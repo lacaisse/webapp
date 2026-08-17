@@ -94,9 +94,10 @@ export const getCompletedPayouts = cache(
   },
 );
 
-// Single-payout summary for the detail header — total / fees / net / manual
-// deduction. Backed by GET /v2/treasury/payouts/{id}. Returns null on a miss
-// (404) or CP error so the page falls through to notFound().
+// Single-payout summary for the detail header — total / processor fees
+// (withheld at source) / platform payout fees / manual deduction / net.
+// Backed by GET /v2/treasury/payouts/{id}. Returns null on a miss (404) or CP
+// error so the page falls through to notFound().
 export const getPayoutSummary = cache(
   async (
     fundId: string,
@@ -177,7 +178,8 @@ export const getAllPayoutOrders = cache(
 );
 
 // The place's live on-chain token balance — so the operator can tell whether
-// the place's account holds enough to cover the burn (`net`). Resolves the
+// the place's account holds enough to cover everything settlement removes (the
+// burn plus the fee sweep). Resolves the
 // place's wallet via CP `listPlaces`, then reads the chain via Alchemy.
 // Returns a Decimal string in token units, or null when we can't determine it
 // (no token configured, no place account, RPC/CP error).

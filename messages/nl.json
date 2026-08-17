@@ -1116,11 +1116,13 @@
         "orderCount": "Bestellingen",
         "total": "Totaal",
         "fees": "Kosten",
+        "processorFees": "Verwerkerskosten",
+        "platformFee": "Platformkosten",
         "net": "Netto",
         "manualDeduction": "Handmatige inhouding",
         "placeBalance": "Saldo handelaar",
-        "placeBalanceEnough": "Genoeg om te verbranden",
-        "placeBalanceLow": "Lager dan het nettobedrag",
+        "placeBalanceEnough": "Genoeg om af te wikkelen",
+        "placeBalanceLow": "Lager dan wat de afwikkeling weghaalt",
         "status": "Status",
         "burnTx": "Burn-tx",
         "loadError": "Kon de uitbetalingen niet laden van CitizenPay. Probeer het zo opnieuw.",
@@ -1157,7 +1159,7 @@
             "complete": "Voltooid"
           },
           "burn": {
-            "hint": "Verbrandt het nettobedrag van het account van de handelaar on-chain."
+            "hint": "Verbrandt het nettobedrag van de handelaar van diens rekening; de platformkosten en inhouding gaan naar het fonds."
           },
           "pay": {
             "hint": "Maakt de bankbetaling aan de handelaar aan; je ondertekent de overschrijving bij je bank.",
@@ -1210,10 +1212,13 @@
           "noMatches": "Geen overdrachten komen overeen met je zoekopdracht.",
           "unknownCounterpart": "Onbekende afzender",
           "amount": "Bedrag",
-          "fee": "Kosten",
+          "feeProcessor": "Verwerkerskosten",
+          "feeProcessorHint": "Aan de bron ingehouden door de betaalverwerker. Laat 0 staan bij een overboeking.",
+          "feePlatform": "Platformkosten",
+          "feePlatformHint": "Jouw deel, bij de afwikkeling van de rekening van de handelaar gehaald. Voorgesteld op basis van je tarief.",
           "descriptionLabel": "Omschrijving",
           "descriptionPlaceholder": "Waarvoor deze order is",
-          "net": "Netto",
+          "net": "Uitgegeven naar handelaar",
           "confirm": "Order toevoegen",
           "successMinted": "Bestelling toegevoegd en netto uitgegeven naar de plaats.",
           "mintFailed": "Bestelling toegevoegd, maar automatische uitgifte mislukt. Verwerk het via het tabblad Problemen."
@@ -1238,7 +1243,7 @@
           "trigger": "Inhouding toevoegen",
           "edit": "Inhouding bewerken",
           "title": "Handmatige inhouding",
-          "description": "Een boekhoudkundige aanpassing die het netto bedrag aan de handelaar verlaagt. Geen on-chain effect.",
+          "description": "Een boekhoudkundige aanpassing die het netto bedrag aan de handelaar verlaagt. Er beweegt nu niets — het bedrag verlaat de rekening van de handelaar samen met de platformkosten bij de afwikkeling.",
           "amount": "Inhoudingsbedrag",
           "amountHint": "Maximaal {max}. Voer 0 in om de inhouding te wissen.",
           "comment": "Opmerking",
@@ -1267,17 +1272,17 @@
         "burn": {
           "button": "Tokens verbranden",
           "title": "Token-uitbetaling verbranden?",
-          "description": "Dit verbrandt de on-chain tokens achter deze uitbetaling. Burn en bankbetaling staan los van elkaar — in willekeurige volgorde.",
+          "description": "Dit verbrandt de on-chain tokens achter het nettobedrag van de handelaar; de platformkosten en een eventuele inhouding gaan naar de fondsrekening. Burn en bankbetaling staan los van elkaar — in willekeurige volgorde.",
           "warning": "Dit is onomkeerbaar. De tokens voor deze uitbetaling worden permanent verbrand.",
           "confirm": "Tokens verbranden",
           "success": "Tokens verbrand. Transactiehash:",
-          "feeSwept": "Kosten overgemaakt naar de fondsrekening: {amount}",
-          "feeNotSwept": "Tokens verbrand, maar de kosten zijn nog niet overgemaakt."
+          "feeSwept": "Platformkosten en inhouding overgemaakt naar de fondsrekening: {amount}",
+          "feeNotSwept": "Tokens verbrand, maar de platformkosten zijn nog niet overgemaakt."
         },
         "feeTransfer": {
-          "pending": "De kosten van deze uitbetaling zijn nog niet overgemaakt.",
-          "button": "Kosten overmaken",
-          "done": "Kosten overgemaakt. Transactiehash:"
+          "pending": "De platformkosten en inhouding van deze uitbetaling zijn nog niet overgemaakt.",
+          "button": "Platformkosten overmaken",
+          "done": "Platformkosten overgemaakt. Transactiehash:"
         },
         "orders": {
           "title": "Bestellingen",
@@ -1376,7 +1381,7 @@
           "notBurnable": "Deze uitbetaling is niet meer in de verbrandstap (al verbrand of afgewikkeld).",
           "payoutNotFound": "Uitbetaling niet gevonden.",
           "deductionFailed": "Kon de inhouding niet opslaan. Probeer het zo opnieuw.",
-          "deductionTooHigh": "De inhouding mag niet hoger zijn dan totaal min kosten.",
+          "deductionTooHigh": "De inhouding mag niet hoger zijn dan totaal min verwerkerskosten en platformkosten.",
           "deductionNotPending": "De handmatige inhouding kan alleen worden gewijzigd zolang de uitbetaling in behandeling is.",
           "reportFailed": "Tokens on-chain verbrand, maar kon dit niet melden aan Citizen Pay. Niet opnieuw proberen — bewaar de transactiehash voor reconciliatie.",
           "noFeeDestination": "Geen bestemmingsrekening voor kosten. Verbind het fonds eerst met Citizen Pay.",
@@ -1400,6 +1405,8 @@
           "feeInvalid": "Voer geldige kosten in.",
           "amountPositive": "Het bedrag moet groter dan nul zijn.",
           "feeTooHigh": "De kosten mogen niet hoger zijn dan het bedrag.",
+          "payoutFeeInvalid": "Voer geldige platformkosten in.",
+          "feesTooHigh": "De verwerkerskosten en platformkosten samen mogen het bedrag niet overschrijden.",
           "descriptionTooLong": "De omschrijving is te lang.",
           "completeFailed": "Kon de uitbetaling niet als voltooid markeren. Probeer het zo opnieuw.",
           "periodFailed": "Kon de afrekenperiode niet bijwerken. Probeer het opnieuw.",

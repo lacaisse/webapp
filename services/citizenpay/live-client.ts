@@ -24,6 +24,7 @@ import {
   type PayoutListPageWire,
   type PayoutListWire,
   type PayoutOrderWire,
+  type RecomputedPayoutWire,
   type BankTransactionWire,
   type FeeCollectionFrequencyWire,
 } from "./api";
@@ -101,8 +102,10 @@ function toCents(decimal: string | Prisma.Decimal): number {
 
 function centsToDecimal(cents: number | null | undefined): string {
   // Live payout rows occasionally omit a numeric field (e.g. total_fees /
-  // manual_deduction on older completed payouts). Treat anything non-finite
-  // as 0 rather than throwing a DecimalError mid-render.
+  // manual_deduction on older completed payouts, or `payoutFees` on any payout
+  // that predates the fee split). Treat anything non-finite as 0 rather than
+  // throwing a DecimalError mid-render — this IS the COALESCE-to-0 the fee
+  // contract asks for.
   const n = typeof cents === "number" && Number.isFinite(cents) ? cents : 0;
   return new Prisma.Decimal(n).div(100).toFixed(2);
 }
@@ -142,6 +145,7 @@ function payoutFromListWire(w: PayoutListWire): Payout {
     endDate: w.endDate,
     totalAmount: centsToDecimal(w.total),
     totalFees: centsToDecimal(w.fees),
+    totalPayoutFees: centsToDecimal(w.payoutFees),
     manualDeduction: centsToDecimal(w.manualDeduction),
     manualDeductionComment: null,
     net: centsToDecimal(w.net),
@@ -169,12 +173,26 @@ function payoutFromDetailWire(w: PayoutDetailWire): Payout {
   };
 }
 
+// The totals block echoed by every endpoint that changes a payout's contents
+// (archive / create-order / add-orders) — cents → decimal, `payoutFees`
+// coalesced to 0 for payouts predating the fee split.
+function recomputedFromWire(p: RecomputedPayoutWire): ArchivedPayout {
+  return {
+    payoutId: p.payoutId,
+    total: centsToDecimal(p.total),
+    fees: centsToDecimal(p.fees),
+    payoutFees: centsToDecimal(p.payoutFees),
+    net: centsToDecimal(p.net),
+  };
+}
+
 // Recomputed totals returned by set/clear manual-deduction — cents → decimal.
 function deductionFromWire(p: ManualDeductionWire["payout"]): PayoutDeduction {
   return {
     payoutId: p.payoutId,
     total: centsToDecimal(p.total),
     fees: centsToDecimal(p.fees),
+    payoutFees: centsToDecimal(p.payoutFees),
     manualDeduction: centsToDecimal(p.manualDeduction),
     manualDeductionComment: p.manualDeductionComment ?? null,
     net: centsToDecimal(p.net),
@@ -190,6 +208,7 @@ function draftFromWire(w: PayoutDraftWire): PayoutDraft {
     orderCount: w.orderCount,
     total: centsToDecimal(w.total),
     fees: centsToDecimal(w.fees),
+    payoutFees: centsToDecimal(w.payoutFees),
     net: centsToDecimal(w.net),
   };
 }
@@ -201,7 +220,10 @@ function payoutOrderFromWire(w: PayoutOrderWire): PayoutOrder {
     id: w.id,
     total: centsToDecimal(totalC),
     fees: centsToDecimal(feesC),
-    // net = total − fees, computed from cents (the wire `due` is unreliable).
+    payoutFee: centsToDecimal(w.payoutFee),
+    // The order's wallet credit: total − fees, computed from cents (the wire
+    // `due` is unreliable). NOT total − fees − payoutFee: the platform cut was
+    // minted along with the credit and only leaves at the payout-level sweep.
     net: centsToDecimal(totalC - feesC),
     due: centsToDecimal(w.due),
     status: w.status,
@@ -683,6 +705,7 @@ export class LiveCitizenPayClient implements CitizenPayClient {
       orderCount: w.orderCount,
       total: centsToDecimal(w.total),
       fees: centsToDecimal(w.fees),
+      payoutFees: centsToDecimal(w.payoutFees),
       net: centsToDecimal(w.net),
       startDate: w.startDate,
       endDate: w.endDate,
@@ -733,16 +756,12 @@ export class LiveCitizenPayClient implements CitizenPayClient {
     const res = await apiPayouts.createOrder(this.creds, payoutId, {
       total: toCents(input.total),
       fees: toCents(input.fees),
+      payoutFee: toCents(input.payoutFee),
       description: input.description,
     });
     return {
       order: payoutOrderFromWire(res.order),
-      payout: {
-        payoutId: res.payout.payoutId,
-        total: centsToDecimal(res.payout.total),
-        fees: centsToDecimal(res.payout.fees),
-        net: centsToDecimal(res.payout.net),
-      },
+      payout: recomputedFromWire(res.payout),
     };
   }
 
@@ -758,6 +777,7 @@ export class LiveCitizenPayClient implements CitizenPayClient {
         orderCount: res.summary.orderCount,
         total: centsToDecimal(res.summary.total),
         fees: centsToDecimal(res.summary.fees),
+        payoutFees: centsToDecimal(res.summary.payoutFees),
         net: centsToDecimal(res.summary.net),
       },
       total: res.total,
@@ -773,12 +793,7 @@ export class LiveCitizenPayClient implements CitizenPayClient {
     const res = await apiPayouts.addOrders(this.creds, payoutId, { orderIds });
     return {
       assigned: res.assigned,
-      payout: {
-        payoutId: res.payout.payoutId,
-        total: centsToDecimal(res.payout.total),
-        fees: centsToDecimal(res.payout.fees),
-        net: centsToDecimal(res.payout.net),
-      },
+      payout: recomputedFromWire(res.payout),
     };
   }
 
@@ -791,12 +806,7 @@ export class LiveCitizenPayClient implements CitizenPayClient {
       payoutId,
       orderId,
     );
-    return {
-      payoutId: payout.payoutId,
-      total: centsToDecimal(payout.total),
-      fees: centsToDecimal(payout.fees),
-      net: centsToDecimal(payout.net),
-    };
+    return recomputedFromWire(payout);
   }
 
   async setManualDeduction(
