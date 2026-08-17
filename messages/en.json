@@ -1110,7 +1110,8 @@
       "tabs": {
         "drafts": "Drafts",
         "pending": "Pending",
-        "completed": "Completed"
+        "completed": "Completed",
+        "export": "Export"
       },
       "settlement": {
         "place": "Place",
@@ -1412,7 +1413,43 @@
           "descriptionTooLong": "The description is too long.",
           "completeFailed": "Couldn't mark the payout as completed. Try again shortly.",
           "periodFailed": "Could not update the settlement period. Please try again.",
-          "periodNotPending": "The settlement period can only be changed while the payout is pending."
+          "periodNotPending": "The settlement period can only be changed while the payout is pending.",
+          "exportFailed": "Couldn't generate the export. Try again shortly."
+        }
+      },
+      "export": {
+        "description": "Accounting recap of merchant payouts: a CSV detailing, merchant by merchant, what was collected and paid out over the period you pick. Semicolon-separated UTF-8, so it opens straight in Excel.",
+        "presets": {
+          "thisMonth": "This month",
+          "lastMonth": "Last month",
+          "thisQuarter": "This quarter",
+          "lastQuarter": "Last quarter",
+          "thisYear": "This year",
+          "lastYear": "Last year"
+        },
+        "from": "From",
+        "to": "To",
+        "download": "Download CSV",
+        "rangeInvalid": "The start date must come before the end date.",
+        "summary": "{count, plural, =0 {No payouts in this period.} one {1 payout in this period, {net} net.} other {# payouts in this period, {net} net.}}",
+        "byMerchant": "By merchant",
+        "payoutCount": "Payouts",
+        "empty": "No payouts in this period.",
+        "columnsHint": "File columns: {columns}.",
+        "columns": {
+          "periodStart": "Period start",
+          "periodEnd": "Period end (inclusive)",
+          "merchant": "Merchant",
+          "business": "Business",
+          "gross": "Gross amount",
+          "processorFees": "Source fees",
+          "platformFee": "Platform fee",
+          "manualDeduction": "Manual deduction",
+          "deductionComment": "Deduction reason",
+          "net": "Net paid out",
+          "status": "Status",
+          "createdAt": "Created at (UTC)",
+          "reference": "Reference"
         }
       },
       "admin": {
