@@ -1,6 +1,8 @@
 {
   "common": {
     "or": "o",
+    "yes": "Sí",
+    "no": "No",
     "cancel": "Cancelar",
     "close": "Cerrar",
     "save": "Guardar",
