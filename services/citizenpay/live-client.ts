@@ -213,6 +213,15 @@ function draftFromWire(w: PayoutDraftWire): PayoutDraft {
   };
 }
 
+// CP documents the processor as already-lowercase (`viva`, `ponto`, …), but we
+// normalise anyway so a stray "Viva " can't travel downstream as a second,
+// unmapped value. Missing field, null and "" all collapse to null — an API
+// deployment without the field is indistinguishable from a non-processor
+// order, and both mean "no named source of funds".
+function processorFromWire(v: string | null | undefined): string | null {
+  return typeof v === "string" && v.trim() ? v.trim().toLowerCase() : null;
+}
+
 function payoutOrderFromWire(w: PayoutOrderWire): PayoutOrder {
   const totalC = typeof w.total === "number" ? w.total : 0;
   const feesC = typeof w.fees === "number" ? w.fees : 0;
@@ -228,6 +237,7 @@ function payoutOrderFromWire(w: PayoutOrderWire): PayoutOrder {
     due: centsToDecimal(w.due),
     status: w.status,
     type: w.type,
+    processor: processorFromWire(w.processor),
     description: w.description ?? null,
     items: Array.isArray(w.items) ? w.items : [],
     txHash: w.txHash ?? w.tx_hash ?? null,

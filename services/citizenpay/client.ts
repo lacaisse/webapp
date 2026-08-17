@@ -314,6 +314,8 @@ class MockCitizenPayClient implements CitizenPayClient {
     // the platform cut was minted with the credit and only leaves at the
     // payout-level sweep. Order 44790 came through a processor (1.42 withheld
     // at source); the other two didn't, so their whole total hit the wallet.
+    // `processor` mirrors that split the way CP does: named on the orders a
+    // provider handled, null on the in-app ones.
     const orders: PayoutOrder[] = [
       {
         id: 44790,
@@ -324,6 +326,7 @@ class MockCitizenPayClient implements CitizenPayClient {
         due: "26.90",
         status: "paid",
         type: "web",
+        processor: "viva",
         description: "Weekly grocery order",
         items: [
           { name: "Apples", quantity: 3, price: 450 },
@@ -344,6 +347,8 @@ class MockCitizenPayClient implements CitizenPayClient {
         due: "12.00",
         status: "paid",
         type: "pos",
+        // Paid in-app from a card balance: no third party touched the money.
+        processor: null,
         description: null,
         items: [],
         // Unsettled with a payer account → burn+mint fix branch.
@@ -361,6 +366,9 @@ class MockCitizenPayClient implements CitizenPayClient {
         due: "5.50",
         status: "paid",
         type: "pos",
+        // Bank-settled: the open-banking provider moved the money and withheld
+        // nothing, hence fees 0 and no payer wallet below.
+        processor: "ponto",
         description: null,
         items: [],
         // Unsettled with no payer account → mint-only fix branch.
@@ -409,6 +417,8 @@ class MockCitizenPayClient implements CitizenPayClient {
         due: credit,
         status: "paid",
         type: "manual",
+        // Typed in by an operator — no processor was involved.
+        processor: null,
         description: input.description,
         items: [],
         // Manual orders have no on-chain settlement yet → reconcile branch.
@@ -444,6 +454,7 @@ class MockCitizenPayClient implements CitizenPayClient {
         due: "18.04",
         status: "paid",
         type: "web",
+        processor: "stripe",
         description: "Late-arriving order",
         items: [],
         txHash: `0x${randomBytes(32).toString("hex")}`,
@@ -460,6 +471,7 @@ class MockCitizenPayClient implements CitizenPayClient {
         due: "7.12",
         status: "paid",
         type: "pos",
+        processor: "viva",
         description: null,
         items: [],
         txHash: `0x${randomBytes(32).toString("hex")}`,

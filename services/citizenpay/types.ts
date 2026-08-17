@@ -350,6 +350,12 @@ export type PayoutOrder = {
   due: string; // Decimal string, EUR (wire passthrough)
   status: string; // paid | refund | refunded | correction | …
   type: string; // web | pos | terminal | …
+  // The payment processor that actually moved the money, lowercase as CP
+  // stores it (`viva`, `ponto`, `stripe`, …). Null when the order wasn't
+  // processor-handled (app, manual) *and* when the API predates the field —
+  // the two are indistinguishable on the wire, so treat null as "unknown
+  // source" and fall back to `type`.
+  processor: string | null;
   description: string | null;
   // Raw line-items array — shape is treasury/POS-specific, so kept opaque
   // and rendered defensively in the UI.

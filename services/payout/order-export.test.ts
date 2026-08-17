@@ -54,6 +54,7 @@ function order(over: Partial<PayoutOrder> & { id: number }): PayoutOrder {
     due: "0.00",
     status: "paid",
     type: "web",
+    processor: null,
     description: "Weekly grocery order",
     items: [],
     txHash: "0xabc",
@@ -82,17 +83,54 @@ const cell = (row: string[], column: (typeof PAYOUT_ORDER_EXPORT_COLUMNS)[number
   row[PAYOUT_ORDER_EXPORT_COLUMNS.indexOf(column)];
 
 describe("orderSourceLabel", () => {
-  it("localizes the order types CitizenPay actually emits", () => {
+  it("names the processor as a brand, identically in every locale", () => {
+    expect(orderSourceLabel({ processor: "viva", type: "web" }, t)).toBe("Viva");
+    expect(orderSourceLabel({ processor: "stripe", type: "web" }, t)).toBe(
+      "Stripe",
+    );
+    expect(orderSourceLabel({ processor: "ponto", type: "terminal" }, t)).toBe(
+      "Ponto",
+    );
+  });
+
+  it("capitalizes a processor CitizenPay onboarded after us", () => {
+    expect(orderSourceLabel({ processor: "mollie", type: "web" }, t)).toBe(
+      "Mollie",
+    );
+    // Already-capitalized spellings survive: only the first letter is forced.
+    expect(orderSourceLabel({ processor: "SumUp", type: "web" }, t)).toBe("SumUp");
+  });
+
+  it("prefers the processor over the channel when both are known", () => {
+    expect(orderSourceLabel({ processor: "viva", type: "terminal" }, t)).toBe(
+      "Viva",
+    );
+  });
+
+  it("localizes the order types CitizenPay emits when no processor handled it", () => {
     for (const type of ["app", "manual", "pos", "terminal", "web"]) {
-      expect(orderSourceLabel(type, t)).toBe(
+      expect(orderSourceLabel({ processor: null, type }, t)).toBe(
         `fund.payments.settlement.orderTypes.${type}`,
       );
     }
   });
 
+  it("falls back to the channel on an API deployment without the field", () => {
+    // `processor` absent entirely — exactly the pre-field behaviour.
+    expect(orderSourceLabel({ type: "web" }, t)).toBe(
+      "fund.payments.settlement.orderTypes.web",
+    );
+    // An empty string is CP saying "none", not a nameless provider.
+    expect(orderSourceLabel({ processor: "", type: "app" }, t)).toBe(
+      "fund.payments.settlement.orderTypes.app",
+    );
+  });
+
   it("prints an unknown future type raw rather than losing it", () => {
-    expect(orderSourceLabel("nfc-wristband", t)).toBe("nfc-wristband");
-    expect(orderSourceLabel(null, t)).toBe("");
+    expect(orderSourceLabel({ processor: null, type: "nfc-wristband" }, t)).toBe(
+      "nfc-wristband",
+    );
+    expect(orderSourceLabel({ processor: null, type: null }, t)).toBe("");
   });
 });
 
@@ -229,6 +267,25 @@ describe("buildPayoutOrderExportCsv", () => {
     expect(cell(r, "processorFees")).toBe("0,00");
     expect(cell(r, "netCredit")).toBe("12,00");
     expect(cell(r, "source")).toBe("fund.payments.settlement.orderTypes.app");
+  });
+
+  it("puts the payment provider in the source column when CitizenPay named one", () => {
+    const file = build([
+      {
+        payout: payout({ id: "p1" }),
+        orders: [
+          order({ id: 1, type: "web", processor: "viva" }),
+          order({ id: 2, type: "terminal", processor: "acme-pay" }),
+          // No provider (and no field at all, on an older API) → the channel.
+          order({ id: 3, type: "app", processor: null }),
+        ],
+      },
+    ]);
+    expect(parseCsv(file.csv).rows.map((r) => cell(r, "source"))).toEqual([
+      "Viva",
+      "Acme-pay",
+      "fund.payments.settlement.orderTypes.app",
+    ]);
   });
 
   it("orders rows oldest first inside a payout, ties broken by id", () => {

@@ -29,17 +29,27 @@
 // ---------------------------------------------------------------------------
 // "Source of funds"
 // ---------------------------------------------------------------------------
-// The treasury API exposes no payment-provider field on an order — a payout
-// order carries only `account, date, due, fees, id, items, payoutFee, status,
-// total, txHash, type`. So the source column is the order **type** (`app`,
-// `terminal`, `web`, `manual`, …), localized. Unknown values print raw rather
-// than as a missing-translation key: CitizenPay can add a type any day and an
+// Two answers, in order of precision:
+//
+//  1. `processor` — the payment provider CitizenPay recorded for the order
+//     (`viva`, `ponto`, `stripe`, …). This is the money's actual origin and
+//     the thing an accountant reconciles a bank statement against, so it wins
+//     whenever it's there. Printed as the brand writes itself ("Viva"), which
+//     is the same string in every locale: a company name is not translated.
+//  2. the order **type** (`app`, `terminal`, `web`, `manual`, …), localized —
+//     the channel the payer used. It's all we have for orders no provider
+//     handled (paid in-app from a card balance, or keyed in by an operator),
+//     and it's also the fallback for an API deployment that predates the
+//     `processor` field: null reads the same either way, and the channel is
+//     never wrong, only less precise.
+//
+// Both sides print unknown values raw rather than as a missing-translation
+// key: CitizenPay can add a type or onboard a provider any day, and an
 // accounting file must not lose information over it.
 //
-// `processorFees` is the second half of that signal: it is only ever > 0 on
-// the connector-backed types, because a payment processor withheld its cut
-// before the money reached the wallet. A row with fees > 0 was processed by a
-// third party; naming *which* one would need CP to expose a provider field.
+// `processorFees` is the corroborating signal: it is only ever > 0 when a
+// provider withheld its cut before the money reached the wallet, so a row with
+// fees > 0 should normally name a processor here.
 //
 // ---------------------------------------------------------------------------
 // Which figures
@@ -92,8 +102,37 @@ const KNOWN_ORDER_STATUSES = new Set([
   "refunded",
 ]);
 
-/** Localized "source of funds" for an order — its type, or the raw value. */
-export function orderSourceLabel(type: string | null, t: ExportTranslate): string {
+// The processors CitizenPay names today, spelled the way each brand does.
+// Deliberately NOT i18n keys: these are company names, identical in fr/en/es/
+// nl, and routing them through the message files would invite a translator to
+// "localize" one. Anything CitizenPay onboards later prints capitalized from
+// the raw lowercase value, which is right for the overwhelming majority of
+// provider names — and still recognisable when it isn't.
+const PROCESSOR_NAMES = new Map([
+  ["ponto", "Ponto"],
+  ["stripe", "Stripe"],
+  ["viva", "Viva"],
+]);
+
+/** Display name for a payment processor: known brand, else capitalized raw. */
+export function processorLabel(processor: string): string {
+  return (
+    PROCESSOR_NAMES.get(processor.toLowerCase()) ??
+    processor.charAt(0).toUpperCase() + processor.slice(1)
+  );
+}
+
+/**
+ * "Source of funds" for an order: the payment processor when CitizenPay named
+ * one, otherwise the localized channel (the pre-`processor` behaviour, and
+ * still the only answer for app/manual orders).
+ */
+export function orderSourceLabel(
+  order: { processor?: string | null; type: string | null },
+  t: ExportTranslate,
+): string {
+  if (order.processor) return processorLabel(order.processor);
+  const { type } = order;
   if (!type) return "";
   return KNOWN_ORDER_TYPES.has(type)
     ? t(`fund.payments.settlement.orderTypes.${type}`)
@@ -188,7 +227,7 @@ function row(
     payoutStatus: t(`fund.payments.settlement.statuses.${payout.status}`),
     orderId: String(order.id),
     orderDate: utcMinute(payoutOrderDate(order) || null),
-    source: orderSourceLabel(order.type, t),
+    source: orderSourceLabel(order, t),
     gross: money(order.total),
     processorFees: money(order.fees),
     platformFeeShare: money(order.payoutFee),
