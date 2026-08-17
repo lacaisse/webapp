@@ -10,6 +10,7 @@ import {
   utcDay,
   type MatchTransfer,
 } from "./match";
+import { orderWalletCredit } from "./money";
 
 const order = { total: "12.50", completedAt: "2026-07-05T14:30:00Z" };
 
@@ -222,6 +223,72 @@ describe("assignPlaceMints", () => {
     );
     expect(res.unmatched).toEqual([1]);
     expect(res.matched).toEqual([]);
+  });
+});
+
+// The amount a place-settled order matches on is its WALLET CREDIT
+// (total − source-withheld fees), which differs by connector. These two cases
+// pin that down, because getting it wrong is silent: the matcher just finds
+// nothing and the order sits in Issues looking unsettled.
+describe("assignPlaceMints — connector fee semantics", () => {
+  it("matches the gross total for a ponto (bank) order — nothing withheld", () => {
+    // No processor took a cut, so the settled transfer is the full total and
+    // the order's net equals it.
+    const total = "40.00";
+    const credit = orderWalletCredit({ total, fees: "0.00" });
+    expect(credit).toBe("40.00");
+
+    const res = assignPlaceMints(
+      [pmOrder({ orderId: 1, net: credit, createdAt: "2026-07-02T09:00:00Z" })],
+      [mint({ hash: "0xponto", amount: total, date: "2026-07-02T09:04:00Z" })],
+    );
+    expect(res.matched).toEqual([{ orderId: 1, txHash: "0xponto" }]);
+  });
+
+  it("matches total − processor fee for a viva/stripe order", () => {
+    // Viva withheld 1.20 before the wallet was credited, so the on-chain mint
+    // is 38.80 — never the 40.00 the payer was charged.
+    const total = "40.00";
+    const credit = orderWalletCredit({ total, fees: "1.20" });
+    expect(credit).toBe("38.80");
+
+    const res = assignPlaceMints(
+      [pmOrder({ orderId: 1, net: credit, createdAt: "2026-07-02T09:00:00Z" })],
+      [mint({ hash: "0xviva", amount: "38.80", date: "2026-07-02T09:04:00Z" })],
+    );
+    expect(res.matched).toEqual([{ orderId: 1, txHash: "0xviva" }]);
+  });
+
+  it("does not match the gross total when a processor withheld at source", () => {
+    // The regression the split guards against: matching on `total` for a
+    // card-paid order finds nothing, because that transfer never existed.
+    const res = assignPlaceMints(
+      [
+        pmOrder({
+          orderId: 1,
+          net: orderWalletCredit({ total: "40.00", fees: "1.20" }),
+          createdAt: "2026-07-02T09:00:00Z",
+        }),
+      ],
+      [mint({ hash: "0xgross", amount: "40.00", date: "2026-07-02T09:04:00Z" })],
+    );
+    expect(res.unmatched).toEqual([1]);
+  });
+
+  it("ignores the platform cut — it is minted with the credit, not withheld", () => {
+    // Whatever payoutFee CP assigns the order, the mint to match is the same
+    // credit: our cut only leaves at the payout-level sweep.
+    const credit = orderWalletCredit({ total: "40.00", fees: "1.20" });
+    const res = assignPlaceMints(
+      [pmOrder({ orderId: 1, net: credit, createdAt: "2026-07-02T09:00:00Z" })],
+      [
+        // 37.80 would be the amount if the 1.00 platform fee had been withheld
+        // at mint time. It isn't, so this transfer is not the settlement.
+        mint({ hash: "0xnetofcut", amount: "37.80", date: "2026-07-02T09:03:00Z" }),
+        mint({ hash: "0xcredit", amount: credit, date: "2026-07-02T09:04:00Z" }),
+      ],
+    );
+    expect(res.matched).toEqual([{ orderId: 1, txHash: "0xcredit" }]);
   });
 });
 
