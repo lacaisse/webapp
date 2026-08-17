@@ -30,7 +30,14 @@ const RANK = { info: 0, low: 1, moderate: 2, high: 3, critical: 4 };
 // stale before this cleanup. Keeping dead entries would suggest we still
 // accept risks we no longer carry. See git history for the old entries and
 // their triage rationale — they're the template for writing the next one.
-const ALLOWLIST = {};
+const ALLOWLIST = {
+  "GHSA-ggr8-5vv4-36mx": {
+    pkg: "deepmerge-ts (transitive via prisma → @prisma/config)",
+    reason:
+      "Stack exhaustion when merging recursive object graphs. deepmerge-ts is reached only by the Prisma CLI merging our own repo-authored prisma.config.ts — never attacker-supplied input — and @prisma/config is not in the runtime bundle (PrismaClient comes from the generated client, not the prisma package). The advisory's fix range (>=8.0.0) isn't shipped by any prisma release: latest 7.9.1 still pins 7.1.5, and npm's only 'fix' is a breaking downgrade to prisma 6. Clears when @prisma/config bumps its deepmerge-ts range.",
+    reviewBy: "2026-10-01",
+  },
+};
 
 function runAudit() {
   try {
