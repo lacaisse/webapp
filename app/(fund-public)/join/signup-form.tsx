@@ -263,7 +263,12 @@ export function SignupForm({
       {step === 0 && (
         <>
           <div className="space-y-2">
-            <Label htmlFor="firstName">{t("firstName")}</Label>
+            <Label htmlFor="firstName">
+              {t("firstName")}
+              <span className="ml-1 text-destructive" aria-hidden>
+                *
+              </span>
+            </Label>
             {/* `defaultValue` is what actually paints the prefilled value.
                 Base UI's Input only takes a value when it is controlled or
                 given defaultValue; RHF's register() supplies neither, so
@@ -283,7 +288,12 @@ export function SignupForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="lastName">{t("lastName")}</Label>
+            <Label htmlFor="lastName">
+              {t("lastName")}
+              <span className="ml-1 text-destructive" aria-hidden>
+                *
+              </span>
+            </Label>
             <Input
               id="lastName"
               autoComplete="family-name"
@@ -298,7 +308,12 @@ export function SignupForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="email">{t("email")}</Label>
+            <Label htmlFor="email">
+              {t("email")}
+              <span className="ml-1 text-destructive" aria-hidden>
+                *
+              </span>
+            </Label>
             <Input
               id="email"
               type="email"
