@@ -327,21 +327,28 @@ function row(
 // File
 // =============================================================================
 
-// `payouts_<fund>_<from>_<to>.csv`. The fund part is the first label of its
-// domain (`acme` for both `acme.lacaisse.eu` and a custom `funds.acme.com`),
-// asciified so no header-encoding surprises reach Content-Disposition.
-export function payoutExportFilename(
-  fundDomain: string,
-  range: PayoutExportRange,
-): string {
-  const label =
+// The fund part of an export filename: the first label of its domain (`acme`
+// for both `acme.lacaisse.eu` and a custom `funds.acme.com`), asciified so no
+// header-encoding surprises reach Content-Disposition. Shared with the
+// transaction-level export (./order-export.ts) so both files sort together in
+// the accountant's download folder.
+export function fundFilenameLabel(fundDomain: string): string {
+  return (
     fundDomain
       .split(".")[0]
       ?.normalize("NFKD")
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "") || "fund";
-  return `payouts_${label}_${range.from}_${range.to}.csv`;
+      .replace(/^-+|-+$/g, "") || "fund"
+  );
+}
+
+/** `payouts_<fund>_<from>_<to>.csv` — one row per payout. */
+export function payoutExportFilename(
+  fundDomain: string,
+  range: PayoutExportRange,
+): string {
+  return `payouts_${fundFilenameLabel(fundDomain)}_${range.from}_${range.to}.csv`;
 }
 
 export type PayoutExportFile = {

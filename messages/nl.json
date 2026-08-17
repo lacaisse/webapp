@@ -1147,6 +1147,19 @@
           "burnt": "Verbrand",
           "complete": "Voltooid"
         },
+        "orderTypes": {
+          "app": "App",
+          "manual": "Handmatig",
+          "pos": "Kassa",
+          "terminal": "Terminal",
+          "web": "Web"
+        },
+        "orderStatuses": {
+          "paid": "Betaald",
+          "refund": "Terugbetaling",
+          "refunded": "Terugbetaald",
+          "correction": "Correctie"
+        },
         "signed": {
           "title": "Betaling ondertekend",
           "description": "Je bankoverschrijving is ondertekend.",
@@ -1414,11 +1427,13 @@
           "completeFailed": "Kon de uitbetaling niet als voltooid markeren. Probeer het zo opnieuw.",
           "periodFailed": "Kon de afrekenperiode niet bijwerken. Probeer het opnieuw.",
           "periodNotPending": "De periode kan alleen worden gewijzigd zolang de uitbetaling in behandeling is.",
-          "exportFailed": "Kon de export niet genereren. Probeer het zo opnieuw."
+          "exportFailed": "Kon de export niet genereren. Probeer het zo opnieuw.",
+          "exportOrdersFailed": "Kon de transacties van een van de uitbetalingen niet laden. De export is niet gegenereerd — probeer het straks opnieuw.",
+          "exportOrdersTruncated": "Een van de uitbetalingen bevat te veel transacties om in één keer te exporteren. Verklein de periode en probeer opnieuw."
         }
       },
       "export": {
-        "description": "Boekhoudkundig overzicht van de uitbetalingen aan handelaars: een CSV die per handelaar toont wat er in de gekozen periode is ontvangen en uitbetaald. UTF-8 met puntkomma, opent direct in Excel.",
+        "description": "Twee boekhoudkundige exports van de uitbetalingen aan handelaars voor de gekozen periode: het overzicht (één regel per uitbetaling) en het transactiedetail (één regel per bestelling in die uitbetalingen). UTF-8 met puntkomma, beide openen direct in Excel.",
         "presets": {
           "thisMonth": "Deze maand",
           "lastMonth": "Vorige maand",
@@ -1429,13 +1444,16 @@
         },
         "from": "Van",
         "to": "Tot",
-        "download": "CSV downloaden",
+        "downloadRecap": "Overzicht (CSV)",
+        "downloadDetail": "Transactiedetail (CSV)",
         "rangeInvalid": "De begindatum moet vóór de einddatum liggen.",
         "summary": "{count, plural, =0 {Geen uitbetalingen in deze periode.} one {1 uitbetaling in deze periode, {net} netto.} other {# uitbetalingen in deze periode, {net} netto.}}",
         "byMerchant": "Per handelaar",
         "payoutCount": "Uitbetalingen",
         "empty": "Geen uitbetalingen in deze periode.",
         "columnsHint": "Kolommen in het bestand: {columns}.",
+        "recapHint": "één regel per uitbetaling aan een handelaar.",
+        "detailHint": "één regel per transactie in die uitbetalingen, met de herkomst ervan.",
         "columns": {
           "periodStart": "Begin periode",
           "periodEnd": "Einde periode (inclusief)",
@@ -1450,6 +1468,24 @@
           "status": "Status",
           "createdAt": "Aangemaakt op (UTC)",
           "reference": "Referentie"
+        },
+        "orderColumns": {
+          "periodStart": "Begin periode",
+          "periodEnd": "Einde periode (inclusief)",
+          "merchant": "Handelaar",
+          "business": "Onderneming",
+          "reference": "Referentie uitbetaling",
+          "payoutStatus": "Status uitbetaling",
+          "orderId": "Transactie-ID",
+          "orderDate": "Transactiedatum (UTC)",
+          "source": "Herkomst",
+          "gross": "Brutobedrag",
+          "processorFees": "Verwerkerskosten",
+          "platformFeeShare": "Aandeel platformkosten",
+          "netCredit": "Netto gecrediteerd",
+          "orderStatus": "Status transactie",
+          "description": "Omschrijving",
+          "txHash": "Transactiehash"
         }
       },
       "admin": {

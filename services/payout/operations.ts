@@ -32,8 +32,14 @@ import { burnDirect, mintDirect, type Translate } from "@/services/token-operati
 import {
   buildPayoutExportCsv,
   PayoutExportRangeSchema,
+  selectPayoutsForExport,
   type PayoutExportFile,
 } from "./export";
+import {
+  buildPayoutOrderExportCsv,
+  type PayoutOrderExportEntry,
+  type PayoutOrderExportFile,
+} from "./order-export";
 import { maxManualDeductionCents, toCents } from "./money";
 import {
   assignPlaceBurns,
@@ -284,11 +290,7 @@ export async function exportPayoutsCsv(
   const c = client(ctx);
   let payouts: Payout[];
   try {
-    const [pending, completed] = await Promise.all([
-      c.listPendingPayouts(),
-      c.listCompletedPayouts(),
-    ]);
-    payouts = [...pending, ...completed];
+    payouts = await listAllPayouts(c);
   } catch (e) {
     console.error("[payout] exportPayoutsCsv failed", logSafe(parsed.data), e);
     return { error: toMessage(e, err(ctx, "exportFailed")) };
@@ -298,6 +300,116 @@ export async function exportPayoutsCsv(
     ok: true,
     ...buildPayoutExportCsv({
       payouts,
+      range: parsed.data,
+      fundDomain: ctx.fund.domain,
+      locale: input.locale,
+      t: ctx.t,
+    }),
+  };
+}
+
+/** Both lifecycle halves of the payout list, in one array. */
+async function listAllPayouts(c: CitizenPayClient): Promise<Payout[]> {
+  const [pending, completed] = await Promise.all([
+    c.listPendingPayouts(),
+    c.listCompletedPayouts(),
+  ]);
+  return [...pending, ...completed];
+}
+
+export type ExportPayoutOrdersResult =
+  | { error: string }
+  | ({ ok: true } & PayoutOrderExportFile);
+
+// How many payouts' order lists are fetched at once. An admin export of a
+// quarter can cover a few hundred payouts and each one is its own paginated
+// CitizenPay call, so they can't go out serially; nor can they all go out at
+// once, which would hammer the treasury API from a single request. A small
+// fixed pool is the middle ground.
+const EXPORT_ORDERS_CONCURRENCY = 4;
+
+/**
+ * The transaction-level accounting export: one row per order inside every
+ * payout the recap ({@link exportPayoutsCsv}) selects for the same range. Same
+ * range semantics — the payout is the accounting unit, so its orders are never
+ * re-filtered by their own dates (see ./order-export.ts).
+ *
+ * Fails whole rather than shipping a partial file: an accounting export that
+ * silently dropped a merchant's transactions is worse than a retry, so any
+ * payout whose orders can't be read — or is so large that the pager truncates
+ * it — aborts the download with a translated error.
+ *
+ * Driven by the fund-host route handler `app/api/payouts/export/orders`. The
+ * fund arrives in `ctx`, never from the request.
+ */
+export async function exportPayoutOrdersCsv(
+  ctx: PayoutContext,
+  input: { from: string; to: string; locale: string },
+): Promise<ExportPayoutOrdersResult> {
+  const parsed = PayoutExportRangeSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      error: ctx.t(parsed.error.issues[0]?.message ?? `${ERR}.exportFailed`),
+    };
+  }
+
+  const c = client(ctx);
+  let selected: Payout[];
+  try {
+    selected = selectPayoutsForExport(await listAllPayouts(c), parsed.data);
+  } catch (e) {
+    console.error(
+      "[payout] exportPayoutOrdersCsv list failed",
+      logSafe(parsed.data),
+      e,
+    );
+    return { error: toMessage(e, err(ctx, "exportFailed")) };
+  }
+
+  const entries: PayoutOrderExportEntry[] = new Array(selected.length);
+  let failure: { error: string } | null = null;
+  let cursor = 0;
+
+  const worker = async () => {
+    while (failure === null) {
+      const index = cursor++;
+      const payout = selected[index];
+      if (!payout) return;
+      try {
+        const loaded = await loadAllPayoutOrders(c, payout.id);
+        if (loaded.truncated) {
+          console.error(
+            "[payout] exportPayoutOrdersCsv truncated",
+            logSafe(payout.id),
+          );
+          failure ??= { error: err(ctx, "exportOrdersTruncated") };
+          return;
+        }
+        entries[index] = { payout, orders: loaded.orders };
+      } catch (e) {
+        console.error(
+          "[payout] exportPayoutOrdersCsv orders failed",
+          logSafe(payout.id),
+          e,
+        );
+        failure ??= { error: toMessage(e, err(ctx, "exportOrdersFailed")) };
+        return;
+      }
+    }
+  };
+
+  await Promise.all(
+    Array.from(
+      { length: Math.min(EXPORT_ORDERS_CONCURRENCY, selected.length) },
+      worker,
+    ),
+  );
+  if (failure) return failure;
+
+  return {
+    ok: true,
+    ...buildPayoutOrderExportCsv({
+      entries,
       range: parsed.data,
       fundDomain: ctx.fund.domain,
       locale: input.locale,

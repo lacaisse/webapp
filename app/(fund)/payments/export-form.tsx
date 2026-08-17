@@ -28,8 +28,15 @@ import type {
 // here, so the same clock decides the calendar boundaries for the markup and
 // for the highlight — no `new Date()` on both sides of hydration.
 //
-// The download itself is a plain <a> to the fund-host route handler, not a
-// server action: Content-Disposition on a real navigation is what makes the
+// Two files come out of the same window, so there are two links: the
+// *récapitulatif* (one row per payout, `/api/payouts/export`) and the *détail
+// des transactions* (one row per order inside those payouts,
+// `/api/payouts/export/orders`). The detail file is the heavier one — it costs
+// CitizenPay one paginated call per payout — so the recap stays the primary
+// button and the detail is the outline one beside it.
+//
+// The downloads themselves are plain <a>s to the fund-host route handlers, not
+// server actions: Content-Disposition on a real navigation is what makes the
 // browser save a file.
 export function PayoutExportForm({
   from,
@@ -64,7 +71,7 @@ export function PayoutExportForm({
   }
 
   const valid = range.from !== "" && range.to !== "" && range.from <= range.to;
-  const href = `/api/payouts/export?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`;
+  const query = `from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`;
   const disabled = !valid || count === 0;
 
   return (
@@ -117,32 +124,53 @@ export function PayoutExportForm({
           />
         </div>
 
-        {/* A disabled anchor isn't a thing, so render the button shape without
-            the href when there's nothing to download. */}
-        {disabled ? (
-          <span
-            className={cn(
-              buttonVariants({ variant: "default" }),
-              "pointer-events-none opacity-50",
-            )}
-            aria-disabled="true"
-          >
-            <Download className="size-4" />
-            {t("download")}
-          </span>
-        ) : (
-          <a
-            href={href}
-            download
-            className={buttonVariants({ variant: "default" })}
-          >
-            <Download className="size-4" />
-            {t("download")}
-          </a>
-        )}
+        <DownloadLink
+          href={`/api/payouts/export?${query}`}
+          label={t("downloadRecap")}
+          variant="default"
+          disabled={disabled}
+        />
+        <DownloadLink
+          href={`/api/payouts/export/orders?${query}`}
+          label={t("downloadDetail")}
+          variant="outline"
+          disabled={disabled}
+        />
       </div>
 
       {!valid && <p className="text-xs text-destructive">{t("rangeInvalid")}</p>}
     </div>
+  );
+}
+
+// A disabled anchor isn't a thing, so render the button shape without the href
+// when there's nothing to download.
+function DownloadLink({
+  href,
+  label,
+  variant,
+  disabled,
+}: {
+  href: string;
+  label: string;
+  variant: "default" | "outline";
+  disabled: boolean;
+}) {
+  if (disabled) {
+    return (
+      <span
+        className={cn(buttonVariants({ variant }), "pointer-events-none opacity-50")}
+        aria-disabled="true"
+      >
+        <Download className="size-4" />
+        {label}
+      </span>
+    );
+  }
+  return (
+    <a href={href} download className={buttonVariants({ variant })}>
+      <Download className="size-4" />
+      {label}
+    </a>
   );
 }

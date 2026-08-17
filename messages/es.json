@@ -1147,6 +1147,19 @@
           "burnt": "Quemado",
           "complete": "Completado"
         },
+        "orderTypes": {
+          "app": "Aplicación",
+          "manual": "Manual",
+          "pos": "TPV",
+          "terminal": "Terminal",
+          "web": "Web"
+        },
+        "orderStatuses": {
+          "paid": "Pagada",
+          "refund": "Reembolso",
+          "refunded": "Reembolsada",
+          "correction": "Corrección"
+        },
         "signed": {
           "title": "Pago firmado",
           "description": "Tu transferencia bancaria ha sido firmada.",
@@ -1414,11 +1427,13 @@
           "completeFailed": "No se pudo marcar el pago como completado. Vuelve a intentarlo en breve.",
           "periodFailed": "No se ha podido actualizar el periodo de liquidación. Inténtalo de nuevo.",
           "periodNotPending": "El periodo solo puede cambiarse mientras el pago está pendiente.",
-          "exportFailed": "No se pudo generar la exportación. Vuelve a intentarlo en breve."
+          "exportFailed": "No se pudo generar la exportación. Vuelve a intentarlo en breve.",
+          "exportOrdersFailed": "No se han podido cargar las transacciones de uno de los pagos. No se ha generado la exportación; inténtalo de nuevo en breve.",
+          "exportOrdersTruncated": "Uno de los pagos contiene demasiadas transacciones para exportarlas de una vez. Reduce el periodo e inténtalo de nuevo."
         }
       },
       "export": {
-        "description": "Resumen contable de los pagos a comercios: un CSV que detalla, comercio por comercio, lo recaudado y lo abonado en el periodo elegido. UTF-8 con punto y coma, se abre directamente en Excel.",
+        "description": "Dos exportaciones contables de los pagos a comercios para el periodo elegido: el resumen (una fila por pago) y el detalle de transacciones (una fila por pedido incluido en esos pagos). UTF-8 con punto y coma, se abren directamente en Excel.",
         "presets": {
           "thisMonth": "Este mes",
           "lastMonth": "El mes pasado",
@@ -1429,13 +1444,16 @@
         },
         "from": "Desde",
         "to": "Hasta",
-        "download": "Descargar CSV",
+        "downloadRecap": "Resumen (CSV)",
+        "downloadDetail": "Detalle de transacciones (CSV)",
         "rangeInvalid": "La fecha de inicio debe ser anterior a la de fin.",
         "summary": "{count, plural, =0 {No hay pagos en este periodo.} one {1 pago en este periodo, {net} neto.} other {# pagos en este periodo, {net} neto.}}",
         "byMerchant": "Por comercio",
         "payoutCount": "Pagos",
         "empty": "No hay pagos en este periodo.",
         "columnsHint": "Columnas del archivo: {columns}.",
+        "recapHint": "una fila por pago a un comercio.",
+        "detailHint": "una fila por transacción incluida en esos pagos, con su origen.",
         "columns": {
           "periodStart": "Inicio del periodo",
           "periodEnd": "Fin del periodo (incluido)",
@@ -1450,6 +1468,24 @@
           "status": "Estado",
           "createdAt": "Fecha de creación (UTC)",
           "reference": "Referencia"
+        },
+        "orderColumns": {
+          "periodStart": "Inicio del periodo",
+          "periodEnd": "Fin del periodo (incluido)",
+          "merchant": "Comercio",
+          "business": "Empresa",
+          "reference": "Referencia del pago",
+          "payoutStatus": "Estado del pago",
+          "orderId": "ID de transacción",
+          "orderDate": "Fecha de la transacción (UTC)",
+          "source": "Origen",
+          "gross": "Importe bruto",
+          "processorFees": "Comisiones de origen",
+          "platformFeeShare": "Parte de la comisión de la plataforma",
+          "netCredit": "Neto acreditado",
+          "orderStatus": "Estado de la transacción",
+          "description": "Descripción",
+          "txHash": "Hash de transacción"
         }
       },
       "admin": {

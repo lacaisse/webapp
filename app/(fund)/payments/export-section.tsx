@@ -19,6 +19,7 @@ import {
   summarizePayoutsByMerchant,
 } from "@/services/payout/export";
 import { fromCents, toCents } from "@/services/payout/money";
+import { PAYOUT_ORDER_EXPORT_COLUMNS } from "@/services/payout/order-export";
 
 import { getCompletedPayouts, getPendingPayouts } from "./data";
 import { PayoutExportForm } from "./export-form";
@@ -137,13 +138,29 @@ export async function ExportView({
         </Table>
       </div>
 
-      {/* Spell out the file's columns: the accountant asked for a specific set
-          of fields, and knowing they're all there saves a download. */}
-      <p className="text-xs text-muted-foreground">
-        {t("columnsHint", {
-          columns: PAYOUT_EXPORT_COLUMNS.map((c) => t(`columns.${c}`)).join(", "),
-        })}
-      </p>
+      {/* Spell out each file's columns: the accountant asked for a specific set
+          of fields, and knowing they're all there saves a download. Two files
+          come out of this window — the recap (one row per payout) and the
+          transaction detail (one row per order inside those payouts) — so each
+          gets its own line rather than one merged list. */}
+      <div className="space-y-1 text-xs text-muted-foreground">
+        <p>
+          <span className="font-medium">{t("downloadRecap")}</span> —{" "}
+          {t("recapHint")}{" "}
+          {t("columnsHint", {
+            columns: PAYOUT_EXPORT_COLUMNS.map((c) => t(`columns.${c}`)).join(", "),
+          })}
+        </p>
+        <p>
+          <span className="font-medium">{t("downloadDetail")}</span> —{" "}
+          {t("detailHint")}{" "}
+          {t("columnsHint", {
+            columns: PAYOUT_ORDER_EXPORT_COLUMNS.map((c) =>
+              t(`orderColumns.${c}`),
+            ).join(", "),
+          })}
+        </p>
+      </div>
     </div>
   );
 }

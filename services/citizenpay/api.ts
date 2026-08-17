@@ -225,6 +225,11 @@ export type PayoutOrderWire = {
   due: number; // cents (total - fees)
   status: string; // paid | refund | refunded | correction | …
   type: string; // web | pos | terminal | …
+  // Payment processor that handled the money, lowercase and verbatim from CP's
+  // processor_tx table (`viva`, `ponto`, `stripe`, …). Absent/null when no
+  // processor was involved (app and manual orders), and absent entirely on API
+  // deployments older than the field — every reader must tolerate both.
+  processor?: string | null;
   description?: string | null; // omitted when null
   items?: unknown[] | null; // raw line-items array
   // The orders endpoint has used both `completed_at` and a plain `date`
