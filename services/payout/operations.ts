@@ -29,6 +29,11 @@ import { ANNOTATION_TRIGGERS } from "@/services/transaction-annotation/annotate"
 import { resolveOrEnqueueAnnotation } from "@/services/transaction-annotation/pending";
 import { burnDirect, mintDirect, type Translate } from "@/services/token-operations/direct";
 
+import {
+  buildPayoutExportCsv,
+  PayoutExportRangeSchema,
+  type PayoutExportFile,
+} from "./export";
 import { maxManualDeductionCents, toCents } from "./money";
 import {
   assignPlaceBurns,
@@ -248,6 +253,57 @@ export async function listPayouts(
     console.error("[payout] listPayouts failed", logSafe(state), e);
     return { error: toMessage(e, err(ctx, "statusFailed")) };
   }
+}
+
+export type ExportPayoutsResult =
+  | { error: string }
+  | ({ ok: true } & PayoutExportFile);
+
+/**
+ * The accounting export: every payout whose settlement period starts inside the
+ * inclusive `[from, to]` day range, as a spreadsheet-ready CSV. All statuses
+ * are included — the file's `status` column is what tells "reversé" from "à
+ * reverser" (see ./export.ts for the date/status/format reasoning).
+ *
+ * Driven by the fund-host route handler `app/api/payouts/export`. The fund
+ * arrives in `ctx`, never from the request, like every other operation here.
+ */
+export async function exportPayoutsCsv(
+  ctx: PayoutContext,
+  input: { from: string; to: string; locale: string },
+): Promise<ExportPayoutsResult> {
+  const parsed = PayoutExportRangeSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      error: ctx.t(parsed.error.issues[0]?.message ?? `${ERR}.exportFailed`),
+    };
+  }
+
+  // Not via listPayouts(ctx, "all"): its failure message is about reading a
+  // status, which reads as a non-sequitur to someone who asked for a file.
+  const c = client(ctx);
+  let payouts: Payout[];
+  try {
+    const [pending, completed] = await Promise.all([
+      c.listPendingPayouts(),
+      c.listCompletedPayouts(),
+    ]);
+    payouts = [...pending, ...completed];
+  } catch (e) {
+    console.error("[payout] exportPayoutsCsv failed", logSafe(parsed.data), e);
+    return { error: toMessage(e, err(ctx, "exportFailed")) };
+  }
+
+  return {
+    ok: true,
+    ...buildPayoutExportCsv({
+      payouts,
+      range: parsed.data,
+      fundDomain: ctx.fund.domain,
+      locale: input.locale,
+      t: ctx.t,
+    }),
+  };
 }
 
 export type PayoutDetailResult =

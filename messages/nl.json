@@ -1108,7 +1108,8 @@
       "tabs": {
         "drafts": "Concepten",
         "pending": "In afwachting",
-        "completed": "Afgehandeld"
+        "completed": "Afgehandeld",
+        "export": "Export"
       },
       "settlement": {
         "place": "Handelaar",
@@ -1410,7 +1411,43 @@
           "descriptionTooLong": "De omschrijving is te lang.",
           "completeFailed": "Kon de uitbetaling niet als voltooid markeren. Probeer het zo opnieuw.",
           "periodFailed": "Kon de afrekenperiode niet bijwerken. Probeer het opnieuw.",
-          "periodNotPending": "De periode kan alleen worden gewijzigd zolang de uitbetaling in behandeling is."
+          "periodNotPending": "De periode kan alleen worden gewijzigd zolang de uitbetaling in behandeling is.",
+          "exportFailed": "Kon de export niet genereren. Probeer het zo opnieuw."
+        }
+      },
+      "export": {
+        "description": "Boekhoudkundig overzicht van de uitbetalingen aan handelaars: een CSV die per handelaar toont wat er in de gekozen periode is ontvangen en uitbetaald. UTF-8 met puntkomma, opent direct in Excel.",
+        "presets": {
+          "thisMonth": "Deze maand",
+          "lastMonth": "Vorige maand",
+          "thisQuarter": "Dit kwartaal",
+          "lastQuarter": "Vorig kwartaal",
+          "thisYear": "Dit jaar",
+          "lastYear": "Vorig jaar"
+        },
+        "from": "Van",
+        "to": "Tot",
+        "download": "CSV downloaden",
+        "rangeInvalid": "De begindatum moet vóór de einddatum liggen.",
+        "summary": "{count, plural, =0 {Geen uitbetalingen in deze periode.} one {1 uitbetaling in deze periode, {net} netto.} other {# uitbetalingen in deze periode, {net} netto.}}",
+        "byMerchant": "Per handelaar",
+        "payoutCount": "Uitbetalingen",
+        "empty": "Geen uitbetalingen in deze periode.",
+        "columnsHint": "Kolommen in het bestand: {columns}.",
+        "columns": {
+          "periodStart": "Begin periode",
+          "periodEnd": "Einde periode (inclusief)",
+          "merchant": "Handelaar",
+          "business": "Onderneming",
+          "gross": "Brutobedrag",
+          "processorFees": "Verwerkerskosten",
+          "platformFee": "Platformkosten",
+          "manualDeduction": "Manuele aftrek",
+          "deductionComment": "Reden van de aftrek",
+          "net": "Netto uitbetaald",
+          "status": "Status",
+          "createdAt": "Aangemaakt op (UTC)",
+          "reference": "Referentie"
         }
       },
       "admin": {

@@ -1108,7 +1108,8 @@
       "tabs": {
         "drafts": "Brouillons",
         "pending": "En attente",
-        "completed": "Réglés"
+        "completed": "Réglés",
+        "export": "Export"
       },
       "settlement": {
         "place": "Commerce",
@@ -1410,7 +1411,43 @@
           "descriptionTooLong": "La description est trop longue.",
           "completeFailed": "Impossible de marquer le versement comme terminé. Réessayez bientôt.",
           "periodFailed": "Impossible de modifier la période de versement. Veuillez réessayer.",
-          "periodNotPending": "La période ne peut être modifiée que tant que le virement est en attente."
+          "periodNotPending": "La période ne peut être modifiée que tant que le virement est en attente.",
+          "exportFailed": "Impossible de générer l'export. Réessayez bientôt."
+        }
+      },
+      "export": {
+        "description": "Récapitulatif comptable des virements aux commerçants : un fichier CSV détaillant, commerçant par commerçant, les montants perçus et reversés sur la période choisie. Séparateur point-virgule et encodage UTF-8, ouvrable directement dans Excel.",
+        "presets": {
+          "thisMonth": "Ce mois-ci",
+          "lastMonth": "Le mois dernier",
+          "thisQuarter": "Ce trimestre",
+          "lastQuarter": "Le trimestre dernier",
+          "thisYear": "Cette année",
+          "lastYear": "L'année dernière"
+        },
+        "from": "Du",
+        "to": "Au",
+        "download": "Télécharger le CSV",
+        "rangeInvalid": "La date de début doit précéder la date de fin.",
+        "summary": "{count, plural, =0 {Aucun virement sur cette période.} one {1 virement sur cette période, {net} net.} other {# virements sur cette période, {net} net.}}",
+        "byMerchant": "Par commerçant",
+        "payoutCount": "Virements",
+        "empty": "Aucun virement sur cette période.",
+        "columnsHint": "Colonnes du fichier : {columns}.",
+        "columns": {
+          "periodStart": "Début de période",
+          "periodEnd": "Fin de période (incluse)",
+          "merchant": "Commerçant",
+          "business": "Enseigne",
+          "gross": "Montant brut",
+          "processorFees": "Frais source",
+          "platformFee": "Commission plateforme",
+          "manualDeduction": "Déduction manuelle",
+          "deductionComment": "Motif de la déduction",
+          "net": "Net reversé",
+          "status": "Statut",
+          "createdAt": "Date de création (UTC)",
+          "reference": "Référence"
         }
       },
       "admin": {
