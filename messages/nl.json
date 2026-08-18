@@ -2059,6 +2059,10 @@
           "mapTitle": "Handelaarskaart",
           "listSnippetLabel": "Handelaarslijst",
           "mapSnippetLabel": "Handelaarskaart"
+        },
+        "preview": {
+          "show": "Voorbeeld",
+          "hide": "Voorbeeld verbergen"
         }
       }
     }

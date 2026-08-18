@@ -2059,6 +2059,10 @@
           "mapTitle": "Carte des commerçants",
           "listSnippetLabel": "Liste des commerçants",
           "mapSnippetLabel": "Carte des commerçants"
+        },
+        "preview": {
+          "show": "Aperçu",
+          "hide": "Masquer l'aperçu"
         }
       }
     }

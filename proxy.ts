@@ -90,9 +90,10 @@ export async function proxy(request: NextRequest) {
   const response = NextResponse.next({ request });
 
   // Embeddable widgets (services/embed): the fund's allowlist decides which
-  // sites may frame them, and the browser is what enforces it. An empty
-  // allowlist means `'none'` — the widgets are off until an admin configures a
-  // domain, which is the safe default for a page that shows a balance.
+  // sites may frame them, and the browser is what enforces it. `'self'` is
+  // always included so the settings page can preview a widget on the fund's
+  // own host — same-origin framing grants nothing an admin doesn't already
+  // have. External sites stay locked out until the allowlist names them.
   //
   // Joining the stored values is safe because they are pre-validated CSP
   // host-sources (services/embed/schema.ts): no whitespace, `;` or quote can
@@ -100,9 +101,7 @@ export async function proxy(request: NextRequest) {
   // that grammar is ever widened, revisit this line.
   const path = request.nextUrl.pathname;
   if (hostType === "fund" && (path === "/embed" || path.startsWith("/embed/"))) {
-    const sources = embedAllowedDomains.length
-      ? embedAllowedDomains.join(" ")
-      : "'none'";
+    const sources = ["'self'", ...embedAllowedDomains].join(" ");
     response.headers.set("Content-Security-Policy", `frame-ancestors ${sources}`);
   } else {
     // Everything that is NOT a widget must not be framable by anyone else.
