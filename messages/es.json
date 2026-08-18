@@ -2319,6 +2319,7 @@
         "cardRequired": "Elige una tarjeta para activar.",
         "cardNotFound": "Esa tarjeta ya no está disponible.",
         "cardTaken": "Esa tarjeta acaba de vincularse a otro miembro.",
+        "cardBlockedOrLost": "Esa tarjeta está bloqueada o reportada como perdida y no se puede asignar.",
         "tierNotFound": "Nivel no encontrado o archivado.",
         "invalidStatusTransition": "Ese cambio de estado no está permitido desde el estado actual."
       },

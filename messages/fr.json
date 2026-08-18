@@ -2319,6 +2319,7 @@
         "cardRequired": "Choisissez une carte à activer.",
         "cardNotFound": "Cette carte n'est plus disponible.",
         "cardTaken": "Cette carte vient d'être liée à un autre membre.",
+        "cardBlockedOrLost": "Cette carte est bloquée ou signalée perdue et ne peut pas être attribuée.",
         "tierNotFound": "Palier introuvable ou archivé.",
         "invalidStatusTransition": "Ce changement de statut n'est pas autorisé depuis l'état actuel."
       },

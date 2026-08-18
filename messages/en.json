@@ -2319,6 +2319,7 @@
         "cardRequired": "Pick a card to activate.",
         "cardNotFound": "That card is no longer available.",
         "cardTaken": "That card was just linked to another member.",
+        "cardBlockedOrLost": "That card is blocked or reported lost and can't be assigned.",
         "tierNotFound": "Tier not found or archived.",
         "invalidStatusTransition": "That status change isn't allowed from the current state."
       },
