@@ -1590,7 +1590,8 @@
         "citizenpay": "Citizen Pay",
         "fees": "Frais",
         "emails": "E-mails",
-        "documents": "Documents"
+        "documents": "Documents",
+        "embeds": "Widgets"
       },
       "general": {
         "title": "Général",
@@ -2017,6 +2018,48 @@
           "bodyTooLong": "Le corps du courrier est trop long.",
           "unknownVariable": "Variable inconnue « {name} ». Supprimez-la ou utilisez l'une des variables listées."
         }
+      },
+      "embeds": {
+        "domains": {
+          "title": "Domaines autorisés",
+          "description": "Les sites autorisés à intégrer vos widgets. Les navigateurs refusent de les afficher ailleurs.",
+          "label": "Un domaine par ligne",
+          "help": "Jusqu'à {max} domaines. Utilisez *.exemple.org pour autoriser tous les sous-domaines, et indiquez le port pour vos tests locaux (localhost:3000).",
+          "emptyWarning": "Aucun domaine configuré — vos widgets ne s'afficheront sur aucun site tant que vous n'en ajoutez pas un.",
+          "saved": "Domaines autorisés enregistrés.",
+          "save": "Enregistrer",
+          "saving": "Enregistrement…"
+        },
+        "accounts": {
+          "title": "Widget de compte",
+          "description": "Publiez le solde et l'activité récente d'un compte. L'adresse du compte et le détail des transactions ne sont jamais affichés.",
+          "none": "Aucun compte pour l'instant.",
+          "enable": "Activer",
+          "disable": "Désactiver",
+          "rotate": "Nouveau lien",
+          "cancel": "Annuler",
+          "snippetLabel": "Collez ceci dans votre site",
+          "disableConfirm": {
+            "title": "Désactiver ce widget ?",
+            "body": "Il cessera de s'afficher partout où il est actuellement intégré. Vous pourrez le réactiver plus tard, mais avec un nouveau lien à recoller."
+          },
+          "rotateConfirm": {
+            "title": "Générer un nouveau lien ?",
+            "body": "Le lien actuel cesse immédiatement de fonctionner. Partout où ce widget est déjà intégré, il ne s'affichera plus tant que vous n'aurez pas collé le nouveau code."
+          },
+          "errors": {
+            "invalid": "Requête invalide.",
+            "notFound": "Ce compte n'existe plus."
+          }
+        },
+        "merchants": {
+          "title": "Widgets commerçants",
+          "description": "Votre annuaire public de commerçants, en liste ou sur une carte. Seuls les commerçants marqués comme visibles publiquement y figurent.",
+          "listTitle": "Commerçants",
+          "mapTitle": "Carte des commerçants",
+          "listSnippetLabel": "Liste des commerçants",
+          "mapSnippetLabel": "Carte des commerçants"
+        }
       }
     }
   },
@@ -2071,7 +2114,9 @@
       "feeInvalid": "Le taux doit être un nombre avec jusqu'à 2 décimales.",
       "feeTooHigh": "Le taux ne peut pas dépasser 100 %.",
       "cutoffDayInvalid": "Le jour de clôture doit être un entier entre 1 et 31.",
-      "nameTooLong": "Le nom est trop long."
+      "nameTooLong": "Le nom est trop long.",
+      "embedDomainInvalid": "Saisissez un domaine par ligne (exemple.org, *.exemple.org, localhost:3000).",
+      "embedDomainsTooMany": "Trop de domaines — retirez-en quelques-uns."
     }
   },
   "team": {
@@ -3633,6 +3678,31 @@
         "noChain": "Aucune chaîne de jetons configurée pour cette caisse.",
         "inconclusive": "Le bundler n'a pas pu répondre. Rien n'a été modifié — réessayez."
       }
+    }
+  },
+  "embed": {
+    "account": {
+      "balanceLabel": "Solde",
+      "recentActivity": "Activité récente",
+      "empty": "Aucune activité pour l'instant.",
+      "unavailable": "L'activité est momentanément indisponible.",
+      "in": "reçu",
+      "out": "envoyé",
+      "kinds": {
+        "mint": "Émission",
+        "burn": "Remboursement",
+        "transfer": "Transfert"
+      }
+    },
+    "merchants": {
+      "title": "Où payer",
+      "empty": "Aucun commerçant pour l'instant.",
+      "website": "Visiter le site",
+      "conditions": "Conditions"
+    },
+    "map": {
+      "empty": "Aucune adresse de commerçant à afficher pour l'instant.",
+      "loading": "Chargement de la carte…"
     }
   }
 }
