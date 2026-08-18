@@ -104,6 +104,16 @@ export async function proxy(request: NextRequest) {
       ? embedAllowedDomains.join(" ")
       : "'none'";
     response.headers.set("Content-Security-Policy", `frame-ancestors ${sources}`);
+  } else {
+    // Everything that is NOT a widget must not be framable by anyone else.
+    // The app sent no anti-framing header at all before this, which left the
+    // dashboard open to clickjacking: an attacker could load it invisibly over
+    // their own page and have an admin click through a destructive action
+    // without seeing it. `'self'` still permits our own same-origin frames.
+    //
+    // Note this only governs framing — it does not affect direct navigation to
+    // any page, including /embed/* opened top-level.
+    response.headers.set("Content-Security-Policy", "frame-ancestors 'self'");
   }
 
   return response;
