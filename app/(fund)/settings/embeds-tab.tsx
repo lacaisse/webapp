@@ -13,14 +13,16 @@ import { prisma } from "@/services/db/prisma";
 import { getFundUrl } from "@/services/fund/server";
 import { EmbedAccounts, type EmbedAccountRow } from "./embed-accounts";
 import { EmbedDomainsForm } from "./embed-domains-form";
+import { EmbedPreview } from "./embed-preview";
 import { EMBED_HEIGHTS, buildEmbedSnippet } from "./embed-snippet";
 
 // Embeds tab: the allowlist that decides where the widgets may be framed, the
 // per-account switches for the account widget, and the copy-paste snippets.
 //
 // The allowlist card comes first deliberately — with no domains configured the
-// CSP is `frame-ancestors 'none'` and nothing renders anywhere, so it's the
-// step that has to happen before any snippet is worth copying.
+// CSP is `frame-ancestors 'self'` and no external site can render a widget, so
+// it's the step that has to happen before any snippet is worth copying. The
+// previews frame same-origin and work regardless.
 
 export async function EmbedsTab({
   fund,
@@ -45,16 +47,16 @@ export async function EmbedsTab({
   // The merchant widgets need no per-fund handle: what they show is already the
   // fund's public directory, so the snippet is the same for every visitor and
   // can be rendered here rather than minted.
-  const merchantsSnippet = buildEmbedSnippet(
-    `${baseUrl}/embed/merchants`,
-    `${fund.name} — ${t("merchants.listTitle")}`,
-    EMBED_HEIGHTS.merchants,
-  );
-  const mapSnippet = buildEmbedSnippet(
-    `${baseUrl}/embed/merchants/map`,
-    `${fund.name} — ${t("merchants.mapTitle")}`,
-    EMBED_HEIGHTS.map,
-  );
+  const merchantsWidget = {
+    src: `${baseUrl}/embed/merchants`,
+    title: `${fund.name} — ${t("merchants.listTitle")}`,
+    height: EMBED_HEIGHTS.merchants,
+  };
+  const mapWidget = {
+    src: `${baseUrl}/embed/merchants/map`,
+    title: `${fund.name} — ${t("merchants.mapTitle")}`,
+    height: EMBED_HEIGHTS.map,
+  };
 
   return (
     <div className="space-y-6">
@@ -90,12 +92,9 @@ export async function EmbedsTab({
         <CardContent className="space-y-4 pb-4">
           <SnippetBlock
             label={t("merchants.listSnippetLabel")}
-            snippet={merchantsSnippet}
+            {...merchantsWidget}
           />
-          <SnippetBlock
-            label={t("merchants.mapSnippetLabel")}
-            snippet={mapSnippet}
-          />
+          <SnippetBlock label={t("merchants.mapSnippetLabel")} {...mapWidget} />
         </CardContent>
       </Card>
     </div>
@@ -104,11 +103,16 @@ export async function EmbedsTab({
 
 function SnippetBlock({
   label,
-  snippet,
+  src,
+  title,
+  height,
 }: {
   label: string;
-  snippet: string;
+  src: string;
+  title: string;
+  height: number;
 }) {
+  const snippet = buildEmbedSnippet(src, title, height);
   return (
     <div className="space-y-1">
       <div className="text-xs font-medium">{label}</div>
@@ -118,6 +122,7 @@ function SnippetBlock({
         </code>
         <CopyButton value={snippet} />
       </div>
+      <EmbedPreview src={src} height={height} title={title} />
     </div>
   );
 }
