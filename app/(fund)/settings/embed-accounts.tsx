@@ -19,6 +19,7 @@ import {
   rotateAccountEmbedSlugAction,
   setAccountEmbedAction,
 } from "@/services/embed/admin-actions";
+import { EmbedPreview } from "./embed-preview";
 import { EMBED_HEIGHTS, buildEmbedSnippet } from "./embed-snippet";
 
 // Per-account controls for the public account widget.
@@ -80,12 +81,12 @@ function AccountRow({
   );
 
   const enabled = account.embedSlug !== null;
-  const snippet = account.embedSlug
-    ? buildEmbedSnippet(
-        `${baseUrl}/embed/account/${account.embedSlug}`,
-        `${fundName} — ${account.name}`,
-        EMBED_HEIGHTS.account,
-      )
+  const src = account.embedSlug
+    ? `${baseUrl}/embed/account/${account.embedSlug}`
+    : null;
+  const title = `${fundName} — ${account.name}`;
+  const snippet = src
+    ? buildEmbedSnippet(src, title, EMBED_HEIGHTS.account)
     : null;
 
   function run(action: () => Promise<{ ok: true } | { error: string }>) {
@@ -140,7 +141,7 @@ function AccountRow({
         </div>
       </div>
 
-      {snippet ? (
+      {snippet && src ? (
         <div className="space-y-1">
           <div className="text-xs text-muted-foreground">
             {t("snippetLabel")}
@@ -151,6 +152,7 @@ function AccountRow({
             </code>
             <CopyButton value={snippet} />
           </div>
+          <EmbedPreview src={src} height={EMBED_HEIGHTS.account} title={title} />
         </div>
       ) : null}
 

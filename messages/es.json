@@ -2059,6 +2059,10 @@
           "mapTitle": "Mapa de comercios",
           "listSnippetLabel": "Lista de comercios",
           "mapSnippetLabel": "Mapa de comercios"
+        },
+        "preview": {
+          "show": "Vista previa",
+          "hide": "Ocultar la vista previa"
         }
       }
     }
