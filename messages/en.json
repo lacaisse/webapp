@@ -1590,7 +1590,8 @@
         "citizenpay": "Citizen Pay",
         "fees": "Fees",
         "emails": "Emails",
-        "documents": "Documents"
+        "documents": "Documents",
+        "embeds": "Embeds"
       },
       "general": {
         "title": "General",
@@ -2017,6 +2018,48 @@
           "bodyTooLong": "The letter body is too long.",
           "unknownVariable": "Unknown placeholder \"{name}\". Remove it or use one of the listed variables."
         }
+      },
+      "embeds": {
+        "domains": {
+          "title": "Allowed domains",
+          "description": "The websites allowed to embed your widgets. Browsers refuse to display them anywhere else.",
+          "label": "One domain per line",
+          "help": "Up to {max} domains. Use *.example.org to allow every subdomain, and include the port when testing locally (localhost:3000).",
+          "emptyWarning": "No domains configured — your widgets won't display on any website until you add one.",
+          "saved": "Allowed domains saved.",
+          "save": "Save",
+          "saving": "Saving…"
+        },
+        "accounts": {
+          "title": "Account widget",
+          "description": "Publish an account's balance and recent activity. The account address and transaction details are never shown.",
+          "none": "No accounts yet.",
+          "enable": "Enable",
+          "disable": "Disable",
+          "rotate": "New link",
+          "cancel": "Cancel",
+          "snippetLabel": "Paste this into your website",
+          "disableConfirm": {
+            "title": "Disable this widget?",
+            "body": "It will stop loading everywhere it's currently embedded. You can enable it again later, but you'll get a new link to paste."
+          },
+          "rotateConfirm": {
+            "title": "Generate a new link?",
+            "body": "The current link stops working immediately. Anywhere this widget is already embedded will stop loading until you paste the new snippet."
+          },
+          "errors": {
+            "invalid": "Invalid request.",
+            "notFound": "That account no longer exists."
+          }
+        },
+        "merchants": {
+          "title": "Merchant widgets",
+          "description": "Your public merchant directory, as a list or on a map. Only merchants marked as publicly visible appear.",
+          "listTitle": "Merchants",
+          "mapTitle": "Merchant map",
+          "listSnippetLabel": "Merchant list",
+          "mapSnippetLabel": "Merchant map"
+        }
       }
     }
   },
@@ -2071,7 +2114,9 @@
       "feeInvalid": "Fee rate must be a number with up to 2 decimal places.",
       "feeTooHigh": "Fee rate can't exceed 100%.",
       "cutoffDayInvalid": "Cutoff day must be a whole number between 1 and 31.",
-      "nameTooLong": "The name is too long."
+      "nameTooLong": "The name is too long.",
+      "embedDomainInvalid": "Enter one domain per line (example.org, *.example.org, localhost:3000).",
+      "embedDomainsTooMany": "Too many domains — remove a few and try again."
     }
   },
   "team": {
@@ -3633,6 +3678,31 @@
         "noChain": "No token chain configured for this fund.",
         "inconclusive": "The bundler could not be reached. Nothing was changed — try again."
       }
+    }
+  },
+  "embed": {
+    "account": {
+      "balanceLabel": "Balance",
+      "recentActivity": "Recent activity",
+      "empty": "No activity yet.",
+      "unavailable": "Activity is temporarily unavailable.",
+      "in": "received",
+      "out": "sent",
+      "kinds": {
+        "mint": "Issued",
+        "burn": "Redeemed",
+        "transfer": "Transfer"
+      }
+    },
+    "merchants": {
+      "title": "Where you can pay",
+      "empty": "No merchants listed yet.",
+      "website": "Visit website",
+      "conditions": "Conditions"
+    },
+    "map": {
+      "empty": "No merchant locations to show yet.",
+      "loading": "Loading map…"
     }
   }
 }

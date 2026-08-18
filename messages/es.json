@@ -1590,7 +1590,8 @@
         "citizenpay": "Citizen Pay",
         "fees": "Comisiones",
         "emails": "Correos",
-        "documents": "Documentos"
+        "documents": "Documentos",
+        "embeds": "Widgets"
       },
       "general": {
         "title": "General",
@@ -2017,6 +2018,48 @@
           "bodyTooLong": "El cuerpo de la carta es demasiado largo.",
           "unknownVariable": "Marcador desconocido «{name}». Elimínalo o usa una de las variables indicadas."
         }
+      },
+      "embeds": {
+        "domains": {
+          "title": "Dominios permitidos",
+          "description": "Los sitios web autorizados a incrustar tus widgets. Los navegadores se niegan a mostrarlos en cualquier otro sitio.",
+          "label": "Un dominio por línea",
+          "help": "Hasta {max} dominios. Usa *.ejemplo.org para permitir todos los subdominios, e incluye el puerto en las pruebas locales (localhost:3000).",
+          "emptyWarning": "No hay dominios configurados: tus widgets no se mostrarán en ningún sitio web hasta que añadas uno.",
+          "saved": "Dominios permitidos guardados.",
+          "save": "Guardar",
+          "saving": "Guardando…"
+        },
+        "accounts": {
+          "title": "Widget de cuenta",
+          "description": "Publica el saldo y la actividad reciente de una cuenta. La dirección de la cuenta y el detalle de las transacciones nunca se muestran.",
+          "none": "Todavía no hay cuentas.",
+          "enable": "Activar",
+          "disable": "Desactivar",
+          "rotate": "Nuevo enlace",
+          "cancel": "Cancelar",
+          "snippetLabel": "Pega esto en tu sitio web",
+          "disableConfirm": {
+            "title": "¿Desactivar este widget?",
+            "body": "Dejará de cargarse en todos los sitios donde esté incrustado. Puedes volver a activarlo más tarde, pero con un enlace nuevo que tendrás que pegar."
+          },
+          "rotateConfirm": {
+            "title": "¿Generar un enlace nuevo?",
+            "body": "El enlace actual deja de funcionar de inmediato. Allí donde ya hayas incrustado este widget dejará de cargarse hasta que pegues el nuevo código."
+          },
+          "errors": {
+            "invalid": "Solicitud no válida.",
+            "notFound": "Esa cuenta ya no existe."
+          }
+        },
+        "merchants": {
+          "title": "Widgets de comercios",
+          "description": "Tu directorio público de comercios, en lista o en un mapa. Solo aparecen los comercios marcados como visibles públicamente.",
+          "listTitle": "Comercios",
+          "mapTitle": "Mapa de comercios",
+          "listSnippetLabel": "Lista de comercios",
+          "mapSnippetLabel": "Mapa de comercios"
+        }
       }
     }
   },
@@ -2071,7 +2114,9 @@
       "feeInvalid": "La tasa de comisión debe ser un número con hasta 2 decimales.",
       "feeTooHigh": "La tasa de comisión no puede superar el 100%.",
       "cutoffDayInvalid": "El día de corte debe ser un número entero entre 1 y 31.",
-      "nameTooLong": "El nombre es demasiado largo."
+      "nameTooLong": "El nombre es demasiado largo.",
+      "embedDomainInvalid": "Introduce un dominio por línea (ejemplo.org, *.ejemplo.org, localhost:3000).",
+      "embedDomainsTooMany": "Demasiados dominios: elimina algunos."
     }
   },
   "team": {
@@ -3633,6 +3678,31 @@
         "noChain": "No hay cadena de tokens configurada para esta caja.",
         "inconclusive": "No se pudo contactar con el bundler. No se ha cambiado nada — inténtalo de nuevo."
       }
+    }
+  },
+  "embed": {
+    "account": {
+      "balanceLabel": "Saldo",
+      "recentActivity": "Actividad reciente",
+      "empty": "Todavía no hay actividad.",
+      "unavailable": "La actividad no está disponible temporalmente.",
+      "in": "recibido",
+      "out": "enviado",
+      "kinds": {
+        "mint": "Emisión",
+        "burn": "Canje",
+        "transfer": "Transferencia"
+      }
+    },
+    "merchants": {
+      "title": "Dónde pagar",
+      "empty": "Todavía no hay comercios.",
+      "website": "Visitar el sitio web",
+      "conditions": "Condiciones"
+    },
+    "map": {
+      "empty": "Todavía no hay ubicaciones de comercios que mostrar.",
+      "loading": "Cargando el mapa…"
     }
   }
 }

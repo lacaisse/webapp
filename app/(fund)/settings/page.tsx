@@ -28,6 +28,7 @@ import {
 } from "./signup-link-reference";
 import { EmailsTab } from "./emails-tab";
 import { DocumentsTab } from "./documents-tab";
+import { EmbedsTab } from "./embeds-tab";
 import { CitizenPayConnect } from "./citizenpay-connect";
 import { TokenInfo } from "./token-info";
 import {
@@ -49,6 +50,7 @@ const TABS = [
   { value: "terms" },
   { value: "citizenpay" },
   { value: "fees" },
+  { value: "embeds" },
 ] as const;
 
 // ADMIN-only. The guard awaits at the top (the (fund) layout only requires
@@ -95,7 +97,7 @@ function SettingsTabsSkeleton() {
   return (
     <>
       <div className="flex flex-wrap gap-2">
-        {Array.from({ length: 9 }).map((_, i) => (
+        {Array.from({ length: 10 }).map((_, i) => (
           <Skeleton key={i} className="h-8 w-20" />
         ))}
       </div>
@@ -262,6 +264,19 @@ async function SettingsContent({
             />
           </CardContent>
         </Card>
+      )}
+
+      {active === "embeds" && (
+        <Suspense fallback={<Skeleton className="h-64 w-full" />}>
+          <EmbedsTab
+            fund={{
+              id: fund.id,
+              name: fund.name,
+              domain: fund.domain,
+              embedAllowedDomains: fund.embedAllowedDomains,
+            }}
+          />
+        </Suspense>
       )}
 
       {active === "fees" && (
