@@ -11,6 +11,8 @@ import { toCanonicalFundDomain } from "@/services/fund/host";
 //      domain). Forwarded as `x-host-type`.
 //   2. For `fund` hosts, forward `x-fund-id` / `x-fund-domain` so app code
 //      doesn't re-parse Host. Read via services/fund/server.ts.
+//   3. Emit the `frame-ancestors` CSP for the fund's embeddable widgets
+//      (`/embed/*`), from the allowlist the same fund lookup already returns.
 //
 // Session refresh is NOT done here — Better Auth uses DB-backed sessions
 // looked up on-demand by services/auth/dal.ts#getCurrentUser; the
@@ -45,6 +47,9 @@ export async function proxy(request: NextRequest) {
   const host = (request.headers.get("host") ?? "").split(":")[0];
 
   let hostType: "auth" | "apex" | "fund" | undefined;
+  // Domains allowed to frame this fund's widgets. Stays empty for non-fund
+  // hosts, which have no widgets to frame.
+  let embedAllowedDomains: string[] = [];
 
   if (!host || host === baseDomain) {
     hostType = "apex";
@@ -65,11 +70,14 @@ export async function proxy(request: NextRequest) {
     const lookupHost = toCanonicalFundDomain(host, baseDomain);
     const fund = await prisma.fund.findUnique({
       where: { domain: lookupHost },
-      select: { id: true, domain: true },
+      // `embedAllowedDomains` rides along on the lookup we already do — a
+      // scalar column, so no join and no extra round-trip on the hot path.
+      select: { id: true, domain: true, embedAllowedDomains: true },
     });
     if (fund) {
       request.headers.set("x-fund-id", fund.id);
       request.headers.set("x-fund-domain", fund.domain);
+      embedAllowedDomains = fund.embedAllowedDomains;
       hostType = "fund";
     }
     // Unknown host → no hostType set; downstream helpers default to apex/404.
@@ -79,7 +87,26 @@ export async function proxy(request: NextRequest) {
     request.headers.set("x-host-type", hostType);
   }
 
-  return NextResponse.next({ request });
+  const response = NextResponse.next({ request });
+
+  // Embeddable widgets (services/embed): the fund's allowlist decides which
+  // sites may frame them, and the browser is what enforces it. An empty
+  // allowlist means `'none'` — the widgets are off until an admin configures a
+  // domain, which is the safe default for a page that shows a balance.
+  //
+  // Joining the stored values is safe because they are pre-validated CSP
+  // host-sources (services/embed/schema.ts): no whitespace, `;` or quote can
+  // be stored, so no entry can terminate this directive or add another. If
+  // that grammar is ever widened, revisit this line.
+  const path = request.nextUrl.pathname;
+  if (hostType === "fund" && (path === "/embed" || path.startsWith("/embed/"))) {
+    const sources = embedAllowedDomains.length
+      ? embedAllowedDomains.join(" ")
+      : "'none'";
+    response.headers.set("Content-Security-Policy", `frame-ancestors ${sources}`);
+  }
+
+  return response;
 }
 
 export const config = {
