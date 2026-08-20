@@ -18,7 +18,6 @@
 //   - phone, iban, householdAdults, householdChildren — moved to custom
 //     questions; no code reads them (the EPC QR uses the FUND's banking IBAN,
 //     and bank-sync matches through LinkedBankAccount).
-//   - contributionAmount — assigned by admins / commitment flows, not asked.
 //   - notes  — admin-internal commentary, not something to ask an applicant.
 //   - locale — captured automatically from the request locale at signup.
 //
@@ -33,7 +32,12 @@
 // Pure module (no Prisma, no server-only) so it can be unit-tested and shared
 // with client components.
 
-export type MemberBuiltinKey = "address" | "postalCode" | "city" | "tierId";
+export type MemberBuiltinKey =
+  | "address"
+  | "postalCode"
+  | "city"
+  | "tierId"
+  | "contributionAmount";
 
 // The input type is fixed by the column — an admin picking "City" can't choose
 // to render it as a checkbox. Label, help text, required, position and step
@@ -44,16 +48,27 @@ export type MemberBuiltinKey = "address" | "postalCode" | "city" | "tierId";
 // customizable").
 export type BuiltinFieldDef = {
   key: MemberBuiltinKey;
-  type: "TEXT" | "SELECT";
+  type: "TEXT" | "SELECT" | "NUMBER";
   // Suggested label offered in the admin picker; the admin can overwrite it.
   labelKey: string;
 };
 
+// contributionAmount (issue #179): the commitment-amount question used to be
+// hardcoded on the signup form. As a builtin the admin can rename it, move
+// it, mark it required, or archive it to hide it entirely. A fund with NO
+// contributionAmount row (never configured) keeps the legacy hardcoded
+// field — see app/(fund-public)/join/page.tsx — so existing forms don't
+// change until an admin opts in.
 export const MEMBER_BUILTIN_FIELDS: BuiltinFieldDef[] = [
   { key: "address", type: "TEXT", labelKey: "members.builtinFields.address" },
   { key: "postalCode", type: "TEXT", labelKey: "members.builtinFields.postalCode" },
   { key: "city", type: "TEXT", labelKey: "members.builtinFields.city" },
   { key: "tierId", type: "SELECT", labelKey: "members.builtinFields.tier" },
+  {
+    key: "contributionAmount",
+    type: "NUMBER",
+    labelKey: "members.builtinFields.contributionAmount",
+  },
 ];
 
 const BY_KEY = new Map(MEMBER_BUILTIN_FIELDS.map((f) => [f.key, f]));
@@ -114,6 +129,15 @@ export function coerceBuiltinValue(
   // Blank means "not answered" — store null rather than an empty string so
   // formatMemberAddress skips the part instead of emitting a stray comma.
   if (text === "") return { ok: true, value: null };
+
+  // The commitment amount feeds a Decimal(10,2) column — same shape rule as
+  // the OptionalMoney schema the legacy hardcoded input enforces.
+  if (key === "contributionAmount") {
+    return /^\d+(\.\d{1,2})?$/.test(text)
+      ? { ok: true, value: text }
+      : { ok: false };
+  }
+
   if (text.length > TEXT_MAX_LENGTH) return { ok: false };
   return { ok: true, value: text };
 }

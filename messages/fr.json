@@ -2556,7 +2556,8 @@
       "address": "Adresse",
       "postalCode": "Code postal",
       "city": "Ville",
-      "tier": "Palier d'allocation"
+      "tier": "Palier d'allocation",
+      "contributionAmount": "Montant que vous souhaitez contribuer"
     }
   },
   "cards": {

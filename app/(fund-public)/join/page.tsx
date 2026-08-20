@@ -33,7 +33,7 @@ export default async function MemberSignupPage({
   // Per-fund custom signup fields (the extras the admin configured on top
   // of the hardcoded firstName/lastName/email) and the optional pages they're
   // grouped into. Both hide archived rows.
-  const [rawFields, rawSteps, tiers] = await Promise.all([
+  const [rawFields, rawSteps, tiers, contributionFieldRow] = await Promise.all([
     prisma.onboardingField.findMany({
       where: { fundId: fund.id, target: "MEMBER", archivedAt: null },
       orderBy: { position: "asc" },
@@ -69,12 +69,42 @@ export default async function MemberSignupPage({
         minContribution: true,
       },
     }),
+    // Who owns the commitment-amount question (issue #179). No row at all →
+    // the legacy hardcoded input below. Any row — active OR archived — means
+    // the admin took it over via Settings → Onboarding: an active row renders
+    // like every other field (their label/help/required/position), an
+    // archived row hides the question entirely. Queried without the
+    // archivedAt filter for exactly that reason.
+    prisma.onboardingField.findUnique({
+      where: {
+        fundId_target_key: {
+          fundId: fund.id,
+          target: "MEMBER",
+          key: "contributionAmount",
+        },
+      },
+      select: { id: true },
+    }),
   ]);
 
-  // The commitment-amount field only applies to FIXED_PERIOD funds with tiers.
-  const showContribution = contributionApplies(fund.allocationMode, tiers.length);
+  // The commitment-amount field only applies to FIXED_PERIOD funds with
+  // tiers, and the legacy hardcoded input only renders while no admin has
+  // taken the question over as a configurable field (issue #179).
+  const contributionAllowed = contributionApplies(
+    fund.allocationMode,
+    tiers.length,
+  );
+  const showContribution = contributionAllowed && contributionFieldRow === null;
 
-  const fields = rawFields.map((f) => {
+  const fields = rawFields
+    // An admin-configured commitment-amount field is still subject to the
+    // FIXED_PERIOD-with-tiers gate — on a fund where the concept doesn't
+    // exist the question is withheld, exactly like the legacy input
+    // (signupMemberAction drops the value server-side regardless).
+    .filter(
+      (f) => f.builtinKey !== "contributionAmount" || contributionAllowed,
+    )
+    .map((f) => {
     const config = (f.config as { options?: { value: string; label: string }[] } | null) ?? null;
     // The tier picker (issue #157) is never admin-customizable — its options
     // are always the fund's current live tiers, not OnboardingField.config.

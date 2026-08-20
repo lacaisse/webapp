@@ -109,8 +109,17 @@ export function parseSignupPrefill(
     // A custom field whose key collides with a builtin or a reserved param
     // can't be addressed from the URL — the builtin wins. Keys are
     // lowercase-with-underscores by schema rule, so this is defensive only.
+    // Exception: `contributionAmount` — when a field def carries that key,
+    // the admin took the question over as a configurable field (issue #179),
+    // the hardcoded input doesn't render, and the param belongs to the
+    // extras. The two can never coexist (page.tsx gates on the field row).
     if (RESERVED_PARAMS.has(field.key)) continue;
-    if ((BUILTIN_KEYS as readonly string[]).includes(field.key)) continue;
+    if (
+      (BUILTIN_KEYS as readonly string[]).includes(field.key) &&
+      field.key !== "contributionAmount"
+    ) {
+      continue;
+    }
 
     const raw = readParam(params, field.key);
     if (raw === undefined) continue;

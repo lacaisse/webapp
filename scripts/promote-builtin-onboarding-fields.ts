@@ -94,7 +94,7 @@ type FieldPlan = {
   oldKey: string;
   newKey: PromotableKey;
   oldType: string;
-  newType: "TEXT" | "SELECT";
+  newType: (typeof MEMBER_BUILTIN_FIELDS)[number]["type"];
   members: MemberPlan[];
 };
 
