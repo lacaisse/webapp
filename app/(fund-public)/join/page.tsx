@@ -62,7 +62,7 @@ export default async function MemberSignupPage({
     prisma.allocationTier.findMany({
       where: { fundId: fund.id, archivedAt: null, hiddenAtSignup: false },
       orderBy: { position: "asc" },
-      select: { id: true, name: true },
+      select: { id: true, name: true, allocationAmount: true },
     }),
   ]);
 
@@ -73,9 +73,14 @@ export default async function MemberSignupPage({
     const config = (f.config as { options?: { value: string; label: string }[] } | null) ?? null;
     // The tier picker (issue #157) is never admin-customizable — its options
     // are always the fund's current live tiers, not OnboardingField.config.
+    // The allocation amount rides along in the label (#186): applicants
+    // choose by amount, and a bare tier name like "Basse" doesn't say it.
     const options =
       f.builtinKey === "tierId"
-        ? tiers.map((tier) => ({ value: tier.id, label: tier.name }))
+        ? tiers.map((tier) => ({
+            value: tier.id,
+            label: `${tier.name} — ${Number(tier.allocationAmount)} €`,
+          }))
         : (config?.options ?? []);
     return {
       id: f.id,
