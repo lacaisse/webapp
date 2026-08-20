@@ -548,30 +548,38 @@ export async function revalidateCardsAfterSyncAction(): Promise<void> {
   revalidatePath("/cards");
 }
 
-export type UnattachedCardHit = {
+export type AssignableCardHit = {
   id: string;
   serialNumber: string;
   number: number | null;
   account: string | null;
   holderName: string | null;
   status: CardStatus;
+  // True when the card can be linked to a member right now: unattached, not
+  // BLOCKED, not reported lost. Unavailable cards are still returned so the
+  // picker can show WHY a card the operator is looking for can't be chosen
+  // (assigned to someone else, blocked, lost) instead of silently omitting it.
+  assignable: boolean;
+  reportedLost: boolean;
+  // Display name of the current holder when the card is attached.
+  assignedTo: string | null;
 };
 
-// Typeahead backing the activate-member dialog. Returns unattached cards
-// (memberId is null) in the current fund matching the query against the serial
-// number / UID (case-insensitive contains), the per-fund card number (exact,
-// when the term is all digits), or the source account address (case-insensitive
-// contains) — admin picks one to link instead of free-typing a serial. Excludes
-// BLOCKED cards and any card reported lost (#189) — those shouldn't be handed
-// to a new member even if CitizenPay hasn't flipped the status yet. With an
-// empty query we surface cards in card-number order so the operator can scroll a
-// predictable list if they don't have the card in hand. Kept well above typical
-// fund inventory size so the empty-query list isn't truncated mid-range (#69).
-const UNATTACHED_LIMIT = 500;
+// Backs the card-picker modal in the activate-member dialog. Returns the
+// fund's cards matching the query against the serial number / UID
+// (case-insensitive contains), the per-fund card number (exact, when the term
+// is all digits), or the source account address (case-insensitive contains).
+// Assignable cards (unattached, not BLOCKED, not reported lost — #189) sort
+// first in card-number order; unavailable ones follow, also by number, flagged
+// with the reason so the picker renders them disabled. With an empty query the
+// full inventory is listed so the operator can scroll a predictable list if
+// they don't have the card in hand. Kept well above typical fund inventory
+// size so the empty-query list isn't truncated mid-range (#69).
+const ASSIGNMENT_SEARCH_LIMIT = 1000;
 
-export async function searchUnattachedCardsAction(
+export async function searchCardsForAssignmentAction(
   q: string,
-): Promise<UnattachedCardHit[]> {
+): Promise<AssignableCardHit[]> {
   const { fund } = await requireFundRole("OPERATOR");
   const term = q.trim();
   // An all-digits term may be a card number — match it exactly alongside the
@@ -579,9 +587,6 @@ export async function searchUnattachedCardsAction(
   const asNumber = /^\d+$/.test(term) ? Number(term) : null;
   const where = {
     fundId: fund.id,
-    memberId: null,
-    status: { not: "BLOCKED" as const },
-    reportedLostAt: null,
     ...(term.length > 0
       ? {
           OR: [
@@ -601,11 +606,31 @@ export async function searchUnattachedCardsAction(
       account: true,
       holderName: true,
       status: true,
+      reportedLostAt: true,
+      memberId: true,
+      member: { select: { firstName: true, lastName: true } },
     },
     orderBy: [{ number: { sort: "asc", nulls: "last" } }, { createdAt: "asc" }],
-    take: UNATTACHED_LIMIT,
+    take: ASSIGNMENT_SEARCH_LIMIT,
   });
-  return cards;
+  const hits = cards.map((card) => ({
+    id: card.id,
+    serialNumber: card.serialNumber,
+    number: card.number,
+    account: card.account,
+    holderName: card.holderName,
+    status: card.status,
+    assignable:
+      card.memberId === null &&
+      card.status !== "BLOCKED" &&
+      card.reportedLostAt === null,
+    reportedLost: card.reportedLostAt !== null,
+    assignedTo: card.member
+      ? `${card.member.firstName} ${card.member.lastName}`.trim()
+      : null,
+  }));
+  // Available-first, each group keeping the number order from the query.
+  return [...hits.filter((h) => h.assignable), ...hits.filter((h) => !h.assignable)];
 }
 
 // =============================================================================

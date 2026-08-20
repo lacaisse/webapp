@@ -19,7 +19,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { activateMemberAction } from "@/services/member/admin-actions";
 
-import { UnattachedCardPicker } from "./unattached-card-picker";
+import { CardPicker } from "./card-picker";
 
 // Activation = link a physical card to the member. The admin picks an
 // already-imported (CitizenPay-synced) unattached card from the typeahead
@@ -50,11 +50,19 @@ export function MemberRowActions({
 
   const pickerLabels = {
     field: t("cardLabel"),
+    choose: t("cardChoose"),
+    modalTitle: t("cardModalTitle"),
+    modalDescription: t("cardModalDescription"),
     placeholder: t("cardPlaceholder"),
     hint: t("cardHint"),
     searching: t("cardSearching"),
     empty: t("cardEmpty"),
     emptyInitial: t("cardEmptyInitial"),
+    available: t("cardAvailable"),
+    unavailable: t("cardUnavailable"),
+    assignedTo: (name: string) => t("cardAssignedTo", { name }),
+    blocked: t("cardBlockedBadge"),
+    lost: t("cardLostBadge"),
     noNumber: t("cardNoNumber"),
     clear: t("cardClear"),
   };
@@ -123,7 +131,7 @@ export function MemberRowActions({
             <AlertDescription>{t("unverifiedWarning")}</AlertDescription>
           </Alert>
         )}
-        <UnattachedCardPicker
+        <CardPicker
           id={`activate-card-${memberId}`}
           labels={pickerLabels}
           value={cardId}
