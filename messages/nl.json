@@ -2232,6 +2232,7 @@
         "emailInvalid": "Voer een geldig e-mailadres in.",
         "emailTaken": "Er bestaat al een aanvraag met dit e-mailadres voor dit fonds.",
         "amountInvalid": "Voer een geldig bedrag in (maximaal 2 decimalen).",
+        "amountBelowTierMin": "Voor het gekozen allocatieniveau is de minimale bijdrage {min} €.",
         "fieldRequired": "{label} is verplicht.",
         "generic": "Er is iets misgegaan. Probeer opnieuw.",
         "required": "Dit veld is verplicht.",

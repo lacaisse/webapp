@@ -62,7 +62,12 @@ export default async function MemberSignupPage({
     prisma.allocationTier.findMany({
       where: { fundId: fund.id, archivedAt: null, hiddenAtSignup: false },
       orderBy: { position: "asc" },
-      select: { id: true, name: true, allocationAmount: true },
+      select: {
+        id: true,
+        name: true,
+        allocationAmount: true,
+        minContribution: true,
+      },
     }),
   ]);
 
@@ -121,6 +126,9 @@ export default async function MemberSignupPage({
             steps={steps}
             referralCode={ref ?? null}
             showContribution={showContribution}
+            tierMinimums={Object.fromEntries(
+              tiers.map((tier) => [tier.id, Number(tier.minContribution)]),
+            )}
             prefill={prefill}
             cancelUrl={cancelUrl}
           />
