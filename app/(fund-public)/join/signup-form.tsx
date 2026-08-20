@@ -131,7 +131,6 @@ export function SignupForm({
       lastName: prefill.lastName,
       email: prefill.email,
       contributionAmount: prefill.contributionAmount,
-      remindersOptOut: false,
       extras: Object.fromEntries(
         allFields.map((f) => [
           f.key,
@@ -173,7 +172,7 @@ export function SignupForm({
   };
 
   // Which inputs live on a given page: identity always leads page 1, the
-  // commitment amount and reminder opt-out always close the last one.
+  // commitment amount always closes the last one.
   const namesForStep = (index: number): (keyof SignupFormInput | `extras.${string}`)[] => {
     const names: (keyof SignupFormInput | `extras.${string}`)[] = [];
     if (index === 0) names.push("firstName", "lastName", "email");
@@ -424,17 +423,6 @@ export function SignupForm({
             </p>
           )}
         </div>
-      )}
-
-      {isLast && (
-        <label className="flex cursor-pointer items-start gap-2 text-sm">
-          <input
-            type="checkbox"
-            {...form.register("remindersOptOut")}
-            className="mt-0.5 size-4 rounded border-input"
-          />
-          <span>{t("remindersOptOut")}</span>
-        </label>
       )}
 
       {errors.root && (

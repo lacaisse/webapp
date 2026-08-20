@@ -2223,7 +2223,6 @@
       "email": "E-mail",
       "contributionAmount": "Bedrag dat u wilt bijdragen (optioneel)",
       "contributionAmountHint": "Laat leeg om het door uw niveau voorgestelde bedrag te gebruiken. U kunt met een beheerder een ander bedrag afspreken.",
-      "remindersOptOut": "Ik wil geen betalingsherinneringen per e-mail ontvangen.",
       "submit": "Aanvragen",
       "submitting": "Verzenden…",
       "errors": {
