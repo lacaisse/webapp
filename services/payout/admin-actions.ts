@@ -349,8 +349,11 @@ export async function recordOrderHashesAction(input: {
 
 export async function createPayoutOrderAction(input: {
   payoutId: string;
-  total: string;
+  /** Processor commission withheld at source — "0" for a bank transfer. */
   fees: string;
+  /** The platform's cut on this order; omitted reads as "0". */
+  payoutFee?: string;
+  total: string;
   description: string | null;
 }): Promise<ops.CreatePayoutOrderResult> {
   return ops.createPayoutOrder(await ctx(), input);
@@ -587,6 +590,21 @@ export async function feeTransferAction(input: {
   // Refresh the client router so the process panel drops the "fees not yet
   // transferred" affordance. Must run in the Server Action — `refresh` throws
   // if called from a Client Component.
+  if ("ok" in res) refresh();
+  return res;
+}
+
+// =============================================================================
+// Settlement period
+// =============================================================================
+
+export async function updatePayoutPeriodAction(input: {
+  payoutId: string;
+  from: string;
+  to: string;
+}): Promise<ops.UpdatePayoutPeriodResult> {
+  const res = await ops.updatePayoutPeriod(await ctx(), input);
+  // Re-render the detail header, where the period sits under the place name.
   if ("ok" in res) refresh();
   return res;
 }

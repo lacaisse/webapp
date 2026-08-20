@@ -1,6 +1,8 @@
 {
   "common": {
     "or": "or",
+    "yes": "Yes",
+    "no": "No",
     "cancel": "Cancel",
     "close": "Close",
     "save": "Save",
@@ -649,6 +651,7 @@
         "max": "Maximum",
         "members": "Members",
         "empty": "No tiers configured. Add one to start allocating.",
+        "hiddenAtSignup": "Hidden at signup",
         "dialog": {
           "createTitle": "Add a tier",
           "editTitle": "Edit tier",
@@ -658,6 +661,8 @@
           "allocation": "Allocation amount",
           "max": "Maximum contribution",
           "position": "Display position",
+          "hiddenAtSignup": "Hide this tier on the signup form",
+          "hiddenAtSignupHint": "The tier stays assignable by an admin and keeps driving allocations — it just never appears in the public signup form.",
           "save": "Save",
           "saving": "Saving…",
           "cancel": "Cancel"
@@ -1105,7 +1110,8 @@
       "tabs": {
         "drafts": "Drafts",
         "pending": "Pending",
-        "completed": "Completed"
+        "completed": "Completed",
+        "export": "Export"
       },
       "settlement": {
         "place": "Place",
@@ -1113,11 +1119,13 @@
         "orderCount": "Orders",
         "total": "Total",
         "fees": "Fees",
+        "processorFees": "Processor fees",
+        "platformFee": "Platform fee",
         "net": "Net",
         "manualDeduction": "Manual deduction",
         "placeBalance": "Place balance",
         "placeBalanceEnough": "Enough to settle",
-        "placeBalanceLow": "Below the payout total",
+        "placeBalanceLow": "Below what settlement removes",
         "status": "Status",
         "burnTx": "Burn tx",
         "loadError": "Couldn't load payouts from CitizenPay. Try again shortly.",
@@ -1139,6 +1147,19 @@
           "burnt": "Burnt",
           "complete": "Complete"
         },
+        "orderTypes": {
+          "app": "App",
+          "manual": "Manual",
+          "pos": "Point of sale",
+          "terminal": "Terminal",
+          "web": "Web"
+        },
+        "orderStatuses": {
+          "paid": "Paid",
+          "refund": "Refund",
+          "refunded": "Refunded",
+          "correction": "Correction"
+        },
         "signed": {
           "title": "Payment signed",
           "description": "Your bank transfer has been signed.",
@@ -1154,7 +1175,7 @@
             "complete": "Complete"
           },
           "burn": {
-            "hint": "Burns the net amount from the place's account on-chain."
+            "hint": "Burns the merchant's net from the place's account; the platform fees and deduction are swept to the fund."
           },
           "pay": {
             "hint": "Create the bank payment to the merchant; you'll sign the transfer at your bank.",
@@ -1207,10 +1228,13 @@
           "noMatches": "No transfers match your search.",
           "unknownCounterpart": "Unknown sender",
           "amount": "Amount",
-          "fee": "Fee",
+          "feeProcessor": "Processor fee",
+          "feeProcessorHint": "Withheld at source by the payment processor. Leave 0 for a bank transfer.",
+          "feePlatform": "Platform fee",
+          "feePlatformHint": "Your cut, swept from the place's account at settlement. Suggested from your fee rate.",
           "descriptionLabel": "Description",
           "descriptionPlaceholder": "What this order is for",
-          "net": "Net",
+          "net": "Minted to the place",
           "confirm": "Add order",
           "successMinted": "Order added and net minted to the place.",
           "mintFailed": "Order added, but automatic minting failed. Reconcile it from the Issues tab."
@@ -1235,7 +1259,7 @@
           "trigger": "Add deduction",
           "edit": "Edit deduction",
           "title": "Manual deduction",
-          "description": "A ledger adjustment that lowers the net paid to the merchant. No on-chain effect.",
+          "description": "A ledger adjustment that lowers the net paid to the merchant. Nothing moves now — the amount leaves the place's account with the platform fees at settlement.",
           "amount": "Deduction amount",
           "amountHint": "Maximum {max}. Enter 0 to clear the deduction.",
           "comment": "Comment",
@@ -1243,6 +1267,18 @@
           "net": "Net after deduction",
           "confirm": "Save",
           "remove": "Remove"
+        },
+        "editPeriod": {
+          "trigger": "Edit period",
+          "title": "Settlement period",
+          "description": "Change the period this payout covers. This only relabels it — the orders are already assigned and no amount changes.",
+          "month": "Whole month",
+          "monthHint": "Pick a month to fill both dates with that calendar month.",
+          "from": "From",
+          "to": "To (excluded)",
+          "covers": "Covers {from} up to (excluding) {to}",
+          "ordersHint": "Orders stay as they are: widening the period pulls in no orders from outside the payout, and they remain available for the next one.",
+          "confirm": "Save period"
         },
         "pay": {
           "button": "Pay merchant",
@@ -1252,17 +1288,17 @@
         "burn": {
           "button": "Burn tokens",
           "title": "Burn payout tokens?",
-          "description": "This burns the on-chain tokens backing this payout. Burn and bank payment are independent — do them in either order.",
+          "description": "This burns the on-chain tokens behind the merchant's net; the platform fees and any deduction are swept to the fund account. Burn and bank payment are independent — do them in either order.",
           "warning": "This is irreversible. The tokens for this payout will be permanently burned.",
           "confirm": "Burn tokens",
           "success": "Tokens burned. Transaction hash:",
-          "feeSwept": "Fees transferred to the fund account: {amount}",
-          "feeNotSwept": "Tokens burned, but the fees haven't been transferred yet."
+          "feeSwept": "Platform fees and deduction transferred to the fund account: {amount}",
+          "feeNotSwept": "Tokens burned, but the platform fees haven't been transferred yet."
         },
         "feeTransfer": {
-          "pending": "This payout's fees haven't been transferred yet.",
-          "button": "Transfer fees",
-          "done": "Fees transferred. Transaction hash:"
+          "pending": "This payout's platform fees and deduction haven't been transferred yet.",
+          "button": "Transfer platform fees",
+          "done": "Platform fees transferred. Transaction hash:"
         },
         "orders": {
           "title": "Orders",
@@ -1361,7 +1397,7 @@
           "notBurnable": "This payout is no longer at the burn step (already burnt or settled).",
           "payoutNotFound": "Payout not found.",
           "deductionFailed": "Couldn't save the deduction. Try again shortly.",
-          "deductionTooHigh": "The deduction can't exceed total minus fees.",
+          "deductionTooHigh": "The deduction can't exceed total minus processor fees and platform fees.",
           "deductionNotPending": "The manual deduction can only be changed while the payout is pending.",
           "reportFailed": "Tokens burned on-chain, but couldn't report it to Citizen Pay. Don't retry — keep the transaction hash for reconciliation.",
           "noFeeDestination": "No fee destination account. Connect the fund to Citizen Pay first.",
@@ -1385,8 +1421,71 @@
           "feeInvalid": "Enter a valid fee.",
           "amountPositive": "The amount must be greater than zero.",
           "feeTooHigh": "The fee can't be more than the amount.",
+          "payoutFeeInvalid": "Enter a valid platform fee.",
+          "feesTooHigh": "The processor fee and platform fee together can't exceed the amount.",
           "descriptionTooLong": "The description is too long.",
-          "completeFailed": "Couldn't mark the payout as completed. Try again shortly."
+          "completeFailed": "Couldn't mark the payout as completed. Try again shortly.",
+          "periodFailed": "Could not update the settlement period. Please try again.",
+          "periodNotPending": "The settlement period can only be changed while the payout is pending.",
+          "exportFailed": "Couldn't generate the export. Try again shortly.",
+          "exportOrdersFailed": "Could not load the transactions of one of the payouts. The export was not generated — try again shortly.",
+          "exportOrdersTruncated": "One of the payouts holds too many transactions to export in one go. Narrow the period and try again."
+        }
+      },
+      "export": {
+        "description": "Two accounting exports of merchant payouts for the period you pick: the recap (one row per payout) and the transaction detail (one row per order inside those payouts). Semicolon-separated UTF-8, so both open straight in Excel.",
+        "presets": {
+          "thisMonth": "This month",
+          "lastMonth": "Last month",
+          "thisQuarter": "This quarter",
+          "lastQuarter": "Last quarter",
+          "thisYear": "This year",
+          "lastYear": "Last year"
+        },
+        "from": "From",
+        "to": "To",
+        "downloadRecap": "Recap (CSV)",
+        "downloadDetail": "Transaction detail (CSV)",
+        "rangeInvalid": "The start date must come before the end date.",
+        "summary": "{count, plural, =0 {No payouts in this period.} one {1 payout in this period, {net} net.} other {# payouts in this period, {net} net.}}",
+        "byMerchant": "By merchant",
+        "payoutCount": "Payouts",
+        "empty": "No payouts in this period.",
+        "columnsHint": "File columns: {columns}.",
+        "recapHint": "one row per payout to a merchant.",
+        "detailHint": "one row per transaction inside those payouts, with where it came from.",
+        "columns": {
+          "periodStart": "Period start",
+          "periodEnd": "Period end (inclusive)",
+          "merchant": "Merchant",
+          "business": "Business",
+          "gross": "Gross amount",
+          "processorFees": "Source fees",
+          "platformFee": "Platform fee",
+          "manualDeduction": "Manual deduction",
+          "deductionComment": "Deduction reason",
+          "net": "Net paid out",
+          "status": "Status",
+          "createdAt": "Created at (UTC)",
+          "reference": "Reference"
+        },
+        "orderColumns": {
+          "periodStart": "Period start",
+          "periodEnd": "Period end (inclusive)",
+          "merchant": "Merchant",
+          "business": "Business",
+          "reference": "Payout reference",
+          "payoutStatus": "Payout status",
+          "orderId": "Transaction ID",
+          "orderDate": "Transaction date (UTC)",
+          "source": "Source",
+          "gross": "Gross amount",
+          "processorFees": "Source fees",
+          "platformFeeShare": "Platform fee share",
+          "netCredit": "Net credited",
+          "orderStatus": "Transaction status",
+          "description": "Description",
+          "txHash": "Transaction hash"
         }
       },
       "admin": {
@@ -1491,7 +1590,8 @@
         "citizenpay": "Citizen Pay",
         "fees": "Fees",
         "emails": "Emails",
-        "documents": "Documents"
+        "documents": "Documents",
+        "embeds": "Embeds"
       },
       "general": {
         "title": "General",
@@ -1610,6 +1710,10 @@
             "builtinCustom": "Custom question",
             "builtinHint": "A member-record detail is saved to its own column, so it feeds letters, reminders and tier assignment. A custom question is stored separately, alongside the application.",
             "builtinLocked": "Saved to the member record ({key}). The input type is fixed; you can still adjust the label, help text, whether it's required, and its position.",
+            "shadowTitle": "Use the member-record field?",
+            "shadowBody": "Pick “{label}” so the answer is stored on the member's record. A custom question is still fine if you really are asking something else.",
+            "shadowUseBuiltin": "Use “{label}”",
+            "shadowKeepCustom": "Create a custom question anyway",
             "visibleIf": {
               "label": "Only show when",
               "none": "Always shown",
@@ -1743,6 +1847,10 @@
         "description": "Commission taken on payments to merchants. Configured here, then pushed to Citizen Pay.",
         "rate": "Fee rate (%)",
         "rateHint": "Percentage taken on each payment (e.g. 2.5 for 2.5%). Leave empty to use Citizen Pay's default rate.",
+        "frequency": "Collection frequency",
+        "frequencyHint": "On every payment, or once at the end of the month. The collection itself is handled by Citizen Pay.",
+        "frequencyPerPayment": "On every payment",
+        "frequencyMonthly": "Monthly (end of month)",
         "syncPending": "Saved locally, but not yet confirmed by Citizen Pay. Save again to retry the sync.",
         "syncFailed": "Rate saved, but the sync to Citizen Pay failed. Save again to retry."
       },
@@ -1793,9 +1901,17 @@
             "title": "Payment received",
             "description": "Email a member receives when a payment is received and reconciled."
           },
+          "PAYMENT_BELOW_MINIMUM": {
+            "title": "Contribution below minimum",
+            "description": "Sent to the member when a received contribution falls below their tier's minimum."
+          },
           "REFERRAL_BONUS_AWARDED": {
             "title": "Referral bonus",
             "description": "Email a sponsor receives when a referral bonus is credited to their card."
+          },
+          "MEMBER_PAYMENT_LINK": {
+            "title": "Payment link (on request)",
+            "description": "Sent by hand from a member's page when they ask for their payment link again."
           }
         },
         "defaultName": "Default template",
@@ -1902,6 +2018,52 @@
           "bodyTooLong": "The letter body is too long.",
           "unknownVariable": "Unknown placeholder \"{name}\". Remove it or use one of the listed variables."
         }
+      },
+      "embeds": {
+        "domains": {
+          "title": "Allowed domains",
+          "description": "The websites allowed to embed your widgets. Browsers refuse to display them anywhere else.",
+          "label": "One domain per line",
+          "help": "Up to {max} domains. Use *.example.org to allow every subdomain, and include the port when testing locally (localhost:3000).",
+          "emptyWarning": "No domains configured — your widgets won't display on any website until you add one.",
+          "saved": "Allowed domains saved.",
+          "save": "Save",
+          "saving": "Saving…"
+        },
+        "accounts": {
+          "title": "Account widget",
+          "description": "Publish an account's balance and recent activity. The account address and transaction details are never shown.",
+          "none": "No accounts yet.",
+          "enable": "Enable",
+          "disable": "Disable",
+          "rotate": "New link",
+          "cancel": "Cancel",
+          "snippetLabel": "Paste this into your website",
+          "disableConfirm": {
+            "title": "Disable this widget?",
+            "body": "It will stop loading everywhere it's currently embedded. You can enable it again later, but you'll get a new link to paste."
+          },
+          "rotateConfirm": {
+            "title": "Generate a new link?",
+            "body": "The current link stops working immediately. Anywhere this widget is already embedded will stop loading until you paste the new snippet."
+          },
+          "errors": {
+            "invalid": "Invalid request.",
+            "notFound": "That account no longer exists."
+          }
+        },
+        "merchants": {
+          "title": "Merchant widgets",
+          "description": "Your public merchant directory, as a list or on a map. Only merchants marked as publicly visible appear.",
+          "listTitle": "Merchants",
+          "mapTitle": "Merchant map",
+          "listSnippetLabel": "Merchant list",
+          "mapSnippetLabel": "Merchant map"
+        },
+        "preview": {
+          "show": "Preview",
+          "hide": "Hide preview"
+        }
       }
     }
   },
@@ -1925,6 +2087,7 @@
       "notFound": "Field not found.",
       "builtinInvalid": "That member detail is not a known one.",
       "builtinTaken": "That detail is already asked for on this form (check archived fields too).",
+      "keyShadowsBuiltin": "“{key}” is the name of a member-record field. Saved as a custom question, the answer won't feed the member's address, the letters, or tier assignment.",
       "visibleIfInvalid": "That visibility condition isn't valid — check the field it depends on.",
       "visibleIfValueRequired": "Enter a value for the visibility condition."
     }
@@ -1955,7 +2118,9 @@
       "feeInvalid": "Fee rate must be a number with up to 2 decimal places.",
       "feeTooHigh": "Fee rate can't exceed 100%.",
       "cutoffDayInvalid": "Cutoff day must be a whole number between 1 and 31.",
-      "nameTooLong": "The name is too long."
+      "nameTooLong": "The name is too long.",
+      "embedDomainInvalid": "Enter one domain per line (example.org, *.example.org, localhost:3000).",
+      "embedDomainsTooMany": "Too many domains — remove a few and try again."
     }
   },
   "team": {
@@ -2034,12 +2199,20 @@
         "subject": "Payment received — {fundName}",
         "textBody": "Hi {firstName},\n\nWe just received your payment of {amount} on {occurredAt} to {fundName}.\n\nIf your fund runs on pay-and-go, your card has already been topped up. Otherwise the credit will land at the next allocation period.\n\nThe {fundName} team"
       },
+      "paymentLink": {
+        "subject": "Your payment link — {fundName}",
+        "textBody": "Hi {firstName},\n\nHere is your {fundName} payment link:\n\n{paymentLink}\n\nTo check your balance and your card history:\n\n{cardLink}\n\nFor any transfer, quote this reference so we can credit your card automatically:\n\n  {paymentReference}\n\nSee you soon,\nThe {fundName} team"
+      },
       "allocationConfirmation": {
         "subject": "{amount} just landed on your card — {fundName}",
         "textBody": "Hi {firstName},\n\nYour allocation of {amount} has just been credited to your {fundName} card. You can spend it at any partner merchant.\n\nThe {fundName} team"
       },
       "footer": {
         "unsubscribe": "Unsubscribe from payment reminders"
+      },
+      "paymentBelowMinimum": {
+        "subject": "Your contribution is below the required minimum — {fundName}",
+        "textBody": "Hi {firstName} {lastName},\n\nWe confirm we have received your monthly contribution of {amount} on {occurredAt}. Unfortunately, this amount is below {minContribution}, the minimum monthly contribution required to participate in {fundName}.\n\nTo receive your {allocationAmount}€ allocation (paid on the 15th of each month), please transfer the remaining amount before the 9th of the month.\n\nDon't hesitate to contact us if you have any questions.\n\nThank you for your understanding,\n\nThe {fundName} team"
       }
     },
     "signup": {
@@ -2353,12 +2526,27 @@
           "amountBelowMin": "The amount can't be below the tier minimum ({min}).",
           "localeInvalid": "Pick a supported language."
         }
+      },
+      "paymentLink": {
+        "send": "Send payment link",
+        "resend": "Resend payment link",
+        "confirmTitle": "Send the payment link?",
+        "confirmDescription": "{name} will receive their payment link, their card link and their transfer reference by email.",
+        "confirm": "Send",
+        "sending": "Sending…",
+        "cancel": "Cancel",
+        "errors": {
+          "noEmail": "This member has no email address.",
+          "noCard": "This member has no card yet — the payment link depends on it.",
+          "sendFailed": "Sending failed. Please try again."
+        }
       }
     },
     "builtinFields": {
       "address": "Address",
       "postalCode": "Postcode",
-      "city": "City"
+      "city": "City",
+      "tier": "Allocation tier"
     }
   },
   "cards": {
@@ -3472,6 +3660,53 @@
     "errors": {
       "titleRequired": "The title is required.",
       "notFound": "Step not found."
+    }
+  },
+  "token": {
+    "reconcile": {
+      "trigger": "Verify",
+      "title": "Verify this operation",
+      "description": "Asks the bundler what actually happened on-chain. Nothing is re-minted — only our record is corrected.",
+      "confirm": "Verify",
+      "checking": "Checking…",
+      "cancel": "Cancel",
+      "close": "Close",
+      "outcomes": {
+        "settled": "Confirmed on-chain. The real transaction hash has been recorded.",
+        "pending": "Still in flight at the bundler. Nothing was changed — check again later.",
+        "failed": "Terminal on-chain failure. The operation is marked failed, so the member can be allocated again.",
+        "never-submitted": "This operation never reached the bundler. The mint-retry cron handles it."
+      },
+      "errors": {
+        "notFound": "Operation not found.",
+        "noChain": "No token chain configured for this fund.",
+        "inconclusive": "The bundler could not be reached. Nothing was changed — try again."
+      }
+    }
+  },
+  "embed": {
+    "account": {
+      "balanceLabel": "Balance",
+      "recentActivity": "Recent activity",
+      "empty": "No activity yet.",
+      "unavailable": "Activity is temporarily unavailable.",
+      "in": "received",
+      "out": "sent",
+      "kinds": {
+        "mint": "Issued",
+        "burn": "Redeemed",
+        "transfer": "Transfer"
+      }
+    },
+    "merchants": {
+      "title": "Where you can pay",
+      "empty": "No merchants listed yet.",
+      "website": "Visit website",
+      "conditions": "Conditions"
+    },
+    "map": {
+      "empty": "No merchant locations to show yet.",
+      "loading": "Loading map…"
     }
   }
 }

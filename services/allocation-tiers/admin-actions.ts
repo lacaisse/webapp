@@ -20,6 +20,9 @@ const TierSchema = z
     allocationAmount: DecimalString,
     maxContribution: DecimalString,
     position: z.number().int().min(0).default(0),
+    // Withhold this tier from the public signup picker (issue #37). Admins can
+    // still assign it and it still drives allocations — see the schema comment.
+    hiddenAtSignup: z.boolean().default(false),
   })
   .refine(
     (v) =>

@@ -563,8 +563,9 @@ export type UnattachedCardHit = {
 // when the term is all digits), or the source account address (case-insensitive
 // contains) — admin picks one to link instead of free-typing a serial. With an
 // empty query we surface cards in card-number order so the operator can scroll a
-// predictable list if they don't have the card in hand.
-const UNATTACHED_LIMIT = 12;
+// predictable list if they don't have the card in hand. Kept well above typical
+// fund inventory size so the empty-query list isn't truncated mid-range (#69).
+const UNATTACHED_LIMIT = 500;
 
 export async function searchUnattachedCardsAction(
   q: string,

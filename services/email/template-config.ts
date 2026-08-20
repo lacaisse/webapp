@@ -122,6 +122,43 @@ export const EDITABLE_EMAIL_TEMPLATES = {
     defaultIsHtml: false,
     variables: ["firstName", "fundName", "amount", "occurredAt"],
   },
+  PAYMENT_BELOW_MINIMUM: {
+    i18nKey: "members.email.paymentBelowMinimum",
+    hasCta: false,
+    defaultIsHtml: false,
+    // Editable because the built-in default states a payout calendar ("versés
+    // le 15 du mois", "avant le 9 du mois") that is one fund's policy, not a
+    // platform rule — every other fund needs to be able to correct it without
+    // a code change. {minContribution} is the tier's minimum, {allocationAmount}
+    // the allocation that minimum unlocks, {amount} what actually arrived.
+    variables: [
+      "firstName",
+      "lastName",
+      "fundName",
+      "amount",
+      "minContribution",
+      "allocationAmount",
+      "occurredAt",
+    ],
+  },
+  MEMBER_PAYMENT_LINK: {
+    i18nKey: "members.email.paymentLink",
+    hasCta: false,
+    defaultIsHtml: false,
+    // Sent by hand when a member asks for their payment details again (issue
+    // #45). {paymentLink} is the public /pay/<serial> page, {cardLink} the tap
+    // URL showing their live balance, {paymentReference} the bank-transfer
+    // communication. No balance figure is interpolated on purpose — see the
+    // comment on sendMemberPaymentLink in transactional.ts.
+    variables: [
+      "firstName",
+      "lastName",
+      "fundName",
+      "paymentReference",
+      "paymentLink",
+      "cardLink",
+    ],
+  },
   REFERRAL_BONUS_AWARDED: {
     i18nKey: "members.admin.email.referralBonusAwarded",
     hasCta: false,
@@ -197,6 +234,23 @@ export const PREVIEW_SAMPLE_VALUES: Record<
     fundName: "Your fund",
     amount: "25",
     occurredAt: "24/07/2026",
+  },
+  PAYMENT_BELOW_MINIMUM: {
+    firstName: "Alex",
+    lastName: "Dupont",
+    fundName: "Your fund",
+    amount: "15",
+    minContribution: "25",
+    allocationAmount: "50",
+    occurredAt: "24/07/2026",
+  },
+  MEMBER_PAYMENT_LINK: {
+    firstName: "Alex",
+    lastName: "Dupont",
+    fundName: "Your fund",
+    paymentReference: "04A2B7C9D1",
+    paymentLink: "https://demo.lacaisse.eu/pay/04A2B7C9D1",
+    cardLink: "https://tap.citizenpay.xyz/card/04A2B7C9D1?network=demo",
   },
   REFERRAL_BONUS_AWARDED: {
     firstName: "Alex",

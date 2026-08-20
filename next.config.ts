@@ -11,11 +11,8 @@ const nextConfig: NextConfig = {
   // cookie + fund-host headers, which are inherently runtime.)
   // See AGENTS.md / node_modules/next/dist/docs/.../instant-navigation.md.
   cacheComponents: true,
-  experimental: {
-    // Surfaces the "Instant Navs" panel in Next DevTools for inspecting the
-    // static shell on page load and client navigation.
-    instantNavigationDevToolsToggle: true,
-  },
+  // (16.3 dropped experimental.instantNavigationDevToolsToggle — the Instant
+  // Navs panel now ships in Next DevTools without a flag.)
 
   // The PDF renderer (services/document/pdf.tsx) reads the Geist TTFs from
   // app/fonts at runtime via fs. Next's tracer can't see that dynamic read, so

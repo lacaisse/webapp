@@ -1,6 +1,8 @@
 {
   "common": {
     "or": "o",
+    "yes": "Sí",
+    "no": "No",
     "cancel": "Cancelar",
     "close": "Cerrar",
     "save": "Guardar",
@@ -649,6 +651,7 @@
         "max": "Máximo",
         "members": "Miembros",
         "empty": "No hay niveles configurados. Añade uno para empezar a asignar.",
+        "hiddenAtSignup": "Oculto en el registro",
         "dialog": {
           "createTitle": "Añadir un nivel",
           "editTitle": "Editar nivel",
@@ -658,6 +661,8 @@
           "allocation": "Importe de asignación",
           "max": "Contribución máxima",
           "position": "Posición de visualización",
+          "hiddenAtSignup": "Ocultar este nivel en el formulario de registro",
+          "hiddenAtSignupHint": "El nivel sigue siendo asignable por un administrador y sigue generando asignaciones — simplemente no aparece en el formulario de registro público.",
           "save": "Guardar",
           "saving": "Guardando…",
           "cancel": "Cancelar"
@@ -1105,7 +1110,8 @@
       "tabs": {
         "drafts": "Borradores",
         "pending": "Pendientes",
-        "completed": "Completados"
+        "completed": "Completados",
+        "export": "Exportar"
       },
       "settlement": {
         "place": "Lugar",
@@ -1113,11 +1119,13 @@
         "orderCount": "Pedidos",
         "total": "Total",
         "fees": "Comisiones",
+        "processorFees": "Comisiones de origen",
+        "platformFee": "Comisión de la plataforma",
         "net": "Neto",
         "manualDeduction": "Deducción manual",
         "placeBalance": "Saldo del lugar",
-        "placeBalanceEnough": "Suficiente para quemar",
-        "placeBalanceLow": "Inferior al importe neto",
+        "placeBalanceEnough": "Suficiente para liquidar",
+        "placeBalanceLow": "Inferior a lo que retira la liquidación",
         "status": "Estado",
         "burnTx": "Tx de quema",
         "loadError": "No se pudieron cargar los pagos desde CitizenPay. Vuelve a intentarlo en breve.",
@@ -1139,6 +1147,19 @@
           "burnt": "Quemado",
           "complete": "Completado"
         },
+        "orderTypes": {
+          "app": "Aplicación",
+          "manual": "Manual",
+          "pos": "TPV",
+          "terminal": "Terminal",
+          "web": "Web"
+        },
+        "orderStatuses": {
+          "paid": "Pagada",
+          "refund": "Reembolso",
+          "refunded": "Reembolsada",
+          "correction": "Corrección"
+        },
         "signed": {
           "title": "Pago firmado",
           "description": "Tu transferencia bancaria ha sido firmada.",
@@ -1154,7 +1175,7 @@
             "complete": "Completado"
           },
           "burn": {
-            "hint": "Quema el importe neto de la cuenta del lugar en la cadena."
+            "hint": "Quema el neto del comercio desde la cuenta del lugar; las comisiones de la plataforma y la deducción se transfieren al fondo."
           },
           "pay": {
             "hint": "Crea el pago bancario al comercio; firmarás la transferencia en tu banco.",
@@ -1207,10 +1228,13 @@
           "noMatches": "Ninguna transferencia coincide con tu búsqueda.",
           "unknownCounterpart": "Remitente desconocido",
           "amount": "Importe",
-          "fee": "Comisión",
+          "feeProcessor": "Comisión del procesador",
+          "feeProcessorHint": "Retenida en origen por la pasarela de pago. Deja 0 para una transferencia bancaria.",
+          "feePlatform": "Comisión de la plataforma",
+          "feePlatformHint": "Tu parte, retirada de la cuenta del lugar en la liquidación. Sugerida según tu tasa.",
           "descriptionLabel": "Descripción",
           "descriptionPlaceholder": "Para qué es este pedido",
-          "net": "Neto",
+          "net": "Acuñado al lugar",
           "confirm": "Añadir pedido",
           "successMinted": "Pedido añadido y neto acuñado para el lugar.",
           "mintFailed": "Pedido añadido, pero la acuñación automática falló. Concílialo desde la pestaña Incidencias."
@@ -1235,7 +1259,7 @@
           "trigger": "Añadir deducción",
           "edit": "Editar deducción",
           "title": "Deducción manual",
-          "description": "Un ajuste contable que reduce el neto pagado al comercio. Sin efecto en la cadena.",
+          "description": "Un ajuste contable que reduce el neto pagado al comercio. Ahora no se mueve nada: el importe sale de la cuenta del lugar junto con las comisiones de la plataforma en la liquidación.",
           "amount": "Importe de la deducción",
           "amountHint": "Máximo {max}. Introduce 0 para eliminar la deducción.",
           "comment": "Comentario",
@@ -1243,6 +1267,18 @@
           "net": "Neto tras la deducción",
           "confirm": "Guardar",
           "remove": "Eliminar"
+        },
+        "editPeriod": {
+          "trigger": "Editar el periodo",
+          "title": "Periodo de liquidación",
+          "description": "Cambia el periodo que cubre este pago. Solo cambia la etiqueta: los pedidos ya están asignados y ningún importe se modifica.",
+          "month": "Mes completo",
+          "monthHint": "Elige un mes para rellenar ambas fechas con ese mes natural.",
+          "from": "Desde",
+          "to": "Hasta (excluido)",
+          "covers": "Cubre desde el {from} hasta el {to} (excluido)",
+          "ordersHint": "Los pedidos no cambian: ampliar el periodo no incorpora pedidos ajenos al pago, y siguen disponibles para el siguiente.",
+          "confirm": "Guardar el periodo"
         },
         "pay": {
           "button": "Pagar al comercio",
@@ -1252,17 +1288,17 @@
         "burn": {
           "button": "Quemar tokens",
           "title": "¿Quemar los tokens del pago?",
-          "description": "Esto quema los tokens en la cadena que respaldan este pago. La quema y el pago bancario son independientes: hazlos en cualquier orden.",
+          "description": "Esto quema los tokens en la cadena que respaldan el neto del comercio; las comisiones de la plataforma y cualquier deducción se transfieren a la cuenta del fondo. La quema y el pago bancario son independientes: hazlos en cualquier orden.",
           "warning": "Esto es irreversible. Los tokens de este pago se quemarán de forma permanente.",
           "confirm": "Quemar tokens",
           "success": "Tokens quemados. Hash de la transacción:",
-          "feeSwept": "Comisiones transferidas a la cuenta del fondo: {amount}",
-          "feeNotSwept": "Tokens quemados, pero las comisiones aún no se han transferido."
+          "feeSwept": "Comisiones de la plataforma y deducción transferidas a la cuenta del fondo: {amount}",
+          "feeNotSwept": "Tokens quemados, pero las comisiones de la plataforma aún no se han transferido."
         },
         "feeTransfer": {
-          "pending": "Las comisiones de este pago aún no se han transferido.",
-          "button": "Transferir comisiones",
-          "done": "Comisiones transferidas. Hash de la transacción:"
+          "pending": "Las comisiones de la plataforma y la deducción de este pago aún no se han transferido.",
+          "button": "Transferir comisiones de la plataforma",
+          "done": "Comisiones de la plataforma transferidas. Hash de la transacción:"
         },
         "orders": {
           "title": "Pedidos",
@@ -1361,7 +1397,7 @@
           "notBurnable": "Este pago ya no está en el paso de quema (ya fue quemado o liquidado).",
           "payoutNotFound": "Pago no encontrado.",
           "deductionFailed": "No se pudo guardar la deducción. Vuelve a intentarlo en breve.",
-          "deductionTooHigh": "La deducción no puede superar el total menos las comisiones.",
+          "deductionTooHigh": "La deducción no puede superar el total menos las comisiones de origen y las de la plataforma.",
           "deductionNotPending": "La deducción manual solo se puede cambiar mientras el pago está pendiente.",
           "reportFailed": "Tokens quemados en la cadena, pero no se pudo notificar a Citizen Pay. No reintentes: conserva el hash de la transacción para la conciliación.",
           "noFeeDestination": "No hay cuenta de destino para las comisiones. Conecta primero el fondo a Citizen Pay.",
@@ -1385,8 +1421,71 @@
           "feeInvalid": "Introduce una comisión válida.",
           "amountPositive": "El importe debe ser mayor que cero.",
           "feeTooHigh": "La comisión no puede ser mayor que el importe.",
+          "payoutFeeInvalid": "Introduce una comisión de la plataforma válida.",
+          "feesTooHigh": "La comisión del procesador y la de la plataforma juntas no pueden superar el importe.",
           "descriptionTooLong": "La descripción es demasiado larga.",
-          "completeFailed": "No se pudo marcar el pago como completado. Vuelve a intentarlo en breve."
+          "completeFailed": "No se pudo marcar el pago como completado. Vuelve a intentarlo en breve.",
+          "periodFailed": "No se ha podido actualizar el periodo de liquidación. Inténtalo de nuevo.",
+          "periodNotPending": "El periodo solo puede cambiarse mientras el pago está pendiente.",
+          "exportFailed": "No se pudo generar la exportación. Vuelve a intentarlo en breve.",
+          "exportOrdersFailed": "No se han podido cargar las transacciones de uno de los pagos. No se ha generado la exportación; inténtalo de nuevo en breve.",
+          "exportOrdersTruncated": "Uno de los pagos contiene demasiadas transacciones para exportarlas de una vez. Reduce el periodo e inténtalo de nuevo."
+        }
+      },
+      "export": {
+        "description": "Dos exportaciones contables de los pagos a comercios para el periodo elegido: el resumen (una fila por pago) y el detalle de transacciones (una fila por pedido incluido en esos pagos). UTF-8 con punto y coma, se abren directamente en Excel.",
+        "presets": {
+          "thisMonth": "Este mes",
+          "lastMonth": "El mes pasado",
+          "thisQuarter": "Este trimestre",
+          "lastQuarter": "El trimestre pasado",
+          "thisYear": "Este año",
+          "lastYear": "El año pasado"
+        },
+        "from": "Desde",
+        "to": "Hasta",
+        "downloadRecap": "Resumen (CSV)",
+        "downloadDetail": "Detalle de transacciones (CSV)",
+        "rangeInvalid": "La fecha de inicio debe ser anterior a la de fin.",
+        "summary": "{count, plural, =0 {No hay pagos en este periodo.} one {1 pago en este periodo, {net} neto.} other {# pagos en este periodo, {net} neto.}}",
+        "byMerchant": "Por comercio",
+        "payoutCount": "Pagos",
+        "empty": "No hay pagos en este periodo.",
+        "columnsHint": "Columnas del archivo: {columns}.",
+        "recapHint": "una fila por pago a un comercio.",
+        "detailHint": "una fila por transacción incluida en esos pagos, con su origen.",
+        "columns": {
+          "periodStart": "Inicio del periodo",
+          "periodEnd": "Fin del periodo (incluido)",
+          "merchant": "Comercio",
+          "business": "Empresa",
+          "gross": "Importe bruto",
+          "processorFees": "Comisiones de origen",
+          "platformFee": "Comisión de la plataforma",
+          "manualDeduction": "Deducción manual",
+          "deductionComment": "Motivo de la deducción",
+          "net": "Neto abonado",
+          "status": "Estado",
+          "createdAt": "Fecha de creación (UTC)",
+          "reference": "Referencia"
+        },
+        "orderColumns": {
+          "periodStart": "Inicio del periodo",
+          "periodEnd": "Fin del periodo (incluido)",
+          "merchant": "Comercio",
+          "business": "Empresa",
+          "reference": "Referencia del pago",
+          "payoutStatus": "Estado del pago",
+          "orderId": "ID de transacción",
+          "orderDate": "Fecha de la transacción (UTC)",
+          "source": "Origen",
+          "gross": "Importe bruto",
+          "processorFees": "Comisiones de origen",
+          "platformFeeShare": "Parte de la comisión de la plataforma",
+          "netCredit": "Neto acreditado",
+          "orderStatus": "Estado de la transacción",
+          "description": "Descripción",
+          "txHash": "Hash de transacción"
         }
       },
       "admin": {
@@ -1491,7 +1590,8 @@
         "citizenpay": "Citizen Pay",
         "fees": "Comisiones",
         "emails": "Correos",
-        "documents": "Documentos"
+        "documents": "Documentos",
+        "embeds": "Widgets"
       },
       "general": {
         "title": "General",
@@ -1610,6 +1710,10 @@
             "builtinCustom": "Pregunta personalizada",
             "builtinHint": "Un dato de la ficha de miembro se guarda en su propia columna, así alimenta cartas, recordatorios y la asignación de nivel. Una pregunta personalizada se guarda aparte, junto a la candidatura.",
             "builtinLocked": "Se guarda en la ficha de miembro ({key}). El tipo de entrada es fijo; puedes ajustar la etiqueta, la ayuda, si es obligatorio y su posición.",
+            "shadowTitle": "¿Usar el campo de la ficha del miembro?",
+            "shadowBody": "Elija «{label}» para que la respuesta se guarde en la ficha del miembro. Una pregunta personalizada sigue siendo válida si realmente pregunta otra cosa.",
+            "shadowUseBuiltin": "Usar «{label}»",
+            "shadowKeepCustom": "Crear igualmente una pregunta personalizada",
             "visibleIf": {
               "label": "Mostrar solo si",
               "none": "Siempre visible",
@@ -1743,6 +1847,10 @@
         "description": "Comisión cobrada sobre los pagos a comercios. Se configura aquí y luego se envía a Citizen Pay.",
         "rate": "Tasa de comisión (%)",
         "rateHint": "Porcentaje cobrado en cada pago (p. ej. 2.5 para 2.5%). Déjalo vacío para usar la tasa predeterminada de Citizen Pay.",
+        "frequency": "Frecuencia de cobro",
+        "frequencyHint": "En cada pago, o una sola vez a fin de mes. El cobro lo realiza Citizen Pay.",
+        "frequencyPerPayment": "En cada pago",
+        "frequencyMonthly": "Mensual (fin de mes)",
         "syncPending": "Guardado localmente, pero aún no confirmado por Citizen Pay. Guarda de nuevo para reintentar la sincronización.",
         "syncFailed": "Tasa guardada, pero la sincronización con Citizen Pay falló. Guarda de nuevo para reintentar."
       },
@@ -1793,9 +1901,17 @@
             "title": "Pago recibido",
             "description": "Correo que recibe el miembro cuando se recibe y concilia un pago."
           },
+          "PAYMENT_BELOW_MINIMUM": {
+            "title": "Contribución por debajo del mínimo",
+            "description": "Enviado al miembro cuando la contribución recibida es inferior al mínimo de su nivel."
+          },
           "REFERRAL_BONUS_AWARDED": {
             "title": "Bono por recomendación",
             "description": "Correo que recibe el padrino cuando se acredita un bono por recomendación en su tarjeta."
+          },
+          "MEMBER_PAYMENT_LINK": {
+            "title": "Enlace de pago (a petición)",
+            "description": "Enviado manualmente desde la ficha de un miembro cuando vuelve a pedir su enlace de pago."
           }
         },
         "defaultName": "Plantilla predeterminada",
@@ -1902,6 +2018,52 @@
           "bodyTooLong": "El cuerpo de la carta es demasiado largo.",
           "unknownVariable": "Marcador desconocido «{name}». Elimínalo o usa una de las variables indicadas."
         }
+      },
+      "embeds": {
+        "domains": {
+          "title": "Dominios permitidos",
+          "description": "Los sitios web autorizados a incrustar tus widgets. Los navegadores se niegan a mostrarlos en cualquier otro sitio.",
+          "label": "Un dominio por línea",
+          "help": "Hasta {max} dominios. Usa *.ejemplo.org para permitir todos los subdominios, e incluye el puerto en las pruebas locales (localhost:3000).",
+          "emptyWarning": "No hay dominios configurados: tus widgets no se mostrarán en ningún sitio web hasta que añadas uno.",
+          "saved": "Dominios permitidos guardados.",
+          "save": "Guardar",
+          "saving": "Guardando…"
+        },
+        "accounts": {
+          "title": "Widget de cuenta",
+          "description": "Publica el saldo y la actividad reciente de una cuenta. La dirección de la cuenta y el detalle de las transacciones nunca se muestran.",
+          "none": "Todavía no hay cuentas.",
+          "enable": "Activar",
+          "disable": "Desactivar",
+          "rotate": "Nuevo enlace",
+          "cancel": "Cancelar",
+          "snippetLabel": "Pega esto en tu sitio web",
+          "disableConfirm": {
+            "title": "¿Desactivar este widget?",
+            "body": "Dejará de cargarse en todos los sitios donde esté incrustado. Puedes volver a activarlo más tarde, pero con un enlace nuevo que tendrás que pegar."
+          },
+          "rotateConfirm": {
+            "title": "¿Generar un enlace nuevo?",
+            "body": "El enlace actual deja de funcionar de inmediato. Allí donde ya hayas incrustado este widget dejará de cargarse hasta que pegues el nuevo código."
+          },
+          "errors": {
+            "invalid": "Solicitud no válida.",
+            "notFound": "Esa cuenta ya no existe."
+          }
+        },
+        "merchants": {
+          "title": "Widgets de comercios",
+          "description": "Tu directorio público de comercios, en lista o en un mapa. Solo aparecen los comercios marcados como visibles públicamente.",
+          "listTitle": "Comercios",
+          "mapTitle": "Mapa de comercios",
+          "listSnippetLabel": "Lista de comercios",
+          "mapSnippetLabel": "Mapa de comercios"
+        },
+        "preview": {
+          "show": "Vista previa",
+          "hide": "Ocultar la vista previa"
+        }
       }
     }
   },
@@ -1925,6 +2087,7 @@
       "notFound": "Campo no encontrado.",
       "builtinInvalid": "Ese dato de miembro no es válido.",
       "builtinTaken": "Ese dato ya se pide en este formulario (revisa también los campos archivados).",
+      "keyShadowsBuiltin": "«{key}» es el nombre de un campo de la ficha del miembro. Guardada como pregunta personalizada, la respuesta no alimentará la dirección del miembro, ni las cartas, ni la asignación de nivel.",
       "visibleIfInvalid": "Esa condición de visibilidad no es válida — revisa el campo del que depende.",
       "visibleIfValueRequired": "Indica el valor de la condición de visibilidad."
     }
@@ -1955,7 +2118,9 @@
       "feeInvalid": "La tasa de comisión debe ser un número con hasta 2 decimales.",
       "feeTooHigh": "La tasa de comisión no puede superar el 100%.",
       "cutoffDayInvalid": "El día de corte debe ser un número entero entre 1 y 31.",
-      "nameTooLong": "El nombre es demasiado largo."
+      "nameTooLong": "El nombre es demasiado largo.",
+      "embedDomainInvalid": "Introduce un dominio por línea (ejemplo.org, *.ejemplo.org, localhost:3000).",
+      "embedDomainsTooMany": "Demasiados dominios: elimina algunos."
     }
   },
   "team": {
@@ -2033,6 +2198,14 @@
       "paymentConfirmation": {
         "subject": "Pago recibido — {fundName}",
         "textBody": "Hola {firstName}:\n\nAcabamos de recibir tu pago de {amount} el {occurredAt} para {fundName}.\n\nSi tu fondo funciona con pago inmediato, tu tarjeta ya se ha recargado. De lo contrario, el crédito se aplicará en el próximo período de asignación.\n\nEl equipo de {fundName}"
+      },
+      "paymentLink": {
+        "subject": "Tu enlace de pago — {fundName}",
+        "textBody": "Hola {firstName},\n\nAquí tienes tu enlace de pago de {fundName}:\n\n{paymentLink}\n\nPara consultar tu saldo y el historial de tu tarjeta:\n\n{cardLink}\n\nEn cualquier transferencia, indica esta referencia para que podamos acreditar tu tarjeta automáticamente:\n\n  {paymentReference}\n\nHasta pronto,\nEl equipo de {fundName}"
+      },
+      "paymentBelowMinimum": {
+        "subject": "Tu contribución está por debajo del mínimo requerido — {fundName}",
+        "textBody": "Hola {firstName} {lastName},\n\nTe confirmamos que hemos recibido tu contribución mensual de {amount} el {occurredAt}. Lamentablemente, este importe es inferior a {minContribution}, la contribución mensual mínima necesaria para participar en {fundName}.\n\nPara poder recibir tu asignación de {allocationAmount}€ (abonada el día 15 de cada mes), te rogamos que transfieras el importe restante antes del día 9 del mes.\n\nNo dudes en ponerte en contacto con nosotros si tienes alguna duda.\n\nGracias por tu comprensión,\n\nEl equipo de {fundName}"
       },
       "allocationConfirmation": {
         "subject": "{amount} acaba de llegar a tu tarjeta — {fundName}",
@@ -2353,12 +2526,27 @@
           "amountBelowMin": "El importe no puede ser inferior al mínimo del nivel ({min}).",
           "localeInvalid": "Elige un idioma compatible."
         }
+      },
+      "paymentLink": {
+        "send": "Enviar el enlace de pago",
+        "resend": "Reenviar el enlace de pago",
+        "confirmTitle": "¿Enviar el enlace de pago?",
+        "confirmDescription": "{name} recibirá por correo su enlace de pago, el enlace a su tarjeta y su referencia de transferencia.",
+        "confirm": "Enviar",
+        "sending": "Enviando…",
+        "cancel": "Cancelar",
+        "errors": {
+          "noEmail": "Este miembro no tiene dirección de correo.",
+          "noCard": "Este miembro aún no tiene tarjeta — el enlace de pago depende de ella.",
+          "sendFailed": "El envío ha fallado. Inténtalo de nuevo."
+        }
       }
     },
     "builtinFields": {
       "address": "Dirección",
       "postalCode": "Código postal",
-      "city": "Ciudad"
+      "city": "Ciudad",
+      "tier": "Nivel de asignación"
     }
   },
   "cards": {
@@ -3472,6 +3660,53 @@
     "errors": {
       "titleRequired": "El título es obligatorio.",
       "notFound": "Paso no encontrado."
+    }
+  },
+  "token": {
+    "reconcile": {
+      "trigger": "Verificar",
+      "title": "Verificar esta operación",
+      "description": "Consulta al bundler qué ocurrió realmente en la cadena. No se vuelve a emitir nada: solo se corrige nuestro registro.",
+      "confirm": "Verificar",
+      "checking": "Verificando…",
+      "cancel": "Cancelar",
+      "close": "Cerrar",
+      "outcomes": {
+        "settled": "Confirmada en la cadena. Se ha registrado el hash real de la transacción.",
+        "pending": "Todavía en curso en el bundler. No se ha cambiado nada — inténtalo más tarde.",
+        "failed": "Fallo definitivo en la cadena. La operación se marca como fallida y el miembro puede volver a recibir su asignación.",
+        "never-submitted": "Esta operación nunca llegó al bundler. Se encarga el cron de reenvío."
+      },
+      "errors": {
+        "notFound": "Operación no encontrada.",
+        "noChain": "No hay cadena de tokens configurada para esta caja.",
+        "inconclusive": "No se pudo contactar con el bundler. No se ha cambiado nada — inténtalo de nuevo."
+      }
+    }
+  },
+  "embed": {
+    "account": {
+      "balanceLabel": "Saldo",
+      "recentActivity": "Actividad reciente",
+      "empty": "Todavía no hay actividad.",
+      "unavailable": "La actividad no está disponible temporalmente.",
+      "in": "recibido",
+      "out": "enviado",
+      "kinds": {
+        "mint": "Emisión",
+        "burn": "Canje",
+        "transfer": "Transferencia"
+      }
+    },
+    "merchants": {
+      "title": "Dónde pagar",
+      "empty": "Todavía no hay comercios.",
+      "website": "Visitar el sitio web",
+      "conditions": "Condiciones"
+    },
+    "map": {
+      "empty": "Todavía no hay ubicaciones de comercios que mostrar.",
+      "loading": "Cargando el mapa…"
     }
   }
 }

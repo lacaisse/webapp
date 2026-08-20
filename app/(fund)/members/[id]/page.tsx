@@ -28,6 +28,10 @@ import { contributionApplies } from "@/services/member/contribution";
 import type { ExtraValue } from "@/services/member/schema";
 import { prisma } from "@/services/db/prisma";
 import { requireCurrentFund } from "@/services/fund/server";
+import {
+  formatOnboardingAnswer,
+  type AnswerFormatters,
+} from "@/services/onboarding/format";
 import { parseVisibleIf } from "@/services/onboarding/visibility";
 
 import { UnassignCardButton } from "../../cards/unassign-card-button";
@@ -38,7 +42,9 @@ import { MemberTierPicker } from "../tier-picker";
 import { EditApplicationDataDialog } from "./edit-application-data-dialog";
 import { EditProfileDialog } from "./edit-profile-dialog";
 import { MintDialog } from "./mint-dialog";
+import { ReconcileOperationButton } from "./reconcile-operation-button";
 import { ReminderOptOutToggle } from "./reminder-opt-out-toggle";
+import { SendPaymentLinkButton } from "./send-payment-link-button";
 
 // Synchronous shell so the route paints its skeleton instantly; the member
 // (params-dependent, uncached) streams in behind <Suspense>.
@@ -61,7 +67,15 @@ async function MemberDetail({
 }) {
   const t = await getTranslations("fund.members.detail");
   const tStatus = await getTranslations("members.admin.status.values");
+  const tCommon = await getTranslations("common");
   const format = await getFormatter();
+  // Injected into formatOnboardingAnswer so the pure helper can render
+  // CHECKBOX / DATE answers in the admin's language without importing
+  // next-intl itself. See services/onboarding/format.ts.
+  const answerFormatters: AnswerFormatters = {
+    boolean: (v) => (v ? tCommon("yes") : tCommon("no")),
+    date: (v) => format.dateTime(new Date(v), { dateStyle: "medium" }),
+  };
   const fund = await requireCurrentFund();
   const { id } = await params;
 
@@ -118,15 +132,21 @@ async function MemberDetail({
         config: true,
         visibleIf: true,
         archivedAt: true,
+        builtinKey: true,
       },
     }),
   ]);
 
-  // Only questions the fund still asks are editable. Answers to archived ones
-  // stay listed below (and are preserved by the action) but can't be changed —
-  // editing a question that no longer exists on the form would be misleading.
+  // Only questions the fund still asks are editable, and only the ones that
+  // are actually stored in `applicationData`. Builtin fields (address,
+  // postalCode, city, tierId) look like ordinary questions but write to a
+  // typed Member column instead — they already have their own editor
+  // (EditProfileDialog / MemberTierPicker above) and must never be routed
+  // into this JSON-answer dialog, or an edit here would silently write to
+  // applicationData while the typed column (and everything that reads it,
+  // like the address on card-assigned emails) stays untouched.
   const editableFields = onboardingFields
-    .filter((f) => f.archivedAt === null)
+    .filter((f) => f.archivedAt === null && f.builtinKey === null)
     .map((f) => {
       const config =
         (f.config as { options?: { value: string; label: string }[] } | null) ??
@@ -196,6 +216,17 @@ async function MemberDetail({
           )}
           {member.status === "ACTIVE" && member.primaryCardId && (
             <AddCardDialog memberId={member.id} memberName={fullName} />
+          )}
+          {/* On-request payment link (issue #45). Needs a card, since both
+              links are keyed on the card serial. */}
+          {member.primaryCardId && member.email && (
+            <SendPaymentLinkButton
+              memberId={member.id}
+              memberName={fullName}
+              alreadySent={member.emails.some(
+                (e) => e.type === "MEMBER_PAYMENT_LINK" && e.status === "SENT",
+              )}
+            />
           )}
           <StatusChangeDialog
             memberId={member.id}
@@ -315,9 +346,19 @@ async function MemberDetail({
               <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
                 {Object.entries(appData).map(([key, value]) => {
                   const field = onboardingFields.find((f) => f.key === key);
+                  const config =
+                    (field?.config as
+                      | { options?: { value: string; label: string }[] }
+                      | null) ?? null;
                   return (
                     <DtDd key={key} label={field?.label ?? key}>
-                      {formatAppValue(value)}
+                      {formatOnboardingAnswer(
+                        value,
+                        field
+                          ? { type: field.type, options: config?.options ?? [] }
+                          : undefined,
+                        answerFormatters,
+                      )}
                     </DtDd>
                   );
                 })}
@@ -426,11 +467,12 @@ async function MemberDetail({
                 {t("tokenOps.amount")}
               </TableHead>
               <TableHead>{t("tokenOps.status")}</TableHead>
+              <TableHead />
             </TableRow>
           </TableHeader>
           <TableBody>
             {member.tokenOperations.length === 0 ? (
-              <TableEmpty colSpan={6}>{t("tokenOps.empty")}</TableEmpty>
+              <TableEmpty colSpan={7}>{t("tokenOps.empty")}</TableEmpty>
             ) : (
               member.tokenOperations.map((op) => (
                 <TableRow key={op.id}>
@@ -449,6 +491,15 @@ async function MemberDetail({
                   </TableCell>
                   <TableCell>
                     <OperationStatusBadge status={op.status} />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {/* Ask the bundler what actually happened (issue #162).
+                        Offered for MINT/BURN rows that carry a hash — a row
+                        with none never reached the bundler and belongs to the
+                        mint-retry cron instead. */}
+                    {op.txHash && (
+                      <ReconcileOperationButton operationId={op.id} />
+                    )}
                   </TableCell>
                 </TableRow>
               ))
@@ -613,13 +664,6 @@ function formatAddress(
     .filter((p) => p && p.length > 0)
     .join(", ");
   return parts || "—";
-}
-
-function formatAppValue(value: unknown): string {
-  if (value === null || value === undefined || value === "") return "—";
-  if (Array.isArray(value)) return value.join(", ");
-  if (typeof value === "object") return JSON.stringify(value);
-  return String(value);
 }
 
 function StatusBadge({ status, label }: { status: string; label: string }) {

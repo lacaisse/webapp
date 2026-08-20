@@ -33,7 +33,7 @@ export default async function MemberSignupPage({
   // Per-fund custom signup fields (the extras the admin configured on top
   // of the hardcoded firstName/lastName/email) and the optional pages they're
   // grouped into. Both hide archived rows.
-  const [rawFields, rawSteps, tierCount] = await Promise.all([
+  const [rawFields, rawSteps, tiers] = await Promise.all([
     prisma.onboardingField.findMany({
       where: { fundId: fund.id, target: "MEMBER", archivedAt: null },
       orderBy: { position: "asc" },
@@ -48,6 +48,7 @@ export default async function MemberSignupPage({
         stepId: true,
         config: true,
         visibleIf: true,
+        builtinKey: true,
       },
     }),
     prisma.onboardingStep.findMany({
@@ -55,16 +56,27 @@ export default async function MemberSignupPage({
       orderBy: { position: "asc" },
       select: { id: true, title: true, description: true, position: true },
     }),
-    prisma.allocationTier.count({
-      where: { fundId: fund.id, archivedAt: null },
+    // Signup-visible tiers only: hiddenAtSignup tiers stay assignable by admins
+    // but are never offered to applicants (issue #37). signupMemberAction
+    // applies the same filter as the authoritative allowlist.
+    prisma.allocationTier.findMany({
+      where: { fundId: fund.id, archivedAt: null, hiddenAtSignup: false },
+      orderBy: { position: "asc" },
+      select: { id: true, name: true },
     }),
   ]);
 
   // The commitment-amount field only applies to FIXED_PERIOD funds with tiers.
-  const showContribution = contributionApplies(fund.allocationMode, tierCount);
+  const showContribution = contributionApplies(fund.allocationMode, tiers.length);
 
   const fields = rawFields.map((f) => {
     const config = (f.config as { options?: { value: string; label: string }[] } | null) ?? null;
+    // The tier picker (issue #157) is never admin-customizable — its options
+    // are always the fund's current live tiers, not OnboardingField.config.
+    const options =
+      f.builtinKey === "tierId"
+        ? tiers.map((tier) => ({ value: tier.id, label: tier.name }))
+        : (config?.options ?? []);
     return {
       id: f.id,
       key: f.key,
@@ -74,7 +86,7 @@ export default async function MemberSignupPage({
       required: f.required,
       position: f.position,
       stepId: f.stepId,
-      options: config?.options ?? [],
+      options,
       visibleIf: parseVisibleIf(f.visibleIf),
     };
   });

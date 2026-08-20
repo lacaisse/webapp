@@ -14,7 +14,10 @@ import { mintTierAllocation } from "./allocate";
 import { matchMember, type Match } from "./matching/match";
 import { isAllocationEligible } from "@/services/member/eligibility";
 import { prisma } from "@/services/db/prisma";
-import { sendPaymentConfirmation } from "@/services/email/transactional";
+import {
+  sendPaymentBelowMinimum,
+  sendPaymentConfirmation,
+} from "@/services/email/transactional";
 import { ANNOTATION_TRIGGERS } from "@/services/transaction-annotation/annotate";
 
 // Bank-sync ingestion. Mirrors CitizenPay-reported bank movements into the
@@ -263,8 +266,10 @@ async function ingestOne(
   const bankTransactionId = existing?.id ?? (await getBankTransactionId(fund.id, payload.externalId));
   if (!bankTransactionId) return { matched: true, minted: false };
 
-  // Queue + send payment confirmation regardless of allocation mode.
-  await dispatchPaymentConfirmation({
+  // Queue + send the contribution email regardless of allocation mode. Routes
+  // to the below-minimum warning when the deposit falls short of the member's
+  // tier minimum, else the standard confirmation (issue #44).
+  await dispatchContributionEmail({
     fund,
     bankTransactionId,
     member: match,
@@ -332,7 +337,7 @@ async function getBankTransactionId(
   return row?.id ?? null;
 }
 
-async function dispatchPaymentConfirmation(args: {
+async function dispatchContributionEmail(args: {
   fund: IngestionFund;
   bankTransactionId: string;
   member: Match;
@@ -343,44 +348,86 @@ async function dispatchPaymentConfirmation(args: {
   // skipped confirmations retroactively.
   if (args.fund.confirmationEmailsPausedAt) return;
 
-  // Look up member email + name. We could pass these from the matcher but
+  // Look up member email + name, plus the tier band so we can tell a full
+  // contribution from a short one. We could pass these from the matcher but
   // re-querying is simpler and the row is small.
   const member = await prisma.member.findUnique({
     where: { id: args.member.memberId },
-    select: { email: true, firstName: true },
+    select: {
+      email: true,
+      firstName: true,
+      lastName: true,
+      tier: { select: { minContribution: true, allocationAmount: true } },
+    },
   });
   if (!member) return;
 
+  const fundBranding = {
+    name: args.fund.name,
+    primaryColor: args.fund.primaryColor,
+    logoUrl: args.fund.logoUrl,
+    senderEmail: args.fund.senderEmail,
+  };
+
+  // Below the tier minimum → warn (issue #44). A member without a tier can't be
+  // "below minimum", so they get the standard confirmation. Decimal.comparedTo
+  // keeps the check in decimal space (no float rounding on the money value).
+  const tier = member.tier;
+  const isBelowMinimum =
+    tier !== null &&
+    new Prisma.Decimal(args.amount).lessThan(tier.minContribution);
+
   try {
-    const emailRow = await prisma.email.create({
-      data: {
+    if (isBelowMinimum && tier) {
+      const emailRow = await prisma.email.create({
+        data: {
+          fundId: args.fund.id,
+          type: "PAYMENT_BELOW_MINIMUM",
+          toEmail: member.email,
+          memberId: args.member.memberId,
+          bankTransactionId: args.bankTransactionId,
+          idempotencyKey: `PAYMENT_BELOW_MINIMUM:bankTransaction:${args.bankTransactionId}`,
+          subject: "Contribution below minimum",
+        },
+      });
+      await sendPaymentBelowMinimum({
+        emailId: emailRow.id,
         fundId: args.fund.id,
-        type: "PAYMENT_CONFIRMATION",
         toEmail: member.email,
-        memberId: args.member.memberId,
-        bankTransactionId: args.bankTransactionId,
-        idempotencyKey: `PAYMENT_CONFIRMATION:bankTransaction:${args.bankTransactionId}`,
-        subject: "Payment received",
-      },
-    });
-    await sendPaymentConfirmation({
-      emailId: emailRow.id,
-      fundId: args.fund.id,
-      toEmail: member.email,
-      firstName: member.firstName,
-      fund: {
-        name: args.fund.name,
-        primaryColor: args.fund.primaryColor,
-        logoUrl: args.fund.logoUrl,
-        senderEmail: args.fund.senderEmail,
-      },
-      amount: args.amount,
-      occurredAt: args.occurredAt,
-    });
+        firstName: member.firstName,
+        lastName: member.lastName,
+        fund: fundBranding,
+        amount: args.amount,
+        minContribution: tier.minContribution.toString(),
+        allocationAmount: tier.allocationAmount.toString(),
+        occurredAt: args.occurredAt,
+      });
+    } else {
+      const emailRow = await prisma.email.create({
+        data: {
+          fundId: args.fund.id,
+          type: "PAYMENT_CONFIRMATION",
+          toEmail: member.email,
+          memberId: args.member.memberId,
+          bankTransactionId: args.bankTransactionId,
+          idempotencyKey: `PAYMENT_CONFIRMATION:bankTransaction:${args.bankTransactionId}`,
+          subject: "Payment received",
+        },
+      });
+      await sendPaymentConfirmation({
+        emailId: emailRow.id,
+        fundId: args.fund.id,
+        toEmail: member.email,
+        firstName: member.firstName,
+        fund: fundBranding,
+        amount: args.amount,
+        occurredAt: args.occurredAt,
+      });
+    }
   } catch (e) {
     const code = (e as { code?: string }).code;
     if (code !== "P2002") {
-      console.error("[bank-sync] payment confirmation queue/send failed", e);
+      console.error("[bank-sync] contribution email queue/send failed", e);
     }
   }
 }

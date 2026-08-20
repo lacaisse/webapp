@@ -1,6 +1,8 @@
 {
   "common": {
     "or": "ou",
+    "yes": "Oui",
+    "no": "Non",
     "cancel": "Annuler",
     "close": "Fermer",
     "save": "Enregistrer",
@@ -649,6 +651,7 @@
         "max": "Maximum",
         "members": "Membres",
         "empty": "Aucun palier configuré. Ajoutez-en un pour commencer.",
+        "hiddenAtSignup": "Masqué à l'inscription",
         "dialog": {
           "createTitle": "Ajouter un palier",
           "editTitle": "Modifier le palier",
@@ -658,6 +661,8 @@
           "allocation": "Montant d'allocation",
           "max": "Contribution maximum",
           "position": "Ordre d'affichage",
+          "hiddenAtSignup": "Masquer ce palier lors de l'inscription",
+          "hiddenAtSignupHint": "Le palier reste assignable par un administrateur et continue d'alimenter les allocations — il n'apparaît simplement pas dans le formulaire d'inscription public.",
           "save": "Enregistrer",
           "saving": "Enregistrement…",
           "cancel": "Annuler"
@@ -1105,7 +1110,8 @@
       "tabs": {
         "drafts": "Brouillons",
         "pending": "En attente",
-        "completed": "Réglés"
+        "completed": "Réglés",
+        "export": "Export"
       },
       "settlement": {
         "place": "Commerce",
@@ -1113,11 +1119,13 @@
         "orderCount": "Commandes",
         "total": "Total",
         "fees": "Frais",
+        "processorFees": "Frais source",
+        "platformFee": "Commission plateforme",
         "net": "Net",
         "manualDeduction": "Déduction manuelle",
         "placeBalance": "Solde du commerce",
         "placeBalanceEnough": "Suffisant pour le règlement",
-        "placeBalanceLow": "Inférieur au total du virement",
+        "placeBalanceLow": "Inférieur au montant prélevé au règlement",
         "status": "Statut",
         "burnTx": "Tx de burn",
         "loadError": "Impossible de charger les virements depuis CitizenPay. Réessayez bientôt.",
@@ -1139,6 +1147,19 @@
           "burnt": "Brûlé",
           "complete": "Terminé"
         },
+        "orderTypes": {
+          "app": "Application",
+          "manual": "Manuel",
+          "pos": "Caisse",
+          "terminal": "Terminal",
+          "web": "Web"
+        },
+        "orderStatuses": {
+          "paid": "Payée",
+          "refund": "Remboursement",
+          "refunded": "Remboursée",
+          "correction": "Correction"
+        },
         "signed": {
           "title": "Paiement signé",
           "description": "Votre virement bancaire a été signé.",
@@ -1154,7 +1175,7 @@
             "complete": "Terminé"
           },
           "burn": {
-            "hint": "Brûle le montant net du compte du commerce on-chain."
+            "hint": "Brûle le net du commerce depuis son compte ; la commission plateforme et la déduction sont transférées à la caisse."
           },
           "pay": {
             "hint": "Crée le paiement bancaire au commerce ; vous signerez le virement à votre banque.",
@@ -1207,10 +1228,13 @@
           "noMatches": "Aucun virement ne correspond à votre recherche.",
           "unknownCounterpart": "Expéditeur inconnu",
           "amount": "Montant",
-          "fee": "Frais",
+          "feeProcessor": "Frais processeur",
+          "feeProcessorHint": "Retenus à la source par le processeur de paiement. Laissez 0 pour un virement bancaire.",
+          "feePlatform": "Commission plateforme",
+          "feePlatformHint": "Votre part, prélevée du compte du commerce au règlement. Suggérée d’après votre taux.",
           "descriptionLabel": "Description",
           "descriptionPlaceholder": "Objet de la commande",
-          "net": "Net",
+          "net": "Émis vers le commerce",
           "confirm": "Ajouter la commande",
           "successMinted": "Commande ajoutée et net émis vers le commerce.",
           "mintFailed": "Commande ajoutée, mais l’émission automatique a échoué. Réconciliez-la depuis l’onglet Problèmes."
@@ -1235,7 +1259,7 @@
           "trigger": "Ajouter une déduction",
           "edit": "Modifier la déduction",
           "title": "Déduction manuelle",
-          "description": "Ajustement comptable qui diminue le net versé au commerce. Sans effet on-chain.",
+          "description": "Ajustement comptable qui diminue le net versé au commerce. Rien ne bouge maintenant : le montant quitte le compte du commerce avec la commission, au règlement.",
           "amount": "Montant de la déduction",
           "amountHint": "Maximum {max}. Saisissez 0 pour supprimer la déduction.",
           "comment": "Commentaire",
@@ -1243,6 +1267,18 @@
           "net": "Net après déduction",
           "confirm": "Enregistrer",
           "remove": "Supprimer"
+        },
+        "editPeriod": {
+          "trigger": "Modifier la période",
+          "title": "Période de versement",
+          "description": "Modifiez la période couverte par ce virement. Cela ne change que le libellé — les commandes sont déjà affectées et aucun montant ne bouge.",
+          "month": "Mois entier",
+          "monthHint": "Choisissez un mois pour remplir les deux dates avec ce mois calendaire.",
+          "from": "Du",
+          "to": "Au (exclu)",
+          "covers": "Couvre du {from} jusqu’au {to} (exclu)",
+          "ordersHint": "Les commandes ne bougent pas : élargir la période n’intègre aucune commande extérieure au virement, elles restent disponibles pour le suivant.",
+          "confirm": "Enregistrer la période"
         },
         "pay": {
           "button": "Payer le commerce",
@@ -1252,17 +1288,17 @@
         "burn": {
           "button": "Brûler les jetons",
           "title": "Brûler les jetons du virement ?",
-          "description": "Cette action brûle les jetons on-chain correspondant à ce virement. Le burn et le paiement bancaire sont indépendants — dans n’importe quel ordre.",
+          "description": "Cette action brûle les jetons on-chain correspondant au net du commerce ; la commission plateforme et la déduction sont transférées à la caisse. Le burn et le paiement bancaire sont indépendants — dans n’importe quel ordre.",
           "warning": "Cette action est irréversible. Les jetons de ce virement seront définitivement brûlés.",
           "confirm": "Brûler les jetons",
           "success": "Jetons brûlés. Hash de transaction :",
-          "feeSwept": "Commission transférée vers le compte de la caisse : {amount}",
-          "feeNotSwept": "Jetons brûlés, mais la commission n'a pas encore été transférée."
+          "feeSwept": "Commission plateforme et déduction transférées vers le compte de la caisse : {amount}",
+          "feeNotSwept": "Jetons brûlés, mais la commission plateforme n’a pas encore été transférée."
         },
         "feeTransfer": {
-          "pending": "La commission de ce virement n'a pas encore été transférée.",
+          "pending": "La commission plateforme et la déduction de ce virement n’ont pas encore été transférées.",
           "button": "Transférer la commission",
-          "done": "Commission transférée. Hash de transaction :"
+          "done": "Commission plateforme transférée. Hash de transaction :"
         },
         "orders": {
           "title": "Commandes",
@@ -1361,7 +1397,7 @@
           "notBurnable": "Ce virement n’est plus à l’étape de brûlage (déjà brûlé ou réglé).",
           "payoutNotFound": "Virement introuvable.",
           "deductionFailed": "Impossible d’enregistrer la déduction. Réessayez bientôt.",
-          "deductionTooHigh": "La déduction ne peut pas dépasser le total moins les frais.",
+          "deductionTooHigh": "La déduction ne peut pas dépasser le total moins les frais processeur et la commission plateforme.",
           "deductionNotPending": "La déduction manuelle ne peut être modifiée que tant que le virement est en attente.",
           "reportFailed": "Jetons brûlés on-chain, mais impossible de le signaler à Citizen Pay. Ne réessayez pas — conservez le hash de transaction pour réconciliation.",
           "noFeeDestination": "Aucun compte de destination pour la commission. Connectez d'abord la caisse à Citizen Pay.",
@@ -1385,8 +1421,71 @@
           "feeInvalid": "Saisissez des frais valides.",
           "amountPositive": "Le montant doit être supérieur à zéro.",
           "feeTooHigh": "Les frais ne peuvent pas dépasser le montant.",
+          "payoutFeeInvalid": "Saisissez une commission plateforme valide.",
+          "feesTooHigh": "Les frais processeur et la commission plateforme ne peuvent pas dépasser le montant.",
           "descriptionTooLong": "La description est trop longue.",
-          "completeFailed": "Impossible de marquer le versement comme terminé. Réessayez bientôt."
+          "completeFailed": "Impossible de marquer le versement comme terminé. Réessayez bientôt.",
+          "periodFailed": "Impossible de modifier la période de versement. Veuillez réessayer.",
+          "periodNotPending": "La période ne peut être modifiée que tant que le virement est en attente.",
+          "exportFailed": "Impossible de générer l'export. Réessayez bientôt.",
+          "exportOrdersFailed": "Impossible de charger les transactions d'un des virements. L'export n'a pas été généré — réessayez bientôt.",
+          "exportOrdersTruncated": "Un des virements contient trop de transactions pour être exporté d'un seul bloc. Réduisez la période et réessayez."
+        }
+      },
+      "export": {
+        "description": "Deux exports comptables des virements aux commerçants sur la période choisie : le récapitulatif (une ligne par virement) et le détail des transactions (une ligne par commande contenue dans ces virements). Séparateur point-virgule et encodage UTF-8, ouvrables directement dans Excel.",
+        "presets": {
+          "thisMonth": "Ce mois-ci",
+          "lastMonth": "Le mois dernier",
+          "thisQuarter": "Ce trimestre",
+          "lastQuarter": "Le trimestre dernier",
+          "thisYear": "Cette année",
+          "lastYear": "L'année dernière"
+        },
+        "from": "Du",
+        "to": "Au",
+        "downloadRecap": "Récapitulatif (CSV)",
+        "downloadDetail": "Détail des transactions (CSV)",
+        "rangeInvalid": "La date de début doit précéder la date de fin.",
+        "summary": "{count, plural, =0 {Aucun virement sur cette période.} one {1 virement sur cette période, {net} net.} other {# virements sur cette période, {net} net.}}",
+        "byMerchant": "Par commerçant",
+        "payoutCount": "Virements",
+        "empty": "Aucun virement sur cette période.",
+        "columnsHint": "Colonnes du fichier : {columns}.",
+        "recapHint": "une ligne par virement à un commerçant.",
+        "detailHint": "une ligne par transaction contenue dans ces virements, avec sa provenance.",
+        "columns": {
+          "periodStart": "Début de période",
+          "periodEnd": "Fin de période (incluse)",
+          "merchant": "Commerçant",
+          "business": "Enseigne",
+          "gross": "Montant brut",
+          "processorFees": "Frais source",
+          "platformFee": "Commission plateforme",
+          "manualDeduction": "Déduction manuelle",
+          "deductionComment": "Motif de la déduction",
+          "net": "Net reversé",
+          "status": "Statut",
+          "createdAt": "Date de création (UTC)",
+          "reference": "Référence"
+        },
+        "orderColumns": {
+          "periodStart": "Début de période",
+          "periodEnd": "Fin de période (incluse)",
+          "merchant": "Commerçant",
+          "business": "Enseigne",
+          "reference": "Référence du virement",
+          "payoutStatus": "Statut du virement",
+          "orderId": "ID transaction",
+          "orderDate": "Date de la transaction (UTC)",
+          "source": "Provenance",
+          "gross": "Montant brut",
+          "processorFees": "Frais source",
+          "platformFeeShare": "Part de commission plateforme",
+          "netCredit": "Net crédité",
+          "orderStatus": "Statut de la transaction",
+          "description": "Description",
+          "txHash": "Hash de transaction"
         }
       },
       "admin": {
@@ -1491,7 +1590,8 @@
         "citizenpay": "Citizen Pay",
         "fees": "Frais",
         "emails": "E-mails",
-        "documents": "Documents"
+        "documents": "Documents",
+        "embeds": "Widgets"
       },
       "general": {
         "title": "Général",
@@ -1610,6 +1710,10 @@
             "builtinCustom": "Question personnalisée",
             "builtinHint": "Une information de la fiche membre est enregistrée dans sa colonne dédiée — elle alimente les courriers, les rappels et l'attribution de palier. Une question personnalisée est stockée à part, avec la candidature.",
             "builtinLocked": "Enregistré dans la fiche membre ({key}). Le type de saisie est imposé ; vous pouvez adapter le libellé, l'aide, l'obligation et la position.",
+            "shadowTitle": "Utiliser le champ de la fiche membre ?",
+            "shadowBody": "Choisissez « {label} » pour que la réponse soit enregistrée dans la fiche du membre. Une question personnalisée reste possible si vous demandez vraiment autre chose.",
+            "shadowUseBuiltin": "Utiliser « {label} »",
+            "shadowKeepCustom": "Créer quand même une question personnalisée",
             "visibleIf": {
               "label": "Afficher seulement si",
               "none": "Toujours affiché",
@@ -1743,6 +1847,10 @@
         "description": "Commission prélevée sur les paiements aux commerces. Configurée ici, puis transmise à Citizen Pay.",
         "rate": "Taux de commission (%)",
         "rateHint": "Pourcentage prélevé sur chaque paiement (ex. 2,5 pour 2,5 %). Laissez vide pour utiliser le taux par défaut de Citizen Pay.",
+        "frequency": "Fréquence de prélèvement",
+        "frequencyHint": "À chaque paiement, ou une seule fois en fin de mois. Le prélèvement lui-même est effectué par Citizen Pay.",
+        "frequencyPerPayment": "À chaque paiement",
+        "frequencyMonthly": "Mensuel (fin de mois)",
         "syncPending": "Enregistré localement, mais pas encore confirmé par Citizen Pay. Enregistrez à nouveau pour réessayer la synchronisation.",
         "syncFailed": "Taux enregistré, mais la synchronisation avec Citizen Pay a échoué. Enregistrez à nouveau pour réessayer."
       },
@@ -1793,9 +1901,17 @@
             "title": "Paiement reçu",
             "description": "E-mail envoyé au membre lorsqu'un paiement est reçu et rapproché."
           },
+          "PAYMENT_BELOW_MINIMUM": {
+            "title": "Cotisation sous le minimum",
+            "description": "E-mail envoyé au membre lorsque la cotisation reçue est inférieure au minimum de son palier."
+          },
           "REFERRAL_BONUS_AWARDED": {
             "title": "Bonus de parrainage",
             "description": "E-mail envoyé au parrain lorsqu'un bonus de parrainage est crédité sur sa carte."
+          },
+          "MEMBER_PAYMENT_LINK": {
+            "title": "Lien de paiement (à la demande)",
+            "description": "E-mail envoyé manuellement depuis la fiche d'un membre qui redemande son lien de paiement."
           }
         },
         "defaultName": "Modèle par défaut",
@@ -1902,6 +2018,52 @@
           "bodyTooLong": "Le corps du courrier est trop long.",
           "unknownVariable": "Variable inconnue « {name} ». Supprimez-la ou utilisez l'une des variables listées."
         }
+      },
+      "embeds": {
+        "domains": {
+          "title": "Domaines autorisés",
+          "description": "Les sites autorisés à intégrer vos widgets. Les navigateurs refusent de les afficher ailleurs.",
+          "label": "Un domaine par ligne",
+          "help": "Jusqu'à {max} domaines. Utilisez *.exemple.org pour autoriser tous les sous-domaines, et indiquez le port pour vos tests locaux (localhost:3000).",
+          "emptyWarning": "Aucun domaine configuré — vos widgets ne s'afficheront sur aucun site tant que vous n'en ajoutez pas un.",
+          "saved": "Domaines autorisés enregistrés.",
+          "save": "Enregistrer",
+          "saving": "Enregistrement…"
+        },
+        "accounts": {
+          "title": "Widget de compte",
+          "description": "Publiez le solde et l'activité récente d'un compte. L'adresse du compte et le détail des transactions ne sont jamais affichés.",
+          "none": "Aucun compte pour l'instant.",
+          "enable": "Activer",
+          "disable": "Désactiver",
+          "rotate": "Nouveau lien",
+          "cancel": "Annuler",
+          "snippetLabel": "Collez ceci dans votre site",
+          "disableConfirm": {
+            "title": "Désactiver ce widget ?",
+            "body": "Il cessera de s'afficher partout où il est actuellement intégré. Vous pourrez le réactiver plus tard, mais avec un nouveau lien à recoller."
+          },
+          "rotateConfirm": {
+            "title": "Générer un nouveau lien ?",
+            "body": "Le lien actuel cesse immédiatement de fonctionner. Partout où ce widget est déjà intégré, il ne s'affichera plus tant que vous n'aurez pas collé le nouveau code."
+          },
+          "errors": {
+            "invalid": "Requête invalide.",
+            "notFound": "Ce compte n'existe plus."
+          }
+        },
+        "merchants": {
+          "title": "Widgets commerçants",
+          "description": "Votre annuaire public de commerçants, en liste ou sur une carte. Seuls les commerçants marqués comme visibles publiquement y figurent.",
+          "listTitle": "Commerçants",
+          "mapTitle": "Carte des commerçants",
+          "listSnippetLabel": "Liste des commerçants",
+          "mapSnippetLabel": "Carte des commerçants"
+        },
+        "preview": {
+          "show": "Aperçu",
+          "hide": "Masquer l'aperçu"
+        }
       }
     }
   },
@@ -1925,6 +2087,7 @@
       "notFound": "Champ introuvable.",
       "builtinInvalid": "Cette information de membre est inconnue.",
       "builtinTaken": "Cette information est déjà demandée sur ce formulaire (vérifiez aussi les champs archivés).",
+      "keyShadowsBuiltin": "« {key} » est le nom d'un champ de la fiche membre. Enregistrée comme question personnalisée, la réponse n'alimentera ni l'adresse du membre, ni les courriers, ni l'attribution de palier.",
       "visibleIfInvalid": "La condition d'affichage n'est pas valide — vérifiez le champ dont elle dépend.",
       "visibleIfValueRequired": "Indiquez la valeur de la condition d'affichage."
     }
@@ -1955,7 +2118,9 @@
       "feeInvalid": "Le taux doit être un nombre avec jusqu'à 2 décimales.",
       "feeTooHigh": "Le taux ne peut pas dépasser 100 %.",
       "cutoffDayInvalid": "Le jour de clôture doit être un entier entre 1 et 31.",
-      "nameTooLong": "Le nom est trop long."
+      "nameTooLong": "Le nom est trop long.",
+      "embedDomainInvalid": "Saisissez un domaine par ligne (exemple.org, *.exemple.org, localhost:3000).",
+      "embedDomainsTooMany": "Trop de domaines — retirez-en quelques-uns."
     }
   },
   "team": {
@@ -2034,12 +2199,20 @@
         "subject": "Paiement reçu — {fundName}",
         "textBody": "Bonjour {firstName},\n\nNous venons de recevoir votre paiement de {amount} le {occurredAt} à {fundName}.\n\nSi votre caisse fonctionne en pay-and-go, votre carte a déjà été créditée. Sinon, le crédit sera attribué lors de la prochaine période d'allocation.\n\nL'équipe {fundName}"
       },
+      "paymentLink": {
+        "subject": "Votre lien de paiement — {fundName}",
+        "textBody": "Bonjour {firstName},\n\nVoici votre lien de paiement {fundName} :\n\n{paymentLink}\n\nPour consulter votre solde et l'historique de votre carte :\n\n{cardLink}\n\nPour tout virement, indiquez cette référence afin que nous puissions créditer votre carte automatiquement :\n\n  {paymentReference}\n\nÀ bientôt,\nL'équipe {fundName}"
+      },
       "allocationConfirmation": {
         "subject": "{amount} viennent d'arriver sur votre carte — {fundName}",
         "textBody": "Bonjour {firstName},\n\nVotre allocation de {amount} vient d'être créditée sur votre carte {fundName}. Vous pouvez l'utiliser chez tout commerce partenaire.\n\nL'équipe {fundName}"
       },
       "footer": {
         "unsubscribe": "Se désinscrire des rappels de paiement"
+      },
+      "paymentBelowMinimum": {
+        "subject": "Votre cotisation est en dessous du minimum requis — {fundName}",
+        "textBody": "Bonjour {firstName} {lastName},\n\nNous vous confirmons que nous avons bien reçu votre cotisation mensuelle de {amount} le {occurredAt}. Malheureusement, ce montant est inférieur à {minContribution}, qui représente la cotisation minimale mensuelle pour pouvoir participer à {fundName}.\n\nAfin de pouvoir recevoir vos {allocationAmount}€ (versés le 15 du mois), vous êtes prié(e) de bien vouloir transférer le reste du montant avant le 9 du mois.\n\nN'hésitez pas à nous contacter en cas de problème.\n\nEn vous remerciant de votre compréhension,\n\nL'équipe {fundName}"
       }
     },
     "signup": {
@@ -2353,12 +2526,27 @@
           "amountBelowMin": "Le montant ne peut pas être inférieur au minimum du palier ({min}).",
           "localeInvalid": "Choisissez une langue prise en charge."
         }
+      },
+      "paymentLink": {
+        "send": "Envoyer le lien de paiement",
+        "resend": "Renvoyer le lien de paiement",
+        "confirmTitle": "Envoyer le lien de paiement ?",
+        "confirmDescription": "{name} recevra par e-mail son lien de paiement, le lien vers sa carte et sa référence de virement.",
+        "confirm": "Envoyer",
+        "sending": "Envoi…",
+        "cancel": "Annuler",
+        "errors": {
+          "noEmail": "Ce membre n'a pas d'adresse e-mail.",
+          "noCard": "Ce membre n'a pas encore de carte — le lien de paiement en dépend.",
+          "sendFailed": "L'envoi a échoué. Réessayez."
+        }
       }
     },
     "builtinFields": {
       "address": "Adresse",
       "postalCode": "Code postal",
-      "city": "Ville"
+      "city": "Ville",
+      "tier": "Palier d'allocation"
     }
   },
   "cards": {
@@ -3472,6 +3660,53 @@
     "errors": {
       "titleRequired": "Le titre est requis.",
       "notFound": "Étape introuvable."
+    }
+  },
+  "token": {
+    "reconcile": {
+      "trigger": "Vérifier",
+      "title": "Vérifier cette opération",
+      "description": "Interroge le bundler pour savoir ce qui s'est réellement passé sur la chaîne. Aucune opération n'est réémise : seul notre enregistrement est corrigé.",
+      "confirm": "Vérifier",
+      "checking": "Vérification…",
+      "cancel": "Annuler",
+      "close": "Fermer",
+      "outcomes": {
+        "settled": "Confirmée sur la chaîne. Le hash de transaction réel a été enregistré.",
+        "pending": "Toujours en cours côté bundler. Rien n'a été modifié — réessayez plus tard.",
+        "failed": "Échec définitif sur la chaîne. L'opération est marquée en échec, le membre peut être réalloué.",
+        "never-submitted": "Cette opération n'a jamais atteint le bundler. Le cron de réémission s'en charge."
+      },
+      "errors": {
+        "notFound": "Opération introuvable.",
+        "noChain": "Aucune chaîne de jetons configurée pour cette caisse.",
+        "inconclusive": "Le bundler n'a pas pu répondre. Rien n'a été modifié — réessayez."
+      }
+    }
+  },
+  "embed": {
+    "account": {
+      "balanceLabel": "Solde",
+      "recentActivity": "Activité récente",
+      "empty": "Aucune activité pour l'instant.",
+      "unavailable": "L'activité est momentanément indisponible.",
+      "in": "reçu",
+      "out": "envoyé",
+      "kinds": {
+        "mint": "Émission",
+        "burn": "Remboursement",
+        "transfer": "Transfert"
+      }
+    },
+    "merchants": {
+      "title": "Où payer",
+      "empty": "Aucun commerçant pour l'instant.",
+      "website": "Visiter le site",
+      "conditions": "Conditions"
+    },
+    "map": {
+      "empty": "Aucune adresse de commerçant à afficher pour l'instant.",
+      "loading": "Chargement de la carte…"
     }
   }
 }

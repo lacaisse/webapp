@@ -3,17 +3,19 @@ import { describe, expect, it } from "vitest";
 
 import {
   coerceBuiltinValue,
+  findShadowedBuiltinKey,
   getBuiltinField,
   isMemberBuiltinKey,
   MEMBER_BUILTIN_FIELDS,
 } from "./builtin-fields";
 
 describe("the built-in registry", () => {
-  it("covers exactly the postal address parts", () => {
+  it("covers the postal address parts plus the tier picker", () => {
     expect(MEMBER_BUILTIN_FIELDS.map((f) => f.key)).toEqual([
       "address",
       "postalCode",
       "city",
+      "tierId",
     ]);
   });
 
@@ -25,8 +27,8 @@ describe("the built-in registry", () => {
     }
   });
 
-  it("excludes admin-internal, auto-captured and allocation columns", () => {
-    for (const key of ["notes", "locale", "tierId", "contributionAmount"]) {
+  it("excludes admin-internal and auto-captured columns", () => {
+    for (const key of ["notes", "locale", "contributionAmount"]) {
       expect(isMemberBuiltinKey(key)).toBe(false);
     }
   });
@@ -38,9 +40,9 @@ describe("the built-in registry", () => {
     expect(getBuiltinField("nope")).toBeNull();
   });
 
-  it("pins every address part to free text", () => {
+  it("pins the address parts to free text and the tier picker to a select", () => {
     for (const f of MEMBER_BUILTIN_FIELDS) {
-      expect(f.type).toBe("TEXT");
+      expect(f.type).toBe(f.key === "tierId" ? "SELECT" : "TEXT");
     }
   });
 
@@ -92,5 +94,44 @@ describe("coerceBuiltinValue", () => {
   it("rejects a key that is no longer (or never was) a built-in", () => {
     expect(coerceBuiltinValue("phone" as never, "+32470112233").ok).toBe(false);
     expect(coerceBuiltinValue("notes" as never, "anything").ok).toBe(false);
+  });
+
+  it("accepts a tier id shape-only — the caller checks it's a real tier", () => {
+    expect(coerceBuiltinValue("tierId", "clx1234567890")).toEqual({
+      ok: true,
+      value: "clx1234567890",
+    });
+    expect(coerceBuiltinValue("tierId", "")).toEqual({ ok: true, value: null });
+    expect(coerceBuiltinValue("tierId", ["a"]).ok).toBe(false);
+  });
+});
+
+describe("findShadowedBuiltinKey", () => {
+  it("catches the lowercase spelling the key rule forces admins into", () => {
+    // The create-time key rule is /^[a-z][a-z0-9_]*$/, so an admin reaching
+    // for the postcode types `postalcode` — which is NOT the built-in
+    // `postalCode`. This is exactly how issue #178 happened.
+    expect(findShadowedBuiltinKey("postalcode")).toBe("postalCode");
+    expect(findShadowedBuiltinKey("POSTALCODE")).toBe("postalCode");
+  });
+
+  it("catches exact matches on every registry attribute", () => {
+    for (const f of MEMBER_BUILTIN_FIELDS) {
+      expect(findShadowedBuiltinKey(f.key)).toBe(f.key);
+    }
+  });
+
+  it("ignores surrounding whitespace, like the dialog's trimmed key", () => {
+    expect(findShadowedBuiltinKey("  city  ")).toBe("city");
+  });
+
+  it("leaves genuinely custom keys alone", () => {
+    expect(findShadowedBuiltinKey("householdAdults")).toBeNull();
+    expect(findShadowedBuiltinKey("allocation")).toBeNull();
+    // Near-misses must not trip it — these really are different questions.
+    expect(findShadowedBuiltinKey("address_2")).toBeNull();
+    expect(findShadowedBuiltinKey("billing_city")).toBeNull();
+    expect(findShadowedBuiltinKey("")).toBeNull();
+    expect(findShadowedBuiltinKey("   ")).toBeNull();
   });
 });

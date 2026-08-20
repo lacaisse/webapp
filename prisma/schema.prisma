@@ -304,6 +304,16 @@ model Fund {
   payoutFeePercentage Decimal? @db.Decimal(5, 2)
   payoutFeeSynced     Boolean  @default(true)
 
+  // When the platform fee above is actually collected. PER_PAYMENT (the
+  // historical behaviour, hence the default) debits the fee on each merchant
+  // payment; MONTHLY accrues it and collects once at month end. The
+  // collection itself runs CP-side — we only mirror the choice. We stay
+  // canonical, exactly like the rate: the settings UI writes here first, then
+  // pushes rate + cadence together in the SAME PATCH /v2/treasury call, so
+  // `payoutFeeSynced` covers both (false = something local hasn't landed on
+  // CP yet).
+  feeCollectionFrequency FeeCollectionFrequency @default(PER_PAYMENT)
+
   // Defaults
   defaultLocale String @default("fr")
   timezone      String @default("Europe/Brussels")
@@ -389,6 +399,15 @@ model Fund {
   memberSignupCancelUrl String?
   memberSignupErrorUrl  String?
 
+  // Embeddable widgets: the domains allowed to frame `/embed/*` on this
+  // fund's host. proxy.ts reads this column on every fund request and emits
+  // `Content-Security-Policy: frame-ancestors <list>`, so an empty list means
+  // `'none'` — the widgets render nowhere until an admin configures a domain.
+  // Values are pre-validated CSP host-sources (see services/embed/schema.ts),
+  // which is what makes joining them into a header safe. A scalar array (not
+  // a join table) so the proxy lookup stays a single row read.
+  embedAllowedDomains String[] @default([])
+
   staff              FundMember[] // staff with admin access (OWNER/ADMIN/VIEWER)
   invites            FundInvite[] // pending staff invitations
   members            Member[] // demand-side recipients of allocations
@@ -421,6 +440,11 @@ enum AllocationMode {
   FIXED_PERIOD // attribute tokens at the end of each period (monthly etc.)
   PAY_AND_GO // mint immediately when CP reports a deposit
   DISABLED // no automatic allocation: deposits are still mirrored/matched, but no minting and no periods
+}
+
+enum FeeCollectionFrequency {
+  PER_PAYMENT // debit the platform fee on every merchant payment (CP default)
+  MONTHLY // accrue the fee and collect it once, at the end of the month
 }
 
 // Per-fund annotation of an on-chain transaction, keyed by tx hash. Lets us
@@ -515,6 +539,15 @@ model FundTokenAccount {
   // namespace is global; NULL for STANDARD accounts (Postgres NULLs are
   // distinct, so any number of them coexist).
   serial String? @unique
+
+  // Public embed handle. NULL (the default) means this account is not
+  // embeddable; a value is an unguessable random token minted by the admin
+  // (services/embed/schema.ts::generateEmbedSlug) and used as the only
+  // credential on `/embed/account/<slug>`. Rotating mints a new one, which
+  // instantly revokes every URL already pasted into a website; disabling
+  // sets it back to NULL. Globally unique because it's a bearer handle —
+  // the lookup is by slug alone, then re-checked against the host's fund.
+  embedSlug String? @unique
 
   archivedAt DateTime? // soft delete — hidden from the list, kept for history
   createdAt  DateTime  @default(now())
@@ -1123,6 +1156,13 @@ model AllocationTier {
   // Display order in the admin UI. Lower = first.
   position Int @default(0)
 
+  // Hidden from the public signup form (issue #37): the tier stays fully live
+  // — admins can assign it, it drives allocations, it shows in the admin UI —
+  // but applicants never see it in the signup tier picker (issue #157), and a
+  // crafted submission naming it is rejected. Distinct from archivedAt, which
+  // retires a tier everywhere.
+  hiddenAtSignup Boolean @default(false)
+
   // Soft-delete: archived tiers can't be assigned to new members but
   // existing assignments remain so historical reporting still works.
   archivedAt DateTime?
@@ -1706,6 +1746,7 @@ enum EmailType {
   PAYMENT_REMINDER_FIRST
   PAYMENT_REMINDER_SECOND
   PAYMENT_CONFIRMATION
+  PAYMENT_BELOW_MINIMUM
   ALLOCATION_CONFIRMATION
   PAYMENT_FORGOTTEN
 
@@ -1721,6 +1762,10 @@ enum EmailType {
   MERCHANT_REJECTED
   REFERRAL_BONUS_AWARDED
   CARD_ASSIGNED
+
+  // Sent by hand from the member detail page when a member asks for their
+  // payment link / account page again (issue #45). No automatic trigger.
+  MEMBER_PAYMENT_LINK
 }
 
 enum EmailStatus {

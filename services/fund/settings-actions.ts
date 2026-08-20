@@ -250,12 +250,15 @@ export async function updateReferralSettingsAction(
 }
 
 // --- Payout fee ----------------------------------------------------------
-// Per-fund platform fee on merchant payments. We are canonical: persist the
-// value locally first (the DB may lead CP), then push it to CitizenPay as
-// integer basis points. A failed push leaves `payoutFeeSynced = false` and
-// returns a warning so the admin can retry by saving again. Clearing the
-// field stores null and skips the push — the assumed CP endpoint takes a
-// concrete bps value, not a "reset to default" signal.
+// Per-fund platform fee on merchant payments: the rate, and the cadence at
+// which CitizenPay collects it (per payment, or once at month end — the
+// collection itself runs CP-side, we only mirror the choice). We are
+// canonical for both: persist locally first (the DB may lead CP), then push
+// rate + cadence together in one call. A failed push leaves
+// `payoutFeeSynced = false` and returns a warning so the admin can retry by
+// saving again. Clearing the rate stores null (keeping the cadence locally)
+// and skips the push — the assumed CP endpoint takes a concrete bps value,
+// not a "reset to default" signal.
 
 export type FeeSettingsResult =
   | { ok: true; warning?: string }
@@ -269,6 +272,9 @@ const PayoutFeeSchema = z.object({
     .or(z.literal(""))
     .nullable()
     .optional(),
+  // Optional: callers that don't send it keep whatever the fund already has
+  // (so an older client can't silently reset a fund to per-payment).
+  feeCollectionFrequency: z.enum(["PER_PAYMENT", "MONTHLY"]).optional(),
 });
 
 export async function updatePayoutFeeAction(
@@ -283,15 +289,22 @@ export async function updatePayoutFeeAction(
 
   const raw = parsed.data.payoutFeePercentage;
   const value = raw && raw !== "" ? raw : null;
+  const frequency = parsed.data.feeCollectionFrequency ?? fund.feeCollectionFrequency;
 
-  // DB-first: the local value is authoritative even if the CP push fails.
-  // Mark unsynced up front; flip to synced only once CP accepts it.
+  // DB-first: the local values are authoritative even if the CP push fails.
+  // Mark unsynced up front; flip to synced only once CP accepts them.
   await prisma.fund.update({
     where: { id: fund.id },
-    data: { payoutFeePercentage: value, payoutFeeSynced: value === null },
+    data: {
+      payoutFeePercentage: value,
+      feeCollectionFrequency: frequency,
+      payoutFeeSynced: value === null,
+    },
   });
 
-  // Nothing to push when cleared.
+  // Nothing to push when the rate is cleared — the cadence alone isn't a
+  // valid fee config for the assumed CP endpoint. It stays stored locally
+  // and rides along with the next push that sets a rate.
   if (value === null) {
     revalidatePath("/settings");
     return { ok: true };
@@ -299,7 +312,10 @@ export async function updatePayoutFeeAction(
 
   try {
     const client = getCitizenPayClient(fund);
-    await client.setPayoutFeePercentage(value);
+    await client.setPayoutFeeConfig({
+      percent: value,
+      collectionFrequency: frequency,
+    });
     await prisma.fund.update({
       where: { id: fund.id },
       data: { payoutFeeSynced: true },

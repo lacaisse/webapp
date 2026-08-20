@@ -241,6 +241,87 @@ function formatEmailDate(isoTimestamp: string, locale: string): string {
   }).format(new Date(isoTimestamp));
 }
 
+// Sent (in place of PAYMENT_CONFIRMATION) when a matched deposit is below the
+// member's tier minimum contribution: confirms receipt but flags the shortfall
+// and the top-up deadline. Like the confirmation, `occurredAt` arrives as a raw
+// ISO-8601 timestamp — format it in the recipient's locale (never interpolate
+// the ISO string; see #147).
+export async function sendPaymentBelowMinimum(args: {
+  emailId: string;
+  fundId: string;
+  toEmail: string;
+  firstName: string;
+  lastName: string;
+  fund: FundBranding;
+  amount: string;
+  minContribution: string;
+  allocationAmount: string;
+  occurredAt: string;
+}): Promise<void> {
+  await dispatchTemplate({
+    emailId: args.emailId,
+    fund: args.fund,
+    render: (locale) =>
+      resolveEmailTemplate({
+        fundId: args.fundId,
+        type: "PAYMENT_BELOW_MINIMUM",
+        locale,
+        vars: {
+          firstName: args.firstName,
+          lastName: args.lastName,
+          fundName: args.fund.name,
+          amount: args.amount,
+          minContribution: args.minContribution,
+          allocationAmount: args.allocationAmount,
+          occurredAt: formatEmailDate(args.occurredAt, locale),
+        },
+      }),
+    to: args.toEmail,
+  });
+}
+
+// Sent by hand from the member detail page when a member asks for their
+// payment link or account page again (issue #45). No automatic trigger.
+//
+// Deliberately carries no balance figure, even though the issue mentions the
+// member's balance: a number interpolated at send time is stale the moment it
+// lands, and resolving it would put a live chain read in the send path. The
+// {cardLink} tap page shows the real balance whenever the member opens it.
+export async function sendMemberPaymentLink(args: {
+  emailId: string;
+  fundId: string;
+  toEmail: string;
+  firstName: string;
+  lastName: string;
+  fund: FundBranding;
+  // Bank-transfer communication bank-sync matches on (the card serial).
+  paymentReference: string;
+  // Public /pay/<serial> page — how to pay this contribution.
+  paymentLink: string;
+  // Public account / tap URL — shows the live balance.
+  cardLink: string;
+}): Promise<void> {
+  await dispatchTemplate({
+    emailId: args.emailId,
+    fund: args.fund,
+    render: (locale) =>
+      resolveEmailTemplate({
+        fundId: args.fundId,
+        type: "MEMBER_PAYMENT_LINK",
+        locale,
+        vars: {
+          firstName: args.firstName,
+          lastName: args.lastName,
+          fundName: args.fund.name,
+          paymentReference: args.paymentReference,
+          paymentLink: args.paymentLink,
+          cardLink: args.cardLink,
+        },
+      }),
+    to: args.toEmail,
+  });
+}
+
 export async function sendPaymentReminder(args: {
   emailId: string;
   fundId: string;

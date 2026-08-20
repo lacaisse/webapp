@@ -23,15 +23,32 @@ import {
   listIncomingBankTransactionsAction,
   type PickableBankTransaction,
 } from "@/services/payout/admin-actions";
+import {
+  orderWalletCredit,
+  suggestPayoutFee,
+} from "@/services/payout/money";
 import { cn } from "@/lib/utils";
 
 type Mode = "manual" | "bank";
 
-// Add an order to a pending payout by hand. Two ways to fill the same three
-// fields (amount / fee / description): type them directly, or pick an incoming
-// bank transaction — which prefills the amount and drops its reference into the
-// description. The amounts stay editable either way; the server re-validates.
-export function CreateOrderDialog({ payoutId }: { payoutId: string }) {
+// Add an order to a pending payout by hand. Two ways to fill the same fields
+// (amount / processor fee / platform fee / description): type them directly, or
+// pick an incoming bank transaction — which prefills the amount and drops its
+// reference into the description. The amounts stay editable either way; the
+// server re-validates.
+//
+// The two fees are different money and the dialog says so: the processor fee
+// was withheld at source (so it defaults to 0 — a bank transfer arrives whole),
+// while the platform fee is the fund's own cut, prefilled from its configured
+// rate and swept from the place's wallet at settlement.
+export function CreateOrderDialog({
+  payoutId,
+  payoutFeePercentage,
+}: {
+  payoutId: string;
+  /** The fund's configured rate, e.g. "2.50". Null when it has none. */
+  payoutFeePercentage: string | null;
+}) {
   const t = useTranslations("fund.payments.settlement.createOrder");
   const tRoot = useTranslations();
   const format = useFormatter();
@@ -41,6 +58,12 @@ export function CreateOrderDialog({ payoutId }: { payoutId: string }) {
 
   const [total, setTotal] = useState("");
   const [fees, setFees] = useState("0");
+  // The platform fee is *derived* from the amount at the fund's rate until the
+  // operator types their own — then their value sticks. Derived rather than
+  // synced in an effect so changing the amount (including by picking a bank
+  // transfer) re-suggests during the same render, with no cascading update.
+  const [payoutFeeInput, setPayoutFeeInput] = useState("0");
+  const [payoutFeeEdited, setPayoutFeeEdited] = useState(false);
   const [description, setDescription] = useState("");
   const [selectedTxId, setSelectedTxId] = useState<string | null>(null);
 
@@ -62,6 +85,8 @@ export function CreateOrderDialog({ payoutId }: { payoutId: string }) {
     setMode("manual");
     setTotal("");
     setFees("0");
+    setPayoutFeeInput("0");
+    setPayoutFeeEdited(false);
     setDescription("");
     setSelectedTxId(null);
     setSearch("");
@@ -80,6 +105,10 @@ export function CreateOrderDialog({ payoutId }: { payoutId: string }) {
     setMode(next);
     setError(null);
   }
+
+  const payoutFee = payoutFeeEdited
+    ? payoutFeeInput
+    : suggestPayoutFee(total, payoutFeePercentage);
 
   // Load the first page whenever the bank tab is open, debounced on the search
   // term so each keystroke doesn't fire a query. The DB read is lazy (only
@@ -127,6 +156,7 @@ export function CreateOrderDialog({ payoutId }: { payoutId: string }) {
         payoutId,
         total: total.trim(),
         fees: fees.trim() || "0",
+        payoutFee: payoutFee.trim() || "0",
         description: description.trim() || null,
       });
       // Only a pre-create failure is a retryable error. Once the order exists
@@ -148,13 +178,18 @@ export function CreateOrderDialog({ payoutId }: { payoutId: string }) {
 
   const totalNum = Number(total);
   const feesNum = Number(fees || "0");
+  const payoutFeeNum = Number(payoutFee || "0");
+  // Mirrors CreatePayoutOrderSchema: a positive total, non-negative fees, and
+  // the two fees together no larger than the total. The action re-validates.
   const netValid =
     total.trim() !== "" &&
     Number.isFinite(totalNum) &&
     totalNum > 0 &&
     Number.isFinite(feesNum) &&
     feesNum >= 0 &&
-    feesNum <= totalNum;
+    Number.isFinite(payoutFeeNum) &&
+    payoutFeeNum >= 0 &&
+    feesNum + payoutFeeNum <= totalNum;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -316,7 +351,9 @@ export function CreateOrderDialog({ payoutId }: { payoutId: string }) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor={`order-fees-${payoutId}`}>{t("fee")}</Label>
+              <Label htmlFor={`order-fees-${payoutId}`}>
+                {t("feeProcessor")}
+              </Label>
               <Input
                 id={`order-fees-${payoutId}`}
                 type="number"
@@ -327,7 +364,32 @@ export function CreateOrderDialog({ payoutId }: { payoutId: string }) {
                 onChange={(e) => setFees(e.target.value)}
                 placeholder="0.00"
               />
+              <p className="text-xs text-muted-foreground">
+                {t("feeProcessorHint")}
+              </p>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor={`order-payout-fee-${payoutId}`}>
+              {t("feePlatform")}
+            </Label>
+            <Input
+              id={`order-payout-fee-${payoutId}`}
+              type="number"
+              min="0"
+              step="0.01"
+              inputMode="decimal"
+              value={payoutFee}
+              onChange={(e) => {
+                setPayoutFeeEdited(true);
+                setPayoutFeeInput(e.target.value);
+              }}
+              placeholder="0.00"
+            />
+            <p className="text-xs text-muted-foreground">
+              {t("feePlatformHint")}
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -343,11 +405,14 @@ export function CreateOrderDialog({ payoutId }: { payoutId: string }) {
             />
           </div>
 
+          {/* What this order mints to the place: total − processor fee. The
+              platform fee is minted with it and only leaves at the payout's
+              settlement sweep, so it is NOT subtracted here. */}
           {netValid && (
             <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm">
               <span className="text-muted-foreground">{t("net")}</span>
               <span className="font-medium tabular-nums">
-                {euro((totalNum - feesNum).toFixed(2))}
+                {euro(orderWalletCredit({ total, fees: fees || "0" }))}
               </span>
             </div>
           )}
