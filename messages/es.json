@@ -2223,7 +2223,6 @@
       "email": "Correo electrónico",
       "contributionAmount": "Importe que deseas aportar (opcional)",
       "contributionAmountHint": "Déjalo vacío para usar el importe sugerido por tu nivel. Podrás acordar otro importe con un administrador.",
-      "remindersOptOut": "No quiero recibir recordatorios de pago por correo electrónico.",
       "submit": "Solicitar",
       "submitting": "Enviando…",
       "errors": {

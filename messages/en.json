@@ -2223,7 +2223,6 @@
       "email": "Email",
       "contributionAmount": "Amount you'd like to contribute (optional)",
       "contributionAmountHint": "Leave blank to use the amount suggested by your tier. You can agree on a different amount with an admin.",
-      "remindersOptOut": "I don't want to receive payment reminder emails.",
       "submit": "Apply",
       "submitting": "Submitting…",
       "errors": {
