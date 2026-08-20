@@ -18,7 +18,7 @@ import {
   isMemberBuiltinKey,
   type BuiltinColumnValue,
 } from "./builtin-fields";
-import { contributionApplies } from "./contribution";
+import { contributionApplies, isBelowTierMinimum } from "./contribution";
 import { generatePaymentReference } from "./payment-reference";
 import {
   BuiltinSignupSchema,
@@ -33,7 +33,7 @@ import {
 export type SignupMemberResult =
   | {
       error: string;
-      field?: "firstName" | "lastName" | "email";
+      field?: "firstName" | "lastName" | "email" | "contributionAmount";
       redirectTo?: string;
     }
   | { ok: true; redirectTo: string };
@@ -84,7 +84,7 @@ export async function signupMemberAction(input: {
   // tier picker (services/member/admin-tier-actions.ts).
   const liveTiers = await prisma.allocationTier.findMany({
     where: { fundId: fund.id, archivedAt: null },
-    select: { id: true, hiddenAtSignup: true },
+    select: { id: true, hiddenAtSignup: true, minContribution: true },
   });
   // The allowlist is the signup-VISIBLE subset (issue #37) — a tier hidden from
   // the picker must also be rejected when named directly, or hiding it would be
@@ -165,6 +165,31 @@ export async function signupMemberAction(input: {
     }
 
     filtered[field.key] = normalizeExtra(value!);
+  }
+
+  // A committed amount below the chosen tier's floor blocks the signup
+  // (issue #158) — same rule the admin/member edit paths already enforce.
+  // Only checkable when the fund's form collects a tier (builtin tierId,
+  // #157); with no tier chosen there is no floor, and an empty amount
+  // defaults to the tier target which is ≥ the floor by definition.
+  const chosenTier =
+    typeof builtinColumns.tierId === "string"
+      ? liveTiers.find((tier) => tier.id === builtinColumns.tierId)
+      : undefined;
+  if (
+    contributionAmount !== null &&
+    chosenTier &&
+    isBelowTierMinimum(
+      Number(contributionAmount),
+      Number(chosenTier.minContribution),
+    )
+  ) {
+    return {
+      error: t("members.signup.errors.amountBelowTierMin" as never, {
+        min: chosenTier.minContribution.toString(),
+      } as never),
+      field: "contributionAmount",
+    };
   }
 
   // Resolve the referral code if any. Soft-fail on invalid / self-referral —

@@ -2232,6 +2232,7 @@
         "emailInvalid": "Enter a valid email address.",
         "emailTaken": "An application with this email already exists for this fund.",
         "amountInvalid": "Enter a valid amount (up to 2 decimals).",
+        "amountBelowTierMin": "For your chosen allocation tier, the minimum contribution is {min} €.",
         "fieldRequired": "{label} is required.",
         "generic": "Something went wrong. Please try again.",
         "required": "This field is required.",

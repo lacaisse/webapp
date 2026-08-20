@@ -2232,6 +2232,7 @@
         "emailInvalid": "Saisissez une adresse email valide.",
         "emailTaken": "Une demande avec cet email existe déjà pour cette caisse.",
         "amountInvalid": "Saisissez un montant valide (jusqu'à 2 décimales).",
+        "amountBelowTierMin": "Pour votre palier d'allocation choisi, le minimum de cotisation est de {min} €.",
         "fieldRequired": "{label} est requis.",
         "generic": "Une erreur s'est produite. Réessayez.",
         "required": "Ce champ est obligatoire.",

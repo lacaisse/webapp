@@ -52,6 +52,7 @@ export function SignupForm({
   steps,
   referralCode,
   showContribution,
+  tierMinimums,
   prefill,
   cancelUrl,
 }: {
@@ -59,6 +60,9 @@ export function SignupForm({
   referralCode: string | null;
   // Only FIXED_PERIOD funds with tiers ask for a commitment amount.
   showContribution: boolean;
+  // Signup-visible tiers' minContribution by tier id — floors the commitment
+  // amount when the form also collects a tier (builtin tierId, issue #158).
+  tierMinimums: Record<string, number>;
   prefill: SignupPrefill;
   cancelUrl: string | null;
 }) {
@@ -77,10 +81,35 @@ export function SignupForm({
 
   // The static schema can't know which extras this fund asks for, so the
   // per-field `required` rules are compiled from the runtime definitions.
-  // Client-side UX only — the action re-checks them against the DB.
+  // Client-side UX only — the action re-checks them against the DB. The
+  // superRefine floors the commitment amount against the chosen tier's
+  // minimum (issue #158); its message is translated here rather than being a
+  // key because the key needs the {min} parameter, which translateError
+  // can't carry.
   const resolverSchema = useMemo(
-    () => SignupFormSchema.extend({ extras: buildExtrasSchema(allFields) }),
-    [allFields],
+    () =>
+      SignupFormSchema.extend({ extras: buildExtrasSchema(allFields) }).superRefine(
+        (data, ctx) => {
+          const tierId = (data.extras as Record<string, unknown> | undefined)
+            ?.tierId;
+          if (typeof tierId !== "string" || !tierId) return;
+          const min = tierMinimums[tierId];
+          if (min == null) return;
+          const amount = Number(data.contributionAmount);
+          if (!data.contributionAmount || Number.isNaN(amount)) return;
+          if (amount < min) {
+            ctx.addIssue({
+              code: "custom",
+              path: ["contributionAmount"],
+              message: tRoot(
+                "members.signup.errors.amountBelowTierMin" as never,
+                { min } as never,
+              ),
+            });
+          }
+        },
+      ),
+    [allFields, tierMinimums, tRoot],
   );
 
   const form = useForm<SignupFormInput>({
@@ -177,9 +206,11 @@ export function SignupForm({
         }
         if (result.field) {
           form.setError(result.field, { message: result.error });
-          // The identity fields all live on page 1 — send them back to it so
-          // they can actually see what needs fixing.
-          if (step !== 0) goToStep(0);
+          // Send the visitor to the page that renders the offending input:
+          // identity fields all live on page 1, the commitment amount on the
+          // last page.
+          const target = result.field === "contributionAmount" ? lastIndex : 0;
+          if (step !== target) goToStep(target);
         } else {
           form.setError("root", { message: result.error });
         }
