@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireFundRole } from "@/services/auth/dal";
+import { resolveFundIban } from "@/services/citizenpay/fund-iban";
 import { resolveTreasurySlug } from "@/services/citizenpay/treasury-slug";
 import { prisma } from "@/services/db/prisma";
 import { resolveRequestedContribution } from "@/services/member/contribution";
@@ -31,6 +32,8 @@ import {
 import {
   buildCardLink,
   buildShopList,
+  dropBlankTokenLines,
+  type EmailContent,
   formatMemberAddress,
   getEmailTemplateLibrary,
   htmlToPlainText,
@@ -296,15 +299,26 @@ type TestMember = {
 // data where the type references it, filling anything the member lacks (or when
 // no member is picked) from the type's illustrative sample values. Returns the
 // text-side vars plus optional html-only overrides (allocation's {shopList}).
+// `content` is the template actually being tested — passed in so {iban} can be
+// resolved live (only when the content references it) instead of always
+// falling back to the illustrative sample, which otherwise looks identical to
+// a real value and would mask a fund that isn't bank-connected yet.
 async function buildTestVars(
   fund: Fund,
   type: EditableEmailType,
   member: TestMember | null,
+  content: EmailContent,
 ): Promise<{ vars: Record<string, string>; htmlVars?: Record<string, string> }> {
   const sample = PREVIEW_SAMPLE_VALUES[type] as Record<string, string>;
   if (!member) {
     return { vars: { ...sample, fundName: fund.name } };
   }
+
+  const scan = `${content.subject}\n${content.bodyText}\n${content.bodyHtml ?? ""}`;
+  const iban =
+    type === "CARD_ASSIGNED" && scan.includes("{iban}")
+      ? await resolveFundIban(fund)
+      : (sample.iban ?? "");
 
   const card = member.primaryCard;
   const serial = card?.serialNumber ?? sample.paymentReference ?? "";
@@ -337,9 +351,7 @@ async function buildTestVars(
       card?.number != null ? String(card.number) : (sample.cardNumber ?? ""),
     address: formatMemberAddress(member),
     occurredAt: sample.occurredAt ?? "",
-    // Test sends use the illustrative sample IBAN rather than a live
-    // CitizenPay banking-status call — this is a preview, not a real send.
-    iban: sample.iban ?? "",
+    iban,
   };
 
   let htmlVars: Record<string, string> | undefined;
@@ -400,16 +412,21 @@ export async function sendTestEmailAction(input: {
     }
   }
 
-  const { vars, htmlVars } = await buildTestVars(fund, input.type, member);
   const content = await loadTemplateContentById({
     fundId: fund.id,
     type: input.type,
     templateId: input.templateId,
     locale: input.locale,
   });
+  const { vars, htmlVars } = await buildTestVars(
+    fund,
+    input.type,
+    member,
+    content,
+  );
 
-  const subject = `${t("fund.settings.emailTemplates.test.subjectPrefix" as never)} ${interpolate(content.subject, vars)}`;
-  const text = interpolate(content.bodyText, vars);
+  const subject = `${t("fund.settings.emailTemplates.test.subjectPrefix" as never)} ${interpolate(dropBlankTokenLines(content.subject, vars), vars)}`;
+  const text = interpolate(dropBlankTokenLines(content.bodyText, vars), vars);
   const html = await renderBrandedEmail({
     fundName: fund.name,
     primaryColor: fund.primaryColor,
@@ -418,7 +435,10 @@ export async function sendTestEmailAction(input: {
     text,
     html: content.bodyHtml
       ? interpolate(
-          content.bodyHtml,
+          dropBlankTokenLines(
+            content.bodyHtml,
+            htmlVars ? { ...vars, ...htmlVars } : vars,
+          ),
           htmlVars ? { ...vars, ...htmlVars } : vars,
         )
       : undefined,
