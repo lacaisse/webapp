@@ -2556,7 +2556,8 @@
       "address": "Dirección",
       "postalCode": "Código postal",
       "city": "Ciudad",
-      "tier": "Nivel de asignación"
+      "tier": "Nivel de asignación",
+      "contributionAmount": "Importe que deseas aportar"
     }
   },
   "cards": {

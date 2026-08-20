@@ -2556,7 +2556,8 @@
       "address": "Address",
       "postalCode": "Postcode",
       "city": "City",
-      "tier": "Allocation tier"
+      "tier": "Allocation tier",
+      "contributionAmount": "Amount you wish to contribute"
     }
   },
   "cards": {

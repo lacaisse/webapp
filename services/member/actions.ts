@@ -167,6 +167,23 @@ export async function signupMemberAction(input: {
     filtered[field.key] = normalizeExtra(value!);
   }
 
+  // The commitment amount can arrive two ways: the legacy hardcoded input
+  // (parsed.data, gated above) or the admin-configured builtin field
+  // (issue #179 — lands in builtinColumns like every other builtin). The
+  // builtin answer honours the same FIXED_PERIOD-with-tiers gate: a fund
+  // that keeps the field configured after dropping tiers shouldn't store a
+  // meaningless value.
+  if (
+    builtinColumns.contributionAmount !== undefined &&
+    !contributionApplies(fund.allocationMode, liveTiers.length)
+  ) {
+    delete builtinColumns.contributionAmount;
+  }
+  const effectiveContribution =
+    typeof builtinColumns.contributionAmount === "string"
+      ? builtinColumns.contributionAmount
+      : contributionAmount;
+
   // A committed amount below the chosen tier's floor blocks the signup
   // (issue #158) — same rule the admin/member edit paths already enforce.
   // Only checkable when the fund's form collects a tier (builtin tierId,
@@ -177,10 +194,10 @@ export async function signupMemberAction(input: {
       ? liveTiers.find((tier) => tier.id === builtinColumns.tierId)
       : undefined;
   if (
-    contributionAmount !== null &&
+    effectiveContribution !== null &&
     chosenTier &&
     isBelowTierMinimum(
-      Number(contributionAmount),
+      Number(effectiveContribution),
       Number(chosenTier.minContribution),
     )
   ) {

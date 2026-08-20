@@ -10,12 +10,13 @@ import {
 } from "./builtin-fields";
 
 describe("the built-in registry", () => {
-  it("covers the postal address parts plus the tier picker", () => {
+  it("covers the postal address parts, the tier picker and the commitment amount", () => {
     expect(MEMBER_BUILTIN_FIELDS.map((f) => f.key)).toEqual([
       "address",
       "postalCode",
       "city",
       "tierId",
+      "contributionAmount",
     ]);
   });
 
@@ -28,7 +29,7 @@ describe("the built-in registry", () => {
   });
 
   it("excludes admin-internal and auto-captured columns", () => {
-    for (const key of ["notes", "locale", "contributionAmount"]) {
+    for (const key of ["notes", "locale"]) {
       expect(isMemberBuiltinKey(key)).toBe(false);
     }
   });
@@ -40,9 +41,16 @@ describe("the built-in registry", () => {
     expect(getBuiltinField("nope")).toBeNull();
   });
 
-  it("pins the address parts to free text and the tier picker to a select", () => {
+  it("pins each attribute to its column's input type", () => {
+    const expected: Record<string, string> = {
+      address: "TEXT",
+      postalCode: "TEXT",
+      city: "TEXT",
+      tierId: "SELECT",
+      contributionAmount: "NUMBER",
+    };
     for (const f of MEMBER_BUILTIN_FIELDS) {
-      expect(f.type).toBe(f.key === "tierId" ? "SELECT" : "TEXT");
+      expect(f.type).toBe(expected[f.key]);
     }
   });
 
@@ -89,6 +97,31 @@ describe("coerceBuiltinValue", () => {
     // than be stringified into a street name.
     expect(coerceBuiltinValue("address", true).ok).toBe(false);
     expect(coerceBuiltinValue("address", ["a", "b"]).ok).toBe(false);
+  });
+
+  it("holds the commitment amount to the money shape (issue #179)", () => {
+    // Same rule as the legacy OptionalMoney input: digits with up to two
+    // decimals, feeding a Decimal(10,2) column.
+    expect(coerceBuiltinValue("contributionAmount", "50")).toEqual({
+      ok: true,
+      value: "50",
+    });
+    expect(coerceBuiltinValue("contributionAmount", " 50.5 ")).toEqual({
+      ok: true,
+      value: "50.5",
+    });
+    expect(coerceBuiltinValue("contributionAmount", "50.50")).toEqual({
+      ok: true,
+      value: "50.50",
+    });
+    expect(coerceBuiltinValue("contributionAmount", "")).toEqual({
+      ok: true,
+      value: null,
+    });
+    expect(coerceBuiltinValue("contributionAmount", "abc").ok).toBe(false);
+    expect(coerceBuiltinValue("contributionAmount", "50.123").ok).toBe(false);
+    expect(coerceBuiltinValue("contributionAmount", "-5").ok).toBe(false);
+    expect(coerceBuiltinValue("contributionAmount", "1,5").ok).toBe(false);
   });
 
   it("rejects a key that is no longer (or never was) a built-in", () => {

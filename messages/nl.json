@@ -2556,7 +2556,8 @@
       "address": "Adres",
       "postalCode": "Postcode",
       "city": "Stad",
-      "tier": "Toewijzingsniveau"
+      "tier": "Toewijzingsniveau",
+      "contributionAmount": "Bedrag dat u wilt bijdragen"
     }
   },
   "cards": {

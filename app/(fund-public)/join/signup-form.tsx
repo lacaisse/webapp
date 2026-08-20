@@ -90,17 +90,25 @@ export function SignupForm({
     () =>
       SignupFormSchema.extend({ extras: buildExtrasSchema(allFields) }).superRefine(
         (data, ctx) => {
-          const tierId = (data.extras as Record<string, unknown> | undefined)
-            ?.tierId;
+          const extras = data.extras as Record<string, unknown> | undefined;
+          const tierId = extras?.tierId;
           if (typeof tierId !== "string" || !tierId) return;
           const min = tierMinimums[tierId];
           if (min == null) return;
-          const amount = Number(data.contributionAmount);
-          if (!data.contributionAmount || Number.isNaN(amount)) return;
+          // The amount lives either on the legacy hardcoded input or on the
+          // admin-configured builtin field (issue #179) — never both.
+          const fromExtras = extras?.contributionAmount;
+          const raw =
+            data.contributionAmount ||
+            (typeof fromExtras === "string" ? fromExtras : "");
+          const amount = Number(raw);
+          if (!raw || Number.isNaN(amount)) return;
           if (amount < min) {
             ctx.addIssue({
               code: "custom",
-              path: ["contributionAmount"],
+              path: data.contributionAmount
+                ? ["contributionAmount"]
+                : ["extras", "contributionAmount"],
               message: tRoot(
                 "members.signup.errors.amountBelowTierMin" as never,
                 { min } as never,
@@ -205,11 +213,29 @@ export function SignupForm({
           return;
         }
         if (result.field) {
-          form.setError(result.field, { message: result.error });
+          // The commitment amount renders either as the legacy hardcoded
+          // input (last page) or as the admin-configured builtin field
+          // (issue #179, wherever the admin placed it) — map the server's
+          // field name to whichever exists on this form.
+          const isBuiltinContribution =
+            result.field === "contributionAmount" && !showContribution;
+          form.setError(
+            isBuiltinContribution
+              ? ("extras.contributionAmount" as never)
+              : result.field,
+            { message: result.error },
+          );
           // Send the visitor to the page that renders the offending input:
-          // identity fields all live on page 1, the commitment amount on the
-          // last page.
-          const target = result.field === "contributionAmount" ? lastIndex : 0;
+          // identity fields all live on page 1.
+          const builtinStep = steps.findIndex((s) =>
+            s.fields.some((f) => f.key === "contributionAmount"),
+          );
+          const target =
+            result.field === "contributionAmount"
+              ? isBuiltinContribution && builtinStep !== -1
+                ? builtinStep
+                : lastIndex
+              : 0;
           if (step !== target) goToStep(target);
         } else {
           form.setError("root", { message: result.error });
