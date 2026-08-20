@@ -561,7 +561,9 @@ export type UnattachedCardHit = {
 // (memberId is null) in the current fund matching the query against the serial
 // number / UID (case-insensitive contains), the per-fund card number (exact,
 // when the term is all digits), or the source account address (case-insensitive
-// contains) — admin picks one to link instead of free-typing a serial. With an
+// contains) — admin picks one to link instead of free-typing a serial. Excludes
+// BLOCKED cards and any card reported lost (#189) — those shouldn't be handed
+// to a new member even if CitizenPay hasn't flipped the status yet. With an
 // empty query we surface cards in card-number order so the operator can scroll a
 // predictable list if they don't have the card in hand. Kept well above typical
 // fund inventory size so the empty-query list isn't truncated mid-range (#69).
@@ -578,6 +580,8 @@ export async function searchUnattachedCardsAction(
   const where = {
     fundId: fund.id,
     memberId: null,
+    status: { not: "BLOCKED" as const },
+    reportedLostAt: null,
     ...(term.length > 0
       ? {
           OR: [

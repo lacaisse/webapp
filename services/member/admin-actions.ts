@@ -84,6 +84,8 @@ export async function activateMemberAction(input: {
       number: true,
       account: true,
       memberId: true,
+      status: true,
+      reportedLostAt: true,
     },
   });
   if (!card) {
@@ -91,6 +93,9 @@ export async function activateMemberAction(input: {
   }
   if (card.memberId) {
     return { error: t("members.admin.errors.cardTaken" as never) };
+  }
+  if (card.status === "BLOCKED" || card.reportedLostAt) {
+    return { error: t("members.admin.errors.cardBlockedOrLost" as never) };
   }
 
   // Look up an existing PENDING referral where this member is the referee.

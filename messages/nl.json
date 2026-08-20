@@ -2368,6 +2368,7 @@
         "cardRequired": "Kies een kaart om te activeren.",
         "cardNotFound": "Die kaart is niet meer beschikbaar.",
         "cardTaken": "Die kaart is zojuist aan een ander lid gekoppeld.",
+        "cardBlockedOrLost": "Die kaart is geblokkeerd of gemeld als verloren en kan niet worden toegewezen.",
         "tierNotFound": "Niveau niet gevonden of gearchiveerd.",
         "invalidStatusTransition": "Deze statuswijziging is niet toegestaan vanuit de huidige status."
       },
