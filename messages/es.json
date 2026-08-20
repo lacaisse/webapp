@@ -2232,6 +2232,7 @@
         "emailInvalid": "Introduce una dirección de correo electrónico válida.",
         "emailTaken": "Ya existe una solicitud con este correo electrónico para este fondo.",
         "amountInvalid": "Introduce un importe válido (hasta 2 decimales).",
+        "amountBelowTierMin": "Para el nivel de asignación elegido, la cotización mínima es de {min} €.",
         "fieldRequired": "{label} es obligatorio.",
         "generic": "Algo salió mal. Inténtalo de nuevo.",
         "required": "Este campo es obligatorio.",
