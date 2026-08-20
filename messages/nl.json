@@ -1,6 +1,8 @@
 {
   "common": {
     "or": "of",
+    "yes": "Ja",
+    "no": "Nee",
     "cancel": "Annuleren",
     "close": "Sluiten",
     "save": "Opslaan",
@@ -1108,7 +1110,8 @@
       "tabs": {
         "drafts": "Concepten",
         "pending": "In afwachting",
-        "completed": "Afgehandeld"
+        "completed": "Afgehandeld",
+        "export": "Export"
       },
       "settlement": {
         "place": "Handelaar",
@@ -1116,11 +1119,13 @@
         "orderCount": "Bestellingen",
         "total": "Totaal",
         "fees": "Kosten",
+        "processorFees": "Verwerkerskosten",
+        "platformFee": "Platformkosten",
         "net": "Netto",
         "manualDeduction": "Handmatige inhouding",
         "placeBalance": "Saldo handelaar",
-        "placeBalanceEnough": "Genoeg om te verbranden",
-        "placeBalanceLow": "Lager dan het nettobedrag",
+        "placeBalanceEnough": "Genoeg om af te wikkelen",
+        "placeBalanceLow": "Lager dan wat de afwikkeling weghaalt",
         "status": "Status",
         "burnTx": "Burn-tx",
         "loadError": "Kon de uitbetalingen niet laden van CitizenPay. Probeer het zo opnieuw.",
@@ -1142,6 +1147,19 @@
           "burnt": "Verbrand",
           "complete": "Voltooid"
         },
+        "orderTypes": {
+          "app": "App",
+          "manual": "Handmatig",
+          "pos": "Kassa",
+          "terminal": "Terminal",
+          "web": "Web"
+        },
+        "orderStatuses": {
+          "paid": "Betaald",
+          "refund": "Terugbetaling",
+          "refunded": "Terugbetaald",
+          "correction": "Correctie"
+        },
         "signed": {
           "title": "Betaling ondertekend",
           "description": "Je bankoverschrijving is ondertekend.",
@@ -1157,7 +1175,7 @@
             "complete": "Voltooid"
           },
           "burn": {
-            "hint": "Verbrandt het nettobedrag van het account van de handelaar on-chain."
+            "hint": "Verbrandt het nettobedrag van de handelaar van diens rekening; de platformkosten en inhouding gaan naar het fonds."
           },
           "pay": {
             "hint": "Maakt de bankbetaling aan de handelaar aan; je ondertekent de overschrijving bij je bank.",
@@ -1210,10 +1228,13 @@
           "noMatches": "Geen overdrachten komen overeen met je zoekopdracht.",
           "unknownCounterpart": "Onbekende afzender",
           "amount": "Bedrag",
-          "fee": "Kosten",
+          "feeProcessor": "Verwerkerskosten",
+          "feeProcessorHint": "Aan de bron ingehouden door de betaalverwerker. Laat 0 staan bij een overboeking.",
+          "feePlatform": "Platformkosten",
+          "feePlatformHint": "Jouw deel, bij de afwikkeling van de rekening van de handelaar gehaald. Voorgesteld op basis van je tarief.",
           "descriptionLabel": "Omschrijving",
           "descriptionPlaceholder": "Waarvoor deze order is",
-          "net": "Netto",
+          "net": "Uitgegeven naar handelaar",
           "confirm": "Order toevoegen",
           "successMinted": "Bestelling toegevoegd en netto uitgegeven naar de plaats.",
           "mintFailed": "Bestelling toegevoegd, maar automatische uitgifte mislukt. Verwerk het via het tabblad Problemen."
@@ -1238,7 +1259,7 @@
           "trigger": "Inhouding toevoegen",
           "edit": "Inhouding bewerken",
           "title": "Handmatige inhouding",
-          "description": "Een boekhoudkundige aanpassing die het netto bedrag aan de handelaar verlaagt. Geen on-chain effect.",
+          "description": "Een boekhoudkundige aanpassing die het netto bedrag aan de handelaar verlaagt. Er beweegt nu niets — het bedrag verlaat de rekening van de handelaar samen met de platformkosten bij de afwikkeling.",
           "amount": "Inhoudingsbedrag",
           "amountHint": "Maximaal {max}. Voer 0 in om de inhouding te wissen.",
           "comment": "Opmerking",
@@ -1246,6 +1267,18 @@
           "net": "Netto na inhouding",
           "confirm": "Opslaan",
           "remove": "Verwijderen"
+        },
+        "editPeriod": {
+          "trigger": "Periode wijzigen",
+          "title": "Afrekenperiode",
+          "description": "Wijzig de periode die deze uitbetaling dekt. Dit past alleen het label aan — de bestellingen zijn al toegewezen en geen enkel bedrag verandert.",
+          "month": "Volledige maand",
+          "monthHint": "Kies een maand om beide datums met die kalendermaand te vullen.",
+          "from": "Van",
+          "to": "Tot (exclusief)",
+          "covers": "Dekt {from} tot (exclusief) {to}",
+          "ordersHint": "Bestellingen blijven ongewijzigd: de periode verbreden haalt geen bestellingen van buiten de uitbetaling binnen, ze blijven beschikbaar voor de volgende.",
+          "confirm": "Periode opslaan"
         },
         "pay": {
           "button": "Handelaar betalen",
@@ -1255,17 +1288,17 @@
         "burn": {
           "button": "Tokens verbranden",
           "title": "Token-uitbetaling verbranden?",
-          "description": "Dit verbrandt de on-chain tokens achter deze uitbetaling. Burn en bankbetaling staan los van elkaar — in willekeurige volgorde.",
+          "description": "Dit verbrandt de on-chain tokens achter het nettobedrag van de handelaar; de platformkosten en een eventuele inhouding gaan naar de fondsrekening. Burn en bankbetaling staan los van elkaar — in willekeurige volgorde.",
           "warning": "Dit is onomkeerbaar. De tokens voor deze uitbetaling worden permanent verbrand.",
           "confirm": "Tokens verbranden",
           "success": "Tokens verbrand. Transactiehash:",
-          "feeSwept": "Kosten overgemaakt naar de fondsrekening: {amount}",
-          "feeNotSwept": "Tokens verbrand, maar de kosten zijn nog niet overgemaakt."
+          "feeSwept": "Platformkosten en inhouding overgemaakt naar de fondsrekening: {amount}",
+          "feeNotSwept": "Tokens verbrand, maar de platformkosten zijn nog niet overgemaakt."
         },
         "feeTransfer": {
-          "pending": "De kosten van deze uitbetaling zijn nog niet overgemaakt.",
-          "button": "Kosten overmaken",
-          "done": "Kosten overgemaakt. Transactiehash:"
+          "pending": "De platformkosten en inhouding van deze uitbetaling zijn nog niet overgemaakt.",
+          "button": "Platformkosten overmaken",
+          "done": "Platformkosten overgemaakt. Transactiehash:"
         },
         "orders": {
           "title": "Bestellingen",
@@ -1364,7 +1397,7 @@
           "notBurnable": "Deze uitbetaling is niet meer in de verbrandstap (al verbrand of afgewikkeld).",
           "payoutNotFound": "Uitbetaling niet gevonden.",
           "deductionFailed": "Kon de inhouding niet opslaan. Probeer het zo opnieuw.",
-          "deductionTooHigh": "De inhouding mag niet hoger zijn dan totaal min kosten.",
+          "deductionTooHigh": "De inhouding mag niet hoger zijn dan totaal min verwerkerskosten en platformkosten.",
           "deductionNotPending": "De handmatige inhouding kan alleen worden gewijzigd zolang de uitbetaling in behandeling is.",
           "reportFailed": "Tokens on-chain verbrand, maar kon dit niet melden aan Citizen Pay. Niet opnieuw proberen — bewaar de transactiehash voor reconciliatie.",
           "noFeeDestination": "Geen bestemmingsrekening voor kosten. Verbind het fonds eerst met Citizen Pay.",
@@ -1388,8 +1421,71 @@
           "feeInvalid": "Voer geldige kosten in.",
           "amountPositive": "Het bedrag moet groter dan nul zijn.",
           "feeTooHigh": "De kosten mogen niet hoger zijn dan het bedrag.",
+          "payoutFeeInvalid": "Voer geldige platformkosten in.",
+          "feesTooHigh": "De verwerkerskosten en platformkosten samen mogen het bedrag niet overschrijden.",
           "descriptionTooLong": "De omschrijving is te lang.",
-          "completeFailed": "Kon de uitbetaling niet als voltooid markeren. Probeer het zo opnieuw."
+          "completeFailed": "Kon de uitbetaling niet als voltooid markeren. Probeer het zo opnieuw.",
+          "periodFailed": "Kon de afrekenperiode niet bijwerken. Probeer het opnieuw.",
+          "periodNotPending": "De periode kan alleen worden gewijzigd zolang de uitbetaling in behandeling is.",
+          "exportFailed": "Kon de export niet genereren. Probeer het zo opnieuw.",
+          "exportOrdersFailed": "Kon de transacties van een van de uitbetalingen niet laden. De export is niet gegenereerd — probeer het straks opnieuw.",
+          "exportOrdersTruncated": "Een van de uitbetalingen bevat te veel transacties om in één keer te exporteren. Verklein de periode en probeer opnieuw."
+        }
+      },
+      "export": {
+        "description": "Twee boekhoudkundige exports van de uitbetalingen aan handelaars voor de gekozen periode: het overzicht (één regel per uitbetaling) en het transactiedetail (één regel per bestelling in die uitbetalingen). UTF-8 met puntkomma, beide openen direct in Excel.",
+        "presets": {
+          "thisMonth": "Deze maand",
+          "lastMonth": "Vorige maand",
+          "thisQuarter": "Dit kwartaal",
+          "lastQuarter": "Vorig kwartaal",
+          "thisYear": "Dit jaar",
+          "lastYear": "Vorig jaar"
+        },
+        "from": "Van",
+        "to": "Tot",
+        "downloadRecap": "Overzicht (CSV)",
+        "downloadDetail": "Transactiedetail (CSV)",
+        "rangeInvalid": "De begindatum moet vóór de einddatum liggen.",
+        "summary": "{count, plural, =0 {Geen uitbetalingen in deze periode.} one {1 uitbetaling in deze periode, {net} netto.} other {# uitbetalingen in deze periode, {net} netto.}}",
+        "byMerchant": "Per handelaar",
+        "payoutCount": "Uitbetalingen",
+        "empty": "Geen uitbetalingen in deze periode.",
+        "columnsHint": "Kolommen in het bestand: {columns}.",
+        "recapHint": "één regel per uitbetaling aan een handelaar.",
+        "detailHint": "één regel per transactie in die uitbetalingen, met de herkomst ervan.",
+        "columns": {
+          "periodStart": "Begin periode",
+          "periodEnd": "Einde periode (inclusief)",
+          "merchant": "Handelaar",
+          "business": "Onderneming",
+          "gross": "Brutobedrag",
+          "processorFees": "Verwerkerskosten",
+          "platformFee": "Platformkosten",
+          "manualDeduction": "Manuele aftrek",
+          "deductionComment": "Reden van de aftrek",
+          "net": "Netto uitbetaald",
+          "status": "Status",
+          "createdAt": "Aangemaakt op (UTC)",
+          "reference": "Referentie"
+        },
+        "orderColumns": {
+          "periodStart": "Begin periode",
+          "periodEnd": "Einde periode (inclusief)",
+          "merchant": "Handelaar",
+          "business": "Onderneming",
+          "reference": "Referentie uitbetaling",
+          "payoutStatus": "Status uitbetaling",
+          "orderId": "Transactie-ID",
+          "orderDate": "Transactiedatum (UTC)",
+          "source": "Herkomst",
+          "gross": "Brutobedrag",
+          "processorFees": "Verwerkerskosten",
+          "platformFeeShare": "Aandeel platformkosten",
+          "netCredit": "Netto gecrediteerd",
+          "orderStatus": "Status transactie",
+          "description": "Omschrijving",
+          "txHash": "Transactiehash"
         }
       },
       "admin": {
@@ -1494,7 +1590,8 @@
         "citizenpay": "Citizen Pay",
         "fees": "Kosten",
         "emails": "E-mails",
-        "documents": "Documenten"
+        "documents": "Documenten",
+        "embeds": "Widgets"
       },
       "general": {
         "title": "Algemeen",
@@ -1613,6 +1710,10 @@
             "builtinCustom": "Aangepaste vraag",
             "builtinHint": "Een gegeven uit de ledenfiche wordt in zijn eigen kolom bewaard en voedt zo brieven, herinneringen en niveautoewijzing. Een aangepaste vraag wordt apart bij de aanvraag bewaard.",
             "builtinLocked": "Wordt in de ledenfiche bewaard ({key}). Het invoertype ligt vast; label, hulptekst, verplichting en positie kun je wel aanpassen.",
+            "shadowTitle": "Het veld van de ledenfiche gebruiken?",
+            "shadowBody": "Kies “{label}” zodat het antwoord op de ledenfiche wordt bewaard. Een aangepaste vraag blijft prima als u echt iets anders vraagt.",
+            "shadowUseBuiltin": "“{label}” gebruiken",
+            "shadowKeepCustom": "Toch een aangepaste vraag maken",
             "visibleIf": {
               "label": "Alleen tonen als",
               "none": "Altijd zichtbaar",
@@ -1746,6 +1847,10 @@
         "description": "Commissie op betalingen aan handelaren. Hier ingesteld en vervolgens naar Citizen Pay gestuurd.",
         "rate": "Kostentarief (%)",
         "rateHint": "Percentage dat op elke betaling wordt ingehouden (bijv. 2,5 voor 2,5%). Laat leeg om het standaardtarief van Citizen Pay te gebruiken.",
+        "frequency": "Inningsfrequentie",
+        "frequencyHint": "Bij elke betaling, of één keer aan het einde van de maand. De inning zelf gebeurt door Citizen Pay.",
+        "frequencyPerPayment": "Bij elke betaling",
+        "frequencyMonthly": "Maandelijks (einde van de maand)",
         "syncPending": "Lokaal opgeslagen, maar nog niet bevestigd door Citizen Pay. Sla opnieuw op om de synchronisatie te herhalen.",
         "syncFailed": "Tarief opgeslagen, maar de synchronisatie met Citizen Pay is mislukt. Sla opnieuw op om opnieuw te proberen."
       },
@@ -1913,6 +2018,52 @@
           "bodyTooLong": "De brieftekst is te lang.",
           "unknownVariable": "Onbekende plaatshouder \"{name}\". Verwijder hem of gebruik een van de vermelde variabelen."
         }
+      },
+      "embeds": {
+        "domains": {
+          "title": "Toegestane domeinen",
+          "description": "De websites die je widgets mogen insluiten. Browsers weigeren ze ergens anders te tonen.",
+          "label": "Eén domein per regel",
+          "help": "Maximaal {max} domeinen. Gebruik *.voorbeeld.org om alle subdomeinen toe te staan, en vermeld de poort bij lokale tests (localhost:3000).",
+          "emptyWarning": "Geen domeinen ingesteld — je widgets verschijnen op geen enkele website totdat je er een toevoegt.",
+          "saved": "Toegestane domeinen opgeslagen.",
+          "save": "Opslaan",
+          "saving": "Opslaan…"
+        },
+        "accounts": {
+          "title": "Rekeningwidget",
+          "description": "Publiceer het saldo en de recente activiteit van een rekening. Het rekeningadres en de transactiedetails worden nooit getoond.",
+          "none": "Nog geen rekeningen.",
+          "enable": "Inschakelen",
+          "disable": "Uitschakelen",
+          "rotate": "Nieuwe link",
+          "cancel": "Annuleren",
+          "snippetLabel": "Plak dit in je website",
+          "disableConfirm": {
+            "title": "Deze widget uitschakelen?",
+            "body": "Hij laadt niet meer op alle websites waar hij nu is ingesloten. Je kunt hem later opnieuw inschakelen, maar dan met een nieuwe link om te plakken."
+          },
+          "rotateConfirm": {
+            "title": "Een nieuwe link genereren?",
+            "body": "De huidige link werkt onmiddellijk niet meer. Overal waar deze widget al is ingesloten laadt hij niet meer totdat je de nieuwe code plakt."
+          },
+          "errors": {
+            "invalid": "Ongeldige aanvraag.",
+            "notFound": "Die rekening bestaat niet meer."
+          }
+        },
+        "merchants": {
+          "title": "Handelaarswidgets",
+          "description": "Je openbare handelaarsgids, als lijst of op een kaart. Alleen handelaars die als openbaar zichtbaar zijn gemarkeerd verschijnen.",
+          "listTitle": "Handelaars",
+          "mapTitle": "Handelaarskaart",
+          "listSnippetLabel": "Handelaarslijst",
+          "mapSnippetLabel": "Handelaarskaart"
+        },
+        "preview": {
+          "show": "Voorbeeld",
+          "hide": "Voorbeeld verbergen"
+        }
       }
     }
   },
@@ -1936,6 +2087,7 @@
       "notFound": "Veld niet gevonden.",
       "builtinInvalid": "Dat lidgegeven is niet bekend.",
       "builtinTaken": "Dat gegeven wordt al gevraagd op dit formulier (controleer ook gearchiveerde velden).",
+      "keyShadowsBuiltin": "“{key}” is de naam van een veld op de ledenfiche. Opgeslagen als aangepaste vraag voedt het antwoord noch het adres van het lid, noch de brieven, noch de niveautoewijzing.",
       "visibleIfInvalid": "Die zichtbaarheidsvoorwaarde is ongeldig — controleer het veld waarvan ze afhangt.",
       "visibleIfValueRequired": "Vul een waarde in voor de zichtbaarheidsvoorwaarde."
     }
@@ -1966,7 +2118,9 @@
       "feeInvalid": "Kostentarief moet een getal met maximaal 2 decimalen zijn.",
       "feeTooHigh": "Kostentarief mag niet hoger zijn dan 100%.",
       "cutoffDayInvalid": "Afkapdag moet een geheel getal tussen 1 en 31 zijn.",
-      "nameTooLong": "De naam is te lang."
+      "nameTooLong": "De naam is te lang.",
+      "embedDomainInvalid": "Voer één domein per regel in (voorbeeld.org, *.voorbeeld.org, localhost:3000).",
+      "embedDomainsTooMany": "Te veel domeinen — verwijder er een paar."
     }
   },
   "team": {
@@ -3528,6 +3682,31 @@
         "noChain": "Geen tokenketen geconfigureerd voor deze caisse.",
         "inconclusive": "De bundler was niet bereikbaar. Er is niets gewijzigd — probeer opnieuw."
       }
+    }
+  },
+  "embed": {
+    "account": {
+      "balanceLabel": "Saldo",
+      "recentActivity": "Recente activiteit",
+      "empty": "Nog geen activiteit.",
+      "unavailable": "Activiteit is tijdelijk niet beschikbaar.",
+      "in": "ontvangen",
+      "out": "verzonden",
+      "kinds": {
+        "mint": "Uitgifte",
+        "burn": "Inwisseling",
+        "transfer": "Overdracht"
+      }
+    },
+    "merchants": {
+      "title": "Waar je kunt betalen",
+      "empty": "Nog geen handelaars.",
+      "website": "Website bezoeken",
+      "conditions": "Voorwaarden"
+    },
+    "map": {
+      "empty": "Nog geen handelaarslocaties om te tonen.",
+      "loading": "Kaart laden…"
     }
   }
 }

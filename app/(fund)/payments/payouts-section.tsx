@@ -28,6 +28,11 @@ type Creds = {
   citizenPayApiKeyEnc: string | null;
 };
 
+type Formatter = Awaited<ReturnType<typeof getFormatter>>;
+type Translations = Awaited<
+  ReturnType<typeof getTranslations<"fund.payments.settlement">>
+>;
+
 // =============================================================================
 // Drafts — unpaid orders grouped by place, ready to roll into a payout
 // =============================================================================
@@ -59,14 +64,14 @@ export async function DraftsView({
             <TableHead>{t("place")}</TableHead>
             <TableHead className="text-right">{t("orderCount")}</TableHead>
             <TableHead className="text-right">{t("total")}</TableHead>
-            <TableHead className="text-right">{t("fees")}</TableHead>
+            <FeeHeads t={t} />
             <TableHead className="text-right">{t("net")}</TableHead>
             <TableHead />
           </TableRow>
         </TableHeader>
         <TableBody>
           {drafts.length === 0 ? (
-            <TableEmpty colSpan={6}>{t("drafts.empty")}</TableEmpty>
+            <TableEmpty colSpan={7}>{t("drafts.empty")}</TableEmpty>
           ) : (
             drafts.map((d) => (
               <TableRow key={d.placeId}>
@@ -79,9 +84,11 @@ export async function DraftsView({
                 <TableCell className="text-right text-sm text-muted-foreground">
                   {euro(format, d.total)}
                 </TableCell>
-                <TableCell className="text-right text-sm text-muted-foreground">
-                  {euro(format, d.fees)}
-                </TableCell>
+                <FeeCells
+                  format={format}
+                  fees={d.fees}
+                  payoutFees={d.payoutFees}
+                />
                 <TableCell className="text-right font-medium">
                   {euro(format, d.net)}
                 </TableCell>
@@ -130,14 +137,15 @@ export async function PendingPayoutsView({
           <TableRow>
             <TableHead>{t("period")}</TableHead>
             <TableHead>{t("place")}</TableHead>
-            <TableHead className="text-right">{t("fees")}</TableHead>
+            <TableHead className="text-right">{t("total")}</TableHead>
+            <FeeHeads t={t} />
             <TableHead className="text-right">{t("net")}</TableHead>
             <TableHead />
           </TableRow>
         </TableHeader>
         <TableBody>
           {payouts.length === 0 ? (
-            <TableEmpty colSpan={5}>{t("pending.empty")}</TableEmpty>
+            <TableEmpty colSpan={7}>{t("pending.empty")}</TableEmpty>
           ) : (
             payouts.map((p) => (
               <TableRow key={p.id}>
@@ -148,8 +156,13 @@ export async function PendingPayoutsView({
                   <PlaceCell name={p.placeName} image={p.placeImage} />
                 </TableCell>
                 <TableCell className="text-right text-sm text-muted-foreground">
-                  {euro(format, p.totalFees)}
+                  {euro(format, p.totalAmount)}
                 </TableCell>
+                <FeeCells
+                  format={format}
+                  fees={p.totalFees}
+                  payoutFees={p.totalPayoutFees}
+                />
                 <TableCell className="text-right font-medium">
                   {euro(format, p.net)}
                 </TableCell>
@@ -198,14 +211,14 @@ export async function CompletedPayoutsView({
             <TableHead>{t("period")}</TableHead>
             <TableHead>{t("place")}</TableHead>
             <TableHead className="text-right">{t("total")}</TableHead>
-            <TableHead className="text-right">{t("fees")}</TableHead>
+            <FeeHeads t={t} />
             <TableHead className="text-right">{t("net")}</TableHead>
             <TableHead />
           </TableRow>
         </TableHeader>
         <TableBody>
           {payouts.length === 0 ? (
-            <TableEmpty colSpan={6}>{t("completed.empty")}</TableEmpty>
+            <TableEmpty colSpan={7}>{t("completed.empty")}</TableEmpty>
           ) : (
             payouts.map((p) => (
               <TableRow key={p.id}>
@@ -218,9 +231,11 @@ export async function CompletedPayoutsView({
                 <TableCell className="text-right text-sm text-muted-foreground">
                   {euro(format, p.totalAmount)}
                 </TableCell>
-                <TableCell className="text-right text-sm text-muted-foreground">
-                  {euro(format, p.totalFees)}
-                </TableCell>
+                <FeeCells
+                  format={format}
+                  fees={p.totalFees}
+                  payoutFees={p.totalPayoutFees}
+                />
                 <TableCell className="text-right font-medium">
                   {euro(format, p.net)}
                 </TableCell>
@@ -249,6 +264,47 @@ async function DetailsLink({ payoutId }: { payoutId: string }) {
     >
       {t("details")}
     </Link>
+  );
+}
+
+// The two fee columns, shared by all three tables so they stay aligned.
+//
+// They are NOT the same money: `fees` is the payment processor's commission,
+// withheld before the place's wallet was ever credited, while `payoutFees` is
+// the platform's own cut, which sits in that wallet until the settlement sweep
+// takes it. Only the second is ours. Rendered small and muted — the Total → Net
+// pair is what an operator scans, the split is the explanation.
+function FeeHeads({ t }: { t: Translations }) {
+  return (
+    <>
+      <TableHead className="text-right text-xs font-normal">
+        {t("processorFees")}
+      </TableHead>
+      <TableHead className="text-right text-xs font-normal">
+        {t("platformFee")}
+      </TableHead>
+    </>
+  );
+}
+
+function FeeCells({
+  format,
+  fees,
+  payoutFees,
+}: {
+  format: Formatter;
+  fees: string;
+  payoutFees: string;
+}) {
+  return (
+    <>
+      <TableCell className="text-right text-xs text-muted-foreground tabular-nums">
+        {euro(format, fees)}
+      </TableCell>
+      <TableCell className="text-right text-xs text-muted-foreground tabular-nums">
+        {euro(format, payoutFees)}
+      </TableCell>
+    </>
   );
 }
 

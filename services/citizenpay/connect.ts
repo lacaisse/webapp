@@ -4,6 +4,7 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 
 import { encryptSecret } from "@/services/crypto/secret";
+import type { FeeCollectionFrequency } from "@/services/db/generated/enums";
 import { prisma } from "@/services/db/prisma";
 import { getFundUrl } from "@/services/fund/server";
 import { deriveSmartAccountAddress } from "@/services/token/smart-account";
@@ -43,6 +44,10 @@ const CP_PICKUP_PATH = "/v2/treasury/register/pickup";
 
 // Match CP's spec ("State lifetime: 30 min").
 const STATE_TTL_MS = 30 * 60 * 1000;
+
+// Schema default for `Fund.feeCollectionFrequency`. The column is never null,
+// so "still the default" is the closest thing to "never configured here".
+const DEFAULT_FEE_FREQUENCY: FeeCollectionFrequency = "PER_PAYMENT";
 
 export class ConnectError extends Error {
   constructor(
@@ -140,15 +145,25 @@ export async function consumeConnect(args: {
   // create-time). Re-derive on every (re)connect so a treasury that
   // changes factory address rolls the SA forward in the same write.
   let smartAccountAddress: string | null = null;
-  // Fee reconciliation against CP's echo. The fee is canonical here, so we
-  // never clobber a locally-set value — we only use CP's reported value to
-  // confirm the sync landed or to seed a first value.
-  let feeWrite: { payoutFeePercentage?: string; payoutFeeSynced: boolean } | null =
-    null;
+  // Fee reconciliation against CP's echo — rate AND collection cadence, the
+  // pair we push together in one PATCH. Both are canonical here, so we never
+  // clobber a locally-set value — we only use CP's reported values to confirm
+  // the sync landed or to seed a first value. `payoutFeeSynced` covers both.
+  let feeWrite:
+    | {
+        payoutFeePercentage?: string;
+        feeCollectionFrequency?: FeeCollectionFrequency;
+        payoutFeeSynced: boolean;
+      }
+    | null = null;
   if (tokenInfo) {
     const fundRow = await prisma.fund.findUnique({
       where: { id: row.fundId },
-      select: { tokenMinterEoaAddress: true, payoutFeePercentage: true },
+      select: {
+        tokenMinterEoaAddress: true,
+        payoutFeePercentage: true,
+        feeCollectionFrequency: true,
+      },
     });
 
     if (tokenInfo.citizenPayAccountFactoryAddress && fundRow?.tokenMinterEoaAddress) {
@@ -160,20 +175,40 @@ export async function consumeConnect(args: {
 
     const localFee = fundRow?.payoutFeePercentage ?? null;
     const cpFee = tokenInfo.payoutFeePercentage;
+    let seededFee: string | undefined;
+    let rateSynced: boolean;
     if (localFee == null) {
       // No local value yet — adopt CP's as the seed (if any). Either way
       // there's nothing pending locally, so we're in sync.
-      feeWrite =
-        cpFee != null
-          ? { payoutFeePercentage: cpFee, payoutFeeSynced: true }
-          : { payoutFeeSynced: true };
+      if (cpFee != null) seededFee = cpFee;
+      rateSynced = true;
     } else {
       // Local value wins. CP echoing the same number confirms our push
       // landed; anything else means CP is stale → flag for a re-push.
-      feeWrite = {
-        payoutFeeSynced: cpFee != null && Number(cpFee) === Number(localFee),
-      };
+      rateSynced = cpFee != null && Number(cpFee) === Number(localFee);
     }
+
+    // Same story for the cadence, except the column is never null — it has a
+    // default. So "still the default" stands in for "never configured here",
+    // and only then do we adopt CP's value.
+    const localFrequency = fundRow?.feeCollectionFrequency ?? DEFAULT_FEE_FREQUENCY;
+    const cpFrequency = tokenInfo.feeCollectionFrequency;
+    let seededFrequency: FeeCollectionFrequency | undefined;
+    if (localFrequency === DEFAULT_FEE_FREQUENCY && cpFrequency != null) {
+      seededFrequency = cpFrequency;
+    }
+    // CP staying silent about the cadence can't confirm anything — and won't
+    // until the assumed PATCH/GET contract ships — so it must not flip an
+    // otherwise-synced fund to "pending". Only a cadence CP reports and that
+    // disagrees with ours means CP is stale.
+    const effectiveFrequency = seededFrequency ?? localFrequency;
+    const frequencySynced = cpFrequency == null || cpFrequency === effectiveFrequency;
+
+    feeWrite = {
+      ...(seededFee != null && { payoutFeePercentage: seededFee }),
+      ...(seededFrequency != null && { feeCollectionFrequency: seededFrequency }),
+      payoutFeeSynced: rateSynced && frequencySynced,
+    };
   }
 
   const now = new Date();

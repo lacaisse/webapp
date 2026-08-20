@@ -66,6 +66,25 @@ export function isMemberBuiltinKey(key: string): key is MemberBuiltinKey {
   return BY_KEY.has(key as MemberBuiltinKey);
 }
 
+// Does an admin-typed CUSTOM key collide with a built-in attribute's name?
+// Case-insensitive on purpose: the create-time key rule is lowercase-only, so
+// a fund reaching for the address ends up typing `postalcode`, which is NOT
+// `postalCode` and therefore silently becomes an ordinary custom question —
+// its answers land in `applicationData` while Member.postalCode stays NULL,
+// and the profile header plus the {address} placeholder on card-assigned
+// emails render blank. That is issue #178.
+//
+// Returns the built-in it shadows, so the caller can offer that instead.
+// Advisory only: a fund is still allowed to ask its own question under such a
+// name (see createOnboardingFieldAction's confirm flow) — some genuinely mean
+// a different thing by "city".
+export function findShadowedBuiltinKey(key: string): MemberBuiltinKey | null {
+  const needle = key.trim().toLowerCase();
+  if (!needle) return null;
+  const hit = MEMBER_BUILTIN_FIELDS.find((f) => f.key.toLowerCase() === needle);
+  return hit ? hit.key : null;
+}
+
 // Matches the bound EditMemberProfileSchema enforces for the admin-side edit,
 // so a member can't arrive through signup in a state the admin form would
 // reject.

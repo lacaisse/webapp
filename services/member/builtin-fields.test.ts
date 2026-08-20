@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   coerceBuiltinValue,
+  findShadowedBuiltinKey,
   getBuiltinField,
   isMemberBuiltinKey,
   MEMBER_BUILTIN_FIELDS,
@@ -102,5 +103,35 @@ describe("coerceBuiltinValue", () => {
     });
     expect(coerceBuiltinValue("tierId", "")).toEqual({ ok: true, value: null });
     expect(coerceBuiltinValue("tierId", ["a"]).ok).toBe(false);
+  });
+});
+
+describe("findShadowedBuiltinKey", () => {
+  it("catches the lowercase spelling the key rule forces admins into", () => {
+    // The create-time key rule is /^[a-z][a-z0-9_]*$/, so an admin reaching
+    // for the postcode types `postalcode` — which is NOT the built-in
+    // `postalCode`. This is exactly how issue #178 happened.
+    expect(findShadowedBuiltinKey("postalcode")).toBe("postalCode");
+    expect(findShadowedBuiltinKey("POSTALCODE")).toBe("postalCode");
+  });
+
+  it("catches exact matches on every registry attribute", () => {
+    for (const f of MEMBER_BUILTIN_FIELDS) {
+      expect(findShadowedBuiltinKey(f.key)).toBe(f.key);
+    }
+  });
+
+  it("ignores surrounding whitespace, like the dialog's trimmed key", () => {
+    expect(findShadowedBuiltinKey("  city  ")).toBe("city");
+  });
+
+  it("leaves genuinely custom keys alone", () => {
+    expect(findShadowedBuiltinKey("householdAdults")).toBeNull();
+    expect(findShadowedBuiltinKey("allocation")).toBeNull();
+    // Near-misses must not trip it — these really are different questions.
+    expect(findShadowedBuiltinKey("address_2")).toBeNull();
+    expect(findShadowedBuiltinKey("billing_city")).toBeNull();
+    expect(findShadowedBuiltinKey("")).toBeNull();
+    expect(findShadowedBuiltinKey("   ")).toBeNull();
   });
 });

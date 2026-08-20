@@ -199,7 +199,8 @@ export type ListCardsResult = {
 };
 
 // Result of reporting a payout burn to CP. The burn itself succeeded (a failure
-// throws). The sweep of the retained cut (fees + manualDeduction) is decoupled:
+// throws). The sweep of the retained cut (payoutFees + manualDeduction) is
+// decoupled:
 // `feeTransferTxHash` is set when it ran in the same call; `feeTransferPending`
 // is true when it still needs running (via `feeTransfer`), with the reason in
 // `feeTransferError`. All sweep fields are null/false when no destination was
@@ -244,9 +245,30 @@ export type PayoutStatusDetail = {
   feeTransferTxHash: string | null;
 };
 
+// =============================================================================
+// FEE SEMANTICS — two fee figures, two different pots of money
+// =============================================================================
+// Payout-shaped types below carry both, and they are NOT interchangeable:
+//
+//   • `fees` / `totalFees` — SOURCE-WITHHELD fees: the payment processor's
+//     commission (Viva, Stripe) deducted before the money reached us. The
+//     place's wallet was credited `total − fees`, so these tokens were never
+//     minted and are never swept. Purely informational on our side.
+//   • `payoutFees` / `totalPayoutFees` — PLATFORM fees charged at payout time
+//     (the fund's own % plus the Ponto/CP method fee). These WERE minted into
+//     the place's wallet and stay there until the fee sweep moves them to the
+//     treasury.
+//
+//   net = total − fees − payoutFees − manualDeduction
+//
+// `net` is computed by the API; it is both the burn amount and the SEPA
+// amount. The sweep moves `payoutFees + manualDeduction` — never `fees`.
+// Payouts predating the split report `payoutFees` as 0.
+
 // Normalised view of CP's `PayoutWire`. Cents-on-the-wire amounts are
 // surfaced as Decimal strings (EUR) so the UI formats them like every other
-// money value in the app. `net = totalAmount - totalFees - manualDeduction`.
+// money value in the app.
+// `net = totalAmount − totalFees − totalPayoutFees − manualDeduction`.
 export type Payout = {
   id: string;
   businessId: string;
@@ -258,7 +280,8 @@ export type Payout = {
   startDate: string; // ISO 8601 — start of the settlement period
   endDate: string; // ISO 8601 — end of the settlement period
   totalAmount: string; // Decimal string, EUR — gross tokens collected
-  totalFees: string; // Decimal string, EUR — platform fees
+  totalFees: string; // Decimal string, EUR — processor fees withheld at source
+  totalPayoutFees: string; // Decimal string, EUR — platform cut, swept at settlement
   manualDeduction: string; // Decimal string, EUR — admin adjustment
   manualDeductionComment: string | null;
   net: string; // Decimal string, EUR — what the merchant is paid
@@ -279,7 +302,7 @@ export type Payout = {
 };
 
 // A draft payout: paid/refunded orders for one place that aren't yet in a
-// payout. Computed, never stored. `net = total - fees`.
+// payout. Computed, never stored. `net = total − fees − payoutFees`.
 export type PayoutDraft = {
   businessId: string;
   placeId: string;
@@ -287,7 +310,8 @@ export type PayoutDraft = {
   placeImage: string | null;
   orderCount: number;
   total: string; // Decimal string, EUR
-  fees: string; // Decimal string, EUR
+  fees: string; // Decimal string, EUR — withheld at source
+  payoutFees: string; // Decimal string, EUR — platform cut at payout
   net: string; // Decimal string, EUR
 };
 
@@ -303,7 +327,8 @@ export type CreatedPayout = {
   status: "pending";
   orderCount: number;
   total: string; // Decimal string, EUR
-  fees: string; // Decimal string, EUR
+  fees: string; // Decimal string, EUR — withheld at source
+  payoutFees: string; // Decimal string, EUR — platform cut at payout
   net: string; // Decimal string, EUR
   startDate: string;
   endDate: string;
@@ -313,13 +338,24 @@ export type CreatedPayout = {
 export type PayoutOrder = {
   id: number;
   total: string; // Decimal string, EUR — the payer paid this
-  fees: string; // Decimal string, EUR
-  // What the place is owed for this order: total − fees. Computed locally —
-  // the wire `due` field means "amount still owed" (often 0) and is NOT this.
+  fees: string; // Decimal string, EUR — processor cut withheld at source
+  // This order's share of the platform cut. Unlike `fees` it WAS credited to
+  // the place's wallet — the payout-level sweep takes it back at settlement.
+  payoutFee: string; // Decimal string, EUR
+  // What landed in the place's wallet for this order: total − fees. Computed
+  // locally — the wire `due` field means "amount still owed" (often 0) and is
+  // NOT this. Correct for every connector: a processor withheld its cut before
+  // the credit, a bank-paid order withheld nothing (fees = 0).
   net: string; // Decimal string, EUR
   due: string; // Decimal string, EUR (wire passthrough)
   status: string; // paid | refund | refunded | correction | …
   type: string; // web | pos | terminal | …
+  // The payment processor that actually moved the money, lowercase as CP
+  // stores it (`viva`, `ponto`, `stripe`, …). Null when the order wasn't
+  // processor-handled (app, manual) *and* when the API predates the field —
+  // the two are indistinguishable on the wire, so treat null as "unknown
+  // source" and fall back to `type`.
+  processor: string | null;
   description: string | null;
   // Raw line-items array — shape is treasury/POS-specific, so kept opaque
   // and rendered defensively in the UI.
@@ -345,11 +381,13 @@ export type PayoutOrdersPage = {
   placeAccountAddress: string | null;
 };
 
-// Recomputed payout totals returned after archiving an order.
+// Recomputed payout totals returned after archiving an order (and by the
+// other contents-changing endpoints). `net = total − fees − payoutFees`.
 export type ArchivedPayout = {
   payoutId: string;
   total: string; // Decimal string, EUR
-  fees: string; // Decimal string, EUR
+  fees: string; // Decimal string, EUR — withheld at source
+  payoutFees: string; // Decimal string, EUR — platform cut at payout
   net: string; // Decimal string, EUR
 };
 
@@ -357,9 +395,11 @@ export type ArchivedPayout = {
 // exists off-CP (e.g. a bank transfer the operator reconciles by hand).
 // EUR Decimal strings (the adapter converts to cents). `description` carries
 // the bank-transfer reference when the order is created from a transaction.
+// The server validates `fees + payoutFee ≤ total`.
 export type CreatePayoutOrderInput = {
   total: string; // EUR decimal — gross amount
-  fees: string; // EUR decimal — platform/handling fee (may be "0")
+  fees: string; // EUR decimal — processor cut withheld at source (may be "0")
+  payoutFee: string; // EUR decimal — platform cut on this order (may be "0")
   description: string | null;
 };
 
@@ -375,7 +415,8 @@ export type CreatedPayoutOrder = {
 export type AddableOrdersSummary = {
   orderCount: number;
   total: string; // Decimal string, EUR
-  fees: string; // Decimal string, EUR
+  fees: string; // Decimal string, EUR — withheld at source
+  payoutFees: string; // Decimal string, EUR — platform cut at payout
   net: string; // Decimal string, EUR
 };
 
@@ -406,18 +447,30 @@ export type AddOrdersResult = {
 
 // Input for setting a payout's manual deduction. `amount` is a EUR Decimal
 // string (the adapter converts to cents); "0" clears the deduction. `comment`
-// is a short free-text note explaining the adjustment.
+// is a short free-text note explaining the adjustment. The server rejects an
+// amount above `total − fees − payoutFees`.
 export type SetManualDeductionInput = {
   amount: string; // EUR decimal
   comment: string | null;
 };
 
+// A pending payout's settlement window as stored after an edit. Deliberately
+// carries no money: the window labels the payout, it doesn't select its orders
+// (CP claims those at creation), so rewriting it can't move a total.
+export type PayoutPeriod = {
+  payoutId: string;
+  startDate: string; // ISO 8601
+  endDate: string; // ISO 8601
+};
+
 // Recomputed payout money after a manual-deduction change: the ArchivedPayout
-// trio plus the deduction and its comment (net = total − fees − deduction).
+// figures plus the deduction and its comment
+// (net = total − fees − payoutFees − deduction).
 export type PayoutDeduction = {
   payoutId: string;
   total: string; // EUR decimal
-  fees: string; // EUR decimal
+  fees: string; // EUR decimal — withheld at source
+  payoutFees: string; // EUR decimal — platform cut at payout
   manualDeduction: string; // EUR decimal
   manualDeductionComment: string | null;
   net: string; // EUR decimal
@@ -480,3 +533,14 @@ export type CreatePayoutPaymentResult =
   | { alreadyCreated: true }
   | { alreadyCreated: false; paymentId: string; signingUrl: string };
 
+// Fee configuration pushed to CP (treasury-level). `percent` is a
+// decimal-percent string (e.g. "2.5" = 2.5%) — the live client converts it to
+// integer basis points on the wire. `collectionFrequency` mirrors the Prisma
+// `FeeCollectionFrequency` enum: PER_PAYMENT debits the fee on each merchant
+// payment, MONTHLY accrues it and collects once at month end. Kept as a
+// literal union here (like `CardStatus`) so the shared types module stays
+// free of generated-client imports.
+export type PayoutFeeConfig = {
+  percent: string;
+  collectionFrequency: "PER_PAYMENT" | "MONTHLY";
+};

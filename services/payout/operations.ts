@@ -20,6 +20,7 @@ import type {
   PayoutDeduction,
   PayoutDraft,
   PayoutOrder,
+  PayoutPeriod,
   PayoutStatus,
   PayoutStatusDetail,
 } from "@/services/citizenpay/types";
@@ -28,6 +29,18 @@ import { ANNOTATION_TRIGGERS } from "@/services/transaction-annotation/annotate"
 import { resolveOrEnqueueAnnotation } from "@/services/transaction-annotation/pending";
 import { burnDirect, mintDirect, type Translate } from "@/services/token-operations/direct";
 
+import {
+  buildPayoutExportCsv,
+  PayoutExportRangeSchema,
+  selectPayoutsForExport,
+  type PayoutExportFile,
+} from "./export";
+import {
+  buildPayoutOrderExportCsv,
+  type PayoutOrderExportEntry,
+  type PayoutOrderExportFile,
+} from "./order-export";
+import { maxManualDeductionCents, toCents } from "./money";
 import {
   assignPlaceBurns,
   assignPlaceMints,
@@ -46,6 +59,7 @@ import {
   SetManualDeductionSchema,
   toRfc3339,
   TX_HASH,
+  UpdatePayoutPeriodSchema,
 } from "./schemas";
 
 // =============================================================================
@@ -247,6 +261,163 @@ export async function listPayouts(
   }
 }
 
+export type ExportPayoutsResult =
+  | { error: string }
+  | ({ ok: true } & PayoutExportFile);
+
+/**
+ * The accounting export: every payout whose settlement period starts inside the
+ * inclusive `[from, to]` day range, as a spreadsheet-ready CSV. All statuses
+ * are included — the file's `status` column is what tells "reversé" from "à
+ * reverser" (see ./export.ts for the date/status/format reasoning).
+ *
+ * Driven by the fund-host route handler `app/api/payouts/export`. The fund
+ * arrives in `ctx`, never from the request, like every other operation here.
+ */
+export async function exportPayoutsCsv(
+  ctx: PayoutContext,
+  input: { from: string; to: string; locale: string },
+): Promise<ExportPayoutsResult> {
+  const parsed = PayoutExportRangeSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      error: ctx.t(parsed.error.issues[0]?.message ?? `${ERR}.exportFailed`),
+    };
+  }
+
+  // Not via listPayouts(ctx, "all"): its failure message is about reading a
+  // status, which reads as a non-sequitur to someone who asked for a file.
+  const c = client(ctx);
+  let payouts: Payout[];
+  try {
+    payouts = await listAllPayouts(c);
+  } catch (e) {
+    console.error("[payout] exportPayoutsCsv failed", logSafe(parsed.data), e);
+    return { error: toMessage(e, err(ctx, "exportFailed")) };
+  }
+
+  return {
+    ok: true,
+    ...buildPayoutExportCsv({
+      payouts,
+      range: parsed.data,
+      fundDomain: ctx.fund.domain,
+      locale: input.locale,
+      t: ctx.t,
+    }),
+  };
+}
+
+/** Both lifecycle halves of the payout list, in one array. */
+async function listAllPayouts(c: CitizenPayClient): Promise<Payout[]> {
+  const [pending, completed] = await Promise.all([
+    c.listPendingPayouts(),
+    c.listCompletedPayouts(),
+  ]);
+  return [...pending, ...completed];
+}
+
+export type ExportPayoutOrdersResult =
+  | { error: string }
+  | ({ ok: true } & PayoutOrderExportFile);
+
+// How many payouts' order lists are fetched at once. An admin export of a
+// quarter can cover a few hundred payouts and each one is its own paginated
+// CitizenPay call, so they can't go out serially; nor can they all go out at
+// once, which would hammer the treasury API from a single request. A small
+// fixed pool is the middle ground.
+const EXPORT_ORDERS_CONCURRENCY = 4;
+
+/**
+ * The transaction-level accounting export: one row per order inside every
+ * payout the recap ({@link exportPayoutsCsv}) selects for the same range. Same
+ * range semantics — the payout is the accounting unit, so its orders are never
+ * re-filtered by their own dates (see ./order-export.ts).
+ *
+ * Fails whole rather than shipping a partial file: an accounting export that
+ * silently dropped a merchant's transactions is worse than a retry, so any
+ * payout whose orders can't be read — or is so large that the pager truncates
+ * it — aborts the download with a translated error.
+ *
+ * Driven by the fund-host route handler `app/api/payouts/export/orders`. The
+ * fund arrives in `ctx`, never from the request.
+ */
+export async function exportPayoutOrdersCsv(
+  ctx: PayoutContext,
+  input: { from: string; to: string; locale: string },
+): Promise<ExportPayoutOrdersResult> {
+  const parsed = PayoutExportRangeSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      error: ctx.t(parsed.error.issues[0]?.message ?? `${ERR}.exportFailed`),
+    };
+  }
+
+  const c = client(ctx);
+  let selected: Payout[];
+  try {
+    selected = selectPayoutsForExport(await listAllPayouts(c), parsed.data);
+  } catch (e) {
+    console.error(
+      "[payout] exportPayoutOrdersCsv list failed",
+      logSafe(parsed.data),
+      e,
+    );
+    return { error: toMessage(e, err(ctx, "exportFailed")) };
+  }
+
+  const entries: PayoutOrderExportEntry[] = new Array(selected.length);
+  let failure: { error: string } | null = null;
+  let cursor = 0;
+
+  const worker = async () => {
+    while (failure === null) {
+      const index = cursor++;
+      const payout = selected[index];
+      if (!payout) return;
+      try {
+        const loaded = await loadAllPayoutOrders(c, payout.id);
+        if (loaded.truncated) {
+          console.error(
+            "[payout] exportPayoutOrdersCsv truncated",
+            logSafe(payout.id),
+          );
+          failure ??= { error: err(ctx, "exportOrdersTruncated") };
+          return;
+        }
+        entries[index] = { payout, orders: loaded.orders };
+      } catch (e) {
+        console.error(
+          "[payout] exportPayoutOrdersCsv orders failed",
+          logSafe(payout.id),
+          e,
+        );
+        failure ??= { error: toMessage(e, err(ctx, "exportOrdersFailed")) };
+        return;
+      }
+    }
+  };
+
+  await Promise.all(
+    Array.from(
+      { length: Math.min(EXPORT_ORDERS_CONCURRENCY, selected.length) },
+      worker,
+    ),
+  );
+  if (failure) return failure;
+
+  return {
+    ok: true,
+    ...buildPayoutOrderExportCsv({
+      entries,
+      range: parsed.data,
+      fundDomain: ctx.fund.domain,
+      locale: input.locale,
+      t: ctx.t,
+    }),
+  };
+}
+
 export type PayoutDetailResult =
   | { error: string }
   | {
@@ -420,11 +591,21 @@ export async function classifyPayoutOrders(
 // Order reconciliation — fix unsettled orders, then tell CP
 // =============================================================================
 // CP does NOT mint/burn. When a pending payout has an order with no settled
-// on-chain tx, we fix it with the fund's own minter wallet, mirroring a real
-// payment: the payer is debited the full `total`, the place is credited the
-// `net` (total − fee), and the treasury keeps the fee.
+// on-chain tx, we fix it with the fund's own minter wallet, reproducing exactly
+// what a real payment would have left behind:
 //   - payer account     → burn `total` from the payer, then mint `net` to the place;
 //   - no payer account  → mint `net` to the place (nothing to burn).
+//
+// `net` here is the order's WALLET CREDIT — `total − fees`, where `fees` is the
+// processor's commission withheld at source. Those tokens are never minted
+// because that money never reached us: the payer's `total` includes them, the
+// place's credit doesn't, and the difference is the processor's, not ours.
+//
+// The platform's own cut (`payoutFee`) is deliberately NOT withheld here. It is
+// minted into the place's wallet along with the rest of the credit and stays
+// there until the payout-level fee sweep moves it to the treasury — so the
+// treasury keeps nothing at mint time. See burnPayout below for the other half.
+//
 // We then POST the resulting mint tx hash back so CP re-runs its confirmation
 // lifecycle.
 
@@ -438,7 +619,7 @@ export async function fixOrder(
     account: string | null; // payer; null ⇒ mint-only
     placeAccount: string | null; // mint destination
     total: string; // EUR decimal — burned from the payer
-    net: string; // EUR decimal (total − fee) — minted to the place
+    net: string; // EUR decimal (total − source-withheld fees) — minted to the place
     // When set, the order is already settled on-chain: skip the burn/mint and
     // just record this operator-supplied hash on the order. No place account or
     // payer balance is needed in this mode.
@@ -475,9 +656,9 @@ export async function fixOrder(
   const direct = { fund: ctx.fund, userId: ctx.userId, t: ctx.t };
 
   // Burn the full total from the payer first (when there is one), then credit
-  // the place its net. The fee is the difference, retained by the treasury.
-  // A mint failure after a successful burn is surfaced with the hash so the
-  // operator can recover.
+  // the place its net. The difference is the processor's commission, which
+  // never existed as tokens on our side. A mint failure after a successful burn
+  // is surfaced with the hash so the operator can recover.
   if (input.account) {
     const burn = await burnDirect(
       direct,
@@ -1091,7 +1272,10 @@ export async function createPayoutOrder(
   input: {
     payoutId: string;
     total: string;
+    /** Processor commission withheld at source — 0 for a bank transfer. */
     fees: string;
+    /** The platform's cut on this order. Defaults to 0 when omitted. */
+    payoutFee?: string;
     description: string | null;
   },
 ): Promise<CreatePayoutOrderResult> {
@@ -1112,6 +1296,7 @@ export async function createPayoutOrder(
     ({ order, payout } = await c.createPayoutOrder(parsed.data.payoutId, {
       total: parsed.data.total,
       fees: parsed.data.fees,
+      payoutFee: parsed.data.payoutFee,
       description: parsed.data.description?.trim() || null,
     }));
   } catch (e) {
@@ -1120,8 +1305,11 @@ export async function createPayoutOrder(
   }
 
   // The order now exists. Reconcile it the same way the per-order "Fix" does:
-  // mint the net to the place and record the hash. A manual order has no payer
-  // account, so this is mint-only (no burn). Past this point we never return a
+  // mint the net to the place and record the hash. `order.net` is the wallet
+  // credit (total − fees), so the platform cut is minted here too and comes
+  // back out at the payout's fee sweep — not withheld now.
+  // A manual order has no payer account, so this is mint-only (no burn). Past
+  // this point we never return a
   // bare { error } — the order is created, so any mint failure comes back as
   // { ok, mintError } to avoid duplicate creates.
   revalidatePath(`/payments/payouts/${parsed.data.payoutId}`);
@@ -1284,7 +1472,7 @@ export type BurnPayoutResult =
       ok: true;
       txHash: string;
       // Sweep outcome. The burn itself succeeded; the sweep of the retained cut
-      // (fees + manualDeduction) is decoupled. `feeTransferTxHash` is set when
+      // (payoutFees + manualDeduction) is decoupled. `feeTransferTxHash` is set when
       // it ran inline; `feeTransferPending` is true when it still needs running
       // (retry via `feeTransfer`), with the reason in `feeTransferError`.
       feeAmount?: string | null;
@@ -1313,8 +1501,9 @@ export async function burnPayout(
     const { status } = await c.getPayoutStatus(payoutId);
     if (status !== "pending") return { error: err(ctx, "notBurnable") };
 
-    // Amount = the payout `net` (total − fees − manualDeduction): the tokens
-    // the place holds for this payout. Read straight from the detail endpoint.
+    // Amount = the payout `net` (total − fees − payoutFees − manualDeduction):
+    // what the merchant actually keeps, and the same figure the SEPA transfer
+    // pays them. Read straight from the detail endpoint — the API computes it.
     let payout;
     try {
       payout = await c.getPayout(payoutId);
@@ -1329,8 +1518,16 @@ export async function burnPayout(
     if (!placeAccount) return { error: err(ctx, "noPlaceAccount") };
 
     // Burn only the `net` on-chain with our minter (records a TokenOperation).
-    // The place account also holds the retained cut (fees + manualDeduction);
-    // CP sweeps that to our minter account when we pass `destination` below.
+    //
+    // The place's wallet holds more than the net: every order was credited
+    // `total − fees`, so the platform's cut (`payoutFees`) is sitting in there
+    // too, along with anything a manual deduction claws back. That surplus is
+    // exactly `payoutFees + manualDeduction`, and CP sweeps it to our minter
+    // account when we pass `destination` below — burn takes the merchant's
+    // share out of circulation, the sweep moves ours to the treasury.
+    //
+    // The source-withheld `fees` are in neither figure: the processor kept that
+    // money before it reached us, so no token for it was ever minted.
     const burn = await burnDirect(
       { fund, userId: ctx.userId, t: ctx.t },
       { from: placeAccount, amount: payout.net },
@@ -1446,6 +1643,54 @@ export type SetManualDeductionResult =
   | { error: string }
   | { ok: true; payout: PayoutDeduction };
 
+export type UpdatePayoutPeriodResult =
+  | { error: string }
+  | { ok: true; period: PayoutPeriod };
+
+/**
+ * Relabel a pending payout's settlement window.
+ *
+ * Purely cosmetic by design: CP claims a payout's orders when it's created and
+ * keeps them linked by id, so widening 1–28 July to the full month makes the
+ * payout read as "July" without pulling in the orders that landed after the
+ * 28th — those stay unassigned and turn up in the next draft. No total, fee,
+ * deduction or net moves. Same live-status pending gate as setManualDeduction:
+ * once settlement starts the period is on the merchant's report.
+ */
+export async function updatePayoutPeriod(
+  ctx: PayoutContext,
+  input: { payoutId: string; from: string; to: string },
+): Promise<UpdatePayoutPeriodResult> {
+  const parsed = UpdatePayoutPeriodSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: ctx.t(parsed.error.issues[0]?.message ?? `${ERR}.periodFailed`) };
+  }
+
+  const c = client(ctx);
+
+  let status;
+  try {
+    ({ status } = await c.getPayoutStatus(parsed.data.payoutId));
+  } catch (e) {
+    console.error("[payout] period status read failed", logSafe(input), e);
+    return { error: toMessage(e, err(ctx, "statusFailed")) };
+  }
+  if (status !== "pending") return { error: err(ctx, "periodNotPending") };
+
+  try {
+    const period = await c.updatePayoutPeriod(parsed.data.payoutId, {
+      startDate: toRfc3339(parsed.data.from),
+      endDate: toRfc3339(parsed.data.to),
+    });
+    revalidatePath("/payments");
+    revalidatePath(`/payments/payouts/${parsed.data.payoutId}`);
+    return { ok: true, period };
+  } catch (e) {
+    console.error("[payout] updatePayoutPeriod failed", logSafe(input), e);
+    return { error: toMessage(e, err(ctx, "periodFailed")) };
+  }
+}
+
 /**
  * Set/clear a payout's manual deduction (+ comment). A pure ledger adjustment
  * on CP's side — it lowers the `net` the merchant is paid, with no on-chain
@@ -1482,9 +1727,16 @@ export async function setManualDeduction(
   }
   if (status !== "pending") return { error: err(ctx, "deductionNotPending") };
 
-  // A deduction larger than (total − fees) would drive net negative.
-  const maxDeduction = Number(payout.totalAmount) - Number(payout.totalFees);
-  if (Number(parsed.data.amount) > maxDeduction) {
+  // A deduction larger than (total − fees − payoutFees) would drive net
+  // negative: both fee figures are already out of the merchant's share before
+  // any adjustment. CP enforces the same bound with a 400; we pre-check for a
+  // clearer message.
+  const maxDeductionCents = maxManualDeductionCents({
+    total: payout.totalAmount,
+    fees: payout.totalFees,
+    payoutFees: payout.totalPayoutFees,
+  });
+  if (toCents(parsed.data.amount) > maxDeductionCents) {
     return { error: err(ctx, "deductionTooHigh") };
   }
 
@@ -1502,7 +1754,10 @@ export async function setManualDeduction(
   }
 }
 
-/** Clear the deduction + comment, net back to total − fees. Same pending gate. */
+/**
+ * Clear the deduction + comment, net back to total − fees − payoutFees. Same
+ * pending gate.
+ */
 export async function clearManualDeduction(
   ctx: PayoutContext,
   payoutId: string,

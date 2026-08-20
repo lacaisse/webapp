@@ -5,6 +5,8 @@ import { getTranslations } from "next-intl/server";
 import { Tabs, resolveActiveTab } from "@/components/ui/tabs";
 import { requireFundRole } from "@/services/auth/dal";
 import { requireCurrentFund } from "@/services/fund/server";
+import { resolvePayoutExportRange } from "@/services/payout/export";
+import { ExportView } from "./export-section";
 import {
   CompletedPayoutsView,
   DraftsView,
@@ -19,18 +21,22 @@ const TABS = [
   { value: "drafts" },
   { value: "pending" },
   { value: "completed" },
+  { value: "export" },
 ] as const;
 
 export default async function PaymentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; from?: string; to?: string }>;
 }) {
   await requireFundRole("ADMIN");
   const t = await getTranslations("fund.payments");
   const fund = await requireCurrentFund();
   const sp = await searchParams;
   const active = resolveActiveTab(sp.tab, TABS);
+  // The export range lives in the URL; a missing or malformed pair falls back
+  // to the default preset rather than erroring the page.
+  const range = resolvePayoutExportRange(sp.from, sp.to);
 
   return (
     <>
@@ -71,6 +77,17 @@ export default async function PaymentsPage({
             fundId={fund.id}
             citizenPayApiKeyId={fund.citizenPayApiKeyId}
             citizenPayApiKeyEnc={fund.citizenPayApiKeyEnc}
+          />
+        </Suspense>
+      )}
+      {active === "export" && (
+        <Suspense fallback={<PayoutsSkeleton />}>
+          <ExportView
+            fundId={fund.id}
+            citizenPayApiKeyId={fund.citizenPayApiKeyId}
+            citizenPayApiKeyEnc={fund.citizenPayApiKeyEnc}
+            from={range.from}
+            to={range.to}
           />
         </Suspense>
       )}

@@ -34,6 +34,12 @@ export const TX_HASH = /^0x[0-9a-fA-F]{64}$/;
 // strings from <input type="number"> (e.g. "28.32") — up to 2dp. The action
 // passes them straight to the client, which converts to cents. `description`
 // is the bank-transfer reference (bank-transaction mode) or free text.
+//
+// The two fee fields are NOT the same money (see services/payout/money.ts):
+// `fees` is the processor's commission withheld at source (0 for a bank
+// transfer — nothing was withheld), `payoutFee` is the platform's cut on this
+// order, which is minted with the credit and swept at settlement. Together
+// they can't exceed the total, which is also what the API enforces.
 const MONEY = /^\d+(\.\d{1,2})?$/;
 
 export const CreatePayoutOrderSchema = z
@@ -41,6 +47,10 @@ export const CreatePayoutOrderSchema = z
     payoutId: z.string().min(1, "fund.payments.settlement.errors.createOrderFailed"),
     total: z.string().regex(MONEY, "fund.payments.settlement.errors.amountInvalid"),
     fees: z.string().regex(MONEY, "fund.payments.settlement.errors.feeInvalid"),
+    payoutFee: z
+      .string()
+      .regex(MONEY, "fund.payments.settlement.errors.payoutFeeInvalid")
+      .default("0"),
     description: z
       .string()
       .trim()
@@ -55,6 +65,10 @@ export const CreatePayoutOrderSchema = z
   .refine((d) => Number(d.fees) <= Number(d.total), {
     message: "fund.payments.settlement.errors.feeTooHigh",
     path: ["fees"],
+  })
+  .refine((d) => Number(d.fees) + Number(d.payoutFee) <= Number(d.total), {
+    message: "fund.payments.settlement.errors.feesTooHigh",
+    path: ["payoutFee"],
   });
 
 export type CreatePayoutOrderFormInput = z.infer<typeof CreatePayoutOrderSchema>;
@@ -87,10 +101,32 @@ export const AddOrdersSchema = z.object({
 
 export type AddOrdersInput = z.infer<typeof AddOrdersSchema>;
 
+// Editing a pending payout's settlement window. Dates arrive as `YYYY-MM-DD`
+// from <input type="date"> and the action widens them with toRfc3339, exactly
+// like creation. Half-open [from, to) — so a payout labelled "July" ends on
+// 2026-08-01, and the dialog shows the inclusive last day instead.
+//
+// Unlike creation, this only relabels: CP claimed the orders when the payout
+// was created and keeps them linked, so no total moves and no order joins or
+// leaves. That's why there's no place filter here.
+export const UpdatePayoutPeriodSchema = z
+  .object({
+    payoutId: z.string().min(1, "fund.payments.settlement.errors.periodFailed"),
+    from: z.string().regex(DATE, "fund.payments.settlement.errors.rangeInvalid"),
+    to: z.string().regex(DATE, "fund.payments.settlement.errors.rangeInvalid"),
+  })
+  .refine((d) => d.from < d.to, {
+    message: "fund.payments.settlement.errors.rangeOrder",
+    path: ["to"],
+  });
+
+export type UpdatePayoutPeriodInput = z.infer<typeof UpdatePayoutPeriodSchema>;
+
 // Setting a payout's manual deduction. `amount` is a EUR decimal string (up to
 // 2dp); "0" clears the deduction. `comment` is an optional short note. The
-// upper bound (≤ total − fees) is enforced in the action, which has the
-// payout's totals; here we only validate shape.
+// upper bound (≤ total − fees − payoutFees, i.e. the merchant's share before
+// the adjustment) is enforced in the operation, which has the payout's totals;
+// here we only validate shape.
 export const SetManualDeductionSchema = z.object({
   payoutId: z.string().min(1, "fund.payments.settlement.errors.deductionFailed"),
   amount: z.string().regex(MONEY, "fund.payments.settlement.errors.amountInvalid"),
