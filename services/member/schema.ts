@@ -30,10 +30,6 @@ export const BuiltinSignupSchema = z.object({
     error: "members.signup.errors.lastNameRequired",
   }),
   email: z.string().email({ error: "members.signup.errors.emailInvalid" }),
-  // Opt out of payment-reminder emails at registration (issue #39/#40).
-  // Persists to Member.emailUnsubscribed; the member can flip it later via the
-  // deregistration link. Defaults to opted-in.
-  remindersOptOut: z.boolean().optional(),
   // The amount the member commits to contribute (issue #82). Optional at
   // signup — there's no tier yet to floor it against, so it's a free amount
   // here; an admin can adjust once a tier is assigned. Empty → null (use the

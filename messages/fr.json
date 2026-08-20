@@ -2223,7 +2223,6 @@
       "email": "Email",
       "contributionAmount": "Montant que vous souhaitez contribuer (optionnel)",
       "contributionAmountHint": "Laissez vide pour utiliser le montant proposé par votre palier. Vous pourrez convenir d'un autre montant avec un administrateur.",
-      "remindersOptOut": "Je ne souhaite pas recevoir les rappels de paiement par email.",
       "submit": "Envoyer",
       "submitting": "Envoi…",
       "errors": {

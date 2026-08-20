@@ -131,7 +131,6 @@ export function SignupForm({
       lastName: prefill.lastName,
       email: prefill.email,
       contributionAmount: prefill.contributionAmount,
-      remindersOptOut: false,
       extras: Object.fromEntries(
         allFields.map((f) => [
           f.key,
@@ -424,17 +423,6 @@ export function SignupForm({
             </p>
           )}
         </div>
-      )}
-
-      {isLast && (
-        <label className="flex cursor-pointer items-start gap-2 text-sm">
-          <input
-            type="checkbox"
-            {...form.register("remindersOptOut")}
-            className="mt-0.5 size-4 rounded border-input"
-          />
-          <span>{t("remindersOptOut")}</span>
-        </label>
       )}
 
       {errors.root && (
