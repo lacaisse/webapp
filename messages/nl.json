@@ -518,6 +518,24 @@
       },
       "import": {
         "button": "CSV importeren"
+      },
+      "export": {
+        "button": "CSV exporteren",
+        "columns": {
+          "firstName": "Voornaam",
+          "lastName": "Achternaam",
+          "email": "E-mail",
+          "status": "Status",
+          "tier": "Niveau",
+          "contributionAmount": "Overeengekomen bijdrage",
+          "address": "Adres",
+          "postalCode": "Postcode",
+          "city": "Stad",
+          "paymentReference": "Betalingsmededeling",
+          "cards": "Kaarten",
+          "joinedAt": "Aangemeld op",
+          "notes": "Notities"
+        }
       }
     },
     "cards": {

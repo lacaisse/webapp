@@ -518,6 +518,24 @@
       },
       "import": {
         "button": "Import CSV"
+      },
+      "export": {
+        "button": "Export CSV",
+        "columns": {
+          "firstName": "First name",
+          "lastName": "Last name",
+          "email": "Email",
+          "status": "Status",
+          "tier": "Tier",
+          "contributionAmount": "Committed contribution",
+          "address": "Address",
+          "postalCode": "Postal code",
+          "city": "City",
+          "paymentReference": "Payment reference",
+          "cards": "Cards",
+          "joinedAt": "Joined",
+          "notes": "Notes"
+        }
       }
     },
     "cards": {
