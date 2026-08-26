@@ -518,6 +518,24 @@
       },
       "import": {
         "button": "Importer un CSV"
+      },
+      "export": {
+        "button": "Exporter en CSV",
+        "columns": {
+          "firstName": "Prénom",
+          "lastName": "Nom",
+          "email": "Email",
+          "status": "Statut",
+          "tier": "Palier",
+          "contributionAmount": "Contribution convenue",
+          "address": "Adresse",
+          "postalCode": "Code postal",
+          "city": "Ville",
+          "paymentReference": "Communication de paiement",
+          "cards": "Cartes",
+          "joinedAt": "Inscrit le",
+          "notes": "Notes"
+        }
       }
     },
     "cards": {
