@@ -37,6 +37,12 @@ const ALLOWLIST = {
       "Stack exhaustion when merging recursive object graphs. deepmerge-ts is reached only by the Prisma CLI merging our own repo-authored prisma.config.ts — never attacker-supplied input — and @prisma/config is not in the runtime bundle (PrismaClient comes from the generated client, not the prisma package). The advisory's fix range (>=8.0.0) isn't shipped by any prisma release: latest 7.9.1 still pins 7.1.5, and npm's only 'fix' is a breaking downgrade to prisma 6. Clears when @prisma/config bumps its deepmerge-ts range.",
     reviewBy: "2026-10-01",
   },
+  "GHSA-3f6p-5ww8-9rcr": {
+    pkg: "mysql2 (transitive via better-auth and prisma)",
+    reason:
+      "Auth plugin downgrade leaking plaintext credentials against a MySQL server. mysql2 is pulled in as an optional DB dialect of better-auth (our instance uses only the Prisma adapter — see services/auth/better-auth.ts) and by the Prisma CLI; we run exclusively against Postgres (DATABASE_URL/DIRECT_URL) and never construct a mysql2 connection anywhere in the app. Same blocker as the deepmerge-ts entry above: the only 'fix' npm offers is a breaking downgrade to prisma 6.19.3. Clears when better-auth/prisma bump their mysql2 range past 3.22.0.",
+    reviewBy: "2026-10-01",
+  },
 };
 
 function runAudit() {
