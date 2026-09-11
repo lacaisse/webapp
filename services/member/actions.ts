@@ -282,10 +282,6 @@ export async function signupMemberAction(input: {
             locale,
             status: "NEW",
             paymentReference,
-            emailUnsubscribed: parsed.data.remindersOptOut ?? false,
-            emailUnsubscribedAt: parsed.data.remindersOptOut
-              ? new Date()
-              : null,
             // Empty → null (use the tier target once a tier is assigned).
             // Gated on FIXED_PERIOD + tiers above.
             contributionAmount,
