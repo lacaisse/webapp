@@ -5,7 +5,7 @@ import { getTranslations } from "next-intl/server";
 import { revalidatePath } from "next/cache";
 
 import { requireFundRole } from "@/services/auth/dal";
-import { dispatchCardAssignedEmail } from "@/services/card/notify";
+import { dispatchCardAssignedEmail, type CardAssignedFund } from "@/services/card/notify";
 import { getCitizenPayClient } from "@/services/citizenpay/client";
 import { prisma } from "@/services/db/prisma";
 import { nextCardNumber } from "@/services/card/numbering";
@@ -326,21 +326,51 @@ export async function addCardAction(input: {
     return { error: t("members.admin.errors.noPrimaryCard" as never) };
   }
 
-  const existing = await prisma.card.findFirst({
-    where: { serialNumber: { equals: cardSerial, mode: "insensitive" } },
-    select: { id: true },
-  });
-  if (existing) {
-    return { error: t("members.admin.errors.serialTaken" as never) };
-  }
-
   const holderName =
     input.holderName?.trim() ||
     `${member.firstName} ${member.lastName}`.trim();
 
-  // Register with CitizenPay first to claim the wallet address. Same
-  // fail-soft behaviour as activation — local row is still created if CP
-  // is unreachable.
+  // A card with this serial may already exist locally — e.g. imported from
+  // CitizenPay via /cards/sync and sitting unattached in inventory, which is
+  // the normal onboarding sequence (sync the fund's cards, then assign one).
+  // Only a serial already bound to a member is a real conflict; an unattached
+  // row is one we should link, not reject (#211 — the prior check flagged ANY
+  // existing row, attached or not, as "taken").
+  const existing = await prisma.card.findFirst({
+    where: { serialNumber: { equals: cardSerial, mode: "insensitive" } },
+    select: {
+      id: true,
+      fundId: true,
+      serialNumber: true,
+      number: true,
+      memberId: true,
+      status: true,
+      reportedLostAt: true,
+    },
+  });
+
+  if (existing) {
+    // Bound to a member already, or a card row from another fund (serial
+    // numbers are globally unique) — genuinely taken.
+    if (existing.memberId || existing.fundId !== fund.id) {
+      return { error: t("members.admin.errors.serialTaken" as never) };
+    }
+    if (existing.status === "BLOCKED" || existing.reportedLostAt) {
+      return { error: t("members.admin.errors.cardBlockedOrLost" as never) };
+    }
+    const card = await prisma.card.update({
+      where: { id: existing.id },
+      data: { memberId: member.id, holderName },
+      select: { id: true, serialNumber: true, number: true },
+    });
+    await sendAddCardEmail(fund, card, member);
+    revalidatePath("/members");
+    return { ok: true };
+  }
+
+  // No local row yet — this is a brand-new physical card. Register with
+  // CitizenPay first to claim the wallet address. Same fail-soft behaviour
+  // as activation — local row is still created if CP is unreachable.
   const cp = getCitizenPayClient(fund);
   let cpAccount: string | null = null;
   try {
@@ -366,37 +396,53 @@ export async function addCardAction(input: {
       status: "INACTIVE", // CP confirms terminal-active separately
       issuedAt: new Date(),
     },
+    select: { id: true, serialNumber: true, number: true },
   });
 
-  // Same CARD_ASSIGNED ("your card is on its way") email as activation —
-  // dependant cards need it too, gated only by the fund-wide member-email
-  // pause. A send failure never fails the add-card flow (#69).
-  if (!fund.confirmationEmailsPausedAt) {
-    try {
-      await dispatchCardAssignedEmail({
-        fund,
-        card: {
-          id: card.id,
-          serialNumber: card.serialNumber,
-          number: card.number,
-          memberId: member.id,
-          member: {
-            email: member.email,
-            firstName: member.firstName,
-            lastName: member.lastName,
-            address: member.address,
-            postalCode: member.postalCode,
-            city: member.city,
-          },
-        },
-      });
-    } catch (e) {
-      console.error("[addCard] card-assigned email dispatch failed", card.id, e);
-    }
-  }
+  await sendAddCardEmail(fund, card, member);
 
   revalidatePath("/members");
   return { ok: true };
+}
+
+// Same CARD_ASSIGNED ("your card is on its way") email as activation —
+// dependant cards need it too, gated only by the fund-wide member-email
+// pause. A send failure never fails the add-card flow (#69).
+async function sendAddCardEmail(
+  fund: CardAssignedFund & { confirmationEmailsPausedAt: Date | null },
+  card: { id: string; serialNumber: string; number: number | null },
+  member: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    address: string | null;
+    postalCode: string | null;
+    city: string | null;
+  },
+) {
+  if (fund.confirmationEmailsPausedAt) return;
+  try {
+    await dispatchCardAssignedEmail({
+      fund,
+      card: {
+        id: card.id,
+        serialNumber: card.serialNumber,
+        number: card.number,
+        memberId: member.id,
+        member: {
+          email: member.email,
+          firstName: member.firstName,
+          lastName: member.lastName,
+          address: member.address,
+          postalCode: member.postalCode,
+          city: member.city,
+        },
+      },
+    });
+  } catch (e) {
+    console.error("[addCard] card-assigned email dispatch failed", card.id, e);
+  }
 }
 
 export type InviteMemberResult =
