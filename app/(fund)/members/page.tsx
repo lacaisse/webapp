@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { Suspense } from "react";
+import { Download } from "lucide-react";
 import Link from "next/link";
 import { getFormatter, getTranslations } from "next-intl/server";
 
 import { TableSearch } from "@/components/table-search";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { Badge, badgeVariants } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, resolveActiveTab } from "@/components/ui/tabs";
 import {
@@ -138,6 +140,14 @@ async function MembersHeader() {
         <p className="text-sm text-muted-foreground">{t("description")}</p>
       </div>
       <div className="flex items-center gap-2">
+        <a
+          href="/api/members/export"
+          download
+          className={buttonVariants({ variant: "outline" })}
+        >
+          <Download className="size-4" />
+          {t("export.button")}
+        </a>
         <MemberImportDialog
           triggerLabel={t("import.button")}
           tiers={tiers.map((tier) => tier.name)}
@@ -441,6 +451,7 @@ function MembersHeaderSkeleton() {
         <Skeleton className="h-4 w-72" />
       </div>
       <div className="flex items-center gap-2">
+        <Skeleton className="h-9 w-28" />
         <Skeleton className="h-9 w-28" />
         <Skeleton className="h-9 w-28" />
       </div>
