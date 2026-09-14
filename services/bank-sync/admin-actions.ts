@@ -51,14 +51,21 @@ export async function linkBankTransactionAction(input: {
     return { error: t("fund.payments.admin.errors.notIncoming" as never) };
   }
 
-  // Look up by card UID (serialNumber, case-insensitive), email, or the legacy
-  // paymentReference (case-insensitive uppercase).
+  // Look up by card UID (serialNumber, case-insensitive — current OR former,
+  // since a member keeps writing a lost/replaced card's serial long after it
+  // was unassigned, issue #222), email, or the legacy paymentReference
+  // (case-insensitive uppercase).
   const member = await prisma.member.findFirst({
     where: {
       fundId: fund.id,
       OR: [
         {
           cards: {
+            some: { serialNumber: { equals: identifier, mode: "insensitive" } },
+          },
+        },
+        {
+          formerCards: {
             some: { serialNumber: { equals: identifier, mode: "insensitive" } },
           },
         },
@@ -223,6 +230,13 @@ export async function suggestMembersForAttributionAction(input: {
               some: { serialNumber: { contains: query, mode: "insensitive" } },
             },
           },
+          // A card the member used to hold — they keep writing its serial on
+          // transfers long after it's replaced (issue #222).
+          {
+            formerCards: {
+              some: { serialNumber: { contains: query, mode: "insensitive" } },
+            },
+          },
         ],
       },
       select: {
@@ -233,13 +247,19 @@ export async function suggestMembersForAttributionAction(input: {
           select: { serialNumber: true },
           take: 1,
         },
+        formerCards: {
+          where: { serialNumber: { contains: query, mode: "insensitive" } },
+          select: { serialNumber: true },
+          take: 1,
+        },
       },
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
       take: 10,
     });
     return members.map((m) => ({
       ...toSuggestion(m),
-      matchedSerial: m.cards[0]?.serialNumber ?? undefined,
+      matchedSerial:
+        m.cards[0]?.serialNumber ?? m.formerCards[0]?.serialNumber ?? undefined,
     }));
   }
 

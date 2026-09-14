@@ -693,6 +693,10 @@ model Member {
   primaryCardId String? @unique
   primaryCard   Card?   @relation("MemberPrimaryCard", fields: [primaryCardId], references: [id], onDelete: SetNull)
 
+  // Cards this member used to hold (see Card.formerMemberId) — inverse only,
+  // no code reads this list off Member today.
+  formerCards Card[] @relation("MemberFormerCards")
+
   // Linked deposits and the mint/burn ops they triggered.
   bankTransactions BankTransaction[]
   tokenOperations  TokenOperation[]
@@ -759,6 +763,16 @@ model Card {
   memberId String?
   member   Member? @relation("MemberCards", fields: [memberId], references: [id], onDelete: SetNull)
 
+  // Set to the previous memberId when this card is unassigned (see
+  // unassignCardAction) — e.g. a lost/replaced card. Members keep writing the
+  // old card's serial on bank transfers well after getting a new primary
+  // card, so bank-sync's SERIAL/OGM match falls back to this member's
+  // *current* primary card when the referenced card itself has no owner
+  // (services/bank-sync/matching/match.ts). Cleared whenever the card is
+  // bound to a member again.
+  formerMemberId String?
+  formerMember   Member? @relation("MemberFormerCards", fields: [formerMemberId], references: [id], onDelete: SetNull)
+
   // CitizenPay linkage. `serialNumber` is the NFC UUID (printed/scannable
   // on the physical card) — admin enters this at activation time. `account`
   // is the on-chain wallet address, populated when CitizenPay registers
@@ -818,6 +832,7 @@ model Card {
 
   @@unique([fundId, number])
   @@index([memberId])
+  @@index([formerMemberId])
   @@index([fundId])
   @@index([status])
 }

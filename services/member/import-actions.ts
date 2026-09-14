@@ -436,6 +436,7 @@ async function linkCardToMember(
       where: { id: cardId },
       data: {
         memberId,
+        formerMemberId: null,
         // Don't blank an existing holder name during a nameless backfill.
         ...(holderName ? { holderName } : {}),
       },

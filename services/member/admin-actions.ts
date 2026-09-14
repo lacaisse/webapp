@@ -135,6 +135,8 @@ export async function activateMemberAction(input: {
       data: {
         memberId: member.id,
         holderName,
+        // Card is actively held again — drop any stale unassignment history.
+        formerMemberId: null,
       },
     });
 
@@ -360,7 +362,7 @@ export async function addCardAction(input: {
     }
     const card = await prisma.card.update({
       where: { id: existing.id },
-      data: { memberId: member.id, holderName },
+      data: { memberId: member.id, holderName, formerMemberId: null },
       select: { id: true, serialNumber: true, number: true },
     });
     await sendAddCardEmail(fund, card, member);

@@ -2,10 +2,12 @@
 import "server-only";
 
 import type { BankTransactionPayload } from "@/services/citizenpay/types";
-import type { MemberStatus } from "@/services/db/generated/enums";
 import { prisma } from "@/services/db/prisma";
 
 import { parseCardSerial, parseStructuredCommunication } from "./parse";
+import { matchFromCard, type Match, type MatchableCard } from "./resolve";
+
+export type { BankMatchMethod, Match } from "./resolve";
 
 // Match an INCOMING deposit to a member. Precedence (fall through on a miss):
 //
@@ -18,65 +20,28 @@ import { parseCardSerial, parseStructuredCommunication } from "./parse";
 // auto fallback and only resolves the member (mint goes to their primary card).
 // NAME matching is deliberately absent here — it never auto-matches; it only
 // ranks suggestions in the review UI.
-
-export type BankMatchMethod =
-  | "SERIAL"
-  | "STRUCTURED_COMMUNICATION"
-  | "IBAN"
-  | "MANUAL";
-
-export type Match = {
-  memberId: string;
-  // Member status gates allocation: only ACTIVE members get an auto-mint.
-  status: MemberStatus;
-  tierId: string | null;
-  // The card account to mint to: the referenced card for SERIAL/OGM (falling
-  // back to the member's primary if that card has no on-chain account yet),
-  // or the member's primary card for IBAN.
-  account: string | null;
-  // The referenced card for SERIAL/OGM matches; null for IBAN.
-  cardId: string | null;
-  method: BankMatchMethod;
-};
+//
+// 1 & 2 also handle a card that resolved but has no CURRENT owner (issue
+// #222): members keep writing an old card's serial/OGM on transfers well
+// after it was unassigned (e.g. lost card replaced). In that case we follow
+// `Card.formerMemberId` to the member who last held it and mint goes to
+// THEIR current primary card, not the stale card's own account — see
+// `matchFromCard` in ./resolve.ts.
 
 // What we need off a resolved card to build a Match.
+const memberMatchSelect = {
+  id: true,
+  status: true,
+  tierId: true,
+  primaryCard: { select: { account: true } },
+} as const;
+
 const cardSelect = {
   id: true,
   account: true,
-  member: {
-    select: {
-      id: true,
-      status: true,
-      tierId: true,
-      primaryCard: { select: { account: true } },
-    },
-  },
-} as const;
-
-function matchFromCard(
-  card: {
-    id: string;
-    account: string | null;
-    member: {
-      id: string;
-      status: MemberStatus;
-      tierId: string | null;
-      primaryCard: { account: string | null } | null;
-    } | null;
-  },
-  method: "SERIAL" | "STRUCTURED_COMMUNICATION",
-): Match | null {
-  // An unattached card (no member) can't drive an allocation — fall through.
-  if (!card.member) return null;
-  return {
-    memberId: card.member.id,
-    status: card.member.status,
-    tierId: card.member.tierId,
-    account: card.account ?? card.member.primaryCard?.account ?? null,
-    cardId: card.id,
-    method,
-  };
-}
+  member: { select: memberMatchSelect },
+  formerMember: { select: memberMatchSelect },
+} satisfies Record<string, unknown>;
 
 export async function matchMember(
   fundId: string,
@@ -87,7 +52,7 @@ export async function matchMember(
   // 1. Serial → card.
   const serial = parseCardSerial(...refs);
   if (serial) {
-    const card = await prisma.card.findFirst({
+    const card: MatchableCard | null = await prisma.card.findFirst({
       where: { fundId, serialNumber: { equals: serial, mode: "insensitive" } },
       select: cardSelect,
     });
@@ -98,7 +63,7 @@ export async function matchMember(
   // 2. Structured communication → card number → card.
   const cardNumber = parseStructuredCommunication(...refs);
   if (cardNumber != null) {
-    const card = await prisma.card.findFirst({
+    const card: MatchableCard | null = await prisma.card.findFirst({
       where: { fundId, number: cardNumber },
       select: cardSelect,
     });
