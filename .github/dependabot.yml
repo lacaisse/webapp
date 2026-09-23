@@ -17,6 +17,21 @@ updates:
       production-minor-patch:
         dependency-type: production
         update-types: ["minor", "patch"]
+    ignore:
+      # better-auth 1.7 moved the MCP plugin out of core into @better-auth/mcp
+      # (+ a required jwt() plugin, renamed helpers and an OAuth schema
+      # migration: oauthApplication → oauthClient, new refresh-token and
+      # client-assertion tables). That is a deliberate migration of the
+      # /api/mcp auth stack, not a routine bump — and @better-auth/passkey
+      # pins better-auth as a peer, so both must stay on 1.6 until it's done.
+      - dependency-name: better-auth
+        versions: [">=1.7.0"]
+      - dependency-name: "@better-auth/passkey"
+        versions: [">=1.7.0"]
+      # typescript-eslint has no release supporting TypeScript 7 yet (peer
+      # range is <6.1.0); a TS major PR just fails `eslint` at startup.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
 
   # Keep the GitHub Actions used in these workflows current (and patched).
   - package-ecosystem: github-actions
