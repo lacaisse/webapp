@@ -3,7 +3,11 @@ import { getLocale, getTranslations } from "next-intl/server";
 
 import { requireFundRole } from "@/services/auth/dal";
 import { prisma } from "@/services/db/prisma";
-import { buildMemberExportCsv } from "@/services/member/export";
+import {
+  buildMemberExportCsv,
+  memberExportQuestions,
+} from "@/services/member/export";
+import type { AnswerFormatters } from "@/services/onboarding/format";
 
 // Download every member of the fund as a spreadsheet-ready CSV (issue #206).
 // Linked from the Export button on Members.
@@ -23,35 +27,67 @@ export async function GET() {
   const t = await getTranslations();
   const locale = await getLocale();
 
-  const members = await prisma.member.findMany({
-    where: { fundId: fund.id },
-    orderBy: { createdAt: "desc" },
-    select: {
-      firstName: true,
-      lastName: true,
-      email: true,
-      status: true,
-      tier: { select: { name: true } },
-      contributionAmount: true,
-      address: true,
-      postalCode: true,
-      city: true,
-      paymentReference: true,
-      cards: { select: { serialNumber: true } },
-      joinedAt: true,
-      notes: true,
-    },
-  });
+  const [members, fields] = await Promise.all([
+    prisma.member.findMany({
+      where: { fundId: fund.id },
+      orderBy: { createdAt: "desc" },
+      select: {
+        firstName: true,
+        lastName: true,
+        email: true,
+        status: true,
+        tier: { select: { name: true } },
+        contributionAmount: true,
+        address: true,
+        postalCode: true,
+        city: true,
+        paymentReference: true,
+        cards: { select: { serialNumber: true } },
+        joinedAt: true,
+        notes: true,
+        applicationData: true,
+      },
+    }),
+    // The fund's custom questions, in form order, archived ones last.
+    // `nulls: "first"` is what makes "last" true: Postgres sorts NULL after
+    // every real timestamp on ASC, which would put the archived questions'
+    // columns BEFORE the live ones. `builtinKey: null` because a built-in
+    // question writes to a typed Member column that the fixed columns above
+    // already export; its applicationData entry doesn't exist.
+    prisma.onboardingField.findMany({
+      where: { fundId: fund.id, target: "MEMBER", builtinKey: null },
+      orderBy: [
+        { archivedAt: { sort: "asc", nulls: "first" } },
+        { position: "asc" },
+      ],
+      select: { key: true, label: true, type: true, config: true },
+    }),
+  ]);
+
+  const rows = members.map((m) => ({
+    ...m,
+    contributionAmount: m.contributionAmount?.toString() ?? null,
+    applicationData:
+      (m.applicationData as Record<string, unknown> | null) ?? null,
+  }));
+
+  // Same injected rendering as the member detail page, minus the date one:
+  // a spreadsheet column of dates wants the sortable ISO form the cell
+  // already holds, not "15 mars 2026". `joinedAt` above is written the same
+  // way for the same reason.
+  const answerFormatters: AnswerFormatters = {
+    boolean: (v) => (v ? t("common.yes") : t("common.no")),
+    date: (v) => v,
+  };
 
   const file = buildMemberExportCsv({
-    members: members.map((m) => ({
-      ...m,
-      contributionAmount: m.contributionAmount?.toString() ?? null,
-    })),
+    members: rows,
+    questions: memberExportQuestions({ fields, members: rows }),
     fundDomain: fund.domain,
     today: new Date().toISOString().slice(0, 10),
     locale,
     t: (key: string) => t(key as never),
+    answerFormatters,
   });
 
   return new Response(file.csv, {

@@ -58,7 +58,11 @@ function resolveOptionLabel(
   return options.find((o) => o.value === raw)?.label ?? raw;
 }
 
-function isEmpty(value: unknown): boolean {
+// Exported because a CSV export needs the same notion of "unanswered" as the
+// detail pages, but renders it as an EMPTY CELL rather than the em dash a
+// `<dd>` needs — a literal "—" in a spreadsheet column is a value an
+// accountant then has to filter out. See services/member/export.ts.
+export function isEmptyAnswer(value: unknown): boolean {
   if (value === null || value === undefined || value === "") return true;
   // An emptied MULTISELECT is stored as `[]` by mergeApplicationData's
   // normaliser only in legacy blobs (it deletes the key today) — either way
@@ -71,7 +75,7 @@ export function formatOnboardingAnswer(
   field: AnswerField | undefined,
   formatters?: AnswerFormatters,
 ): string {
-  if (isEmpty(value)) return "—";
+  if (isEmptyAnswer(value)) return "—";
 
   if (field?.type === "SELECT") {
     return resolveOptionLabel(value, field.options);
