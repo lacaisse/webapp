@@ -929,6 +929,12 @@ export async function importCardNumbersAction(input: {
 // state and the assign-card flow (activateMemberAction) can give them a
 // replacement primary. Balance is left untouched — move it first with
 // transferBetweenCardsAction if it should follow the holder.
+//
+// Stamps `Card.formerMemberId` with the outgoing holder (issue #222): members
+// keep writing this card's serial on bank transfers long after getting a
+// replacement, so bank-sync's SERIAL/OGM match (services/bank-sync/matching/
+// match.ts) uses it to fall back to the member's new primary card instead of
+// leaving the deposit unmatched.
 
 export type UnassignCardResult = { ok: true } | { error: string };
 
@@ -951,7 +957,7 @@ export async function unassignCardAction(input: {
   await prisma.$transaction([
     prisma.card.update({
       where: { id: card.id },
-      data: { memberId: null },
+      data: { memberId: null, formerMemberId: memberId },
     }),
     // Only clears the pointer when this card actually was the primary — a
     // no-op for secondary (dependant) cards.
