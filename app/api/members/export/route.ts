@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { getFormatter, getLocale, getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 
 import { requireFundRole } from "@/services/auth/dal";
 import { prisma } from "@/services/db/prisma";
@@ -48,13 +48,18 @@ export async function GET() {
         applicationData: true,
       },
     }),
-    // The fund's custom questions, in form order, archived ones last — the
-    // same ordering the member detail page uses. `builtinKey: null` because a
-    // built-in question writes to a typed Member column that the fixed
-    // columns above already export; its applicationData entry doesn't exist.
+    // The fund's custom questions, in form order, archived ones last.
+    // `nulls: "first"` is what makes "last" true: Postgres sorts NULL after
+    // every real timestamp on ASC, which would put the archived questions'
+    // columns BEFORE the live ones. `builtinKey: null` because a built-in
+    // question writes to a typed Member column that the fixed columns above
+    // already export; its applicationData entry doesn't exist.
     prisma.onboardingField.findMany({
       where: { fundId: fund.id, target: "MEMBER", builtinKey: null },
-      orderBy: [{ archivedAt: "asc" }, { position: "asc" }],
+      orderBy: [
+        { archivedAt: { sort: "asc", nulls: "first" } },
+        { position: "asc" },
+      ],
       select: { key: true, label: true, type: true, config: true },
     }),
   ]);
