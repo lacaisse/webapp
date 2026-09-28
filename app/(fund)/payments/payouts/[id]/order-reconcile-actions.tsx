@@ -12,6 +12,7 @@ import {
 import { useFormatter, useTranslations } from "next-intl";
 import { useState, useTransition } from "react";
 
+import { Sensitive } from "@/components/privacy/sensitive";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -364,7 +365,13 @@ function FixDialog({
                       the long bank reference truncates instead of pushing the
                       modal past its max-w-sm. */}
                   <div className="min-w-0 flex-1 truncate">
-                    {bankMatch.counterpartName ?? t("bankMatchUnknown")}
+                    {bankMatch.counterpartName ? (
+                      <Sensitive kind="name">
+                        {bankMatch.counterpartName}
+                      </Sensitive>
+                    ) : (
+                      t("bankMatchUnknown")
+                    )}
                   </div>
                   <div className="shrink-0 font-medium tabular-nums">
                     {format.number(Number(bankMatch.amount), {
@@ -375,7 +382,11 @@ function FixDialog({
                 </div>
                 <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                   <div className="min-w-0 flex-1 truncate font-mono">
-                    {bankMatch.reference ?? "—"}
+                    {bankMatch.reference ? (
+                      <Sensitive kind="number">{bankMatch.reference}</Sensitive>
+                    ) : (
+                      "—"
+                    )}
                   </div>
                   <div className="shrink-0">
                     {format.dateTime(new Date(bankMatch.occurredAt), {

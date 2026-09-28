@@ -7,7 +7,9 @@ import { useMemo, useState, useTransition } from "react";
 
 import { Combobox } from "@base-ui/react/combobox";
 
+import { usePrivacyMode } from "@/components/privacy/privacy-provider";
 import { Badge } from "@/components/ui/badge";
+import { maskValue } from "@/lib/privacy";
 import { setCardSourceAction } from "@/services/card/admin-actions";
 
 // A card's pull-from source: another fund card, or a SOURCE token account.
@@ -40,6 +42,9 @@ export function CardSourcePicker({
   const t = useTranslations("fund.cards.detail.source");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  // Card options are people (number, holder, serial); SOURCE accounts are the
+  // fund's own and stay readable. Search still runs on the real values.
+  const privacy = usePrivacyMode();
 
   const current = useMemo(
     () => options.find((o) => refId(o) === currentRefId) ?? null,
@@ -49,6 +54,7 @@ export function CardSourcePicker({
 
   const label = (o: SourceOption) => {
     if (o.type === "card") {
+      if (privacy) return maskValue("name");
       const num = o.number != null ? `#${o.number}` : null;
       return [num, o.name].filter(Boolean).join(" · ") || o.serial;
     }
@@ -100,7 +106,11 @@ export function CardSourcePicker({
           <Combobox.Input
             placeholder={
               unresolvedSourceSerial
-                ? t("unresolved", { serial: unresolvedSourceSerial })
+                ? t("unresolved", {
+                    serial: privacy
+                      ? maskValue("number")
+                      : unresolvedSourceSerial,
+                  })
                 : t("placeholder")
             }
             className="h-8 w-full rounded-md bg-background py-1 pr-14 pl-2 text-xs ring-1 ring-foreground/15 outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
@@ -146,7 +156,9 @@ export function CardSourcePicker({
                         {label(item)}
                       </span>
                       <span className="truncate font-mono text-[0.7rem] text-muted-foreground">
-                        {item.serial}
+                        {privacy && item.type === "card"
+                          ? maskValue("number")
+                          : item.serial}
                       </span>
                     </span>
                     <Badge variant="outline" className="shrink-0">

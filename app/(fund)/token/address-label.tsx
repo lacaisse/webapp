@@ -8,6 +8,7 @@ import {
   Wallet2,
 } from "lucide-react";
 
+import { Sensitive } from "@/components/privacy/sensitive";
 import { Badge } from "@/components/ui/badge";
 import { isZeroAddress, shortAddress } from "@/services/alchemy/format";
 
@@ -15,6 +16,11 @@ import { isZeroAddress, shortAddress } from "@/services/alchemy/format";
 // own locally), special protocol addresses (zero = mint/burn, fund
 // minter), and falls back to a truncated hex with an "Unknown" badge so
 // non-crypto users get something they can recognise.
+//
+// Privacy mode: people (cards, CitizenPay profiles) and unresolved raw
+// addresses render through <Sensitive>; fund accounts, places and protocol
+// addresses stay readable. This module stays a plain server-renderable one —
+// the client-side <Sensitive> makes the call.
 
 export type AddressDirectory = {
   // lowercased address -> labels
@@ -156,7 +162,9 @@ export function AddressLabel({
     return (
       <span className="inline-flex items-center gap-1.5 text-sm">
         <User className="size-3.5 text-muted-foreground" />
-        <span>{card.name}</span>
+        <span>
+          <Sensitive kind="name">{card.name}</Sensitive>
+        </span>
       </span>
     );
   }
@@ -176,16 +184,25 @@ export function AddressLabel({
     return (
       <span className="inline-flex items-center gap-1.5 text-sm">
         {profile.imageSmall ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={profile.imageSmall}
-            alt=""
-            className="size-3.5 rounded-full object-cover"
-          />
+          // The avatar sits on top of the fallback icon; in privacy mode
+          // <Sensitive> drops the image (empty mask) and the icon shows.
+          <span className="relative inline-flex size-3.5 shrink-0">
+            <User className="size-3.5 text-muted-foreground" />
+            <Sensitive kind="name" mask="">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={profile.imageSmall}
+                alt=""
+                className="absolute inset-0 size-3.5 rounded-full bg-background object-cover"
+              />
+            </Sensitive>
+          </span>
         ) : (
           <User className="size-3.5 text-muted-foreground" />
         )}
-        <span>{profile.name}</span>
+        <span>
+          <Sensitive kind="name">{profile.name}</Sensitive>
+        </span>
       </span>
     );
   }
@@ -194,7 +211,7 @@ export function AddressLabel({
     <span className="inline-flex items-center gap-2">
       <Store className="size-3.5 text-muted-foreground" />
       <span className="font-mono text-xs text-muted-foreground">
-        {shortAddress(lower)}
+        <Sensitive kind="address">{shortAddress(lower)}</Sensitive>
       </span>
       <Badge variant="outline">{labels.unknown}</Badge>
     </span>

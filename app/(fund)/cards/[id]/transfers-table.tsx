@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowRight, ChevronRight, RotateCcw } from "lucide-react";
 import { getFormatter, getTranslations } from "next-intl/server";
 
+import { Sensitive } from "@/components/privacy/sensitive";
 import { buttonVariants } from "@/components/ui/button";
 import {
   Table,
@@ -18,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { formatTokenAmount, isZeroAddress } from "@/services/alchemy/format";
 import { listTransfersForAccount } from "@/services/alchemy/transfers";
 import { prisma } from "@/services/db/prisma";
+import { getPrivacyMode } from "@/services/privacy/server";
 import { getAnnotations } from "@/services/transaction-annotation/annotate";
 
 import {
@@ -62,6 +64,7 @@ export async function CardTransfersTable({
   const t = await getTranslations("fund.cards.detail.transfers");
   const tAcc = await getTranslations("fund.accounts");
   const format = await getFormatter();
+  const privacy = await getPrivacyMode();
 
   const [page, cards, placesResult, merchants, tokenAccounts] =
     await Promise.all([
@@ -173,8 +176,14 @@ export async function CardTransfersTable({
 
   // Override the entry for the card we're viewing so its row labels read
   // "This card" rather than echoing its own holder name on every line —
-  // it's the implicit subject of the page.
-  directory.cards.set(account.toLowerCase(), { name: t("self") });
+  // it's the implicit subject of the page. In privacy mode card labels are
+  // masked, so "This card" goes through the (readable) accounts map instead
+  // — it names no one and keeps the direction of each row legible.
+  if (privacy) {
+    directory.accounts.set(account.toLowerCase(), { name: t("self") });
+  } else {
+    directory.cards.set(account.toLowerCase(), { name: t("self") });
+  }
 
   const labelDict = {
     issued: t("issued"),
@@ -231,7 +240,10 @@ export async function CardTransfersTable({
                   />
                 </TableCell>
                 <TableCell className="text-right font-medium tabular-nums">
-                  {formatTokenAmount(tx.rawValue, decimals)}
+                  {/* Every row moves money on or off this member card. */}
+                  <Sensitive kind="amount">
+                    {formatTokenAmount(tx.rawValue, decimals)}
+                  </Sensitive>
                   {symbol && (
                     <span className="ml-1 text-xs text-muted-foreground">
                       {symbol}

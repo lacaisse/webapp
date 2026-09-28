@@ -5,10 +5,12 @@ import { Loader2, RotateCcw, Send } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useState, useTransition } from "react";
 
+import { usePrivacyMode } from "@/components/privacy/privacy-provider";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { maskValue } from "@/lib/privacy";
 import {
   previewEmailTemplateAction,
   saveTemplateLocalizationAction,
@@ -58,6 +60,7 @@ export function EmailTemplateEditor({
   const t = useTranslations("fund.settings.emailTemplates");
   const tRoot = useTranslations("fund.settings");
   const tLocale = useTranslations("locale");
+  const privacy = usePrivacyMode();
 
   const readOnly = templateId === null;
 
@@ -356,7 +359,9 @@ export function EmailTemplateEditor({
               <option value="">{t("test.sampleData")}</option>
               {testMembers.map((m) => (
                 <option key={m.id} value={m.id}>
-                  {`${m.firstName} ${m.lastName}`.trim()} — {m.email}
+                  {privacy
+                    ? `${maskValue("name")} — ${maskValue("email")}`
+                    : `${`${m.firstName} ${m.lastName}`.trim()} — ${m.email}`}
                 </option>
               ))}
             </select>

@@ -4,9 +4,11 @@
 import { Store, User, Wallet, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { usePrivacyMode } from "@/components/privacy/privacy-provider";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { maskValue } from "@/lib/privacy";
 import { cn } from "@/lib/utils";
 import { shortAddress } from "@/services/alchemy/format";
 import {
@@ -258,16 +260,20 @@ function SelectedChip({
       : selected.kind === "place"
         ? Store
         : Wallet;
+  // Privacy mode masks card (person) recipients; places stay readable.
+  const masked = usePrivacyMode() && selected.kind === "card";
   return (
     <div className="flex min-w-0 items-center gap-2 overflow-hidden rounded-lg border border-input bg-muted/30 px-2.5 py-1.5">
       <Icon className="size-4 shrink-0 text-muted-foreground" />
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium">{selected.label}</div>
+        <div className="truncate text-sm font-medium">
+          {masked ? maskValue("name") : selected.label}
+        </div>
         <div
           className="truncate font-mono text-xs text-muted-foreground"
-          title={selected.account}
+          title={masked ? undefined : selected.account}
         >
-          {shortAddress(selected.account)}
+          {masked ? maskValue("address") : shortAddress(selected.account)}
         </div>
       </div>
       <button
@@ -353,14 +359,25 @@ function HitRow({
 }) {
   const Icon = hit.kind === "card" ? User : Store;
   const badge = hit.kind === "card" ? labels.card : labels.place;
+  // Privacy mode masks card (person) rows; the search itself still runs on
+  // the real values server-side.
+  const masked = usePrivacyMode() && hit.kind === "card";
   return (
     <>
       <Icon className="size-4 shrink-0 text-muted-foreground" />
       <div className="min-w-0 flex-1">
-        <div className="truncate font-medium">{hit.label}</div>
+        <div className="truncate font-medium">
+          {masked ? maskValue("name") : hit.label}
+        </div>
         <div className="truncate font-mono text-xs text-muted-foreground">
-          {hit.sublabel ? `${hit.sublabel} · ` : ""}
-          {hit.account}
+          {masked ? (
+            `${hit.sublabel ? `${maskValue("number")} · ` : ""}${maskValue("address")}`
+          ) : (
+            <>
+              {hit.sublabel ? `${hit.sublabel} · ` : ""}
+              {hit.account}
+            </>
+          )}
         </div>
       </div>
       <Badge variant="outline" className="shrink-0">

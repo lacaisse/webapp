@@ -4,6 +4,8 @@
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 
+import { usePrivacyMode } from "@/components/privacy/privacy-provider";
+import { Sensitive } from "@/components/privacy/sensitive";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,6 +35,10 @@ type EmailRow = {
 
 export function EmailDetailDialog({ email }: { email: EmailRow }) {
   const t = useTranslations("fund.emails.detail");
+  const tPrivacy = useTranslations("privacyMode");
+  // The body is addressed to a member (name, card, amounts) — privacy mode
+  // replaces it wholesale rather than trying to mask inside the HTML.
+  const privacy = usePrivacyMode();
   const [view, setView] = useState<"text" | "html">("text");
 
   return (
@@ -48,7 +54,8 @@ export function EmailDetailDialog({ email }: { email: EmailRow }) {
         <DialogHeader>
           <DialogTitle>{email.subject}</DialogTitle>
           <DialogDescription>
-            <code className="text-xs">{email.type}</code> · {email.toEmail}
+            <code className="text-xs">{email.type}</code> ·{" "}
+            <Sensitive kind="email">{email.toEmail}</Sensitive>
           </DialogDescription>
         </DialogHeader>
 
@@ -83,7 +90,13 @@ export function EmailDetailDialog({ email }: { email: EmailRow }) {
           </Alert>
         )}
 
-        {(email.bodyText || email.bodyHtml) && (
+        {privacy && (email.bodyText || email.bodyHtml) && (
+          <p className="rounded-md bg-muted p-3 text-xs text-muted-foreground">
+            {tPrivacy("masked")}
+          </p>
+        )}
+
+        {!privacy && (email.bodyText || email.bodyHtml) && (
           <div className="space-y-2">
             <div className="inline-flex gap-0.5 rounded-md bg-muted p-0.5 text-xs">
               <button

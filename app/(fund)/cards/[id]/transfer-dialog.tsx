@@ -5,6 +5,7 @@ import { CreditCard, X } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useTranslations } from "next-intl";
 
+import { Sensitive } from "@/components/privacy/sensitive";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -266,11 +267,11 @@ function TargetCardPicker({
           <CreditCard className="size-4 shrink-0 text-muted-foreground" />
           <div className="flex min-w-0 flex-1 items-baseline gap-2">
             <span className="shrink-0 font-mono text-sm font-medium">
-              {value.serialNumber}
+              <Sensitive kind="number">{value.serialNumber}</Sensitive>
             </span>
             {value.holderName && (
               <span className="truncate text-xs text-muted-foreground">
-                {value.holderName}
+                <Sensitive kind="name">{value.holderName}</Sensitive>
               </span>
             )}
           </div>
@@ -330,11 +331,21 @@ function TargetCardPicker({
                   <CreditCard className="size-4 shrink-0 text-muted-foreground" />
                   <div className="min-w-0 flex-1">
                     <div className="truncate font-mono text-sm font-medium">
-                      {card.serialNumber}
+                      <Sensitive kind="number">{card.serialNumber}</Sensitive>
                     </div>
                     <div className="truncate text-xs text-muted-foreground">
-                      {card.holderName ??
-                        (card.number != null ? `#${card.number}` : t("noName"))}
+                      {card.holderName != null ? (
+                        <Sensitive kind="name">{card.holderName}</Sensitive>
+                      ) : card.number != null ? (
+                        <>
+                          #
+                          <Sensitive kind="number">
+                            {String(card.number)}
+                          </Sensitive>
+                        </>
+                      ) : (
+                        t("noName")
+                      )}
                     </div>
                   </div>
                 </button>

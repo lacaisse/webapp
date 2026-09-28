@@ -2,9 +2,11 @@
 import { redirect } from "next/navigation";
 
 import { FundSidebar } from "@/components/fund-sidebar";
+import { PrivacyProvider } from "@/components/privacy/privacy-provider";
 import { requireFundRole } from "@/services/auth/dal";
 import { getApexUrl } from "@/services/fund/server";
 import { getHostType } from "@/services/host/server";
+import { getPrivacyMode } from "@/services/privacy/server";
 
 // Fund admin shell: sidebar + main content. Entry requires at least OPERATOR
 // (cards + members manager); each page self-guards beyond that — ADMIN-only
@@ -23,20 +25,24 @@ export default async function FundLayout({
   }
 
   const { fund, membership } = await requireFundRole("OPERATOR");
+  const privacy = await getPrivacyMode();
 
   return (
-    <div className="flex flex-1">
-      <FundSidebar
-        fundName={fund.name}
-        fundDomain={fund.domain}
-        apexUrl={getApexUrl("/")}
-        role={membership.role}
-      />
-      <main className="flex-1 bg-muted/40">
-        <div className="mx-auto w-full max-w-6xl space-y-6 px-6 py-8">
-          {children}
-        </div>
-      </main>
-    </div>
+    <PrivacyProvider enabled={privacy}>
+      <div className="flex flex-1">
+        <FundSidebar
+          fundName={fund.name}
+          fundDomain={fund.domain}
+          apexUrl={getApexUrl("/")}
+          role={membership.role}
+          privacyMode={privacy}
+        />
+        <main className="flex-1 bg-muted/40">
+          <div className="mx-auto w-full max-w-6xl space-y-6 px-6 py-8">
+            {children}
+          </div>
+        </main>
+      </div>
+    </PrivacyProvider>
   );
 }

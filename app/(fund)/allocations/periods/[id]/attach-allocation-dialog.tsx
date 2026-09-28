@@ -5,6 +5,7 @@ import { Link2, Loader2 } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { useEffect, useState, useTransition } from "react";
 
+import { Sensitive } from "@/components/privacy/sensitive";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -121,7 +122,7 @@ export function AttachAllocationDialog({
                 >
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium tabular-nums">
-                      {a.amount}
+                      <Sensitive kind="amount">{a.amount}</Sensitive>
                     </div>
                     <div className="truncate text-xs text-muted-foreground">
                       {format.dateTime(new Date(a.submittedAt), {

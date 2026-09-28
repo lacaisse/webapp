@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { getFormatter, getTranslations } from "next-intl/server";
 
+import { Sensitive } from "@/components/privacy/sensitive";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -31,6 +32,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { maskValue } from "@/lib/privacy";
 import { cn } from "@/lib/utils";
 import { formatTokenAmount, isZeroAddress } from "@/services/alchemy/format";
 import { listTransfersForAccount } from "@/services/alchemy/transfers";
@@ -38,6 +40,7 @@ import { getCitizenPayClient } from "@/services/citizenpay/client";
 import { prisma } from "@/services/db/prisma";
 import { requireFundRole } from "@/services/auth/dal";
 import { requireCurrentFund } from "@/services/fund/server";
+import { getPrivacyMode } from "@/services/privacy/server";
 import {
   formatOnboardingAnswer,
   type AnswerFormatters,
@@ -91,6 +94,10 @@ async function MerchantDetail({
   const fund = await requireCurrentFund();
   const { id } = await params;
   const { cursor } = await searchParams;
+  // Privacy mode masks the merchant's contact person (not the business) and
+  // bank details. Strings interpolated through t() are masked here; rendered
+  // values go through <Sensitive>.
+  const privacy = await getPrivacyMode();
 
   const merchant = await prisma.merchant.findFirst({
     where: { id, fundId: fund.id },
@@ -250,7 +257,9 @@ async function MerchantDetail({
           <CardContent className="pb-3 text-sm">
             <p>
               {t("invite.sentTo", {
-                email: merchant.citizenPayInviteEmail ?? "",
+                email: privacy
+                  ? maskValue("email")
+                  : (merchant.citizenPayInviteEmail ?? ""),
               })}
               {merchant.citizenPayInviteSentAt &&
                 ` ${t("invite.on", {
@@ -282,10 +291,26 @@ async function MerchantDetail({
           <CardContent className="pb-3">
             <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
               <DtDd label={t("contact.contactName")}>
-                {merchant.contactName ?? "—"}
+                {merchant.contactName ? (
+                  <Sensitive kind="name">{merchant.contactName}</Sensitive>
+                ) : (
+                  "—"
+                )}
               </DtDd>
-              <DtDd label={t("contact.email")}>{merchant.email ?? "—"}</DtDd>
-              <DtDd label={t("contact.phone")}>{merchant.phone ?? "—"}</DtDd>
+              <DtDd label={t("contact.email")}>
+                {merchant.email ? (
+                  <Sensitive kind="email">{merchant.email}</Sensitive>
+                ) : (
+                  "—"
+                )}
+              </DtDd>
+              <DtDd label={t("contact.phone")}>
+                {merchant.phone ? (
+                  <Sensitive kind="phone">{merchant.phone}</Sensitive>
+                ) : (
+                  "—"
+                )}
+              </DtDd>
               <DtDd label={t("contact.website")}>
                 {merchant.website ? (
                   <a
@@ -301,27 +326,33 @@ async function MerchantDetail({
                 )}
               </DtDd>
               <DtDd label={t("contact.address")}>
-                {formatAddress(
-                  merchant.address,
-                  merchant.postalCode,
-                  merchant.city,
-                  merchant.country,
-                )}
+                <Sensitive kind="address">
+                  {formatAddress(
+                    merchant.address,
+                    merchant.postalCode,
+                    merchant.city,
+                    merchant.country,
+                  )}
+                </Sensitive>
               </DtDd>
               {mapsUrl && coords && (
                 <DtDd label={t("contact.location")}>
-                  <a
-                    href={mapsUrl}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="inline-flex items-center gap-1 hover:underline"
-                  >
-                    {t("contact.coordinates", {
-                      lat: coords.lat,
-                      lng: coords.lng,
-                    })}
-                    <ExternalLink className="size-3" />
-                  </a>
+                  {/* Masks the whole link — the OSM href carries the
+                      coordinates too. */}
+                  <Sensitive kind="address">
+                    <a
+                      href={mapsUrl}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="inline-flex items-center gap-1 hover:underline"
+                    >
+                      {t("contact.coordinates", {
+                        lat: coords.lat,
+                        lng: coords.lng,
+                      })}
+                      <ExternalLink className="size-3" />
+                    </a>
+                  </Sensitive>
                 </DtDd>
               )}
               {merchant.emailVerifiedAt && (
@@ -419,7 +450,7 @@ async function MerchantDetail({
               )}
               {merchant.reviewNote && (
                 <DtDd label={t("business.reviewNote")}>
-                  {merchant.reviewNote}
+                  <Sensitive kind="text">{merchant.reviewNote}</Sensitive>
                 </DtDd>
               )}
             </dl>
@@ -445,13 +476,15 @@ async function MerchantDetail({
                     | null) ?? null;
                 return (
                   <DtDd key={key} label={field?.label ?? key}>
-                    {formatOnboardingAnswer(
-                      value,
-                      field
-                        ? { type: field.type, options: config?.options ?? [] }
-                        : undefined,
-                      answerFormatters,
-                    )}
+                    <Sensitive kind="text">
+                      {formatOnboardingAnswer(
+                        value,
+                        field
+                          ? { type: field.type, options: config?.options ?? [] }
+                          : undefined,
+                        answerFormatters,
+                      )}
+                    </Sensitive>
                   </DtDd>
                 );
               })}
@@ -492,7 +525,13 @@ async function MerchantDetail({
                     {format.dateTime(b.occurredAt, { dateStyle: "medium" })}
                   </TableCell>
                   <TableCell className="font-mono text-xs">
-                    {b.counterpartReference ?? b.remittanceInfo ?? "—"}
+                    {(b.counterpartReference ?? b.remittanceInfo) ? (
+                      <Sensitive kind="number">
+                        {b.counterpartReference ?? b.remittanceInfo}
+                      </Sensitive>
+                    ) : (
+                      "—"
+                    )}
                   </TableCell>
                   <TableCell className="text-right font-medium">
                     {b.amount.toString()} {b.currency}
@@ -531,7 +570,7 @@ async function MerchantDetail({
                   </TableCell>
                   <TableCell className="text-sm">{e.type}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {e.toEmail}
+                    <Sensitive kind="email">{e.toEmail}</Sensitive>
                   </TableCell>
                   <TableCell>
                     <EmailStatusBadge status={e.status} />
@@ -580,6 +619,10 @@ async function MerchantTransfersSection({
   const t = await getTranslations("fund.merchants.detail");
   const tAcc = await getTranslations("fund.accounts");
   const format = await getFormatter();
+  // Counterparty labels come from a shared server-rendered directory, so
+  // privacy mode masks the person-bearing entries (member cards, CP user
+  // profiles) as they go in. Places and fund accounts stay named.
+  const privacy = await getPrivacyMode();
 
   let transferRows: Array<{
     uniqueId: string;
@@ -672,14 +715,23 @@ async function MerchantTransfersSection({
           );
 
     transferDirectory = buildAddressDirectory({
-      cards: cards.map((c) => ({
-        account: c.account,
-        holderName: c.holderName,
-        memberName: c.member
-          ? `${c.member.firstName} ${c.member.lastName}`.trim()
-          : "",
-        serialNumber: c.serialNumber,
-      })),
+      cards: cards.map((c) =>
+        privacy
+          ? {
+              account: c.account,
+              holderName: maskValue("name"),
+              memberName: maskValue("name"),
+              serialNumber: maskValue("number"),
+            }
+          : {
+              account: c.account,
+              holderName: c.holderName,
+              memberName: c.member
+                ? `${c.member.firstName} ${c.member.lastName}`.trim()
+                : "",
+              serialNumber: c.serialNumber,
+            },
+      ),
       places: placesResult.map((p) => ({
         account: p.account,
         name: merchantNameByPlaceId.get(p.id) ?? p.name,
@@ -688,7 +740,13 @@ async function MerchantTransfersSection({
         account: a.address,
         name: a.name || tAcc("defaultName"),
       })),
-      profiles: fetchedProfiles,
+      profiles: privacy
+        ? fetchedProfiles.map((p) => ({
+            account: p.account,
+            name: maskValue("name"),
+            imageSmall: null,
+          }))
+        : fetchedProfiles,
       minterEoa: fund.tokenMinterEoaAddress,
       minterSmartAccount: fund.tokenMinterSmartAccountAddress,
     });

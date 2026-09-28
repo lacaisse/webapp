@@ -4,6 +4,7 @@ import { Download } from "lucide-react";
 import Link from "next/link";
 import { getFormatter, getTranslations } from "next-intl/server";
 
+import { Sensitive } from "@/components/privacy/sensitive";
 import { TableSearch } from "@/components/table-search";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { Badge, badgeVariants } from "@/components/ui/badge";
@@ -19,6 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { maskValue } from "@/lib/privacy";
 import { parseCardNumber, searchTokens } from "@/lib/search";
 import { cn } from "@/lib/utils";
 import { MemberStatus } from "@/services/db/generated/enums";
@@ -26,6 +28,7 @@ import { prisma } from "@/services/db/prisma";
 import { requireCurrentFund } from "@/services/fund/server";
 import { contributionApplies } from "@/services/member/contribution";
 import { isMemberDeletable } from "@/services/member/eligibility";
+import { getPrivacyMode } from "@/services/privacy/server";
 import { AddCardDialog } from "./add-card-dialog";
 import { BulkActionsBar } from "./bulk-actions-bar";
 import { DeleteMemberButton } from "./delete-member-button";
@@ -174,6 +177,7 @@ async function MembersContent({
   const sp = await searchParams;
   const active = resolveActiveTab(sp.tab, TABS);
   const q = sp.q?.trim() || null;
+  const privacy = await getPrivacyMode();
 
   const status = statusFilterFor(active);
   const [members, tiers, statusCounts] = await Promise.all([
@@ -292,6 +296,9 @@ async function MembersContent({
           ) : (
             members.map((m) => {
               const fullName = `${m.firstName} ${m.lastName}`.trim();
+              // Dialog props are interpolated into strings client-side, so
+              // they get the mask here rather than a <Sensitive> wrapper.
+              const displayName = privacy ? maskValue("name") : fullName;
               return (
                 <TableRow key={m.id}>
                   <TableCell className="w-10">
@@ -302,11 +309,13 @@ async function MembersContent({
                       href={`/members/${m.id}`}
                       className="hover:underline"
                     >
-                      {fullName}
+                      <Sensitive kind="name">{fullName}</Sensitive>
                     </Link>
                   </TableCell>
                   <TableCell>
-                    <div className="text-sm">{m.email}</div>
+                    <div className="text-sm">
+                      <Sensitive kind="email">{m.email}</Sensitive>
+                    </div>
                     {!m.emailVerifiedAt && (
                       <div className="text-xs text-warning">
                         {t("unverified")}
@@ -335,16 +344,25 @@ async function MembersContent({
                         <div className="flex gap-1">
                           <dt>{t("contribution.committed")}:</dt>
                           <dd className="tabular-nums text-foreground">
-                            {m.contributionAmount.toString()}
+                            <Sensitive kind="amount">
+                              {m.contributionAmount.toString()}
+                            </Sensitive>
                           </dd>
                         </div>
                       )}
                       <div className="flex gap-1">
                         <dt>{t("contribution.lastReceived")}:</dt>
                         <dd className="tabular-nums text-foreground">
-                          {m.bankTransactions[0]
-                            ? `${m.bankTransactions[0].amount.toString()} ${m.bankTransactions[0].currency}`
-                            : t("contribution.none")}
+                          {m.bankTransactions[0] ? (
+                            <>
+                              <Sensitive kind="amount">
+                                {m.bankTransactions[0].amount.toString()}
+                              </Sensitive>{" "}
+                              {m.bankTransactions[0].currency}
+                            </>
+                          ) : (
+                            t("contribution.none")
+                          )}
                         </dd>
                       </div>
                     </dl>
@@ -365,11 +383,16 @@ async function MembersContent({
                           >
                             {card.number !== null && (
                               <span className="tabular-nums">
-                                #{card.number}
+                                #
+                                <Sensitive kind="number">
+                                  {String(card.number)}
+                                </Sensitive>
                               </span>
                             )}
                             <span className="font-mono text-muted-foreground">
-                              {card.serialNumber}
+                              <Sensitive kind="number">
+                                {card.serialNumber}
+                              </Sensitive>
                             </span>
                           </Link>
                         ))}
@@ -385,7 +408,7 @@ async function MembersContent({
                         (m.status === "NEW" || m.status === "ACTIVE") && (
                           <MemberRowActions
                             memberId={m.id}
-                            memberName={fullName}
+                            memberName={displayName}
                             emailVerified={m.emailVerifiedAt !== null}
                             alreadyActive={m.status === "ACTIVE"}
                           />
@@ -393,18 +416,18 @@ async function MembersContent({
                       {m.status === "ACTIVE" && m.primaryCardId && (
                         <AddCardDialog
                           memberId={m.id}
-                          memberName={fullName}
+                          memberName={displayName}
                         />
                       )}
                       <StatusChangeDialog
                         memberId={m.id}
-                        memberName={fullName}
+                        memberName={displayName}
                         currentStatus={m.status}
                       />
                       {isMemberDeletable(m) && (
                         <DeleteMemberButton
                           memberId={m.id}
-                          memberName={fullName}
+                          memberName={displayName}
                         />
                       )}
                     </div>

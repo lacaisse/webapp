@@ -23,6 +23,11 @@
     "nl": "Nederlands",
     "es": "Español"
   },
+  "privacyMode": {
+    "toggle": "Privacy mode",
+    "on": "Personal data hidden",
+    "masked": "Hidden in privacy mode"
+  },
   "auth": {
     "login": {
       "title": "Sign in",
@@ -366,37 +371,91 @@
     "dashboard": {
       "title": "Dashboard",
       "description": "Overview of your fund's activity and balances.",
+      "tokenFallback": "tokens",
+      "range": {
+        "3m": "3 months",
+        "6m": "6 months",
+        "12m": "12 months"
+      },
       "kpi": {
-        "totalBalance": "Total balance",
-        "totalBalanceHint": "Tokens in circulation across all cards.",
+        "circulation": "Tokens in circulation",
+        "circulationHintChain": "On-chain total supply.",
+        "circulationHintCards": "Sum of card balances (on-chain supply unavailable).",
+        "circulationHintNone": "No token configured yet.",
         "activeMembers": "Active members",
-        "activeMembersHint": "Members with at least one active card.",
-        "allocatedThisMonth": "Allocated this month",
-        "allocatedThisMonthHint": "Tokens issued to members this month.",
-        "spentThisMonth": "Spent this month",
-        "spentThisMonthHint": "Tokens redeemed at merchants this month."
+        "activeMembersHint": "+{n} this month",
+        "activeMerchants": "Active merchants",
+        "activeMerchantsHint": "{n} connected to CitizenPay",
+        "contributions": "Contributions this month",
+        "contributionsHint": "{deposits, plural, one {# deposit} other {# deposits}} · {unmatched} unmatched",
+        "allocated": "Allocated this month",
+        "allocatedHint": "Confirmed allocations to members' cards.",
+        "paidOut": "Paid out to merchants this month",
+        "paidOutHint": "{n, plural, =0 {No bank transfers yet} one {# bank transfer} other {# bank transfers}}",
+        "heldByMerchants": "Held by merchants",
+        "heldByMerchantsHint": "Awaiting payout",
+        "heldByMerchantsUnavailable": "CitizenPay unavailable",
+        "pending": "Pending allocations",
+        "pendingHint": "{failed, plural, =0 {None failed} one {# failed} other {# failed}} in the last {months} months"
+      },
+      "charts": {
+        "moneyTitle": "Money in vs tokens allocated",
+        "moneyDescription": "Contributions received and tokens allocated per month (1 {symbol} = 1 €).",
+        "contributionsSeries": "Contributions received (€)",
+        "allocatedSeries": "Tokens allocated ({symbol})",
+        "moneyAria": "Bar chart of contributions received and tokens allocated per month",
+        "membersTitle": "New members per month",
+        "membersDescription": "{total, plural, one {# member} other {# members}} in total",
+        "membersSeries": "New members",
+        "membersAria": "Bar chart of new members per month",
+        "empty": "No data for this period."
+      },
+      "payouts": {
+        "title": "Merchant payouts",
+        "description": "{total} paid out to {n, plural, one {# merchant} other {# merchants}} in the last {months} months",
+        "empty": "No payouts in this period."
+      },
+      "members": {
+        "title": "Members by status",
+        "description": "Every member on file, by lifecycle status.",
+        "empty": "No members yet."
+      },
+      "memberStatus": {
+        "ACTIVE": "Active",
+        "NEW": "New",
+        "PAUSED": "Paused",
+        "INACTIVE": "Inactive",
+        "STOPPED": "Stopped",
+        "REJECTED": "Rejected"
       },
       "tiers": {
         "title": "Allocation tiers",
-        "description": "Balance and reach for each configured tier.",
         "range": "Min {min} · Max {max}",
-        "members": "{n} members",
+        "members": "{n, plural, one {# member} other {# members}}",
         "empty": "No tiers configured."
-      },
-      "citizenpay": {
-        "title": "Citizen Pay connection",
-        "description": "Status of the link to your Citizen Pay account.",
-        "account": "Account",
-        "terminal": "Terminal",
-        "lastSync": "Last sync"
       },
       "recentActivity": {
         "title": "Recent activity",
         "date": "Date",
         "event": "Event",
-        "subject": "Subject",
+        "subject": "Member",
         "amount": "Amount",
-        "empty": "No activity yet."
+        "empty": "No activity yet.",
+        "type": {
+          "MINT": "Allocation",
+          "BURN": "Burn",
+          "TRANSFER": "Transfer"
+        },
+        "status": {
+          "PENDING": "pending",
+          "CONFIRMED": "confirmed",
+          "FAILED": "failed"
+        }
+      },
+      "citizenpay": {
+        "connected": "CitizenPay account {account} · last sync {lastSync}",
+        "never": "never",
+        "notConnected": "Not connected to CitizenPay."
       }
     },
     "members": {

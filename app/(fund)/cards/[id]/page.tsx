@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Coins, Download, ExternalLink } from "lucide-react";
 import { getFormatter, getTranslations } from "next-intl/server";
 
+import { Sensitive } from "@/components/privacy/sensitive";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import {
@@ -15,6 +16,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { CopyButton } from "@/components/copy-button";
+import { maskValue } from "@/lib/privacy";
 import { getBalances } from "@/services/alchemy/balances";
 import { formatTokenAmount, shortAddress } from "@/services/alchemy/format";
 import { getCitizenPayClient } from "@/services/citizenpay/client";
@@ -25,6 +27,7 @@ import {
 import { prisma } from "@/services/db/prisma";
 import { buildCardLink } from "@/services/email/templates";
 import { requireCurrentFund } from "@/services/fund/server";
+import { getPrivacyMode } from "@/services/privacy/server";
 
 import { CardRowActions } from "../card-row-actions";
 import { TableSkeleton } from "../../token/skeleton";
@@ -47,6 +50,7 @@ export default async function CardDetailPage({
   const tNotify = await getTranslations("cards.admin.notify");
   const format = await getFormatter();
   const fund = await requireCurrentFund();
+  const privacy = await getPrivacyMode();
   const { id } = await params;
   const sp = await searchParams;
 
@@ -85,6 +89,10 @@ export default async function CardDetailPage({
     ? `${card.member.firstName} ${card.member.lastName}`.trim()
     : "";
   const holderLabel = card.holderName || memberName || card.serialNumber;
+  // String props into client dialogs get the mask here; rendered values use
+  // <Sensitive>.
+  const holderDisplay = privacy ? maskValue("name") : holderLabel;
+  const notifyName = privacy ? maskValue("name") : memberName || holderLabel;
   const isPrimary = card.member?.primaryCardId === card.id;
   const isLost = card.reportedLostAt !== null;
   const canShowBalance =
@@ -107,14 +115,14 @@ export default async function CardDetailPage({
           {canShowBalance && (
             <TransferDialog
               cardId={card.id}
-              holderLabel={holderLabel}
+              holderLabel={holderDisplay}
               tokenSymbol={fund.tokenSymbol}
             />
           )}
           {card.memberId && (
             <UnassignCardButton
               cardId={card.id}
-              holderLabel={holderLabel}
+              holderLabel={holderDisplay}
               isPrimary={isPrimary}
             />
           )}
@@ -122,7 +130,7 @@ export default async function CardDetailPage({
             cardId={card.id}
             status={card.status}
             isLost={isLost}
-            holderLabel={holderLabel}
+            holderLabel={holderDisplay}
             hasAccount={card.account !== null}
             tokenSymbol={fund.tokenSymbol}
             tokenDecimals={fund.tokenDecimals}
@@ -132,13 +140,15 @@ export default async function CardDetailPage({
 
       <header className="space-y-2">
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="font-heading text-2xl font-medium">{holderLabel}</h1>
+          <h1 className="font-heading text-2xl font-medium">
+            <Sensitive kind="name">{holderLabel}</Sensitive>
+          </h1>
           <StatusBadge status={card.status} />
           {isLost && <Badge variant="warning">{tList("badges.lost")}</Badge>}
           {isPrimary && <Badge variant="outline">{tList("primary")}</Badge>}
         </div>
         <p className="font-mono text-xs text-muted-foreground">
-          {card.serialNumber}
+          <Sensitive kind="number">{card.serialNumber}</Sensitive>
         </p>
       </header>
 
@@ -179,7 +189,7 @@ export default async function CardDetailPage({
           <CardContent className="pb-3">
             <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
               <DtDd label={t("info.serial")} mono>
-                {card.serialNumber}
+                <Sensitive kind="number">{card.serialNumber}</Sensitive>
               </DtDd>
               <DtDd label={t("info.tapLink")}>
                 <span className="inline-flex items-center gap-1">
@@ -198,14 +208,20 @@ export default async function CardDetailPage({
               <DtDd label={t("info.number")}>
                 <CardNumberEdit cardId={card.id} initial={card.number} />
               </DtDd>
-              <DtDd label={t("info.holder")}>{card.holderName ?? "—"}</DtDd>
+              <DtDd label={t("info.holder")}>
+                {card.holderName ? (
+                  <Sensitive kind="name">{card.holderName}</Sensitive>
+                ) : (
+                  "—"
+                )}
+              </DtDd>
               <DtDd label={t("info.member")}>
                 {card.member ? (
                   <Link
                     href={`/members/${card.member.id}`}
                     className="hover:underline"
                   >
-                    {memberName}
+                    <Sensitive kind="name">{memberName}</Sensitive>
                   </Link>
                 ) : (
                   "—"
@@ -226,7 +242,7 @@ export default async function CardDetailPage({
                           </Badge>
                           <NotifyCardButton
                             cardId={card.id}
-                            memberName={memberName || holderLabel}
+                            memberName={notifyName}
                             mode="resend"
                           />
                         </>
@@ -237,7 +253,7 @@ export default async function CardDetailPage({
                           </Badge>
                           <NotifyCardButton
                             cardId={card.id}
-                            memberName={memberName || holderLabel}
+                            memberName={notifyName}
                             mode="retry"
                           />
                         </>
@@ -248,7 +264,7 @@ export default async function CardDetailPage({
                           </Badge>
                           <NotifyCardButton
                             cardId={card.id}
-                            memberName={memberName || holderLabel}
+                            memberName={notifyName}
                             mode="send"
                           />
                         </>
@@ -273,9 +289,11 @@ export default async function CardDetailPage({
                   <span className="inline-flex items-center gap-1">
                     <span
                       className="font-mono text-xs"
-                      title={card.account}
+                      title={privacy ? undefined : card.account}
                     >
-                      {shortAddress(card.account)}
+                      <Sensitive kind="address">
+                        {shortAddress(card.account)}
+                      </Sensitive>
                     </span>
                     <CopyButton value={card.account} />
                   </span>
@@ -412,7 +430,11 @@ async function BalanceDisplay({
     <div className="flex items-baseline gap-2">
       <Coins className="size-5 self-center text-muted-foreground" />
       <span className="font-heading text-3xl font-medium tabular-nums">
-        {formatted ?? "—"}
+        {formatted !== null ? (
+          <Sensitive kind="amount">{formatted}</Sensitive>
+        ) : (
+          "—"
+        )}
       </span>
       {symbol && formatted && (
         <span className="text-sm text-muted-foreground">{symbol}</span>

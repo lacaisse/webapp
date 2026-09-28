@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Download } from "lucide-react";
 import { getFormatter, getTranslations } from "next-intl/server";
 
+import { Sensitive } from "@/components/privacy/sensitive";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -24,6 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { maskValue } from "@/lib/privacy";
 import { contributionApplies } from "@/services/member/contribution";
 import type { ExtraValue } from "@/services/member/schema";
 import { prisma } from "@/services/db/prisma";
@@ -33,6 +35,7 @@ import {
   type AnswerFormatters,
 } from "@/services/onboarding/format";
 import { parseVisibleIf } from "@/services/onboarding/visibility";
+import { getPrivacyMode } from "@/services/privacy/server";
 
 import { UnassignCardButton } from "../../cards/unassign-card-button";
 import { AddCardDialog } from "../add-card-dialog";
@@ -77,6 +80,7 @@ async function MemberDetail({
     date: (v) => format.dateTime(new Date(v), { dateStyle: "medium" }),
   };
   const fund = await requireCurrentFund();
+  const privacy = await getPrivacyMode();
   const { id } = await params;
 
   const member = await prisma.member.findFirst({
@@ -170,6 +174,9 @@ async function MemberDetail({
   );
 
   const fullName = `${member.firstName} ${member.lastName}`.trim();
+  // Dialog props are interpolated into strings client-side, so they get the
+  // mask here rather than a <Sensitive> wrapper.
+  const displayName = privacy ? maskValue("name") : fullName;
   const emailVerified = member.emailVerifiedAt !== null;
   const appData =
     (member.applicationData as Record<string, unknown> | null) ?? null;
@@ -206,23 +213,23 @@ async function MemberDetail({
             (member.status === "NEW" || member.status === "ACTIVE") && (
               <MemberRowActions
                 memberId={member.id}
-                memberName={fullName}
+                memberName={displayName}
                 emailVerified={emailVerified}
                 alreadyActive={member.status === "ACTIVE"}
               />
             )}
           {member.status === "ACTIVE" && member.primaryCard?.account && (
-            <MintDialog memberId={member.id} memberName={fullName} />
+            <MintDialog memberId={member.id} memberName={displayName} />
           )}
           {member.status === "ACTIVE" && member.primaryCardId && (
-            <AddCardDialog memberId={member.id} memberName={fullName} />
+            <AddCardDialog memberId={member.id} memberName={displayName} />
           )}
           {/* On-request payment link (issue #45). Needs a card, since both
               links are keyed on the card serial. */}
           {member.primaryCardId && member.email && (
             <SendPaymentLinkButton
               memberId={member.id}
-              memberName={fullName}
+              memberName={displayName}
               alreadySent={member.emails.some(
                 (e) => e.type === "MEMBER_PAYMENT_LINK" && e.status === "SENT",
               )}
@@ -230,7 +237,7 @@ async function MemberDetail({
           )}
           <StatusChangeDialog
             memberId={member.id}
-            memberName={fullName}
+            memberName={displayName}
             currentStatus={member.status}
           />
         </div>
@@ -238,11 +245,15 @@ async function MemberDetail({
 
       <header className="space-y-2">
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="font-heading text-2xl font-medium">{fullName}</h1>
+          <h1 className="font-heading text-2xl font-medium">
+            <Sensitive kind="name">{fullName}</Sensitive>
+          </h1>
           <StatusBadge status={member.status} label={tStatus(member.status)} />
         </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-          <span>{member.email}</span>
+          <span>
+            <Sensitive kind="email">{member.email}</Sensitive>
+          </span>
           {!emailVerified && (
             <Badge variant="warning">{t("unverified")}</Badge>
           )}
@@ -258,7 +269,9 @@ async function MemberDetail({
           <CardContent className="pb-3">
             <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
               <DtDd label={t("profile.address")}>
-                {formatAddress(member.address, member.postalCode, member.city)}
+                <Sensitive kind="address">
+                  {formatAddress(member.address, member.postalCode, member.city)}
+                </Sensitive>
               </DtDd>
               <DtDd label={t("profile.joined")}>
                 {format.dateTime(member.joinedAt, { dateStyle: "medium" })}
@@ -270,7 +283,9 @@ async function MemberDetail({
               )}
               {member.notes && (
                 <DtDd label={t("profile.notes")}>
-                  <span className="whitespace-pre-wrap">{member.notes}</span>
+                  <span className="whitespace-pre-wrap">
+                    <Sensitive kind="text">{member.notes}</Sensitive>
+                  </span>
                 </DtDd>
               )}
             </dl>
@@ -295,7 +310,9 @@ async function MemberDetail({
               {showContribution && (
                 <DtDd label={t("banking.committed")}>
                   {member.contributionAmount ? (
-                    member.contributionAmount.toString()
+                    <Sensitive kind="amount">
+                      {member.contributionAmount.toString()}
+                    </Sensitive>
                   ) : member.tier ? (
                     <span>
                       {member.tier.allocationAmount.toString()}{" "}
@@ -309,9 +326,17 @@ async function MemberDetail({
                 </DtDd>
               )}
               <DtDd label={t("banking.primaryCard")} mono>
-                {member.primaryCard?.account ??
-                  member.primaryCard?.serialNumber ??
-                  "—"}
+                {member.primaryCard?.account ? (
+                  <Sensitive kind="address">
+                    {member.primaryCard.account}
+                  </Sensitive>
+                ) : member.primaryCard?.serialNumber ? (
+                  <Sensitive kind="number">
+                    {member.primaryCard.serialNumber}
+                  </Sensitive>
+                ) : (
+                  "—"
+                )}
               </DtDd>
             </dl>
           </CardContent>
@@ -352,13 +377,18 @@ async function MemberDetail({
                       | null) ?? null;
                   return (
                     <DtDd key={key} label={field?.label ?? key}>
-                      {formatOnboardingAnswer(
-                        value,
-                        field
-                          ? { type: field.type, options: config?.options ?? [] }
-                          : undefined,
-                        answerFormatters,
-                      )}
+                      <Sensitive kind="text">
+                        {formatOnboardingAnswer(
+                          value,
+                          field
+                            ? {
+                                type: field.type,
+                                options: config?.options ?? [],
+                              }
+                            : undefined,
+                          answerFormatters,
+                        )}
+                      </Sensitive>
                     </DtDd>
                   );
                 })}
@@ -399,10 +429,14 @@ async function MemberDetail({
                 return (
                   <TableRow key={c.id}>
                     <TableCell className="font-mono text-xs">
-                      {c.serialNumber}
+                      <Sensitive kind="number">{c.serialNumber}</Sensitive>
                     </TableCell>
                     <TableCell>
-                      <div className="text-sm">{c.holderName ?? fullName}</div>
+                      <div className="text-sm">
+                        <Sensitive kind="name">
+                          {c.holderName ?? fullName}
+                        </Sensitive>
+                      </div>
                       {isPrimary && (
                         <div className="text-xs text-muted-foreground">
                           {t("cards.primary")}
@@ -423,7 +457,13 @@ async function MemberDetail({
                         : "—"}
                     </TableCell>
                     <TableCell className="text-right font-medium">
-                      {c.balance?.toString() ?? "—"}
+                      {c.balance ? (
+                        <Sensitive kind="amount">
+                          {c.balance.toString()}
+                        </Sensitive>
+                      ) : (
+                        "—"
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
@@ -439,7 +479,11 @@ async function MemberDetail({
                         </a>
                         <UnassignCardButton
                           cardId={c.id}
-                          holderLabel={c.holderName ?? fullName}
+                          holderLabel={
+                            privacy
+                              ? maskValue("name")
+                              : (c.holderName ?? fullName)
+                          }
                           isPrimary={isPrimary}
                         />
                       </div>
@@ -487,7 +531,7 @@ async function MemberDetail({
                     {op.allocationPeriod?.label ?? "—"}
                   </TableCell>
                   <TableCell className="text-right font-medium">
-                    {op.amount.toString()}
+                    <Sensitive kind="amount">{op.amount.toString()}</Sensitive>
                   </TableCell>
                   <TableCell>
                     <OperationStatusBadge status={op.status} />
@@ -531,14 +575,21 @@ async function MemberDetail({
                     {format.dateTime(b.occurredAt, { dateStyle: "medium" })}
                   </TableCell>
                   <TableCell className="font-mono text-xs">
-                    {b.counterpartReference ?? b.remittanceInfo ?? "—"}
+                    {(b.counterpartReference ?? b.remittanceInfo) ? (
+                      <Sensitive kind="number">
+                        {b.counterpartReference ?? b.remittanceInfo}
+                      </Sensitive>
+                    ) : (
+                      "—"
+                    )}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {b.allocationPeriod?.label ?? "—"}
                   </TableCell>
                   <TableCell className="text-right font-medium">
                     {b.direction === "OUTGOING" && "−"}
-                    {b.amount.toString()} {b.currency}
+                    <Sensitive kind="amount">{b.amount.toString()}</Sensitive>{" "}
+                    {b.currency}
                   </TableCell>
                 </TableRow>
               ))
@@ -593,7 +644,7 @@ async function MemberDetail({
                   </TableCell>
                   <TableCell className="text-sm">{e.type}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {e.toEmail}
+                    <Sensitive kind="email">{e.toEmail}</Sensitive>
                   </TableCell>
                   <TableCell>
                     <EmailStatusBadge status={e.status} />

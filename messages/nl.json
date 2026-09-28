@@ -23,6 +23,11 @@
     "nl": "Nederlands",
     "es": "Español"
   },
+  "privacyMode": {
+    "toggle": "Privacymodus",
+    "on": "Persoonsgegevens verborgen",
+    "masked": "Verborgen in privacymodus"
+  },
   "auth": {
     "login": {
       "title": "Inloggen",
@@ -366,37 +371,91 @@
     "dashboard": {
       "title": "Dashboard",
       "description": "Overzicht van de activiteit en saldi van uw fonds.",
+      "tokenFallback": "tokens",
+      "range": {
+        "3m": "3 maanden",
+        "6m": "6 maanden",
+        "12m": "12 maanden"
+      },
       "kpi": {
-        "totalBalance": "Totaal saldo",
-        "totalBalanceHint": "Tokens in omloop op alle kaarten.",
+        "circulation": "Tokens in omloop",
+        "circulationHintChain": "Totale on-chain voorraad.",
+        "circulationHintCards": "Som van de kaartsaldi (on-chain voorraad niet beschikbaar).",
+        "circulationHintNone": "Nog geen token geconfigureerd.",
         "activeMembers": "Actieve leden",
-        "activeMembersHint": "Leden met minstens één actieve kaart.",
-        "allocatedThisMonth": "Toegekend deze maand",
-        "allocatedThisMonthHint": "Tokens uitgegeven aan leden deze maand.",
-        "spentThisMonth": "Besteed deze maand",
-        "spentThisMonthHint": "Tokens ingewisseld bij handelaars deze maand."
+        "activeMembersHint": "+{n} deze maand",
+        "activeMerchants": "Actieve handelaars",
+        "activeMerchantsHint": "{n} verbonden met CitizenPay",
+        "contributions": "Bijdragen deze maand",
+        "contributionsHint": "{deposits, plural, one {# storting} other {# stortingen}} · {unmatched} niet gekoppeld",
+        "allocated": "Toegekend deze maand",
+        "allocatedHint": "Bevestigde toekenningen op de kaarten van leden.",
+        "paidOut": "Uitbetaald aan handelaars deze maand",
+        "paidOutHint": "{n, plural, =0 {Nog geen overschrijvingen} one {# overschrijving} other {# overschrijvingen}}",
+        "heldByMerchants": "In handen van handelaars",
+        "heldByMerchantsHint": "Wacht op uitbetaling",
+        "heldByMerchantsUnavailable": "CitizenPay niet beschikbaar",
+        "pending": "Toekenningen in behandeling",
+        "pendingHint": "{failed, plural, =0 {Geen mislukt} one {# mislukt} other {# mislukt}} in de laatste {months} maanden"
+      },
+      "charts": {
+        "moneyTitle": "Ontvangen bijdragen en toegekende tokens",
+        "moneyDescription": "Ontvangen bijdragen en toegekende tokens per maand (1 {symbol} = 1 €).",
+        "contributionsSeries": "Ontvangen bijdragen (€)",
+        "allocatedSeries": "Toegekende tokens ({symbol})",
+        "moneyAria": "Staafdiagram van ontvangen bijdragen en toegekende tokens per maand",
+        "membersTitle": "Nieuwe leden per maand",
+        "membersDescription": "{total, plural, one {# lid} other {# leden}} in totaal",
+        "membersSeries": "Nieuwe leden",
+        "membersAria": "Staafdiagram van nieuwe leden per maand",
+        "empty": "Geen gegevens voor deze periode."
+      },
+      "payouts": {
+        "title": "Uitbetalingen aan handelaars",
+        "description": "{total} uitbetaald aan {n, plural, one {# handelaar} other {# handelaars}} in de laatste {months} maanden",
+        "empty": "Geen uitbetalingen in deze periode."
+      },
+      "members": {
+        "title": "Leden per status",
+        "description": "Alle geregistreerde leden, per status.",
+        "empty": "Nog geen leden."
+      },
+      "memberStatus": {
+        "ACTIVE": "Actief",
+        "NEW": "Nieuw",
+        "PAUSED": "Gepauzeerd",
+        "INACTIVE": "Inactief",
+        "STOPPED": "Gestopt",
+        "REJECTED": "Geweigerd"
       },
       "tiers": {
         "title": "Allocatieniveaus",
-        "description": "Saldo en bereik van elk geconfigureerd niveau.",
         "range": "Min {min} · Max {max}",
-        "members": "{n} leden",
+        "members": "{n, plural, one {# lid} other {# leden}}",
         "empty": "Nog geen niveaus geconfigureerd."
-      },
-      "citizenpay": {
-        "title": "Citizen Pay-verbinding",
-        "description": "Status van de koppeling met uw Citizen Pay-account.",
-        "account": "Account",
-        "terminal": "Terminal",
-        "lastSync": "Laatste synchronisatie"
       },
       "recentActivity": {
         "title": "Recente activiteit",
         "date": "Datum",
         "event": "Gebeurtenis",
-        "subject": "Onderwerp",
+        "subject": "Lid",
         "amount": "Bedrag",
-        "empty": "Nog geen activiteit."
+        "empty": "Nog geen activiteit.",
+        "type": {
+          "MINT": "Toekenning",
+          "BURN": "Vernietiging",
+          "TRANSFER": "Overdracht"
+        },
+        "status": {
+          "PENDING": "in behandeling",
+          "CONFIRMED": "bevestigd",
+          "FAILED": "mislukt"
+        }
+      },
+      "citizenpay": {
+        "connected": "CitizenPay-account {account} · laatste synchronisatie {lastSync}",
+        "never": "nooit",
+        "notConnected": "Niet verbonden met CitizenPay."
       }
     },
     "members": {
