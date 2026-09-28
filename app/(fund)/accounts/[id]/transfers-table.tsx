@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { useState, useTransition } from "react";
 
+import { Sensitive } from "@/components/privacy/sensitive";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -80,10 +81,17 @@ export function TransfersTable({
                 <TableCell>{t(`directions.${tr.direction}`)}</TableCell>
                 <TableCell className="text-xs">
                   {counterpartyName ? (
+                    // Only the fund's own named token accounts resolve to a
+                    // name here — fund-level, never masked.
                     <span>{counterpartyName}</span>
                   ) : (
+                    // Anything else is a bare address: a member card, a
+                    // place or an outside wallet. The row carries no kind to
+                    // tell them apart, so privacy mode masks them all.
                     <span className="font-mono text-muted-foreground">
-                      {shortAddress(counterparty)}
+                      <Sensitive kind="address">
+                        {shortAddress(counterparty)}
+                      </Sensitive>
                     </span>
                   )}
                   <TxAnnotationCell

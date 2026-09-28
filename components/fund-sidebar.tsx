@@ -8,6 +8,7 @@ import {
   ArrowUpRight,
   Coins,
   CreditCard,
+  EyeOff,
   Landmark,
   LayoutDashboard,
   Mail,
@@ -21,6 +22,7 @@ import {
 } from "lucide-react";
 
 import { LocaleSwitcher } from "@/components/locale-switcher";
+import { PrivacyToggle } from "@/components/privacy/privacy-toggle";
 import { hasMinFundRole } from "@/services/auth/roles";
 import type { FundRole } from "@/services/db/generated/enums";
 import { cn } from "@/lib/utils";
@@ -39,14 +41,17 @@ export function FundSidebar({
   fundDomain,
   apexUrl,
   role,
+  privacyMode,
 }: {
   fundName: string;
   fundDomain: string;
   apexUrl: string;
   role: FundRole;
+  privacyMode: boolean;
 }) {
   const pathname = usePathname();
   const t = useTranslations("fund.nav");
+  const tPrivacy = useTranslations("privacyMode");
 
   const allItems: Item[] = [
     { href: "/dashboard", label: t("dashboard"), icon: LayoutDashboard, minRole: "ADMIN" },
@@ -71,6 +76,12 @@ export function FundSidebar({
       <div className="flex flex-col gap-0.5 p-4">
         <div className="font-heading text-base font-medium">{fundName}</div>
         <div className="text-xs text-muted-foreground">{fundDomain}</div>
+        {privacyMode ? (
+          <div className="mt-1.5 inline-flex w-fit items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+            <EyeOff className="size-3" />
+            {tPrivacy("on")}
+          </div>
+        ) : null}
       </div>
 
       <nav className="flex-1 px-2">
@@ -106,6 +117,7 @@ export function FundSidebar({
           <ArrowUpRight className="size-4" />
           {t("backToApex")}
         </a>
+        <PrivacyToggle enabled={privacyMode} />
         <div className="px-2">
           <LocaleSwitcher />
         </div>

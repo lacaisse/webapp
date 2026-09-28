@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { getFormatter, getTranslations } from "next-intl/server";
 
+import { Sensitive } from "@/components/privacy/sensitive";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import {
@@ -14,6 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { maskValue } from "@/lib/privacy";
 import { parseCardNumber, searchTokens } from "@/lib/search";
 import { cn } from "@/lib/utils";
 import { getBalances } from "@/services/alchemy/balances";
@@ -23,6 +25,7 @@ import {
   CardStatus,
 } from "@/services/db/generated/enums";
 import { prisma } from "@/services/db/prisma";
+import { getPrivacyMode } from "@/services/privacy/server";
 
 import { CardRowActions } from "./card-row-actions";
 import {
@@ -103,6 +106,7 @@ export async function CardsTable({
   const t = await getTranslations("fund.cards");
   const tBulk = await getTranslations("cards.admin.bulk");
   const format = await getFormatter();
+  const privacy = await getPrivacyMode();
 
   const where = whereFor(tab, fund.id, q);
 
@@ -245,6 +249,9 @@ export async function CardsTable({
                 ? `${c.member.firstName} ${c.member.lastName}`.trim()
                 : "";
               const holderLabel = c.holderName || memberName || c.serialNumber;
+              // String props (aria labels, dialog copy) get the mask here;
+              // rendered cells use <Sensitive>.
+              const holderDisplay = privacy ? maskValue("name") : holderLabel;
               const isPrimary = c.member?.primaryCardId === c.id;
               const isLost = c.reportedLostAt !== null;
               const rawBalance = c.account
@@ -259,15 +266,19 @@ export async function CardsTable({
                   <TableCell className="w-8">
                     <CardSelectCheckbox
                       id={c.id}
-                      label={tBulk("selectRow", { holder: holderLabel })}
+                      label={tBulk("selectRow", { holder: holderDisplay })}
                     />
                   </TableCell>
                   <TableCell className="tabular-nums text-sm text-muted-foreground">
-                    {c.number ?? "—"}
+                    {c.number !== null ? (
+                      <Sensitive kind="number">{String(c.number)}</Sensitive>
+                    ) : (
+                      "—"
+                    )}
                   </TableCell>
                   <TableCell className="font-mono text-xs">
                     <Link href={`/cards/${c.id}`} className="hover:underline">
-                      {c.serialNumber}
+                      <Sensitive kind="number">{c.serialNumber}</Sensitive>
                     </Link>
                   </TableCell>
                   <TableCell>
@@ -275,7 +286,7 @@ export async function CardsTable({
                       href={`/cards/${c.id}`}
                       className="text-sm hover:underline"
                     >
-                      {holderLabel}
+                      <Sensitive kind="name">{holderLabel}</Sensitive>
                     </Link>
                     {isPrimary && (
                       <div className="text-xs text-muted-foreground">
@@ -284,7 +295,11 @@ export async function CardsTable({
                     )}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {memberName || "—"}
+                    {memberName ? (
+                      <Sensitive kind="name">{memberName}</Sensitive>
+                    ) : (
+                      "—"
+                    )}
                   </TableCell>
                   <TableCell>
                     <SourceCell
@@ -305,7 +320,9 @@ export async function CardsTable({
                     </div>
                   </TableCell>
                   <TableCell className="text-right font-medium tabular-nums">
-                    {formattedBalance ?? (
+                    {formattedBalance !== null ? (
+                      <Sensitive kind="amount">{formattedBalance}</Sensitive>
+                    ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
                     {formattedBalance && fund.tokenSymbol && (
@@ -324,7 +341,7 @@ export async function CardsTable({
                       cardId={c.id}
                       status={c.status}
                       isLost={isLost}
-                      holderLabel={holderLabel}
+                      holderLabel={holderDisplay}
                       hasAccount={c.account !== null}
                       tokenSymbol={fund.tokenSymbol}
                       tokenDecimals={fund.tokenDecimals}
@@ -374,7 +391,11 @@ function SourceCell({
     return <span className="text-muted-foreground">—</span>;
   }
   if (!source) {
-    return <span className="font-mono text-xs">{sourceSerial}</span>;
+    return (
+      <span className="font-mono text-xs">
+        <Sensitive kind="number">{sourceSerial}</Sensitive>
+      </span>
+    );
   }
   const holder =
     source.holderName ||
@@ -385,9 +406,11 @@ function SourceCell({
     [source.number !== null ? `#${source.number}` : null, holder]
       .filter(Boolean)
       .join(" · ") || source.serialNumber;
+  // One placeholder for the whole label: it mixes the card number, holder
+  // name and serial, all personal.
   return (
     <Link href={`/cards/${source.id}`} className="text-sm hover:underline">
-      {label}
+      <Sensitive kind="name">{label}</Sensitive>
     </Link>
   );
 }

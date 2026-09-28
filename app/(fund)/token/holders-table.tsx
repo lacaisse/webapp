@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 
+import { Sensitive } from "@/components/privacy/sensitive";
 import { buttonVariants } from "@/components/ui/button";
 import {
   Table,
@@ -195,7 +196,15 @@ export async function HoldersTable({
                   </AddressLink>
                 </TableCell>
                 <TableCell className="text-right font-medium tabular-nums">
-                  {formatTokenAmount(h.rawBalance, decimals)}
+                  {/* A card balance is one member's money; place and fund
+                      account balances stay readable in privacy mode. */}
+                  {directory.cards.has(h.address.toLowerCase()) ? (
+                    <Sensitive kind="amount">
+                      {formatTokenAmount(h.rawBalance, decimals)}
+                    </Sensitive>
+                  ) : (
+                    formatTokenAmount(h.rawBalance, decimals)
+                  )}
                   {symbol && (
                     <span className="ml-1 text-xs text-muted-foreground">
                       {symbol}

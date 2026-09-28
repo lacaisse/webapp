@@ -2,6 +2,7 @@
 import { notFound } from "next/navigation";
 import { getFormatter, getTranslations } from "next-intl/server";
 
+import { Sensitive } from "@/components/privacy/sensitive";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -111,13 +112,17 @@ export default async function ReferralsPage() {
               referrals.map((r) => (
                 <TableRow key={r.id}>
                   <TableCell>
-                    {`${r.sponsor.firstName} ${r.sponsor.lastName}`.trim()}
+                    <Sensitive kind="name">
+                      {`${r.sponsor.firstName} ${r.sponsor.lastName}`.trim()}
+                    </Sensitive>
                   </TableCell>
                   <TableCell>
-                    {`${r.referee.firstName} ${r.referee.lastName}`.trim()}
+                    <Sensitive kind="name">
+                      {`${r.referee.firstName} ${r.referee.lastName}`.trim()}
+                    </Sensitive>
                   </TableCell>
                   <TableCell className="font-mono text-xs">
-                    {r.codeUsed}
+                    <Sensitive kind="number">{r.codeUsed}</Sensitive>
                   </TableCell>
                   <TableCell>
                     <ReferralStatusBadge

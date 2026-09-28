@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { getFormatter, getTranslations } from "next-intl/server";
 
+import { Sensitive } from "@/components/privacy/sensitive";
 import { buttonVariants } from "@/components/ui/button";
 import {
   Table,
@@ -93,18 +94,30 @@ export async function BankTransactionsTable({
                     })}
                   </TableCell>
                   <TableCell>
-                    <div className="text-sm">{tx.counterpartName ?? "—"}</div>
+                    <div className="text-sm">
+                      {tx.counterpartName ? (
+                        <Sensitive kind="name">{tx.counterpartName}</Sensitive>
+                      ) : (
+                        "—"
+                      )}
+                    </div>
                     {tx.counterpartIban && (
                       <div className="font-mono text-xs text-muted-foreground">
-                        {tx.counterpartIban}
+                        <Sensitive kind="iban">{tx.counterpartIban}</Sensitive>
                       </div>
                     )}
                   </TableCell>
                   <TableCell className="font-mono text-xs">
-                    {tx.remittanceInfo ?? "—"}
+                    {tx.remittanceInfo ? (
+                      <Sensitive kind="text">{tx.remittanceInfo}</Sensitive>
+                    ) : (
+                      "—"
+                    )}
                   </TableCell>
                   <TableCell className="text-sm">
-                    {tx.memberName ?? (
+                    {tx.memberName ? (
+                      <Sensitive kind="name">{tx.memberName}</Sensitive>
+                    ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
                   </TableCell>
@@ -136,10 +149,22 @@ export async function BankTransactionsTable({
                       signed >= 0 ? "text-success" : "text-foreground",
                     )}
                   >
-                    {format.number(signed, {
-                      style: "currency",
-                      currency: tx.currency,
-                    })}
+                    {tx.direction === "INCOMING" ? (
+                      // An incoming transfer is a person's deposit —
+                      // per-person money under privacy mode. Outgoing
+                      // flows are the fund's own and stay visible.
+                      <Sensitive kind="amount">
+                        {format.number(signed, {
+                          style: "currency",
+                          currency: tx.currency,
+                        })}
+                      </Sensitive>
+                    ) : (
+                      format.number(signed, {
+                        style: "currency",
+                        currency: tx.currency,
+                      })
+                    )}
                   </TableCell>
                 </TableRow>
               );

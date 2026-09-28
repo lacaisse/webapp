@@ -4,6 +4,8 @@
 import { CreditCard, Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { usePrivacyMode } from "@/components/privacy/privacy-provider";
+import { Sensitive } from "@/components/privacy/sensitive";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { maskValue } from "@/lib/privacy";
 import { cn } from "@/lib/utils";
 import {
   searchCardsForAssignmentAction,
@@ -193,6 +196,7 @@ function CardPickerDialog({
   onPick: (card: AssignableCardHit) => void;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
+  const privacy = usePrivacyMode();
 
   const assignable = hits.filter((h) => h.assignable);
   const unavailable = hits.filter((h) => !h.assignable);
@@ -301,7 +305,9 @@ function CardPickerDialog({
                 <CardIdentity card={card} noNumberLabel={labels.noNumber} />
                 <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                   {card.assignedTo
-                    ? labels.assignedTo(card.assignedTo)
+                    ? labels.assignedTo(
+                        privacy ? maskValue("name") : card.assignedTo,
+                      )
                     : card.reportedLost
                       ? labels.lost
                       : labels.blocked}
@@ -334,14 +340,20 @@ function CardIdentity({
       <CreditCard className="size-4 shrink-0 text-muted-foreground" />
       <div className="min-w-0 flex-1">
         <div className="truncate font-mono text-sm font-medium">
-          {card.number != null ? `#${card.number}` : noNumberLabel}
+          {card.number != null ? (
+            <>
+              #<Sensitive kind="number">{String(card.number)}</Sensitive>
+            </>
+          ) : (
+            noNumberLabel
+          )}
           <span className="ml-2 font-normal text-muted-foreground">
-            {card.serialNumber}
+            <Sensitive kind="number">{card.serialNumber}</Sensitive>
           </span>
         </div>
         {card.account && (
           <div className="truncate font-mono text-xs text-muted-foreground">
-            {card.account}
+            <Sensitive kind="address">{card.account}</Sensitive>
           </div>
         )}
       </div>
@@ -367,11 +379,11 @@ function SelectedChip({
       <div className="flex min-w-0 flex-1 items-baseline gap-2">
         {card.number != null && (
           <span className="shrink-0 font-mono text-sm font-medium">
-            #{card.number}
+            #<Sensitive kind="number">{String(card.number)}</Sensitive>
           </span>
         )}
         <span className="truncate font-mono text-xs text-muted-foreground">
-          {card.serialNumber}
+          <Sensitive kind="number">{card.serialNumber}</Sensitive>
         </span>
       </div>
       <button

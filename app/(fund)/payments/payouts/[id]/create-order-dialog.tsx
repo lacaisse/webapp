@@ -5,6 +5,7 @@ import { AlertTriangle, CheckCircle2, Loader2, Plus, Search } from "lucide-react
 import { useFormatter, useTranslations } from "next-intl";
 import { useEffect, useState, useTransition } from "react";
 
+import { Sensitive } from "@/components/privacy/sensitive";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -296,10 +297,18 @@ export function CreateOrderDialog({
                           pushing the whole dialog wider than its max-w-sm. */}
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm">
-                          {tx.counterpartName ?? t("unknownCounterpart")}
+                          {tx.counterpartName ? (
+                            <Sensitive kind="name">{tx.counterpartName}</Sensitive>
+                          ) : (
+                            t("unknownCounterpart")
+                          )}
                         </div>
                         <div className="truncate font-mono text-xs text-muted-foreground">
-                          {tx.reference ?? "—"}
+                          {tx.reference ? (
+                            <Sensitive kind="number">{tx.reference}</Sensitive>
+                          ) : (
+                            "—"
+                          )}
                         </div>
                       </div>
                       <div className="shrink-0 text-right">

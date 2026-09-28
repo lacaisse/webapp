@@ -23,6 +23,11 @@
     "nl": "Nederlands",
     "es": "Español"
   },
+  "privacyMode": {
+    "toggle": "Modo privacidad",
+    "on": "Datos personales ocultos",
+    "masked": "Oculto en modo privacidad"
+  },
   "auth": {
     "login": {
       "title": "Iniciar sesión",
@@ -366,37 +371,91 @@
     "dashboard": {
       "title": "Panel",
       "description": "Resumen de la actividad y los saldos de tu fondo.",
+      "tokenFallback": "tokens",
+      "range": {
+        "3m": "3 meses",
+        "6m": "6 meses",
+        "12m": "12 meses"
+      },
       "kpi": {
-        "totalBalance": "Saldo total",
-        "totalBalanceHint": "Tokens en circulación en todas las tarjetas.",
+        "circulation": "Tokens en circulación",
+        "circulationHintChain": "Suministro total on-chain.",
+        "circulationHintCards": "Suma de los saldos de las tarjetas (suministro on-chain no disponible).",
+        "circulationHintNone": "Aún no hay ningún token configurado.",
         "activeMembers": "Miembros activos",
-        "activeMembersHint": "Miembros con al menos una tarjeta activa.",
-        "allocatedThisMonth": "Asignado este mes",
-        "allocatedThisMonthHint": "Tokens emitidos a los miembros este mes.",
-        "spentThisMonth": "Gastado este mes",
-        "spentThisMonthHint": "Tokens canjeados en comercios este mes."
+        "activeMembersHint": "+{n} este mes",
+        "activeMerchants": "Comercios activos",
+        "activeMerchantsHint": "{n} conectados a CitizenPay",
+        "contributions": "Aportaciones este mes",
+        "contributionsHint": "{deposits, plural, one {# transferencia} other {# transferencias}} · {unmatched} sin asignar",
+        "allocated": "Asignado este mes",
+        "allocatedHint": "Asignaciones confirmadas en las tarjetas de los miembros.",
+        "paidOut": "Pagado a comercios este mes",
+        "paidOutHint": "{n, plural, =0 {Aún no hay transferencias} one {# transferencia bancaria} other {# transferencias bancarias}}",
+        "heldByMerchants": "En manos de los comercios",
+        "heldByMerchantsHint": "Pendiente de pago",
+        "heldByMerchantsUnavailable": "CitizenPay no disponible",
+        "pending": "Asignaciones pendientes",
+        "pendingHint": "{failed, plural, =0 {Ninguna fallida} one {# fallida} other {# fallidas}} en los últimos {months} meses"
+      },
+      "charts": {
+        "moneyTitle": "Aportaciones recibidas y tokens asignados",
+        "moneyDescription": "Aportaciones recibidas y tokens asignados por mes (1 {symbol} = 1 €).",
+        "contributionsSeries": "Aportaciones recibidas (€)",
+        "allocatedSeries": "Tokens asignados ({symbol})",
+        "moneyAria": "Gráfico de barras de las aportaciones recibidas y los tokens asignados por mes",
+        "membersTitle": "Nuevos miembros por mes",
+        "membersDescription": "{total, plural, one {# miembro} other {# miembros}} en total",
+        "membersSeries": "Nuevos miembros",
+        "membersAria": "Gráfico de barras de los nuevos miembros por mes",
+        "empty": "No hay datos para este periodo."
+      },
+      "payouts": {
+        "title": "Pagos a comercios",
+        "description": "{total} pagados a {n, plural, one {# comercio} other {# comercios}} en los últimos {months} meses",
+        "empty": "No hay pagos en este periodo."
+      },
+      "members": {
+        "title": "Miembros por estado",
+        "description": "Todos los miembros registrados, según su estado.",
+        "empty": "Aún no hay miembros."
+      },
+      "memberStatus": {
+        "ACTIVE": "Activo",
+        "NEW": "Nuevo",
+        "PAUSED": "En pausa",
+        "INACTIVE": "Inactivo",
+        "STOPPED": "Baja",
+        "REJECTED": "Rechazado"
       },
       "tiers": {
         "title": "Niveles de asignación",
-        "description": "Saldo y alcance de cada nivel configurado.",
         "range": "Mín {min} · Máx {max}",
-        "members": "{n} miembros",
+        "members": "{n, plural, one {# miembro} other {# miembros}}",
         "empty": "No hay niveles configurados."
-      },
-      "citizenpay": {
-        "title": "Conexión con Citizen Pay",
-        "description": "Estado del enlace con tu cuenta de Citizen Pay.",
-        "account": "Cuenta",
-        "terminal": "Terminal",
-        "lastSync": "Última sincronización"
       },
       "recentActivity": {
         "title": "Actividad reciente",
         "date": "Fecha",
         "event": "Evento",
-        "subject": "Asunto",
+        "subject": "Miembro",
         "amount": "Importe",
-        "empty": "Aún no hay actividad."
+        "empty": "Aún no hay actividad.",
+        "type": {
+          "MINT": "Asignación",
+          "BURN": "Destrucción",
+          "TRANSFER": "Transferencia"
+        },
+        "status": {
+          "PENDING": "pendiente",
+          "CONFIRMED": "confirmada",
+          "FAILED": "fallida"
+        }
+      },
+      "citizenpay": {
+        "connected": "Cuenta de CitizenPay {account} · última sincronización {lastSync}",
+        "never": "nunca",
+        "notConnected": "Sin conexión con CitizenPay."
       }
     },
     "members": {

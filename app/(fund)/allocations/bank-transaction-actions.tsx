@@ -4,6 +4,7 @@
 import { useTranslations } from "next-intl";
 import { useEffect, useState, useTransition } from "react";
 
+import { Sensitive } from "@/components/privacy/sensitive";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -136,10 +137,12 @@ export function AttributeDialog({
                   className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted disabled:opacity-50"
                 >
                   <span className="flex min-w-0 items-center gap-2">
-                    <span className="truncate">{s.name}</span>
+                    <span className="truncate">
+                      <Sensitive kind="name">{s.name}</Sensitive>
+                    </span>
                     {s.matchedSerial && (
                       <span className="shrink-0 font-mono text-xs text-muted-foreground">
-                        {s.matchedSerial}
+                        <Sensitive kind="number">{s.matchedSerial}</Sensitive>
                       </span>
                     )}
                   </span>

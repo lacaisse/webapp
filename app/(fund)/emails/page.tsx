@@ -2,6 +2,7 @@
 import { Suspense } from "react";
 import { getFormatter, getTranslations } from "next-intl/server";
 
+import { Sensitive } from "@/components/privacy/sensitive";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -156,7 +157,9 @@ async function EmailsTable({ status }: { status?: EmailStatus }) {
                   timeStyle: "short",
                 })}
               </TableCell>
-              <TableCell className="text-sm">{e.toEmail}</TableCell>
+              <TableCell className="text-sm">
+                <Sensitive kind="email">{e.toEmail}</Sensitive>
+              </TableCell>
               <TableCell>
                 <code className="text-xs">{e.type}</code>
               </TableCell>

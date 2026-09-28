@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { getFormatter, getTranslations } from "next-intl/server";
 
+import { Sensitive } from "@/components/privacy/sensitive";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -25,12 +26,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { AttributeDialog } from "@/app/(fund)/allocations/bank-transaction-actions";
+import { maskValue } from "@/lib/privacy";
 import { fetchFundPeriods } from "@/app/(fund)/bank/data";
 import { findAllocationPlans } from "@/services/allocation-periods/run";
 import { Prisma } from "@/services/db/generated/client";
 import { prisma } from "@/services/db/prisma";
 import { requireFundRole } from "@/services/auth/dal";
 import { requireCurrentFund } from "@/services/fund/server";
+import { getPrivacyMode } from "@/services/privacy/server";
 
 import { AllocateMemberButton } from "./allocate-member-button";
 import { AttachAllocationDialog } from "./attach-allocation-dialog";
@@ -83,6 +86,13 @@ async function AllocationPeriodDetail({
   const { id } = await params;
   const { tab } = await searchParams;
   const active = resolveActiveTab(tab, TABS);
+  // Privacy mode: member names / deposit amounts handed to client dialogs as
+  // plain strings (t() interpolations) are masked here; rendered cells use
+  // <Sensitive>. Display-only — the actions still receive real ids.
+  const privacy = await getPrivacyMode();
+  const maskName = (name: string) => (privacy ? maskValue("name") : name);
+  const maskAmount = (amount: string) =>
+    privacy ? maskValue("amount") : amount;
 
   const period = await prisma.allocationPeriod.findFirst({
     where: { id, fundId: fund.id },
@@ -391,14 +401,16 @@ async function AllocationPeriodDetail({
                         href={`/members/${p.memberId}`}
                         className="hover:underline"
                       >
-                        {p.memberName}
+                        <Sensitive kind="name">{p.memberName}</Sensitive>
                       </Link>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {p.tierName}
                     </TableCell>
                     <TableCell className="text-right text-sm text-muted-foreground">
-                      {p.deposited.toString()}
+                      <Sensitive kind="amount">
+                        {p.deposited.toString()}
+                      </Sensitive>
                     </TableCell>
                     <TableCell className="text-right font-medium">
                       {p.amount.toString()}
@@ -407,7 +419,7 @@ async function AllocationPeriodDetail({
                       <AllocateMemberButton
                         periodId={period.id}
                         memberId={p.memberId}
-                        memberName={p.memberName}
+                        memberName={maskName(p.memberName)}
                         amount={p.amount.toString()}
                         periodLabel={period.label}
                       />
@@ -457,22 +469,38 @@ async function AllocationPeriodDetail({
                             href={`/members/${b.member.id}`}
                             className="hover:underline"
                           >
-                            {`${b.member.firstName} ${b.member.lastName}`.trim()}
+                            <Sensitive kind="name">
+                              {`${b.member.firstName} ${b.member.lastName}`.trim()}
+                            </Sensitive>
                           </Link>
                         ) : (
                           <div className="flex items-center gap-2">
                             <span className="text-sm text-muted-foreground">
-                              {b.counterpartName ?? "—"}
+                              {b.counterpartName ? (
+                                <Sensitive kind="name">
+                                  {b.counterpartName}
+                                </Sensitive>
+                              ) : (
+                                "—"
+                              )}
                             </span>
                             <AttributeDialog bankTransactionId={b.id} />
                           </div>
                         )}
                       </TableCell>
                       <TableCell className="font-mono text-xs">
-                        {b.counterpartReference ?? b.remittanceInfo ?? "—"}
+                        {(b.counterpartReference ?? b.remittanceInfo) ? (
+                          <Sensitive kind="number">
+                            {b.counterpartReference ?? b.remittanceInfo}
+                          </Sensitive>
+                        ) : (
+                          "—"
+                        )}
                       </TableCell>
                       <TableCell className="text-right font-medium">
-                        {b.amount.toString()} {b.currency}
+                        <Sensitive kind="amount">
+                          {`${b.amount.toString()} ${b.currency}`}
+                        </Sensitive>
                       </TableCell>
                       <TableCell>
                         <Badge variant={allocation.variant}>
@@ -488,8 +516,12 @@ async function AllocationPeriodDetail({
                             {b.member && (
                               <AttachAllocationDialog
                                 bankTransactionId={b.id}
-                                memberName={`${b.member.firstName} ${b.member.lastName}`.trim()}
-                                depositAmount={`${b.amount.toString()} ${b.currency}`}
+                                memberName={maskName(
+                                  `${b.member.firstName} ${b.member.lastName}`.trim(),
+                                )}
+                                depositAmount={maskAmount(
+                                  `${b.amount.toString()} ${b.currency}`,
+                                )}
                               />
                             )}
                             <MoveDepositPeriodPicker
@@ -500,11 +532,13 @@ async function AllocationPeriodDetail({
                             <RemoveDepositButton
                               bankTransactionId={b.id}
                               label={
-                                b.member
-                                  ? `${b.member.firstName} ${b.member.lastName}`.trim()
-                                  : (b.counterpartName ??
-                                    b.counterpartReference ??
-                                    "—")
+                                privacy
+                                  ? maskValue("name")
+                                  : b.member
+                                    ? `${b.member.firstName} ${b.member.lastName}`.trim()
+                                    : (b.counterpartName ??
+                                      b.counterpartReference ??
+                                      "—")
                               }
                             />
                           </div>
@@ -569,7 +603,7 @@ async function AllocationPeriodDetail({
                             href={`/members/${op.member.id}`}
                             className="hover:underline"
                           >
-                            {memberName}
+                            <Sensitive kind="name">{memberName}</Sensitive>
                           </Link>
                         ) : (
                           "—"
@@ -579,7 +613,9 @@ async function AllocationPeriodDetail({
                         {op.tier?.name ?? "—"}
                       </TableCell>
                       <TableCell className="text-right font-medium">
-                        {op.amount.toString()}
+                        <Sensitive kind="amount">
+                          {op.amount.toString()}
+                        </Sensitive>
                       </TableCell>
                       <TableCell>
                         <OperationStatusBadge status={op.status} />
@@ -599,8 +635,8 @@ async function AllocationPeriodDetail({
                         {notif.action && (
                           <NotifyAllocationButton
                             tokenOperationId={op.id}
-                            memberName={memberName}
-                            amount={op.amount.toString()}
+                            memberName={maskName(memberName)}
+                            amount={maskAmount(op.amount.toString())}
                             isRetry={notif.action === "retry"}
                           />
                         )}
@@ -649,7 +685,7 @@ async function AllocationPeriodDetail({
                         href={`/members/${m.id}`}
                         className="hover:underline"
                       >
-                        {m.name}
+                        <Sensitive kind="name">{m.name}</Sensitive>
                       </Link>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
@@ -687,7 +723,7 @@ async function AllocationPeriodDetail({
                         <RemindMemberButton
                           periodId={period.id}
                           memberId={m.id}
-                          memberName={m.name}
+                          memberName={maskName(m.name)}
                           isRetry={m.reminder.state === "failed"}
                         />
                       )}
@@ -734,14 +770,14 @@ async function AllocationPeriodDetail({
                         href={`/members/${m.id}`}
                         className="hover:underline"
                       >
-                        {m.name}
+                        <Sensitive kind="name">{m.name}</Sensitive>
                       </Link>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {m.tierName}
                     </TableCell>
                     <TableCell className="text-right font-medium">
-                      {m.deposited}
+                      <Sensitive kind="amount">{m.deposited}</Sensitive>
                     </TableCell>
                     <TableCell className="text-right text-sm text-muted-foreground">
                       {m.min}

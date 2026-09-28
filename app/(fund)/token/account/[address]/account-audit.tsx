@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { getFormatter, getTranslations } from "next-intl/server";
 
+import { Sensitive } from "@/components/privacy/sensitive";
 import { buttonVariants } from "@/components/ui/button";
 import {
   Table,
@@ -23,8 +24,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TxAnnotationCell, TxTriggerCell } from "@/components/tx-annotation";
+import { maskValue } from "@/lib/privacy";
 import { cn } from "@/lib/utils";
 import { getBalances } from "@/services/alchemy/balances";
+import { getPrivacyMode } from "@/services/privacy/server";
 import { formatTokenAmount, isZeroAddress } from "@/services/alchemy/format";
 import { getTotalSupply } from "@/services/alchemy/supply";
 import { prisma } from "@/services/db/prisma";
@@ -209,6 +212,15 @@ export async function AccountAudit({
   };
 
   const fmt = (raw: string) => formatTokenAmount(raw, decimals);
+  // Privacy mode: when the audited account is a member card its balance and
+  // totals are one person's money; row amounts are also masked whenever the
+  // counterparty is a card. Fund accounts and places stay readable.
+  const privacy = await getPrivacyMode();
+  const subjectIsCard = directory.cards.has(account.toLowerCase());
+  const money = (value: string, sensitive = subjectIsCard) =>
+    sensitive ? <Sensitive kind="amount">{value}</Sensitive> : value;
+  const moneyText = (value: string) =>
+    privacy && subjectIsCard ? maskValue("amount") : value;
   const fmtBalance = (v: bigint) =>
     v < BigInt(0) ? `−${fmt((-v).toString())}` : fmt(v.toString());
 
@@ -241,19 +253,25 @@ export async function AccountAudit({
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <SummaryTile
           label={t("balance")}
-          value={withSymbol(fmtBalance(currentBalance), symbol)}
+          value={money(withSymbol(fmtBalance(currentBalance), symbol))}
           hint={
-            sharePct != null ? t("shareOfSupply", { share: sharePct }) : null
+            sharePct != null
+              ? money(t("shareOfSupply", { share: sharePct }))
+              : null
           }
         />
         <SummaryTile
           label={t("totalIn")}
-          value={withSymbol(`+${fmt(timeline.totalIn.toString())}`, symbol)}
+          value={money(
+            withSymbol(`+${fmt(timeline.totalIn.toString())}`, symbol),
+          )}
           hint={t("transfersIn", { count: inCount })}
         />
         <SummaryTile
           label={t("totalOut")}
-          value={withSymbol(`−${fmt(timeline.totalOut.toString())}`, symbol)}
+          value={money(
+            withSymbol(`−${fmt(timeline.totalOut.toString())}`, symbol),
+          )}
           hint={t("transfersOut", { count: outCount })}
         />
         {verdict === "reconciled" && (
@@ -278,9 +296,11 @@ export async function AccountAudit({
               </span>
             }
             hint={t("unexplainedHint", {
-              amount: withSymbol(
-                formatSignedAmount(timeline.openingBalance, fmt),
-                symbol,
+              amount: moneyText(
+                withSymbol(
+                  formatSignedAmount(timeline.openingBalance, fmt),
+                  symbol,
+                ),
               ),
             })}
           />
@@ -296,7 +316,9 @@ export async function AccountAudit({
             }
             hint={t("truncatedHint", {
               count: total,
-              amount: withSymbol(fmtBalance(timeline.openingBalance), symbol),
+              amount: moneyText(
+                withSymbol(fmtBalance(timeline.openingBalance), symbol),
+              ),
             })}
           />
         )}
@@ -348,7 +370,11 @@ export async function AccountAudit({
                     entry.direction === "self" && "text-muted-foreground",
                   )}
                 >
-                  {formatSignedAmount(entry.delta, fmt)}
+                  {money(
+                    formatSignedAmount(entry.delta, fmt),
+                    subjectIsCard ||
+                      directory.cards.has(entry.counterparty.toLowerCase()),
+                  )}
                   {symbol && (
                     <span className="ml-1 text-xs font-normal text-muted-foreground">
                       {symbol}
@@ -356,7 +382,7 @@ export async function AccountAudit({
                   )}
                 </TableCell>
                 <TableCell className="text-right text-sm text-muted-foreground tabular-nums">
-                  {fmtBalance(entry.balanceAfter)}
+                  {money(fmtBalance(entry.balanceAfter))}
                 </TableCell>
                 <TableCell>
                   <TxTriggerCell

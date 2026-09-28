@@ -2,6 +2,7 @@
 import { ArrowRight } from "lucide-react";
 import { getFormatter, getTranslations } from "next-intl/server";
 
+import { Sensitive } from "@/components/privacy/sensitive";
 import {
   Table,
   TableBody,
@@ -226,7 +227,15 @@ export async function TransfersTable({
                   </AddressLink>
                 </TableCell>
                 <TableCell className="text-right font-medium tabular-nums">
-                  {formatTokenAmount(tx.rawValue, decimals)}
+                  {/* Money on or off a member card is per-person money. */}
+                  {directory.cards.has(tx.from.toLowerCase()) ||
+                  directory.cards.has(tx.to.toLowerCase()) ? (
+                    <Sensitive kind="amount">
+                      {formatTokenAmount(tx.rawValue, decimals)}
+                    </Sensitive>
+                  ) : (
+                    formatTokenAmount(tx.rawValue, decimals)
+                  )}
                   {symbol && (
                     <span className="ml-1 text-xs text-muted-foreground">
                       {symbol}

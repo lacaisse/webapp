@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { getFormatter, getTranslations } from "next-intl/server";
 
+import { Sensitive } from "@/components/privacy/sensitive";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -122,9 +123,19 @@ export async function MerchantsTable({
                   </Link>
                 </TableCell>
                 <TableCell>
-                  <div className="text-sm">{m.contactName ?? "—"}</div>
+                  <div className="text-sm">
+                    {m.contactName ? (
+                      <Sensitive kind="name">{m.contactName}</Sensitive>
+                    ) : (
+                      "—"
+                    )}
+                  </div>
                   <div className="text-xs text-muted-foreground">
-                    {m.email ?? "—"}
+                    {m.email ? (
+                      <Sensitive kind="email">{m.email}</Sensitive>
+                    ) : (
+                      "—"
+                    )}
                   </div>
                 </TableCell>
                 <TableCell>
