@@ -36,6 +36,7 @@ function payout(over: Partial<Payout> & { id: string }): Payout {
     burnTxHashes: [],
     feeTransferPending: false,
     feeTransferTxHash: null,
+    burnClaim: null,
     pontoPaymentId: null,
     pontoPaymentStatus: null,
     emailRecipient: null,

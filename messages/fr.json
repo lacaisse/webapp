@@ -1372,6 +1372,36 @@
           "feeSwept": "Commission plateforme et déduction transférées vers le compte de la caisse : {amount}",
           "feeNotSwept": "Jetons brûlés, mais la commission plateforme n’a pas encore été transférée."
         },
+        "burnClaim": {
+          "started": "Un brûlage a été lancé le {time} et n’a pas été confirmé.",
+          "hint": "Il est peut-être encore en cours, ou il a été interrompu. Vérifiez le compte du lieu on-chain, puis enregistrez la transaction du brûlage ou, si rien n’a été brûlé, libérez la réservation.",
+          "record": {
+            "button": "Enregistrer le brûlage",
+            "title": "Enregistrer la transaction de brûlage ?",
+            "description": "Enregistre cette transaction comme le brûlage du virement et le règle comme un brûlage normal (les frais de plateforme sont transférés à la caisse). N’utilisez qu’une transaction vérifiée on-chain : le brûlage du net de ce virement depuis le compte du lieu.",
+            "label": "Hash de transaction",
+            "confirm": "Enregistrer le brûlage",
+            "verifyHint": "La transaction est d’abord vérifiée on-chain : ce doit être un brûlage réussi du net exact de ce virement depuis le compte du lieu. Un hash userOp fonctionne aussi."
+          },
+          "release": {
+            "button": "Libérer",
+            "title": "Libérer la réservation de brûlage ?",
+            "description": "La libération permet un nouveau brûlage de ce virement.",
+            "warning": "Ne libérez qu’après avoir vérifié on-chain que rien n’a été brûlé pour ce virement. Si le brûlage précédent a abouti, brûler à nouveau détruit deux fois les jetons du commerçant.",
+            "confirm": "Libérer la réservation",
+            "availableAt": "Disponible à partir du {time} : un brûlage en cours peut mettre quelques minutes à atteindre la chaîne."
+          },
+          "attempt": {
+            "running": "Une tentative depuis cette page est encore marquée comme en cours. Attendez qu’elle se termine avant d’agir.",
+            "notSent": "La tentative enregistrée a échoué avant d’être envoyée, elle n’a donc rien brûlé. La libération est sans risque dès que le délai le permet.",
+            "success": "Le brûlage de la tentative est confirmé on-chain. Enregistrez-le ci-dessous (le hash est prérempli).",
+            "reverted": "La userOp de la tentative a été annulée on-chain, elle n’a donc rien brûlé. La libération est sans risque dès que le délai le permet.",
+            "pending": "La userOp de la tentative est encore en attente chez le bundler. Patientez, puis vérifiez à nouveau.",
+            "unknown": "L’issue de la tentative n’a pas pu être déterminée. Vérifiez la userOp on-chain avant d’agir.",
+            "userOp": "UserOp :",
+            "tx": "Transaction :"
+          }
+        },
         "feeTransfer": {
           "pending": "La commission plateforme et la déduction de ce virement n’ont pas encore été transférées.",
           "button": "Transférer la commission",
@@ -1506,7 +1536,22 @@
           "periodNotPending": "La période ne peut être modifiée que tant que le virement est en attente.",
           "exportFailed": "Impossible de générer l'export. Réessayez bientôt.",
           "exportOrdersFailed": "Impossible de charger les transactions d'un des virements. L'export n'a pas été généré — réessayez bientôt.",
-          "exportOrdersTruncated": "Un des virements contient trop de transactions pour être exporté d'un seul bloc. Réduisez la période et réessayez."
+          "exportOrdersTruncated": "Un des virements contient trop de transactions pour être exporté d'un seul bloc. Réduisez la période et réessayez.",
+          "burnInProgress": "Une autre tentative de brûlage de ce virement a commencé le {claimedAt} et est toujours en cours ou a été interrompue. Rien n’a été brûlé cette fois. Utilisez le panneau de la page du virement pour enregistrer sa transaction ou la libérer.",
+          "burnClaimFailed": "Le brûlage n’a pas pu être sécurisé auprès de Citizen Pay, rien n’a donc été brûlé. Réessayez bientôt.",
+          "burnMayHaveBeenSent": "Le brûlage a peut-être été envoyé on-chain, mais son issue est inconnue. Ne réessayez pas : vérifiez la chaîne (avec le hash userOp ci-dessous, s’il est indiqué), puis enregistrez le hash de transaction du brûlage ou libérez la réservation depuis la page du virement.",
+          "duplicateBurn": "Ce virement a été brûlé DEUX FOIS : la transaction {txHash} a été enregistrée en plus d’un brûlage antérieur. Citizen Pay a été alerté. Ne brûlez plus — contactez Citizen Pay pour réconcilier.",
+          "noBurnClaim": "Plus aucune tentative de brûlage n’est en cours pour ce virement. Rechargez la page.",
+          "releaseClaimFailed": "Impossible de libérer la réservation de brûlage. Réessayez bientôt.",
+          "burnInProgressByCitizenPay": "Citizen Pay brûle lui-même ce virement en ce moment. Rien n’a été brûlé d’ici. Contactez Citizen Pay si cela n’aboutit pas.",
+          "burnBookkeepingFailed": "Le brûlage a abouti et a été enregistré chez Citizen Pay, mais son enregistrement dans l’historique des jetons de la caisse a échoué. Vérifiez la page Jeton.",
+          "burnVerifyFailed": "Impossible de vérifier la transaction on-chain. Rien n’a été enregistré. Réessayez bientôt.",
+          "burnHashNotFound": "Cette transaction est introuvable on-chain (ou pas encore confirmée). Rien n’a été enregistré.",
+          "burnHashNotSuccessful": "Cette transaction a échoué on-chain, elle n’a donc rien brûlé. Rien n’a été enregistré.",
+          "burnHashNotBurn": "Cette transaction n’est pas un brûlage des jetons de ce lieu. Rien n’a été enregistré.",
+          "burnHashWrongAmount": "Cette transaction a brûlé {found}, mais le net de ce virement est de {expected}. Rien n’a été enregistré.",
+          "releaseTooRecent": "Cette réservation de brûlage ne peut pas encore être libérée : un brûlage en cours peut mettre quelques minutes à atteindre la chaîne. La libération sera possible à partir du {releasableAt}.",
+          "releaseClaimChanged": "La réservation de brûlage a changé depuis le chargement de la page (une autre tentative l’a prise, ou elle a été résolue). La page a été rechargée — vérifiez à nouveau avant d’agir."
         }
       },
       "export": {

@@ -68,7 +68,12 @@ async function payoutCtx(
       `${fund.name} is not connected to Citizen Pay yet — no payout data exists until an admin issues an API key in the fund's settings.`,
     );
   }
-  return { fund, userId: ctx.userId, t: (key: string) => t(key as never) };
+  return {
+    fund,
+    userId: ctx.userId,
+    t: (key: string, values?: Record<string, string | number>) =>
+      t(key as never, values as never),
+  };
 }
 
 // Ponto only mints a signing link when it's given an https URL to send the
@@ -249,7 +254,7 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
     "get_payout",
     {
       description:
-        "Everything about one payout: totals (gross / processor fees withheld at source / platform payout fees / manual deduction / net, where net = total − fees − payoutFees − manualDeduction), the live lifecycle status, the bank signing link while it is awaiting signature, whether the retained fee sweep is still outstanding, and how many of its orders are confirmed on-chain vs. sitting in Issues. Reading the status also nudges settlement forward on CitizenPay's side (a signed payment finalises here). Requires ADMIN.",
+        "Everything about one payout: totals (gross / processor fees withheld at source / platform payout fees / manual deduction / net, where net = total − fees − payoutFees − manualDeduction), the live lifecycle status, the bank signing link while it is awaiting signature, whether the retained fee sweep is still outstanding, any burn attempt still in flight (`burnClaim`: when it was started — never burn while it is set), and how many of its orders are confirmed on-chain vs. sitting in Issues. Reading the status also nudges settlement forward on CitizenPay's side (a signed payment finalises here). Requires ADMIN.",
       inputSchema: {
         fund: FUND_PARAM,
         payoutId: PAYOUT_ID,
@@ -307,6 +312,9 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
         burnTxHashes: p.burnTxHashes,
         feeTransferPending: detail.feeTransferPending,
         feeTransferTxHash: detail.feeTransferTxHash,
+        // Non-null while a burn attempt holds the payout and nothing is
+        // recorded yet: do not burn — an admin resolves it on the payout page.
+        burnClaim: detail.burnClaim,
         emailRecipient: p.emailRecipient,
         emailSentAt: p.emailSentAt,
         orders,
@@ -658,7 +666,7 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
     "burn_payout",
     {
       description:
-        "IRREVERSIBLE. Burn the tokens backing a payout: destroys the payout's net from the merchant place's wallet with the fund's minter, reports the burn to CitizenPay (which marks the payout burnt), and sweeps the retained cut — the platform payout fees plus any manual deduction — to the fund's treasury account. Processor fees withheld at source are in neither figure; they never entered the wallet. Run this once the fiat leg is paid — burning before the merchant is paid destroys their balance with nothing sent. Only valid while the payout is pending; a second call is rejected. Requires ADMIN.",
+        "IRREVERSIBLE. Burn the tokens backing a payout: destroys the payout's net from the merchant place's wallet with the fund's minter, reports the burn to CitizenPay (which marks the payout burnt), and sweeps the retained cut — the platform payout fees plus any manual deduction — to the fund's treasury account. Processor fees withheld at source are in neither figure; they never entered the wallet. Run this once the fiat leg is paid — burning before the merchant is paid destroys their balance with nothing sent. Only valid while the payout is pending; a second call is rejected — the burn first takes Citizen Pay's burn claim, so only one attempt can run. If it fails saying the burn may have been sent or another attempt is in progress, do NOT retry: an admin checks the chain and records or releases the attempt from the payout page. A timeout or dropped connection does NOT mean the burn failed — the burn can take over a minute and may still land. Never call this again after an unclear outcome; read get_payout instead (status `burnt`, or a non-null `burnClaim` = an attempt still in flight). Requires ADMIN.",
       inputSchema: {
         fund: FUND_PARAM,
         payoutId: PAYOUT_ID,
@@ -680,6 +688,8 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
         feeTransferTxHash: res.feeTransferTxHash ?? null,
         feeTransferPending: res.feeTransferPending ?? false,
         feeTransferError: res.feeTransferError ?? null,
+        // The burn is recorded; something after it on our side failed.
+        warning: res.warning ?? null,
         hint: res.feeTransferPending
           ? "The burn succeeded but the fee sweep did not run — retry it with sweep_payout_fees. Do NOT call burn_payout again."
           : undefined,

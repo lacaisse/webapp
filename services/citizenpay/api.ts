@@ -177,6 +177,18 @@ export type PayoutListPageWire = {
 // row plus the manual-deduction comment.
 export type PayoutDetailWire = PayoutListWire & {
   manualDeductionComment?: string | null;
+  // Set only while a burn claim is in flight (taken, nothing recorded yet) —
+  // see `burnClaim` below. Absent on an api that predates the claim.
+  burnClaim?: PayoutBurnClaimWire | null;
+};
+
+// An in-flight burn claim, as `/payouts/{id}` and `/payouts/{id}/status`
+// report it — only ever a treasury-key client's claim (`source` "external");
+// CP's own server-side burn is not shown here.
+export type PayoutBurnClaimWire = {
+  claimId?: string;
+  claimedAt: string; // RFC3339
+  source: "external";
 };
 
 // A draft payout: a computed summary of paid/refunded orders for one place
@@ -860,6 +872,7 @@ export const payouts = {
     signingUrl?: string | null;
     feeTransferPending?: boolean;
     feeTransferTxHash?: string | null;
+    burnClaim?: PayoutBurnClaimWire | null;
   }> {
     return request(
       creds,
@@ -893,11 +906,18 @@ export const payouts = {
   // the sweep fails. A non-2xx means the burn itself failed. On 200 you MUST
   // read the body: `feeTransferPending: true` (+ `feeTransferError`) means the
   // sweep didn't run and needs a retry via `feeTransfer` below.
+  //
+  // `claimId` (optional) names the burn claim this report closes (see
+  // `burnClaim`). A report is never refused for claim reasons — the tokens are
+  // already gone. Reporting the SAME hash again is idempotent; a DIFFERENT
+  // hash on an already-burned payout is appended and answered with
+  // `duplicateBurn: true` (CP raises a red alert).
   burn(
     creds: CitizenPayApiCredentials,
     payoutId: string,
     txHash: string,
     destination?: string,
+    claimId?: string,
   ): Promise<{
     success: boolean;
     txHash?: string;
@@ -905,11 +925,62 @@ export const payouts = {
     feeTransferTxHash?: string | null;
     feeTransferPending?: boolean;
     feeTransferError?: string | null;
+    duplicateBurn?: boolean;
   }> {
     return request(creds, "POST", `/v2/treasury/payouts/${encodeURIComponent(payoutId)}/burn`, {
-      body: destination ? { txHash, destination } : { txHash },
+      body: {
+        txHash,
+        ...(destination ? { destination } : {}),
+        ...(claimId ? { claimId } : {}),
+      },
       timeoutMs: 30_000,
     });
+  },
+  // Take the burn claim BEFORE burning on chain ourselves, so two concurrent
+  // attempts can't both burn: one atomic UPDATE on CP's side, exactly one
+  // caller gets a `claimId`. 409s (CitizenPayApiError):
+  //   - `payout is already burnt` / `payout is already complete`;
+  //   - `payout is not pending` (e.g. payment-pending);
+  //   - `burn already in progress` with `{ error, claimedAt, source }` in the
+  //     body — another claim holds the payout; `source` "api" means CP itself
+  //     is burning it.
+  burnClaim(
+    creds: CitizenPayApiCredentials,
+    payoutId: string,
+  ): Promise<{ claimId: string; claimedAt: string }> {
+    return request(
+      creds,
+      "POST",
+      `/v2/treasury/payouts/${encodeURIComponent(payoutId)}/burn-claim`,
+      { timeoutMs: 30_000 },
+    );
+  },
+  // Release a burn claim (204, empty body). Idempotent when there's no claim
+  // or the payout is already burned.
+  //   - `claimId` alone: immediate release of exactly that claim (409 `burn
+  //     claim does not match` otherwise) — the burn's own pre-broadcast path.
+  //   - `force: true`: for an attempt that was interrupted, after a human
+  //     checked the chain. Refused with 409 `burn claim is too recent`
+  //     (`{error, claimedAt, releasableAt}`) until the claim is 10 minutes
+  //     old; with a `claimId` as well it must still match (pinned release).
+  // Never releases CP's own api-side claim.
+  releaseBurnClaim(
+    creds: CitizenPayApiCredentials,
+    payoutId: string,
+    args: { claimId?: string; force?: boolean } = {},
+  ): Promise<null> {
+    return request(
+      creds,
+      "DELETE",
+      `/v2/treasury/payouts/${encodeURIComponent(payoutId)}/burn-claim`,
+      {
+        query: {
+          claimId: args.claimId,
+          force: args.force ? "true" : undefined,
+        },
+        timeoutMs: 30_000,
+      },
+    );
   },
   // Standalone, idempotent sweep of the retained cut (`payoutFees +
   // manualDeduction`) to `destination`. Run it

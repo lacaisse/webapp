@@ -2,6 +2,7 @@
 import "server-only";
 
 import { revalidatePath } from "next/cache";
+import { parseUnits } from "viem";
 
 import { formatTokenAmount } from "@/services/alchemy/format";
 import {
@@ -18,6 +19,7 @@ import type {
   ArchivedPayout,
   Payout,
   PayoutDeduction,
+  PayoutBurnClaim,
   PayoutDraft,
   PayoutOrder,
   PayoutPeriod,
@@ -29,6 +31,8 @@ import { ANNOTATION_TRIGGERS } from "@/services/transaction-annotation/annotate"
 import { resolveOrEnqueueAnnotation } from "@/services/transaction-annotation/pending";
 import { burnDirect, mintDirect, type Translate } from "@/services/token-operations/direct";
 
+
+import { verifyPayoutBurn } from "./burn-verify";
 import {
   buildPayoutExportCsv,
   PayoutExportRangeSchema,
@@ -83,8 +87,12 @@ export type PayoutContext = {
 
 const ERR = "fund.payments.settlement.errors";
 
-function err(ctx: PayoutContext, key: string): string {
-  return ctx.t(`${ERR}.${key}`);
+function err(
+  ctx: PayoutContext,
+  key: string,
+  values?: Record<string, string | number>,
+): string {
+  return ctx.t(`${ERR}.${key}`, values);
 }
 
 function client(ctx: PayoutContext): CitizenPayClient {
@@ -428,6 +436,8 @@ export type PayoutDetailResult =
       signingUrl: string | null;
       feeTransferPending: boolean;
       feeTransferTxHash: string | null;
+      /** In-flight burn claim (a burn started, nothing recorded yet). */
+      burnClaim: PayoutBurnClaim | null;
     };
 
 /**
@@ -465,6 +475,7 @@ export async function getPayoutDetail(
     signingUrl: live?.signingUrl ?? null,
     feeTransferPending: live?.feeTransferPending ?? payout.feeTransferPending,
     feeTransferTxHash: live?.feeTransferTxHash ?? payout.feeTransferTxHash,
+    burnClaim: live ? live.burnClaim : payout.burnClaim,
   };
 }
 
@@ -1467,7 +1478,13 @@ export async function createPayoutPayment(
 }
 
 export type BurnPayoutResult =
-  | { error: string }
+  | {
+      error: string;
+      // Set when the error is a DOUBLE burn: this burn was recorded on top of
+      // an earlier, different one (CP appended the hash and alerted).
+      duplicateBurn?: true;
+      txHash?: string;
+    }
   | {
       ok: true;
       txHash: string;
@@ -1479,13 +1496,56 @@ export type BurnPayoutResult =
       feeTransferTxHash?: string | null;
       feeTransferPending?: boolean;
       feeTransferError?: string | null;
+      // The burn went through and is recorded with CP, but something on our
+      // side after it failed (e.g. the token-history bookkeeping). Show it,
+      // but it is not a burn failure.
+      warning?: string;
     };
+
+// CP's 409 messages on `burn-claim` (plan §4.2). Matched loosely — the
+// status code is what says "refused"; the text only picks the explanation.
+const CLAIM_NOT_BURNABLE = /already (burnt|burned|complete)|not pending/i;
+const CLAIM_IN_PROGRESS = /burn already in progress/i;
+// …and on a forced `DELETE burn-claim`.
+const CLAIM_TOO_RECENT = /too recent/i;
+const CLAIM_MISMATCH = /does not match/i;
+
+// An RFC3339 instant as a fixed, locale-free UTC label for the error strings
+// (the operations layer has no formatter; the payout page renders its own).
+function claimTimeLabel(claimedAt: unknown): string {
+  if (typeof claimedAt !== "string" || !claimedAt) return "?";
+  const d = new Date(claimedAt);
+  if (Number.isNaN(d.getTime())) return claimedAt;
+  return `${d.toISOString().slice(0, 16).replace("T", " ")} UTC`;
+}
+
+// Best-effort release of OUR claim (by id) when we know nothing was burned.
+// A failure only leaves the claim for an admin to release from the payout
+// page — log it, never mask the error the caller is about to return.
+async function releaseOwnClaim(
+  c: CitizenPayClient,
+  payoutId: string,
+  claimId: string,
+): Promise<void> {
+  try {
+    await c.releasePayoutBurn(payoutId, { claimId });
+  } catch (e) {
+    console.error("[payout] releasing burn claim failed", logSafe(payoutId), e);
+  }
+}
 
 /**
  * Burn step. CP no longer burns server-side — we burn the place's tokens (the
  * payout `net`) with the fund's minter wallet, then report the hash so CP marks
- * the payout `burnt`. Only valid while the payout is `pending`; live status is
- * re-checked first so a duplicate submit can't double-burn. IRREVERSIBLE.
+ * the payout `burnt`. Only valid while the payout is `pending`. IRREVERSIBLE.
+ *
+ * Double-burn guard: before touching the chain we take CP's burn claim, which
+ * exactly one concurrent attempt can win (two admins, a double click across
+ * tabs, a retry after a timeout all used to read `pending` and burn). The
+ * claim is released again only when the burn certainly never left; once it
+ * may have been sent, the claim stays and the payout page offers an admin
+ * "record the hash" or "release after checking the chain" (see
+ * `recordPayoutBurn` / `releasePayoutBurnClaim`).
  */
 export async function burnPayout(
   ctx: PayoutContext,
@@ -1495,27 +1555,69 @@ export async function burnPayout(
   try {
     const c = client(ctx);
 
-    // Idempotency guard: CP flips the payout to `burnt` the instant it records
-    // our hash, so re-checking live status here means a stale/duplicate submit
-    // can't double-burn.
+    // Cheap early exit with the familiar message; the claim below is the
+    // actual guard.
     const { status } = await c.getPayoutStatus(payoutId);
     if (status !== "pending") return { error: err(ctx, "notBurnable") };
+
+    // Claim. Fails CLOSED: if we can't get a claim for any reason — a 409, a
+    // network error, a 5xx, or a 404 from an api that predates the route
+    // (deploy order is api first, but the webapp may briefly be ahead) — we
+    // burn nothing.
+    let claimId: string;
+    try {
+      ({ claimId } = await c.claimPayoutBurn(payoutId));
+    } catch (e) {
+      if (e instanceof CitizenPayApiError && e.status === 409) {
+        if (CLAIM_NOT_BURNABLE.test(e.message)) {
+          return { error: err(ctx, "notBurnable") };
+        }
+        if (CLAIM_IN_PROGRESS.test(e.message)) {
+          const body = e.body as { claimedAt?: unknown; source?: unknown } | null;
+          // CP's own server-side burn never shows up as a claim on the payout
+          // page, so there's nothing for the admin to resolve there.
+          if (body?.source === "api") {
+            return { error: err(ctx, "burnInProgressByCitizenPay") };
+          }
+          return {
+            error: err(ctx, "burnInProgress", {
+              claimedAt: claimTimeLabel(body?.claimedAt),
+            }),
+          };
+        }
+      }
+      console.error("[payout] burn claim failed", logSafe(payoutId), e);
+      return { error: err(ctx, "burnClaimFailed") };
+    }
 
     // Amount = the payout `net` (total − fees − payoutFees − manualDeduction):
     // what the merchant actually keeps, and the same figure the SEPA transfer
     // pays them. Read straight from the detail endpoint — the API computes it.
-    let payout;
-    try {
-      payout = await c.getPayout(payoutId);
-    } catch {
-      return { error: err(ctx, "payoutNotFound") };
-    }
-
+    //
     // Source = the place's wallet (each order's net was minted there). It rides
     // on the orders-page envelope — one row is enough to read it.
-    const ordersPage = await c.getPayoutOrders(payoutId, { limit: 1 });
-    const placeAccount = ordersPage.placeAccountAddress;
-    if (!placeAccount) return { error: err(ctx, "noPlaceAccount") };
+    //
+    // Nothing is on chain yet, so any failure here hands the claim back.
+    let payout: Payout;
+    let placeAccount: string | null;
+    try {
+      try {
+        payout = await c.getPayout(payoutId);
+      } catch {
+        await releaseOwnClaim(c, payoutId, claimId);
+        return { error: err(ctx, "payoutNotFound") };
+      }
+      const ordersPage = await c.getPayoutOrders(payoutId, { limit: 1 });
+      placeAccount = ordersPage.placeAccountAddress;
+    } catch (e) {
+      console.error("[payout] burn pre-read failed", logSafe(payoutId), e);
+      await releaseOwnClaim(c, payoutId, claimId);
+      return { error: toMessage(e, err(ctx, "burnFailed")) };
+    }
+    if (!placeAccount) {
+      await releaseOwnClaim(c, payoutId, claimId);
+      return { error: err(ctx, "noPlaceAccount") };
+    }
 
     // Burn only the `net` on-chain with our minter (records a TokenOperation).
     //
@@ -1528,59 +1630,267 @@ export async function burnPayout(
     //
     // The source-withheld `fees` are in neither figure: the processor kept that
     // money before it reached us, so no token for it was ever minted.
-    const burn = await burnDirect(
-      { fund, userId: ctx.userId, t: ctx.t },
-      { from: placeAccount, amount: payout.net },
-      { trigger: ANNOTATION_TRIGGERS.payoutBurn },
-    );
-    if ("error" in burn) return { error: burn.error };
-
-    // Report the hash so CP marks the payout burnt, and hand CP the minter
-    // smart account as the sweep destination for the retained cut. A non-2xx
-    // here means the BURN record failed — the tokens are already gone, so
-    // surface the hash and do NOT retry (re-running would burn again). A 2xx
-    // means the burn is recorded; the sweep is reported in the body and may be
-    // pending (retry via `feeTransfer`) without being a burn failure.
-    let report;
+    let burn: Awaited<ReturnType<typeof burnDirect>>;
     try {
-      report = await c.burnPayout(
-        payoutId,
-        burn.txHash,
-        fund.tokenMinterSmartAccountAddress ?? undefined,
+      burn = await burnDirect(
+        { fund, userId: ctx.userId, t: ctx.t },
+        { from: placeAccount, amount: payout.net },
+        { trigger: ANNOTATION_TRIGGERS.payoutBurn },
       );
     } catch (e) {
-      console.error("[payout] reporting burn to CP failed", logSafe(payoutId), e);
-      return { error: `${err(ctx, "reportFailed")} (tx ${burn.txHash})` };
+      // Unclassified (e.g. the TokenOperation insert, or bookkeeping after a
+      // failure): we can't prove nothing was sent, so the claim stays.
+      console.error("[payout] burnDirect threw", logSafe(payoutId), e);
+      return { error: err(ctx, "burnMayHaveBeenSent") };
+    }
+    if ("error" in burn) {
+      if (!burn.broadcast) {
+        // Certain to have failed before the userop left: free the payout for
+        // a clean retry and show the burn's own error, as before.
+        await releaseOwnClaim(c, payoutId, claimId);
+        return { error: burn.error };
+      }
+      if (burn.txHash) {
+        // The burn CONFIRMED on chain and only our bookkeeping after it
+        // failed: the tokens are gone and the hash is known, so record it now
+        // rather than leave the claim for a human. Only if that report fails
+        // does the claim stay (reportPayoutBurn says so, with the hash).
+        console.error(
+          "[payout] burn confirmed but bookkeeping failed; reporting anyway",
+          logSafe({ payoutId, txHash: burn.txHash }),
+          burn.error,
+        );
+        const reported = await reportPayoutBurn(ctx, c, payoutId, burn.txHash, claimId);
+        return "ok" in reported
+          ? { ...reported, warning: err(ctx, "burnBookkeepingFailed") }
+          : reported;
+      }
+      // May be on chain. Keep the claim so nobody burns again; an admin
+      // resolves it from the payout page after checking the chain — the
+      // userop hash is the handle to look it up.
+      console.error(
+        "[payout] burn may have been sent, keeping claim",
+        logSafe({ payoutId, userOpHash: burn.userOpHash ?? null }),
+        burn.error,
+      );
+      const msg = err(ctx, "burnMayHaveBeenSent");
+      return { error: burn.userOpHash ? `${msg} (userOp ${burn.userOpHash})` : msg };
     }
 
-    // The burn itself is annotated inside burnDirect (trigger PAYOUT_BURN,
-    // acting admin). The fee sweep is CP's own userOp — annotate it here: a
-    // userOp's settlement tx hash isn't final until `success` (a retry can
-    // change it), so we resolve once now and queue if still pending.
-    if (report.feeTransferTxHash) {
-      await resolveOrEnqueueAnnotation({
-        fundId: fund.id,
-        chainId: fund.tokenChainId,
-        userOpHash: report.feeTransferTxHash,
-        kind: ANNOTATION_TRIGGERS.payoutFee,
-        trigger: ANNOTATION_TRIGGERS.payoutFee,
-        triggeredByUserId: ctx.userId,
-      });
-    }
-
-    revalidatePath("/payments");
-    revalidatePath(`/payments/payouts/${payoutId}`);
-    return {
-      ok: true,
-      txHash: burn.txHash,
-      feeAmount: report.feeAmount,
-      feeTransferTxHash: report.feeTransferTxHash,
-      feeTransferPending: report.feeTransferPending,
-      feeTransferError: report.feeTransferError,
-    };
+    // Report the hash so CP marks the payout burnt. A non-2xx here means the
+    // BURN record failed — the tokens are already gone, so keep the claim,
+    // surface the hash and do NOT retry the burn (re-running would burn
+    // again); the hash can be recorded from the payout page.
+    return await reportPayoutBurn(ctx, c, payoutId, burn.txHash, claimId);
   } catch (e) {
     console.error("[payout] burnPayout failed", logSafe(payoutId), e);
     return { error: toMessage(e, err(ctx, "burnFailed")) };
+  }
+}
+
+// Report a burn's hash to CP and run the post-burn handling. Shared by the
+// burn itself and by `recordPayoutBurn` (an interrupted attempt's hash
+// recorded by an admin), so both settle the payout identically.
+//
+// CP marks the payout burnt and, given the minter smart account as
+// `destination`, sweeps the retained cut to it. A 2xx means the burn is
+// recorded; the sweep is reported in the body and may be pending (retry via
+// `feeTransfer`) without being a burn failure.
+async function reportPayoutBurn(
+  ctx: PayoutContext,
+  c: CitizenPayClient,
+  payoutId: string,
+  txHash: string,
+  claimId?: string,
+): Promise<BurnPayoutResult> {
+  const { fund } = ctx;
+  let report;
+  try {
+    report = await c.burnPayout(
+      payoutId,
+      txHash,
+      fund.tokenMinterSmartAccountAddress ?? undefined,
+      claimId,
+    );
+  } catch (e) {
+    console.error("[payout] reporting burn to CP failed", logSafe(payoutId), e);
+    return { error: `${err(ctx, "reportFailed")} (tx ${txHash})` };
+  }
+
+  // The burn itself is annotated inside burnDirect (trigger PAYOUT_BURN,
+  // acting admin). The fee sweep is CP's own userOp — annotate it here: a
+  // userOp's settlement tx hash isn't final until `success` (a retry can
+  // change it), so we resolve once now and queue if still pending.
+  if (report.feeTransferTxHash) {
+    await resolveOrEnqueueAnnotation({
+      fundId: fund.id,
+      chainId: fund.tokenChainId,
+      userOpHash: report.feeTransferTxHash,
+      kind: ANNOTATION_TRIGGERS.payoutFee,
+      trigger: ANNOTATION_TRIGGERS.payoutFee,
+      triggeredByUserId: ctx.userId,
+    });
+  }
+
+  // CP recorded this hash on top of an EARLIER, different burn: the merchant's
+  // tokens were burned twice. CP has raised its own alert; make sure the
+  // operator can't miss it either. No revalidation here on purpose: in a
+  // server action it re-renders the page at once, which would unmount the
+  // dialog showing this error — the dialog refreshes the page when closed.
+  if (report.duplicateBurn) {
+    console.error("[payout] DUPLICATE BURN reported", logSafe({ payoutId, txHash }));
+    return {
+      error: err(ctx, "duplicateBurn", { txHash }),
+      duplicateBurn: true,
+      txHash,
+    };
+  }
+
+  revalidatePath("/payments");
+  revalidatePath(`/payments/payouts/${payoutId}`);
+  return {
+    ok: true,
+    txHash,
+    feeAmount: report.feeAmount,
+    feeTransferTxHash: report.feeTransferTxHash,
+    feeTransferPending: report.feeTransferPending,
+    feeTransferError: report.feeTransferError,
+  };
+}
+
+/**
+ * Record the hash of a burn whose attempt was interrupted after it went on
+ * chain (the claim is still in flight, nothing recorded). The admin pastes the
+ * hash — a tx hash or the attempt's userop hash — and we VERIFY it on chain
+ * before reporting: a successful tx whose logs hold a `Transfer` of the fund's
+ * token from this payout's place account to the zero address for exactly the
+ * payout `net`. Only then is it reported exactly as the burn would have been
+ * (same sweep destination, same post-burn handling). No claimId is needed: CP
+ * never refuses a burn report for claim reasons.
+ *
+ * Not checked: whether the same hash was already recorded on ANOTHER payout of
+ * the same place with the same net — nothing local links a burn to a payout.
+ */
+export async function recordPayoutBurn(
+  ctx: PayoutContext,
+  input: { payoutId: string; txHash: string },
+): Promise<BurnPayoutResult> {
+  const { fund } = ctx;
+  const hash = input.txHash.trim();
+  if (!TX_HASH.test(hash)) return { error: err(ctx, "txHashInvalid") };
+  if (!fund.tokenAddress || fund.tokenDecimals == null) {
+    return { error: ctx.t("tokenOps.errors.tokenNotConfigured") };
+  }
+
+  try {
+    const c = client(ctx);
+    // Only while a claim is in flight: that's the one state where a burn may
+    // exist unrecorded. Re-read it so a stale page can't record a hash on a
+    // payout that's already burned (CP would book it as a second burn).
+    const live = await c.getPayoutStatus(input.payoutId);
+    if (live.status !== "pending" || !live.burnClaim) {
+      return { error: err(ctx, "noBurnClaim") };
+    }
+
+    const payout = await c.getPayout(input.payoutId);
+    const { placeAccountAddress } = await c.getPayoutOrders(input.payoutId, {
+      limit: 1,
+    });
+    if (!placeAccountAddress) return { error: err(ctx, "noPlaceAccount") };
+
+    let check;
+    try {
+      check = await verifyPayoutBurn({
+        chainId: fund.tokenChainId,
+        hash,
+        token: fund.tokenAddress,
+        from: placeAccountAddress,
+        // Same units burnDirect burned: the decimal net at token decimals.
+        amount: parseUnits(payout.net, fund.tokenDecimals),
+        decimals: fund.tokenDecimals,
+      });
+    } catch (e) {
+      console.error("[payout] burn verification failed", logSafe(input), e);
+      return { error: err(ctx, "burnVerifyFailed") };
+    }
+    if (!("ok" in check)) {
+      switch (check.reason) {
+        case "notFound":
+          return { error: err(ctx, "burnHashNotFound") };
+        case "notSuccessful":
+          return { error: err(ctx, "burnHashNotSuccessful") };
+        case "notBurn":
+          return { error: err(ctx, "burnHashNotBurn") };
+        case "wrongAmount":
+          return {
+            error: err(ctx, "burnHashWrongAmount", {
+              found: check.found,
+              expected: check.expected,
+            }),
+          };
+      }
+    }
+    // Report the settlement tx hash, even when the admin pasted a userop hash
+    // — it's what a normal burn reports.
+    return await reportPayoutBurn(ctx, c, input.payoutId, check.txHash);
+  } catch (e) {
+    console.error("[payout] recordPayoutBurn failed", logSafe(input.payoutId), e);
+    return { error: toMessage(e, err(ctx, "statusFailed")) };
+  }
+}
+
+export type ReleaseBurnClaimResult =
+  | {
+      error: string;
+      // The claim on CP is no longer the one the page showed (another attempt
+      // took it, or it was released / recorded): re-read the page.
+      stale?: true;
+    }
+  | { ok: true };
+
+/**
+ * Force-release an in-flight burn claim, allowing a new burn. Only for an
+ * attempt an admin has confirmed ON CHAIN never burned anything — releasing
+ * after a burn that did go out invites a second one.
+ *
+ * Pinned: the `claimId` the page was rendered with goes along, so a claim
+ * taken by a NEW attempt meanwhile is never released by mistake. CP refuses a
+ * forced release until the claim is 10 minutes old (a live burn can take a
+ * few minutes to reach the chain), never releases its own api-side claim, and
+ * does nothing once the payout is burned.
+ */
+export async function releasePayoutBurnClaim(
+  ctx: PayoutContext,
+  payoutId: string,
+  claimId?: string | null,
+): Promise<ReleaseBurnClaimResult> {
+  try {
+    await client(ctx).releasePayoutBurn(payoutId, {
+      ...(claimId ? { claimId } : {}),
+      force: true,
+    });
+    console.warn(
+      "[payout] burn claim force-released",
+      logSafe({ payoutId, claimId: claimId ?? null, by: ctx.userId }),
+    );
+    revalidatePath(`/payments/payouts/${payoutId}`);
+    return { ok: true };
+  } catch (e) {
+    if (e instanceof CitizenPayApiError && e.status === 409) {
+      if (CLAIM_TOO_RECENT.test(e.message)) {
+        const body = e.body as { releasableAt?: unknown } | null;
+        return {
+          error: err(ctx, "releaseTooRecent", {
+            releasableAt: claimTimeLabel(body?.releasableAt),
+          }),
+        };
+      }
+      if (CLAIM_MISMATCH.test(e.message)) {
+        return { error: err(ctx, "releaseClaimChanged"), stale: true };
+      }
+    }
+    console.error("[payout] releasePayoutBurnClaim failed", logSafe(payoutId), e);
+    return { error: toMessage(e, err(ctx, "releaseClaimFailed")) };
   }
 }
 

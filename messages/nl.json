@@ -1372,6 +1372,36 @@
           "feeSwept": "Platformkosten en inhouding overgemaakt naar de fondsrekening: {amount}",
           "feeNotSwept": "Tokens verbrand, maar de platformkosten zijn nog niet overgemaakt."
         },
+        "burnClaim": {
+          "started": "Er is een verbranding gestart op {time} die niet is bevestigd.",
+          "hint": "Ze loopt misschien nog, of werd onderbroken. Controleer de account van de locatie on-chain en registreer daarna de transactie van de verbranding of, als er niets is verbrand, geef de claim vrij.",
+          "record": {
+            "button": "Verbranding registreren",
+            "title": "De verbrandtransactie registreren?",
+            "description": "Registreert deze transactie als de verbranding van de uitbetaling en handelt die af als een gewone verbranding (de platformkosten gaan naar het fonds). Gebruik alleen een transactie die je on-chain hebt gecontroleerd: de verbranding van het netto van deze uitbetaling vanaf de account van de locatie.",
+            "label": "Transactiehash",
+            "confirm": "Verbranding registreren",
+            "verifyHint": "De transactie wordt eerst on-chain gecontroleerd: het moet een geslaagde verbranding zijn van precies het netto van deze uitbetaling vanaf de account van de locatie. Een userOp-hash werkt ook."
+          },
+          "release": {
+            "button": "Vrijgeven",
+            "title": "De verbrandclaim vrijgeven?",
+            "description": "Vrijgeven maakt een nieuwe verbranding van deze uitbetaling mogelijk.",
+            "warning": "Geef alleen vrij nadat je on-chain hebt gecontroleerd dat er niets is verbrand voor deze uitbetaling. Als de eerdere verbranding is gelukt, vernietigt opnieuw verbranden de tokens van de handelaar twee keer.",
+            "confirm": "Claim vrijgeven",
+            "availableAt": "Beschikbaar vanaf {time}: een lopende verbranding kan enkele minuten nodig hebben om de chain te bereiken."
+          },
+          "attempt": {
+            "running": "Een poging vanaf deze pagina staat nog als lopend gemarkeerd. Wacht tot ze klaar is voor je iets doet.",
+            "notSent": "De geregistreerde poging mislukte voordat ze werd verzonden en heeft dus niets verbrand. Vrijgeven is veilig zodra de timer het toelaat.",
+            "success": "De verbranding van de poging is on-chain bevestigd. Registreer ze hieronder (de hash is al ingevuld).",
+            "reverted": "De userOp van de poging is on-chain teruggedraaid en heeft dus niets verbrand. Vrijgeven is veilig zodra de timer het toelaat.",
+            "pending": "De userOp van de poging staat nog in afwachting bij de bundler. Wacht en controleer opnieuw.",
+            "unknown": "De uitkomst van de poging kon niet worden bepaald. Controleer de userOp on-chain voor je iets doet.",
+            "userOp": "UserOp:",
+            "tx": "Transactie:"
+          }
+        },
         "feeTransfer": {
           "pending": "De platformkosten en inhouding van deze uitbetaling zijn nog niet overgemaakt.",
           "button": "Platformkosten overmaken",
@@ -1506,7 +1536,22 @@
           "periodNotPending": "De periode kan alleen worden gewijzigd zolang de uitbetaling in behandeling is.",
           "exportFailed": "Kon de export niet genereren. Probeer het zo opnieuw.",
           "exportOrdersFailed": "Kon de transacties van een van de uitbetalingen niet laden. De export is niet gegenereerd — probeer het straks opnieuw.",
-          "exportOrdersTruncated": "Een van de uitbetalingen bevat te veel transacties om in één keer te exporteren. Verklein de periode en probeer opnieuw."
+          "exportOrdersTruncated": "Een van de uitbetalingen bevat te veel transacties om in één keer te exporteren. Verklein de periode en probeer opnieuw.",
+          "burnInProgress": "Een andere verbrandpoging voor deze uitbetaling is gestart op {claimedAt} en loopt nog of werd onderbroken. Er is nu niets verbrand. Gebruik het paneel op de uitbetalingspagina om de transactie te registreren of vrij te geven.",
+          "burnClaimFailed": "De verbranding kon niet worden vastgelegd bij Citizen Pay, dus er is niets verbrand. Probeer het zo opnieuw.",
+          "burnMayHaveBeenSent": "De verbranding is mogelijk on-chain verzonden, maar de uitkomst is onbekend. Niet opnieuw proberen: controleer de chain (met de userOp-hash hieronder, indien vermeld) en registreer daarna de transactiehash van de verbranding of geef de claim vrij op de uitbetalingspagina.",
+          "duplicateBurn": "Deze uitbetaling is TWEE KEER verbrand: transactie {txHash} is geregistreerd bovenop een eerdere verbranding. Citizen Pay is gewaarschuwd. Niet opnieuw verbranden — neem contact op met Citizen Pay om af te stemmen.",
+          "noBurnClaim": "Er loopt geen verbrandpoging meer voor deze uitbetaling. Laad de pagina opnieuw.",
+          "releaseClaimFailed": "Kon de verbrandclaim niet vrijgeven. Probeer het zo opnieuw.",
+          "burnInProgressByCitizenPay": "Citizen Pay verbrandt deze uitbetaling op dit moment zelf. Hier is niets verbrand. Neem contact op met Citizen Pay als het niet wordt afgerond.",
+          "burnBookkeepingFailed": "De verbranding is gelukt en geregistreerd bij Citizen Pay, maar opslaan in de tokengeschiedenis van het fonds is mislukt. Controleer de tokenpagina.",
+          "burnVerifyFailed": "Kon de transactie on-chain niet controleren. Er is niets geregistreerd. Probeer het zo opnieuw.",
+          "burnHashNotFound": "Die transactie is niet gevonden on-chain (of nog niet bevestigd). Er is niets geregistreerd.",
+          "burnHashNotSuccessful": "Die transactie is on-chain mislukt en heeft dus niets verbrand. Er is niets geregistreerd.",
+          "burnHashNotBurn": "Die transactie is geen verbranding van de tokens van deze locatie. Er is niets geregistreerd.",
+          "burnHashWrongAmount": "Die transactie verbrandde {found}, maar het netto van deze uitbetaling is {expected}. Er is niets geregistreerd.",
+          "releaseTooRecent": "Deze verbrandclaim kan nog niet worden vrijgegeven: een lopende verbranding kan enkele minuten nodig hebben om de chain te bereiken. Vrijgeven kan vanaf {releasableAt}.",
+          "releaseClaimChanged": "De verbrandclaim is gewijzigd sinds de pagina werd geladen (een andere poging nam ze over, of ze werd afgehandeld). De pagina is opnieuw geladen — controleer opnieuw voor je iets doet."
         }
       },
       "export": {

@@ -11,7 +11,9 @@ import {
   suggestPayoutFee,
   toCents,
 } from "@/services/payout/money";
+import { FORCED_RELEASE_MIN_AGE_MS } from "@/services/payout/burn-claim-config";
 
+import { CitizenPayApiError } from "./api";
 import type { CitizenPayClient } from "./client-interface";
 import { LiveCitizenPayClient } from "./live-client";
 import type {
@@ -39,6 +41,8 @@ import type {
   ListPlacesResult,
   OperationStatusResult,
   Payout,
+  PayoutBurnClaim,
+  PayoutBurnClaimed,
   PayoutBurnReport,
   PayoutDeduction,
   PayoutDraft,
@@ -645,6 +649,15 @@ class MockCitizenPayClient implements CitizenPayClient {
 
   async getPayout(payoutId: string): Promise<Payout> {
     this.log("getPayout", { payoutId });
+    const base = this.mockPayoutDetail(payoutId);
+    return {
+      ...base,
+      burnTxHashes: mockBurnHashes.get(payoutId) ?? base.burnTxHashes,
+      burnClaim: mockBurnClaim(payoutId),
+    };
+  }
+
+  private mockPayoutDetail(payoutId: string): Payout {
     if (completedMockPayouts.has(payoutId)) {
       return mockPayout(payoutId, "complete", "150.00");
     }
@@ -696,10 +709,18 @@ class MockCitizenPayClient implements CitizenPayClient {
     opts: { redirectUrl?: string } = {},
   ): Promise<PayoutStatusDetail> {
     this.log("getPayoutStatus", { payoutId, ...opts });
-    const base = { feeTransferPending: false, feeTransferTxHash: null };
-    // A manual "mark complete" wins over the fixture's lifecycle stage.
+    const base = {
+      feeTransferPending: false,
+      feeTransferTxHash: null,
+      burnClaim: mockBurnClaim(payoutId),
+    };
+    // A manual "mark complete" wins over the fixture's lifecycle stage, then
+    // a burn reported this session.
     if (completedMockPayouts.has(payoutId)) {
       return { status: "complete", signingUrl: null, ...base };
+    }
+    if (mockBurnHashes.has(payoutId)) {
+      return { status: "burnt", signingUrl: null, ...base };
     }
     // Map the mock payouts so dev sees each lifecycle stage (and the signing
     // QR for the payment-pending one).
@@ -733,8 +754,17 @@ class MockCitizenPayClient implements CitizenPayClient {
     payoutId: string,
     txHash: string,
     destination?: string,
+    claimId?: string,
   ): Promise<PayoutBurnReport> {
-    this.log("burnPayout", { payoutId, txHash, destination });
+    this.log("burnPayout", { payoutId, txHash, destination, claimId });
+    // Recording the burn closes whatever claim was in flight and marks the
+    // payout burnt, as CP does. Same hash again is idempotent; a different
+    // one is appended and flagged as a double burn.
+    mockBurnClaims.delete(payoutId);
+    const hashes = mockBurnHashes.get(payoutId) ?? [];
+    const known = hashes.some((h) => h.toLowerCase() === txHash.toLowerCase());
+    const duplicateBurn = hashes.length > 0 && !known;
+    if (!known) mockBurnHashes.set(payoutId, [...hashes, txHash]);
     // Mock: the sweep "succeeds" inline when a destination is supplied.
     return {
       feeAmount: null,
@@ -743,7 +773,61 @@ class MockCitizenPayClient implements CitizenPayClient {
         : null,
       feeTransferPending: false,
       feeTransferError: null,
+      duplicateBurn,
     };
+  }
+
+  // Mirrors CP's claim rules closely enough for dev: one claim per payout,
+  // 409s shaped like the real ones so the burn flow's error paths render.
+  async claimPayoutBurn(payoutId: string): Promise<PayoutBurnClaimed> {
+    this.log("claimPayoutBurn", { payoutId });
+    const refuse = (error: string): never => {
+      throw new CitizenPayApiError(error, 409, { error });
+    };
+    if (mockBurnHashes.has(payoutId)) refuse("payout is already burnt");
+    const { status } = await this.getPayoutStatus(payoutId);
+    if (status === "complete") refuse("payout is already complete");
+    const existing = mockBurnClaims.get(payoutId);
+    if (existing) {
+      throw new CitizenPayApiError("burn already in progress", 409, {
+        error: "burn already in progress",
+        claimedAt: existing.claimedAt,
+        source: "external",
+      });
+    }
+    if (status !== "pending") refuse("payout is not pending");
+    const claim = {
+      claimId: randomBytes(16).toString("hex"),
+      claimedAt: new Date().toISOString(),
+    };
+    mockBurnClaims.set(payoutId, claim);
+    return claim;
+  }
+
+  async releasePayoutBurn(
+    payoutId: string,
+    args: { claimId?: string; force?: boolean },
+  ): Promise<void> {
+    this.log("releasePayoutBurn", { payoutId, ...args });
+    const existing = mockBurnClaims.get(payoutId);
+    if (!existing) return;
+    if (args.claimId && existing.claimId !== args.claimId) {
+      throw new CitizenPayApiError("burn claim does not match", 409, {
+        error: "burn claim does not match",
+      });
+    }
+    if (args.force) {
+      const releasableAt =
+        Date.parse(existing.claimedAt) + FORCED_RELEASE_MIN_AGE_MS;
+      if (Date.now() < releasableAt) {
+        throw new CitizenPayApiError("burn claim is too recent", 409, {
+          error: "burn claim is too recent",
+          claimedAt: existing.claimedAt,
+          releasableAt: new Date(releasableAt).toISOString(),
+        });
+      }
+    }
+    mockBurnClaims.delete(payoutId);
   }
 
   async feeTransfer(
@@ -784,6 +868,19 @@ const MOCK_PENDING_PAYOUTS: {
   { id: "mock-payout-2", status: "payment-pending", amount: "42.50" },
 ];
 const completedMockPayouts = new Set<string>();
+
+// Burn claims taken and burns reported this session (same lifetime as
+// completedMockPayouts). A forced release waits out the same 10 minutes CP
+// enforces.
+const mockBurnClaims = new Map<string, PayoutBurnClaimed>();
+const mockBurnHashes = new Map<string, string[]>();
+
+function mockBurnClaim(payoutId: string): PayoutBurnClaim | null {
+  const claim = mockBurnClaims.get(payoutId);
+  return claim
+    ? { claimId: claim.claimId, claimedAt: claim.claimedAt, source: "external" }
+    : null;
+}
 
 // Card → source-card assignments made this session, so the card detail page
 // round-trips set/fetch in dev. Module-level: the factory hands out a fresh
@@ -884,6 +981,7 @@ function mockPayout(id: string, status: PayoutStatus, amount: string): Payout {
     burnTxHashes: [],
     feeTransferPending: false,
     feeTransferTxHash: null,
+    burnClaim: null,
     pontoPaymentId: null,
     pontoPaymentStatus: null,
     emailRecipient: null,

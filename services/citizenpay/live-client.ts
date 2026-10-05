@@ -20,6 +20,7 @@ import {
   type PaginatedCards,
   type ManualDeductionWire,
   type PayoutDraftWire,
+  type PayoutBurnClaimWire,
   type PayoutDetailWire,
   type PayoutListPageWire,
   type PayoutListWire,
@@ -57,6 +58,8 @@ import type {
   ListPlacesResult,
   OperationStatusResult,
   Payout,
+  PayoutBurnClaim,
+  PayoutBurnClaimed,
   PayoutBurnReport,
   PayoutDeduction,
   PayoutDraft,
@@ -155,6 +158,8 @@ function payoutFromListWire(w: PayoutListWire): Payout {
     burnTxHashes: [],
     feeTransferPending: w.feeTransferPending ?? false,
     feeTransferTxHash: w.feeTransferTxHash ?? null,
+    // Only the detail endpoint carries the claim — see payoutFromDetailWire.
+    burnClaim: null,
     pontoPaymentId: null,
     pontoPaymentStatus: w.pontoPaymentStatus ?? null,
     emailRecipient: null,
@@ -170,6 +175,20 @@ function payoutFromDetailWire(w: PayoutDetailWire): Payout {
   return {
     ...payoutFromListWire(w),
     manualDeductionComment: w.manualDeductionComment ?? null,
+    burnClaim: burnClaimFromWire(w.burnClaim),
+  };
+}
+
+// In-flight burn claim. Absent (older api) and null both mean "none"; a claim
+// without a timestamp or id is still a claim, so keep it rather than hide it.
+export function burnClaimFromWire(
+  w: PayoutBurnClaimWire | null | undefined,
+): PayoutBurnClaim | null {
+  if (!w) return null;
+  return {
+    claimId: typeof w.claimId === "string" && w.claimId ? w.claimId : null,
+    claimedAt: w.claimedAt ?? "",
+    source: "external",
   };
 }
 
@@ -934,6 +953,7 @@ export class LiveCitizenPayClient implements CitizenPayClient {
       signingUrl: res.signingUrl ?? null,
       feeTransferPending: res.feeTransferPending ?? false,
       feeTransferTxHash: res.feeTransferTxHash ?? null,
+      burnClaim: burnClaimFromWire(res.burnClaim),
     };
   }
 
@@ -956,14 +976,39 @@ export class LiveCitizenPayClient implements CitizenPayClient {
     payoutId: string,
     txHash: string,
     destination?: string,
+    claimId?: string,
   ): Promise<PayoutBurnReport> {
-    const res = await apiPayouts.burn(this.creds, payoutId, txHash, destination);
+    const res = await apiPayouts.burn(
+      this.creds,
+      payoutId,
+      txHash,
+      destination,
+      claimId,
+    );
     return {
       feeAmount: res.feeAmount != null ? centsToDecimal(res.feeAmount) : null,
       feeTransferTxHash: res.feeTransferTxHash ?? null,
       feeTransferPending: res.feeTransferPending ?? false,
       feeTransferError: res.feeTransferError ?? null,
+      duplicateBurn: res.duplicateBurn === true,
     };
+  }
+
+  async claimPayoutBurn(payoutId: string): Promise<PayoutBurnClaimed> {
+    const res = await apiPayouts.burnClaim(this.creds, payoutId);
+    // A 2xx without a claim id would let the caller burn unguarded — treat it
+    // as a failed claim (the caller fails closed on any throw).
+    if (!res || typeof res.claimId !== "string" || !res.claimId) {
+      throw new Error("burn-claim returned no claimId");
+    }
+    return { claimId: res.claimId, claimedAt: res.claimedAt ?? "" };
+  }
+
+  async releasePayoutBurn(
+    payoutId: string,
+    args: { claimId?: string; force?: boolean },
+  ): Promise<void> {
+    await apiPayouts.releaseBurnClaim(this.creds, payoutId, args);
   }
 
   async feeTransfer(

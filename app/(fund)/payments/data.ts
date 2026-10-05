@@ -11,6 +11,7 @@ import type {
   PayoutOrder,
   PayoutStatusDetail,
 } from "@/services/citizenpay/types";
+import { findBurnAttempt, type BurnAttempt } from "@/services/payout/burn-attempt";
 import { loadAllPayoutOrders } from "@/services/payout/operations";
 
 // Loaders for the Payments → Payouts views. Each is wrapped in React's
@@ -173,6 +174,26 @@ export const getAllPayoutOrders = cache(
         truncated: false,
         error: true,
       };
+    }
+  },
+);
+
+// The burn attempt behind an in-flight claim (see services/payout/burn-attempt)
+// — for the claim panel only, so it degrades to null rather than failing the
+// page.
+export const getBurnAttempt = cache(
+  async (
+    fundId: string,
+    chainId: number,
+    placeAccount: string,
+    net: string,
+    claimedAt: string,
+  ): Promise<BurnAttempt | null> => {
+    try {
+      return await findBurnAttempt({ fundId, chainId, placeAccount, net, claimedAt });
+    } catch (e) {
+      console.warn("[payments] findBurnAttempt failed", e);
+      return null;
     }
   },
 );
