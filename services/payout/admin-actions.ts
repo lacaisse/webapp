@@ -37,7 +37,12 @@ import { AddableOrdersRangeSchema, toRfc3339, TX_HASH } from "./schemas";
 async function ctx() {
   const t = await getTranslations();
   const { fund, user } = await requireFundRole("ADMIN");
-  return { fund, userId: user.id, t: (key: string) => t(key as never) };
+  return {
+    fund,
+    userId: user.id,
+    t: (key: string, values?: Record<string, string | number>) =>
+      t(key as never, values as never),
+  };
 }
 
 // Result shapes the dashboard components import. Declared in ./operations and
@@ -59,6 +64,7 @@ export type BurnPayoutResult = ops.BurnPayoutResult;
 export type CompletePayoutResult = ops.CompletePayoutResult;
 export type CreatePayoutPaymentResult = { error: string } | { ok: true };
 export type FeeTransferActionResult = ops.FeeTransferOutcome;
+export type ReleaseBurnClaimResult = ops.ReleaseBurnClaimResult;
 
 // =============================================================================
 // Drafts → payout
@@ -580,6 +586,32 @@ export async function burnPayoutAction(input: {
   payoutId: string;
 }): Promise<ops.BurnPayoutResult> {
   return ops.burnPayout(await ctx(), input.payoutId);
+}
+
+// A burn attempt was interrupted after taking CP's burn claim: record its
+// on-chain hash (the admin checked the chain), settling the payout exactly as
+// the burn would have. Confirmed in the UI before firing.
+export async function recordPayoutBurnAction(input: {
+  payoutId: string;
+  txHash: string;
+}): Promise<ops.BurnPayoutResult> {
+  const res = await ops.recordPayoutBurn(await ctx(), input);
+  // The claim panel gives way to the burnt stage. Not on an error (including
+  // a duplicate burn): the dialog must stay up to show it, and refreshes the
+  // page itself when closed. `refresh` is server-action-only.
+  if ("ok" in res) refresh();
+  return res;
+}
+
+// Release an interrupted burn's claim so a new burn can run. Only after the
+// admin confirmed on chain that nothing was burned — the UI says so and
+// confirms before firing.
+export async function releasePayoutBurnClaimAction(input: {
+  payoutId: string;
+}): Promise<ops.ReleaseBurnClaimResult> {
+  const res = await ops.releasePayoutBurnClaim(await ctx(), input.payoutId);
+  if ("ok" in res) refresh();
+  return res;
 }
 
 // Run (or retry) just the fee sweep for an already-burned payout.

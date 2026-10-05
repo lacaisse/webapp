@@ -1372,6 +1372,25 @@
           "feeSwept": "Platform fees and deduction transferred to the fund account: {amount}",
           "feeNotSwept": "Tokens burned, but the platform fees haven't been transferred yet."
         },
+        "burnClaim": {
+          "started": "A burn was started at {time} and has not been confirmed.",
+          "hint": "It may still be running, or it was interrupted. Check the place's account on chain, then record the burn's transaction or release the claim.",
+          "apiSource": "Citizen Pay is running this burn itself. Refresh the status in a moment.",
+          "record": {
+            "button": "Record burn",
+            "title": "Record the burn transaction?",
+            "description": "Records this transaction as the payout's burn and settles it like a normal burn (the platform fees are swept to the fund). Only use a transaction you've checked on chain: the burn of this payout's net from the place's account.",
+            "label": "Transaction hash",
+            "confirm": "Record burn"
+          },
+          "release": {
+            "button": "Release",
+            "title": "Release the burn claim?",
+            "description": "Releasing allows a new burn of this payout.",
+            "warning": "Only release after checking on chain that nothing was burned for this payout. If the earlier burn went through, burning again destroys the merchant's tokens twice.",
+            "confirm": "Release claim"
+          }
+        },
         "feeTransfer": {
           "pending": "This payout's platform fees and deduction haven't been transferred yet.",
           "button": "Transfer platform fees",
@@ -1506,7 +1525,13 @@
           "periodNotPending": "The settlement period can only be changed while the payout is pending.",
           "exportFailed": "Couldn't generate the export. Try again shortly.",
           "exportOrdersFailed": "Could not load the transactions of one of the payouts. The export was not generated — try again shortly.",
-          "exportOrdersTruncated": "One of the payouts holds too many transactions to export in one go. Narrow the period and try again."
+          "exportOrdersTruncated": "One of the payouts holds too many transactions to export in one go. Narrow the period and try again.",
+          "burnInProgress": "Another burn attempt for this payout started at {claimedAt} and is still running or was interrupted. Nothing was burned now. Use the panel on the payout page to record its transaction or release it.",
+          "burnClaimFailed": "The burn couldn't be secured with Citizen Pay, so nothing was burned. Try again shortly.",
+          "burnMayHaveBeenSent": "The burn may have been sent on chain, but its outcome is unknown. Don't retry: check the place's account on chain, then record the burn's transaction hash or release the claim from the payout page.",
+          "duplicateBurn": "This payout has been burned TWICE: transaction {txHash} was recorded on top of an earlier burn. Citizen Pay has been alerted. Don't burn again — contact Citizen Pay to reconcile.",
+          "noBurnClaim": "No burn attempt is in flight for this payout any more. Reload the page.",
+          "releaseClaimFailed": "Couldn't release the burn claim. Try again shortly."
         }
       },
       "export": {

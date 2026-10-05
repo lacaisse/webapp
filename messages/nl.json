@@ -1372,6 +1372,25 @@
           "feeSwept": "Platformkosten en inhouding overgemaakt naar de fondsrekening: {amount}",
           "feeNotSwept": "Tokens verbrand, maar de platformkosten zijn nog niet overgemaakt."
         },
+        "burnClaim": {
+          "started": "Er is een verbranding gestart op {time} die niet is bevestigd.",
+          "hint": "Ze loopt misschien nog, of werd onderbroken. Controleer de account van de locatie on-chain en registreer daarna de transactie van de verbranding of geef de claim vrij.",
+          "apiSource": "Citizen Pay voert deze verbranding zelf uit. Vernieuw de status zo meteen.",
+          "record": {
+            "button": "Verbranding registreren",
+            "title": "De verbrandtransactie registreren?",
+            "description": "Registreert deze transactie als de verbranding van de uitbetaling en handelt die af als een gewone verbranding (de platformkosten gaan naar het fonds). Gebruik alleen een transactie die je on-chain hebt gecontroleerd: de verbranding van het netto van deze uitbetaling vanaf de account van de locatie.",
+            "label": "Transactiehash",
+            "confirm": "Verbranding registreren"
+          },
+          "release": {
+            "button": "Vrijgeven",
+            "title": "De verbrandclaim vrijgeven?",
+            "description": "Vrijgeven maakt een nieuwe verbranding van deze uitbetaling mogelijk.",
+            "warning": "Geef alleen vrij nadat je on-chain hebt gecontroleerd dat er niets is verbrand voor deze uitbetaling. Als de eerdere verbranding is gelukt, vernietigt opnieuw verbranden de tokens van de handelaar twee keer.",
+            "confirm": "Claim vrijgeven"
+          }
+        },
         "feeTransfer": {
           "pending": "De platformkosten en inhouding van deze uitbetaling zijn nog niet overgemaakt.",
           "button": "Platformkosten overmaken",
@@ -1506,7 +1525,13 @@
           "periodNotPending": "De periode kan alleen worden gewijzigd zolang de uitbetaling in behandeling is.",
           "exportFailed": "Kon de export niet genereren. Probeer het zo opnieuw.",
           "exportOrdersFailed": "Kon de transacties van een van de uitbetalingen niet laden. De export is niet gegenereerd — probeer het straks opnieuw.",
-          "exportOrdersTruncated": "Een van de uitbetalingen bevat te veel transacties om in één keer te exporteren. Verklein de periode en probeer opnieuw."
+          "exportOrdersTruncated": "Een van de uitbetalingen bevat te veel transacties om in één keer te exporteren. Verklein de periode en probeer opnieuw.",
+          "burnInProgress": "Een andere verbrandpoging voor deze uitbetaling is gestart op {claimedAt} en loopt nog of werd onderbroken. Er is nu niets verbrand. Gebruik het paneel op de uitbetalingspagina om de transactie te registreren of vrij te geven.",
+          "burnClaimFailed": "De verbranding kon niet worden vastgelegd bij Citizen Pay, dus er is niets verbrand. Probeer het zo opnieuw.",
+          "burnMayHaveBeenSent": "De verbranding is mogelijk on-chain verzonden, maar de uitkomst is onbekend. Niet opnieuw proberen: controleer de account van de locatie on-chain en registreer daarna de transactiehash van de verbranding of geef de claim vrij op de uitbetalingspagina.",
+          "duplicateBurn": "Deze uitbetaling is TWEE KEER verbrand: transactie {txHash} is geregistreerd bovenop een eerdere verbranding. Citizen Pay is gewaarschuwd. Niet opnieuw verbranden — neem contact op met Citizen Pay om af te stemmen.",
+          "noBurnClaim": "Er loopt geen verbrandpoging meer voor deze uitbetaling. Laad de pagina opnieuw.",
+          "releaseClaimFailed": "Kon de verbrandclaim niet vrijgeven. Probeer het zo opnieuw."
         }
       },
       "export": {

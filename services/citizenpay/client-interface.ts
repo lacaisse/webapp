@@ -28,6 +28,7 @@ import type {
   ListPlacesResult,
   OperationStatusResult,
   Payout,
+  PayoutBurnClaimed,
   PayoutBurnReport,
   PayoutDeduction,
   PayoutDraft,
@@ -456,7 +457,29 @@ export interface CitizenPayClient {
     payoutId: string,
     txHash: string,
     destination?: string,
+    claimId?: string,
   ): Promise<PayoutBurnReport>;
+
+  /**
+   * Take the burn claim BEFORE burning a payout's tokens on chain, so exactly
+   * one concurrent attempt can proceed. Pass the returned `claimId` to
+   * `burnPayout` (or `releasePayoutBurn` if the burn never went out). Throws
+   * CitizenPayApiError 409 when the payout is already burnt / complete or
+   * another claim is in flight (`burn already in progress`, body carries
+   * `claimedAt`). Backed by POST /v2/treasury/payouts/{id}/burn-claim.
+   */
+  claimPayoutBurn(payoutId: string): Promise<PayoutBurnClaimed>;
+
+  /**
+   * Release a burn claim. With `claimId`, only that claim (409 on mismatch);
+   * with `force: true`, whatever external claim is there — only after a human
+   * checked the chain that nothing was burned. Idempotent when there's no
+   * claim. Backed by DELETE /v2/treasury/payouts/{id}/burn-claim.
+   */
+  releasePayoutBurn(
+    payoutId: string,
+    args: { claimId?: string; force?: boolean },
+  ): Promise<void>;
 
   /**
    * Run (or retry) just the fee sweep to `destination` — the standalone,

@@ -9,6 +9,7 @@ import { ANNOTATION_TRIGGERS } from "@/services/transaction-annotation/annotate"
 import { resolveOrEnqueueAnnotation } from "@/services/transaction-annotation/pending";
 import {
   burnFromToken,
+  failedBeforeSubmit,
   mintToken,
   UserOpError,
   type FundMinterContext,
@@ -28,8 +29,14 @@ import { ManualBurnDirectSchema, ManualMintDirectSchema } from "./schemas";
 // next-intl translator so the dashboard answers in the operator's locale and
 // MCP answers in English, without this module knowing about either.
 
-/** Root next-intl translator (`getTranslations()` with no namespace). */
-export type Translate = (key: string) => string;
+/**
+ * Root next-intl translator (`getTranslations()` with no namespace). `values`
+ * fills ICU placeholders; translators that ignore it still fit the type.
+ */
+export type Translate = (
+  key: string,
+  values?: Record<string, string | number>,
+) => string;
 
 // The fund columns the minter needs: the 4337 stack identity FundMinterContext
 // already describes, plus the decimals used to scale the amount. A raw Prisma
@@ -50,9 +57,24 @@ export type DirectMintResult =
   | { ok: true; txHash: string; userOpHash: string }
   | { error: string; field?: "to" | "amount" | "note" };
 
+// A failed burn says which side of the bundler hand-off it failed on, for
+// callers that must not burn twice (the payout burn claim, which may only be
+// released when nothing can be on its way on chain):
+//   - `broadcast: false` — certain to have failed before the userop was sent
+//     (validation, missing config, decrypt, sponsoring, signing);
+//   - `broadcast: true`  — it may have been sent: the submit call or the
+//     confirmation poll failed, or the burn CONFIRMED and our own bookkeeping
+//     after it failed (then `txHash` is set). Unknown errors land here too.
+// A thrown error (e.g. the TokenOperation insert) is not classified — treat it
+// like `broadcast: true`.
 export type DirectBurnResult =
   | { ok: true; txHash: string; userOpHash: string }
-  | { error: string; field?: "from" | "amount" | "note" };
+  | {
+      error: string;
+      field?: "from" | "amount" | "note";
+      broadcast: boolean;
+      txHash?: string;
+    };
 
 // Audit context for the annotation written on success. `trigger` is one of
 // ANNOTATION_TRIGGERS. Internal callers (order settlement, payouts, account
@@ -149,23 +171,32 @@ export async function burnDirect(
     return {
       error: t(issue.message),
       field: issue.path[0] as "from" | "amount" | undefined,
+      broadcast: false,
     };
   }
 
   const note = input.note?.trim();
   if (!audit && !note) {
-    return { error: t("tokenOps.errors.noteRequired"), field: "note" };
+    return {
+      error: t("tokenOps.errors.noteRequired"),
+      field: "note",
+      broadcast: false,
+    };
   }
 
   if (!fund.tokenAddress || fund.tokenDecimals == null) {
-    return { error: t("tokenOps.errors.tokenNotConfigured") };
+    return { error: t("tokenOps.errors.tokenNotConfigured"), broadcast: false };
   }
 
   let amountUnits: bigint;
   try {
     amountUnits = parseUnits(parsed.data.amount, fund.tokenDecimals);
   } catch {
-    return { error: t("tokenOps.errors.amountInvalid"), field: "amount" };
+    return {
+      error: t("tokenOps.errors.amountInvalid"),
+      field: "amount",
+      broadcast: false,
+    };
   }
 
   const op = await prisma.tokenOperation.create({
@@ -178,12 +209,16 @@ export async function burnDirect(
     },
   });
 
+  // Set once the burn confirmed on chain: a failure after that point is our
+  // own bookkeeping, and the burn must not be reported as "not sent".
+  let burnedTxHash: string | null = null;
   try {
     const { txHash, userOpHash } = await burnFromToken({
       fund,
       from: parsed.data.from as `0x${string}`,
       amount: amountUnits,
     });
+    burnedTxHash = txHash;
     await prisma.tokenOperation.update({
       where: { id: op.id },
       data: { status: "CONFIRMED", txHash, confirmedAt: new Date() },
@@ -208,6 +243,10 @@ export async function burnDirect(
       data: { status: "FAILED", errorMessage },
     });
     console.error("[burnDirect] failed", op.id, e);
-    return { error: t("tokenOps.errors.submitFailed") };
+    return {
+      error: t("tokenOps.errors.submitFailed"),
+      broadcast: burnedTxHash !== null || !failedBeforeSubmit(e),
+      ...(burnedTxHash ? { txHash: burnedTxHash } : {}),
+    };
   }
 }

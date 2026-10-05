@@ -12,6 +12,7 @@ import {
   toCents,
 } from "@/services/payout/money";
 
+import { CitizenPayApiError } from "./api";
 import type { CitizenPayClient } from "./client-interface";
 import { LiveCitizenPayClient } from "./live-client";
 import type {
@@ -39,6 +40,8 @@ import type {
   ListPlacesResult,
   OperationStatusResult,
   Payout,
+  PayoutBurnClaim,
+  PayoutBurnClaimed,
   PayoutBurnReport,
   PayoutDeduction,
   PayoutDraft,
@@ -645,6 +648,10 @@ class MockCitizenPayClient implements CitizenPayClient {
 
   async getPayout(payoutId: string): Promise<Payout> {
     this.log("getPayout", { payoutId });
+    return { ...this.mockPayoutDetail(payoutId), burnClaim: mockBurnClaim(payoutId) };
+  }
+
+  private mockPayoutDetail(payoutId: string): Payout {
     if (completedMockPayouts.has(payoutId)) {
       return mockPayout(payoutId, "complete", "150.00");
     }
@@ -696,7 +703,11 @@ class MockCitizenPayClient implements CitizenPayClient {
     opts: { redirectUrl?: string } = {},
   ): Promise<PayoutStatusDetail> {
     this.log("getPayoutStatus", { payoutId, ...opts });
-    const base = { feeTransferPending: false, feeTransferTxHash: null };
+    const base = {
+      feeTransferPending: false,
+      feeTransferTxHash: null,
+      burnClaim: mockBurnClaim(payoutId),
+    };
     // A manual "mark complete" wins over the fixture's lifecycle stage.
     if (completedMockPayouts.has(payoutId)) {
       return { status: "complete", signingUrl: null, ...base };
@@ -733,8 +744,11 @@ class MockCitizenPayClient implements CitizenPayClient {
     payoutId: string,
     txHash: string,
     destination?: string,
+    claimId?: string,
   ): Promise<PayoutBurnReport> {
-    this.log("burnPayout", { payoutId, txHash, destination });
+    this.log("burnPayout", { payoutId, txHash, destination, claimId });
+    // Recording the burn closes whatever claim was in flight, as CP does.
+    mockBurnClaims.delete(payoutId);
     // Mock: the sweep "succeeds" inline when a destination is supplied.
     return {
       feeAmount: null,
@@ -743,7 +757,48 @@ class MockCitizenPayClient implements CitizenPayClient {
         : null,
       feeTransferPending: false,
       feeTransferError: null,
+      duplicateBurn: false,
     };
+  }
+
+  // Mirrors CP's claim rules closely enough for dev: one claim per payout,
+  // 409s shaped like the real ones so the burn flow's error paths render.
+  async claimPayoutBurn(payoutId: string): Promise<PayoutBurnClaimed> {
+    this.log("claimPayoutBurn", { payoutId });
+    if (completedMockPayouts.has(payoutId)) {
+      throw new CitizenPayApiError("payout is already complete", 409, {
+        error: "payout is already complete",
+      });
+    }
+    const existing = mockBurnClaims.get(payoutId);
+    if (existing) {
+      throw new CitizenPayApiError("burn already in progress", 409, {
+        error: "burn already in progress",
+        claimedAt: existing.claimedAt,
+        source: "external",
+      });
+    }
+    const claim = {
+      claimId: randomBytes(16).toString("hex"),
+      claimedAt: new Date().toISOString(),
+    };
+    mockBurnClaims.set(payoutId, claim);
+    return claim;
+  }
+
+  async releasePayoutBurn(
+    payoutId: string,
+    args: { claimId?: string; force?: boolean },
+  ): Promise<void> {
+    this.log("releasePayoutBurn", { payoutId, ...args });
+    const existing = mockBurnClaims.get(payoutId);
+    if (!existing) return;
+    if (!args.force && args.claimId && existing.claimId !== args.claimId) {
+      throw new CitizenPayApiError("burn claim does not match", 409, {
+        error: "burn claim does not match",
+      });
+    }
+    mockBurnClaims.delete(payoutId);
   }
 
   async feeTransfer(
@@ -784,6 +839,14 @@ const MOCK_PENDING_PAYOUTS: {
   { id: "mock-payout-2", status: "payment-pending", amount: "42.50" },
 ];
 const completedMockPayouts = new Set<string>();
+
+// Burn claims taken this session (same lifetime as completedMockPayouts).
+const mockBurnClaims = new Map<string, PayoutBurnClaimed>();
+
+function mockBurnClaim(payoutId: string): PayoutBurnClaim | null {
+  const claim = mockBurnClaims.get(payoutId);
+  return claim ? { claimedAt: claim.claimedAt, source: "external" } : null;
+}
 
 // Card → source-card assignments made this session, so the card detail page
 // round-trips set/fetch in dev. Module-level: the factory hands out a fresh
@@ -884,6 +947,7 @@ function mockPayout(id: string, status: PayoutStatus, amount: string): Payout {
     burnTxHashes: [],
     feeTransferPending: false,
     feeTransferTxHash: null,
+    burnClaim: null,
     pontoPaymentId: null,
     pontoPaymentStatus: null,
     emailRecipient: null,

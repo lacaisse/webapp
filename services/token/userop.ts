@@ -261,6 +261,47 @@ export class UserOpError extends Error {
   }
 }
 
+// -----------------------------------------------------------------------------
+// Which side of the bundler hand-off did a failure happen on?
+// -----------------------------------------------------------------------------
+// An error's `code` can't answer that: `submit_failed` is raised by a sponsor
+// HTTP error (nothing sent), by `eth_sendUserOperation` itself (maybe sent) and
+// by the post-submit status poll (sent), and the burn path may replace the
+// error with a role check's. Callers that must not repeat an on-chain action
+// (the payout burn claim) need to know whether a retry could double it, so
+// `runUserOp` tags every error raised BEFORE `eth_sendUserOperation` is called
+// — config, decrypt, existence check, sponsoring, signing. Anything untagged
+// (the submit call, the poll, a thrown non-object) may have reached the
+// bundler. The tag is a symbol property: the thrown value, its type and its
+// message are unchanged for every existing caller.
+const FAILED_BEFORE_SUBMIT = Symbol("userop.failedBeforeSubmit");
+
+function markFailedBeforeSubmit(e: unknown): unknown {
+  if (e !== null && typeof e === "object") {
+    try {
+      Object.defineProperty(e, FAILED_BEFORE_SUBMIT, { value: true });
+    } catch {
+      // Frozen / exotic error object: leave it untagged, which reads as
+      // "may have been submitted" — the safe default.
+    }
+  }
+  return e;
+}
+
+/**
+ * True only when `e` is certain to have been raised before the userop was
+ * handed to the bundler (`eth_sendUserOperation`), i.e. nothing can be on its
+ * way on chain. False means "may have been submitted" — including for errors
+ * this module never saw.
+ */
+export function failedBeforeSubmit(e: unknown): boolean {
+  return (
+    e !== null &&
+    typeof e === "object" &&
+    (e as Record<symbol, unknown>)[FAILED_BEFORE_SUBMIT] === true
+  );
+}
+
 // =============================================================================
 // JSON serialisation (bundler RPC)
 // =============================================================================
@@ -800,28 +841,39 @@ async function runUserOp(
   } = {},
 ): Promise<{ txHash: Hex; userOpHash: Hex }> {
   const chainId = ctx.fund.tokenChainId;
-  const prepared = await prepareUserOp({
-    client: ctx.client,
-    chainId,
-    owner: ctx.owner,
-    sender: opts.sender ?? ctx.sender,
-    factory: ctx.factory,
-    saltNonce: opts.saltNonce ?? SALT_NONCE,
-    callData,
-  });
-  const sponsored = await paymasterSignUserOp({
-    chainId,
-    entrypoint: ctx.entrypoint,
-    paymaster: ctx.paymaster,
-    paymasterType: ctx.paymasterType,
-    op: prepared,
-  });
-  const signed = await signUserOp({
-    client: ctx.client,
-    entrypoint: ctx.entrypoint,
-    op: sponsored,
-    privateKey: ctx.privateKey,
-  });
+  // Everything up to the signed userop is local or a read/sponsor call that
+  // cannot put anything on chain — tag its failures (see failedBeforeSubmit).
+  let signed: UserOp;
+  try {
+    const prepared = await prepareUserOp({
+      client: ctx.client,
+      chainId,
+      owner: ctx.owner,
+      sender: opts.sender ?? ctx.sender,
+      factory: ctx.factory,
+      saltNonce: opts.saltNonce ?? SALT_NONCE,
+      callData,
+    });
+    const sponsored = await paymasterSignUserOp({
+      chainId,
+      entrypoint: ctx.entrypoint,
+      paymaster: ctx.paymaster,
+      paymasterType: ctx.paymasterType,
+      op: prepared,
+    });
+    signed = await signUserOp({
+      client: ctx.client,
+      entrypoint: ctx.entrypoint,
+      op: sponsored,
+      privateKey: ctx.privateKey,
+    });
+  } catch (e) {
+    throw markFailedBeforeSubmit(e);
+  }
+  // From here on the userop may have reached the bundler: a failed or timed
+  // out `eth_sendUserOperation` can still have been accepted, so its errors
+  // (and the poll's) stay untagged.
+  //
   // `eth_sendUserOperation` returns the userop hash (the engine queues
   // on-chain submission asynchronously). We then poll the bundler for
   // the actual tx hash + terminal status.
@@ -895,8 +947,14 @@ export async function burnFromToken(args: {
   userOpData?: unknown;
   extraData?: unknown;
 }): Promise<{ txHash: Hex; userOpHash: Hex }> {
-  const ctx = loadFundContext(args.fund);
-  const callData = safeBurnFromCallData(ctx.token, args.from, args.amount);
+  let ctx: FundContext;
+  let callData: Hex;
+  try {
+    ctx = loadFundContext(args.fund);
+    callData = safeBurnFromCallData(ctx.token, args.from, args.amount);
+  } catch (e) {
+    throw markFailedBeforeSubmit(e);
+  }
   try {
     return await runUserOp(ctx, callData, {
       userOpData: args.userOpData,
@@ -904,7 +962,15 @@ export async function burnFromToken(args: {
     });
   } catch (e) {
     if (e instanceof UserOpError && e.code === "submit_failed") {
-      await assertBurnerRole(ctx);
+      try {
+        await assertBurnerRole(ctx);
+      } catch (roleError) {
+        // The role diagnosis replaces the original error; carry over whether
+        // that original failed before submit, or the caller would lose it.
+        throw failedBeforeSubmit(e)
+          ? markFailedBeforeSubmit(roleError)
+          : roleError;
+      }
     }
     throw e;
   }

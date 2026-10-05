@@ -210,6 +210,24 @@ export type PayoutBurnReport = {
   feeTransferTxHash: string | null;
   feeTransferPending: boolean;
   feeTransferError: string | null;
+  // True when the payout was ALREADY burned with a different hash: CP appended
+  // this one and alerted. Tokens were burned twice — surface it loudly.
+  duplicateBurn: boolean;
+};
+
+// A burn claim we hold: taken before burning on chain so no concurrent attempt
+// can burn the same payout (POST /payouts/{id}/burn-claim).
+export type PayoutBurnClaimed = {
+  claimId: string;
+  claimedAt: string; // RFC3339
+};
+
+// An in-flight burn claim as the payout detail / status report it: non-null
+// only while a claim is taken and no burn is recorded yet. `source` "external"
+// is a treasury-key client's claim (ours); "api" is CP's own server-side burn.
+export type PayoutBurnClaim = {
+  claimedAt: string; // RFC3339
+  source: "external" | "api";
 };
 
 // Result of the standalone fee-transfer (sweep) endpoint. A failure throws
@@ -243,6 +261,9 @@ export type PayoutStatusDetail = {
   // the "fees not yet transferred" affordance; `feeTransferTxHash` is the proof.
   feeTransferPending: boolean;
   feeTransferTxHash: string | null;
+  // In-flight burn claim (see PayoutBurnClaim) — drives the "burn started but
+  // not confirmed" panel. Null when none, or on an api without the claim.
+  burnClaim: PayoutBurnClaim | null;
 };
 
 // =============================================================================
@@ -293,6 +314,9 @@ export type Payout = {
   // true on a burned payout whose retained cut hasn't been swept yet.
   feeTransferPending: boolean;
   feeTransferTxHash: string | null;
+  // In-flight burn claim — only the detail endpoint carries it; null on list
+  // rows (see PayoutStatusDetail).
+  burnClaim: PayoutBurnClaim | null;
   pontoPaymentId: string | null;
   pontoPaymentStatus: string | null;
   emailRecipient: string | null;

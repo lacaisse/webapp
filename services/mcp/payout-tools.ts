@@ -68,7 +68,12 @@ async function payoutCtx(
       `${fund.name} is not connected to Citizen Pay yet — no payout data exists until an admin issues an API key in the fund's settings.`,
     );
   }
-  return { fund, userId: ctx.userId, t: (key: string) => t(key as never) };
+  return {
+    fund,
+    userId: ctx.userId,
+    t: (key: string, values?: Record<string, string | number>) =>
+      t(key as never, values as never),
+  };
 }
 
 // Ponto only mints a signing link when it's given an https URL to send the
@@ -658,7 +663,7 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
     "burn_payout",
     {
       description:
-        "IRREVERSIBLE. Burn the tokens backing a payout: destroys the payout's net from the merchant place's wallet with the fund's minter, reports the burn to CitizenPay (which marks the payout burnt), and sweeps the retained cut — the platform payout fees plus any manual deduction — to the fund's treasury account. Processor fees withheld at source are in neither figure; they never entered the wallet. Run this once the fiat leg is paid — burning before the merchant is paid destroys their balance with nothing sent. Only valid while the payout is pending; a second call is rejected. Requires ADMIN.",
+        "IRREVERSIBLE. Burn the tokens backing a payout: destroys the payout's net from the merchant place's wallet with the fund's minter, reports the burn to CitizenPay (which marks the payout burnt), and sweeps the retained cut — the platform payout fees plus any manual deduction — to the fund's treasury account. Processor fees withheld at source are in neither figure; they never entered the wallet. Run this once the fiat leg is paid — burning before the merchant is paid destroys their balance with nothing sent. Only valid while the payout is pending; a second call is rejected — the burn first takes Citizen Pay's burn claim, so only one attempt can run. If it fails saying the burn may have been sent or another attempt is in progress, do NOT retry: an admin checks the chain and records or releases the attempt from the payout page. Requires ADMIN.",
       inputSchema: {
         fund: FUND_PARAM,
         payoutId: PAYOUT_ID,

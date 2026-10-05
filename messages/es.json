@@ -1372,6 +1372,25 @@
           "feeSwept": "Comisiones de la plataforma y deducción transferidas a la cuenta del fondo: {amount}",
           "feeNotSwept": "Tokens quemados, pero las comisiones de la plataforma aún no se han transferido."
         },
+        "burnClaim": {
+          "started": "Se inició una quema el {time} y no se ha confirmado.",
+          "hint": "Puede que siga en curso o que se haya interrumpido. Comprueba la cuenta del local en la cadena y luego registra la transacción de quema o libera la reserva.",
+          "apiSource": "Citizen Pay está realizando esta quema por su cuenta. Actualiza el estado en un momento.",
+          "record": {
+            "button": "Registrar quema",
+            "title": "¿Registrar la transacción de quema?",
+            "description": "Registra esta transacción como la quema del pago y lo liquida como una quema normal (las comisiones de la plataforma se transfieren al fondo). Usa solo una transacción que hayas comprobado en la cadena: la quema del neto de este pago desde la cuenta del local.",
+            "label": "Hash de la transacción",
+            "confirm": "Registrar quema"
+          },
+          "release": {
+            "button": "Liberar",
+            "title": "¿Liberar la reserva de quema?",
+            "description": "Liberarla permite una nueva quema de este pago.",
+            "warning": "Libera solo después de comprobar en la cadena que no se quemó nada para este pago. Si la quema anterior se completó, quemar de nuevo destruye dos veces los tokens del comercio.",
+            "confirm": "Liberar reserva"
+          }
+        },
         "feeTransfer": {
           "pending": "Las comisiones de la plataforma y la deducción de este pago aún no se han transferido.",
           "button": "Transferir comisiones de la plataforma",
@@ -1506,7 +1525,13 @@
           "periodNotPending": "El periodo solo puede cambiarse mientras el pago está pendiente.",
           "exportFailed": "No se pudo generar la exportación. Vuelve a intentarlo en breve.",
           "exportOrdersFailed": "No se han podido cargar las transacciones de uno de los pagos. No se ha generado la exportación; inténtalo de nuevo en breve.",
-          "exportOrdersTruncated": "Uno de los pagos contiene demasiadas transacciones para exportarlas de una vez. Reduce el periodo e inténtalo de nuevo."
+          "exportOrdersTruncated": "Uno de los pagos contiene demasiadas transacciones para exportarlas de una vez. Reduce el periodo e inténtalo de nuevo.",
+          "burnInProgress": "Otro intento de quema de este pago empezó el {claimedAt} y sigue en curso o se interrumpió. Esta vez no se quemó nada. Usa el panel de la página del pago para registrar su transacción o liberarlo.",
+          "burnClaimFailed": "No se pudo asegurar la quema con Citizen Pay, así que no se quemó nada. Vuelve a intentarlo en breve.",
+          "burnMayHaveBeenSent": "Es posible que la quema se haya enviado a la cadena, pero se desconoce el resultado. No reintentes: comprueba la cuenta del local en la cadena y luego registra el hash de la transacción de quema o libera la reserva desde la página del pago.",
+          "duplicateBurn": "Este pago se ha quemado DOS VECES: la transacción {txHash} se registró además de una quema anterior. Se ha avisado a Citizen Pay. No vuelvas a quemar: contacta con Citizen Pay para conciliar.",
+          "noBurnClaim": "Ya no hay ningún intento de quema en curso para este pago. Recarga la página.",
+          "releaseClaimFailed": "No se pudo liberar la reserva de quema. Vuelve a intentarlo en breve."
         }
       },
       "export": {

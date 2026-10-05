@@ -14,6 +14,7 @@ import {
   Info,
   Loader2,
   RefreshCw,
+  Unlock,
 } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 
@@ -28,7 +29,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import type { PayoutStatus } from "@/services/citizenpay/types";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import type { PayoutBurnClaim, PayoutStatus } from "@/services/citizenpay/types";
 import {
   burnPayoutAction,
   completePayoutAction,
@@ -36,7 +39,10 @@ import {
   feeTransferAction,
   getPayoutStatusAction,
   pollPayoutStatusAction,
+  recordPayoutBurnAction,
+  releasePayoutBurnClaimAction,
 } from "@/services/payout/admin-actions";
+import { TX_HASH } from "@/services/payout/schemas";
 import { cn } from "@/lib/utils";
 
 // How often to poll for signing completion while the QR is on screen (only
@@ -52,6 +58,13 @@ const STEPS: { status: PayoutStatus; key: string }[] = [
   { status: "complete", key: "complete" },
 ];
 
+// An in-flight burn claim as the page hands it down: the start time is
+// pre-formatted server-side so server and client render the same string.
+export type BurnClaimView = {
+  source: PayoutBurnClaim["source"];
+  startedAt: string;
+};
+
 // Guided "Process payout" card: a stepper showing where the payout is, plus
 // the single contextual action for the current stage. Drives the admin
 // burn → pay → sign → complete rather than showing every button at once.
@@ -62,6 +75,7 @@ export function PayoutProcess({
   signingUrl,
   signingQr,
   feeTransferPending,
+  burnClaim,
 }: {
   payoutId: string;
   status: PayoutStatus;
@@ -75,6 +89,10 @@ export function PayoutProcess({
   // True when the payout is burned but the retained cut hasn't been swept yet
   // — drives a persistent "Transfer fees" retry affordance.
   feeTransferPending: boolean;
+  // A burn attempt took CP's claim and nothing is recorded yet — it may still
+  // be running or it was interrupted. Replaces the Burn button with the
+  // record / release panel so no second burn can start from here.
+  burnClaim: BurnClaimView | null;
 }) {
   const t = useTranslations("fund.payments.settlement.process");
   const tFee = useTranslations("fund.payments.settlement.feeTransfer");
@@ -89,11 +107,14 @@ export function PayoutProcess({
       <Stepper status={status} />
 
       <div className="border-t border-border pt-4">
-        {status === "pending" && (
-          <ActionRow hint={t("burn.hint")}>
-            <BurnDialog payoutId={payoutId} />
-          </ActionRow>
-        )}
+        {status === "pending" &&
+          (burnClaim ? (
+            <BurnClaimPanel payoutId={payoutId} claim={burnClaim} />
+          ) : (
+            <ActionRow hint={t("burn.hint")}>
+              <BurnDialog payoutId={payoutId} />
+            </ActionRow>
+          ))}
         {status === "burnt" &&
           (canInitiatePayment ? (
             <SignPayment
@@ -499,6 +520,7 @@ function BurnDialog({ payoutId }: { payoutId: string }) {
   const t = useTranslations("fund.payments.settlement.burn");
   const tRoot = useTranslations();
   const format = useFormatter();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -513,6 +535,10 @@ function BurnDialog({ payoutId }: { payoutId: string }) {
   function onOpenChange(next: boolean) {
     setOpen(next);
     if (!next) {
+      // A failed burn may have left CP's claim in flight (another attempt is
+      // running, or ours may have reached the chain) — re-render so the page
+      // shows the claim panel instead of offering Burn again.
+      if (error) router.refresh();
       setError(null);
       setTxHash(null);
       setFee(null);
@@ -634,6 +660,213 @@ function BurnDialog({ payoutId }: { payoutId: string }) {
             </DialogFooter>
           </div>
         )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// A burn was started (CP's claim is taken) but nothing is recorded. The admin
+// checks the chain and either records the burn's hash or releases the claim;
+// both sit behind their own confirmation dialog. CP's own server-side burn
+// ("api" source) can't be resolved from here — just say so.
+function BurnClaimPanel({
+  payoutId,
+  claim,
+}: {
+  payoutId: string;
+  claim: BurnClaimView;
+}) {
+  const t = useTranslations("fund.payments.settlement.burnClaim");
+  return (
+    <div className="space-y-3">
+      <Alert variant="warning">
+        <AlertTriangle className="size-4" />
+        <AlertDescription>
+          <div className="font-medium">
+            {t("started", { time: claim.startedAt })}
+          </div>
+          <div className="mt-1">
+            {claim.source === "api" ? t("apiSource") : t("hint")}
+          </div>
+        </AlertDescription>
+      </Alert>
+      {claim.source !== "api" && (
+        <div className="flex flex-wrap items-center gap-2">
+          <RecordBurnDialog payoutId={payoutId} />
+          <ReleaseBurnClaimDialog payoutId={payoutId} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RecordBurnDialog({ payoutId }: { payoutId: string }) {
+  const t = useTranslations("fund.payments.settlement.burnClaim.record");
+  const tRoot = useTranslations();
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [hash, setHash] = useState("");
+  const valid = TX_HASH.test(hash.trim());
+
+  function onOpenChange(next: boolean) {
+    setOpen(next);
+    if (!next) {
+      // After an error the payout may still have moved (a duplicate burn was
+      // recorded, the claim went away) — re-read it.
+      if (error) router.refresh();
+      setError(null);
+      setHash("");
+    }
+  }
+
+  const onConfirm = () => {
+    setError(null);
+    startTransition(async () => {
+      const result = await recordPayoutBurnAction({
+        payoutId,
+        txHash: hash.trim(),
+      });
+      if ("error" in result) {
+        setError(result.error);
+        return;
+      }
+      // The action refreshed the route: the payout re-renders as burnt.
+      onOpenChange(false);
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogTrigger
+        render={
+          <Button variant="default" size="sm">
+            <Flame className="size-4" />
+            {t("button")}
+          </Button>
+        }
+      />
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t("title")}</DialogTitle>
+          <DialogDescription>{t("description")}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2">
+          <Label htmlFor={`burn-hash-${payoutId}`}>{t("label")}</Label>
+          <Input
+            id={`burn-hash-${payoutId}`}
+            value={hash}
+            onChange={(e) => setHash(e.target.value)}
+            placeholder="0x…"
+            className="font-mono"
+            autoComplete="off"
+            spellCheck={false}
+            disabled={pending}
+          />
+          {hash.trim() !== "" && !valid && (
+            <p className="text-xs text-destructive">
+              {tRoot("fund.payments.settlement.errors.txHashInvalid")}
+            </p>
+          )}
+        </div>
+        {error && (
+          <Alert variant="destructive">
+            <AlertTriangle className="size-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => onOpenChange(false)}
+            disabled={pending}
+          >
+            {tRoot("common.cancel")}
+          </Button>
+          <Button
+            type="button"
+            onClick={onConfirm}
+            disabled={pending || !valid}
+          >
+            {pending && <Loader2 className="size-4 animate-spin" />}
+            {t("confirm")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ReleaseBurnClaimDialog({ payoutId }: { payoutId: string }) {
+  const t = useTranslations("fund.payments.settlement.burnClaim.release");
+  const tRoot = useTranslations();
+  const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function onOpenChange(next: boolean) {
+    setOpen(next);
+    if (!next) setError(null);
+  }
+
+  const onConfirm = () => {
+    setError(null);
+    startTransition(async () => {
+      const result = await releasePayoutBurnClaimAction({ payoutId });
+      if ("error" in result) {
+        setError(result.error);
+        return;
+      }
+      // The action refreshed the route: the Burn button is back.
+      onOpenChange(false);
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogTrigger
+        render={
+          <Button variant="outline" size="sm">
+            <Unlock className="size-4" />
+            {t("button")}
+          </Button>
+        }
+      />
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t("title")}</DialogTitle>
+          <DialogDescription>{t("description")}</DialogDescription>
+        </DialogHeader>
+        <Alert variant="destructive">
+          <AlertTriangle className="size-4" />
+          <AlertDescription>{t("warning")}</AlertDescription>
+        </Alert>
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => onOpenChange(false)}
+            disabled={pending}
+          >
+            {tRoot("common.cancel")}
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={onConfirm}
+            disabled={pending}
+          >
+            {pending && <Loader2 className="size-4 animate-spin" />}
+            {t("confirm")}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

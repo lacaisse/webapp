@@ -96,6 +96,22 @@ export default async function PayoutDetailPage({
 
   const backTab = payout.status === "complete" ? "completed" : "pending";
 
+  // In-flight burn claim (a burn started but nothing recorded yet). /status is
+  // the live read; the detail carries it too, for when /status failed. The
+  // time is formatted here so server and client render the same string.
+  const burnClaim = live ? live.burnClaim : payout.burnClaim;
+  const burnClaimView = burnClaim
+    ? {
+        source: burnClaim.source,
+        startedAt: Number.isNaN(Date.parse(burnClaim.claimedAt))
+          ? burnClaim.claimedAt
+          : format.dateTime(new Date(burnClaim.claimedAt), {
+              dateStyle: "medium",
+              timeStyle: "medium",
+            }),
+      }
+    : null;
+
   return (
     <div className="space-y-6">
       <div>
@@ -215,6 +231,7 @@ export default async function PayoutDetailPage({
         signingUrl={signingUrl}
         signingQr={signingQr}
         feeTransferPending={live?.feeTransferPending ?? payout.feeTransferPending}
+        burnClaim={burnClaimView}
       />
 
       <section className="space-y-3">
