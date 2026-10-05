@@ -31,7 +31,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { PayoutBurnClaim, PayoutStatus } from "@/services/citizenpay/types";
+import type { PayoutStatus } from "@/services/citizenpay/types";
+import type { BurnAttempt } from "@/services/payout/burn-claim-config";
 import {
   burnPayoutAction,
   completePayoutAction,
@@ -61,8 +62,16 @@ const STEPS: { status: PayoutStatus; key: string }[] = [
 // An in-flight burn claim as the page hands it down: the start time is
 // pre-formatted server-side so server and client render the same string.
 export type BurnClaimView = {
-  source: PayoutBurnClaim["source"];
+  // Pins the forced release to the claim this page showed.
+  claimId: string | null;
   startedAt: string;
+  // When CP will accept a forced release (claim + 10 min); 0 = unknown, let
+  // the server decide.
+  releasableAtMs: number;
+  releasableAtLabel: string;
+  // What we know locally about the attempt behind the claim (null: nothing
+  // found, or the lookup failed).
+  attempt: BurnAttempt | null;
 };
 
 // Guided "Process payout" card: a stepper showing where the payout is, plus
@@ -525,6 +534,7 @@ function BurnDialog({ payoutId }: { payoutId: string }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [fee, setFee] = useState<{
     txHash: string | null;
     amount: string | null;
@@ -541,6 +551,7 @@ function BurnDialog({ payoutId }: { payoutId: string }) {
       if (error) router.refresh();
       setError(null);
       setTxHash(null);
+      setWarning(null);
       setFee(null);
     }
   }
@@ -554,6 +565,7 @@ function BurnDialog({ payoutId }: { payoutId: string }) {
         return;
       }
       setTxHash(result.txHash);
+      setWarning(result.warning ?? null);
       setFee({
         txHash: result.feeTransferTxHash ?? null,
         amount: result.feeAmount ?? null,
@@ -604,6 +616,12 @@ function BurnDialog({ payoutId }: { payoutId: string }) {
                 )}
               </AlertDescription>
             </Alert>
+            {warning && (
+              <Alert variant="warning">
+                <AlertTriangle className="size-4" />
+                <AlertDescription>{warning}</AlertDescription>
+              </Alert>
+            )}
             {fee?.pending && (
               <>
                 <Alert variant="warning">
@@ -666,9 +684,9 @@ function BurnDialog({ payoutId }: { payoutId: string }) {
 }
 
 // A burn was started (CP's claim is taken) but nothing is recorded. The admin
-// checks the chain and either records the burn's hash or releases the claim;
-// both sit behind their own confirmation dialog. CP's own server-side burn
-// ("api" source) can't be resolved from here — just say so.
+// checks the chain — helped by what we know of the attempt — and either
+// records the burn's hash or, once the claim is old enough that no live burn
+// can still be on its way, releases it. Both sit behind a confirmation dialog.
 function BurnClaimPanel({
   payoutId,
   claim,
@@ -677,6 +695,9 @@ function BurnClaimPanel({
   claim: BurnClaimView;
 }) {
   const t = useTranslations("fund.payments.settlement.burnClaim");
+  const attempt = claim.attempt;
+  const confirmedHash =
+    attempt?.kind === "sent" && attempt.status === "success" ? attempt.txHash : null;
   return (
     <div className="space-y-3">
       <Alert variant="warning">
@@ -685,39 +706,84 @@ function BurnClaimPanel({
           <div className="font-medium">
             {t("started", { time: claim.startedAt })}
           </div>
-          <div className="mt-1">
-            {claim.source === "api" ? t("apiSource") : t("hint")}
-          </div>
+          <div className="mt-1">{t("hint")}</div>
         </AlertDescription>
       </Alert>
-      {claim.source !== "api" && (
-        <div className="flex flex-wrap items-center gap-2">
-          <RecordBurnDialog payoutId={payoutId} />
-          <ReleaseBurnClaimDialog payoutId={payoutId} />
+      {attempt && attempt.kind !== "none" && <BurnAttemptInfo attempt={attempt} />}
+      <div className="flex flex-wrap items-center gap-2">
+        <RecordBurnDialog payoutId={payoutId} prefill={confirmedHash} />
+        {/* Keyed by claim: a new claim restarts its own 10-minute wait. */}
+        <ReleaseBurnClaimDialog
+          key={claim.claimId ?? claim.startedAt}
+          payoutId={payoutId}
+          claim={claim}
+        />
+      </div>
+    </div>
+  );
+}
+
+// The attempt behind the claim, as far as we can see it: its userop / tx hash
+// and what the bundler says about it now.
+function BurnAttemptInfo({
+  attempt,
+}: {
+  attempt: Exclude<BurnAttempt, { kind: "none" }>;
+}) {
+  const t = useTranslations("fund.payments.settlement.burnClaim.attempt");
+  let advice: string;
+  if (attempt.kind === "running") advice = t("running");
+  else if (attempt.kind === "notSent") advice = t("notSent");
+  else if (attempt.status === "success") advice = t("success");
+  else if (attempt.status === "reverted") advice = t("reverted");
+  else if (attempt.status === "pending" || attempt.status === "submitted") {
+    advice = t("pending");
+  } else advice = t("unknown");
+
+  return (
+    <div className="space-y-1 rounded-lg border border-border px-3 py-2 text-sm">
+      <div>{advice}</div>
+      {attempt.kind === "sent" && attempt.userOpHash && (
+        <div className="text-xs text-muted-foreground">
+          {t("userOp")}{" "}
+          <span className="font-mono break-all">{attempt.userOpHash}</span>
+        </div>
+      )}
+      {attempt.kind === "sent" && attempt.txHash && (
+        <div className="text-xs text-muted-foreground">
+          {t("tx")} <span className="font-mono break-all">{attempt.txHash}</span>
         </div>
       )}
     </div>
   );
 }
 
-function RecordBurnDialog({ payoutId }: { payoutId: string }) {
+function RecordBurnDialog({
+  payoutId,
+  prefill,
+}: {
+  payoutId: string;
+  // A confirmed hash for the attempt, when we found one.
+  prefill: string | null;
+}) {
   const t = useTranslations("fund.payments.settlement.burnClaim.record");
   const tRoot = useTranslations();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [hash, setHash] = useState("");
+  const [hash, setHash] = useState(prefill ?? "");
   const valid = TX_HASH.test(hash.trim());
 
   function onOpenChange(next: boolean) {
     setOpen(next);
-    if (!next) {
+    if (next) {
+      setHash(prefill ?? "");
+    } else {
       // After an error the payout may still have moved (a duplicate burn was
       // recorded, the claim went away) — re-read it.
       if (error) router.refresh();
       setError(null);
-      setHash("");
     }
   }
 
@@ -769,6 +835,7 @@ function RecordBurnDialog({ payoutId }: { payoutId: string }) {
               {tRoot("fund.payments.settlement.errors.txHashInvalid")}
             </p>
           )}
+          <p className="text-xs text-muted-foreground">{t("verifyHint")}</p>
         </div>
         {error && (
           <Alert variant="destructive">
@@ -799,9 +866,32 @@ function RecordBurnDialog({ payoutId }: { payoutId: string }) {
   );
 }
 
-function ReleaseBurnClaimDialog({ payoutId }: { payoutId: string }) {
+// True once `atMs` has passed; re-renders when it does. Starts false so the
+// server render and hydration agree (no clock reads during render). A new
+// `atMs` belongs to a new claim — the caller remounts (key) to reset it.
+function useHasPassed(atMs: number): boolean {
+  const [passed, setPassed] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(
+      () => setPassed(true),
+      Math.max(0, atMs - Date.now()),
+    );
+    return () => clearTimeout(timer);
+  }, [atMs]);
+  return passed;
+}
+
+function ReleaseBurnClaimDialog({
+  payoutId,
+  claim,
+}: {
+  payoutId: string;
+  claim: BurnClaimView;
+}) {
   const t = useTranslations("fund.payments.settlement.burnClaim.release");
   const tRoot = useTranslations();
+  const router = useRouter();
+  const releasable = useHasPassed(claim.releasableAtMs);
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -814,9 +904,15 @@ function ReleaseBurnClaimDialog({ payoutId }: { payoutId: string }) {
   const onConfirm = () => {
     setError(null);
     startTransition(async () => {
-      const result = await releasePayoutBurnClaimAction({ payoutId });
+      const result = await releasePayoutBurnClaimAction({
+        payoutId,
+        claimId: claim.claimId,
+      });
       if ("error" in result) {
         setError(result.error);
+        // The claim is no longer the one shown: re-read the page so the
+        // admin sees the current one (or none).
+        if (result.stale) router.refresh();
         return;
       }
       // The action refreshed the route: the Burn button is back.
@@ -825,50 +921,58 @@ function ReleaseBurnClaimDialog({ payoutId }: { payoutId: string }) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogTrigger
-        render={
-          <Button variant="outline" size="sm">
-            <Unlock className="size-4" />
-            {t("button")}
-          </Button>
-        }
-      />
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t("title")}</DialogTitle>
-          <DialogDescription>{t("description")}</DialogDescription>
-        </DialogHeader>
-        <Alert variant="destructive">
-          <AlertTriangle className="size-4" />
-          <AlertDescription>{t("warning")}</AlertDescription>
-        </Alert>
-        {error && (
+    <div className="flex flex-col gap-1">
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogTrigger
+          disabled={!releasable}
+          render={
+            <Button variant="outline" size="sm" disabled={!releasable}>
+              <Unlock className="size-4" />
+              {t("button")}
+            </Button>
+          }
+        />
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("title")}</DialogTitle>
+            <DialogDescription>{t("description")}</DialogDescription>
+          </DialogHeader>
           <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
+            <AlertTriangle className="size-4" />
+            <AlertDescription>{t("warning")}</AlertDescription>
           </Alert>
-        )}
-        <DialogFooter>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => onOpenChange(false)}
-            disabled={pending}
-          >
-            {tRoot("common.cancel")}
-          </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            onClick={onConfirm}
-            disabled={pending}
-          >
-            {pending && <Loader2 className="size-4 animate-spin" />}
-            {t("confirm")}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => onOpenChange(false)}
+              disabled={pending}
+            >
+              {tRoot("common.cancel")}
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={onConfirm}
+              disabled={pending}
+            >
+              {pending && <Loader2 className="size-4 animate-spin" />}
+              {t("confirm")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {!releasable && claim.releasableAtLabel && (
+        <span className="max-w-xs text-xs text-muted-foreground">
+          {t("availableAt", { time: claim.releasableAtLabel })}
+        </span>
+      )}
+    </div>
   );
 }
 

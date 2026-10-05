@@ -608,8 +608,15 @@ export async function recordPayoutBurnAction(input: {
 // confirms before firing.
 export async function releasePayoutBurnClaimAction(input: {
   payoutId: string;
+  // The claim the page showed: the release is pinned to it, so a claim a new
+  // attempt took meanwhile is never released by mistake.
+  claimId: string | null;
 }): Promise<ops.ReleaseBurnClaimResult> {
-  const res = await ops.releasePayoutBurnClaim(await ctx(), input.payoutId);
+  const res = await ops.releasePayoutBurnClaim(
+    await ctx(),
+    input.payoutId,
+    input.claimId,
+  );
   if ("ok" in res) refresh();
   return res;
 }

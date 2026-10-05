@@ -180,14 +180,15 @@ function payoutFromDetailWire(w: PayoutDetailWire): Payout {
 }
 
 // In-flight burn claim. Absent (older api) and null both mean "none"; a claim
-// without a timestamp is still a claim, so keep it rather than hide it.
-function burnClaimFromWire(
+// without a timestamp or id is still a claim, so keep it rather than hide it.
+export function burnClaimFromWire(
   w: PayoutBurnClaimWire | null | undefined,
 ): PayoutBurnClaim | null {
   if (!w) return null;
   return {
+    claimId: typeof w.claimId === "string" && w.claimId ? w.claimId : null,
     claimedAt: w.claimedAt ?? "",
-    source: w.source === "api" ? "api" : "external",
+    source: "external",
   };
 }
 

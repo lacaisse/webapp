@@ -16,6 +16,7 @@ const userop = vi.hoisted(() => ({
   burnFromToken: vi.fn(),
   mintToken: vi.fn(),
   failedBeforeSubmit: vi.fn(),
+  attemptedUserOpHash: vi.fn(),
 }));
 vi.mock("@/services/token/userop", () => ({
   ...userop,
@@ -47,6 +48,7 @@ beforeEach(() => {
   prisma.tokenOperation.update.mockResolvedValue({});
   userop.burnFromToken.mockResolvedValue({ txHash: TX, userOpHash: "0xuserop" });
   userop.failedBeforeSubmit.mockReturnValue(false);
+  userop.attemptedUserOpHash.mockReturnValue(null);
 });
 
 describe("burnDirect — broadcast", () => {
@@ -82,12 +84,28 @@ describe("burnDirect — broadcast", () => {
     });
   });
 
-  it("is true, with the hash, when the burn confirmed but bookkeeping failed", async () => {
+  it("carries the attempted userOp hash and stores it on the failed row", async () => {
+    const userOp = `0x${"cd".repeat(32)}`;
+    userop.burnFromToken.mockRejectedValueOnce(new Error("poll timed out"));
+    userop.attemptedUserOpHash.mockReturnValueOnce(userOp);
+    expect(await burnDirect(ctx, input, audit)).toEqual({
+      error: "tokenOps.errors.submitFailed",
+      broadcast: true,
+      userOpHash: userOp,
+    });
+    expect(prisma.tokenOperation.update).toHaveBeenLastCalledWith({
+      where: { id: "op-1" },
+      data: { status: "FAILED", errorMessage: `Error: poll timed out [userOp ${userOp}]` },
+    });
+  });
+
+  it("is true, with the hashes, when the burn confirmed but bookkeeping failed", async () => {
     resolveOrEnqueueAnnotation.mockRejectedValueOnce(new Error("db hiccup"));
     expect(await burnDirect(ctx, input, audit)).toEqual({
       error: "tokenOps.errors.submitFailed",
       broadcast: true,
       txHash: TX,
+      userOpHash: "0xuserop",
     });
   });
 

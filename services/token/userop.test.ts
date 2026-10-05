@@ -11,7 +11,13 @@ vi.mock("@/services/crypto/secret", () => ({
   decryptSecret: () => `0x${"11".repeat(32)}`,
 }));
 
-import { burnFromToken, failedBeforeSubmit, UserOpError } from "./userop";
+import {
+  attemptedUserOpHash,
+  burnFromToken,
+  failedBeforeSubmit,
+  getTxReceiptWithLogs,
+  UserOpError,
+} from "./userop";
 
 const BUNDLER = "https://bundler.test";
 const ZERO_WORD = `0x${"00".repeat(32)}`;
@@ -115,6 +121,8 @@ describe("burnFromToken — failedBeforeSubmit", () => {
     const e = await burnError();
     expect((e as UserOpError).code).toBe("sponsor_failed");
     expect(failedBeforeSubmit(e)).toBe(true);
+    // Nothing was sent, so there's no attempt to look up.
+    expect(attemptedUserOpHash(e)).toBeNull();
   });
 
   // A sponsor HTTP error is coded `submit_failed`, which triggers the role
@@ -129,9 +137,11 @@ describe("burnFromToken — failedBeforeSubmit", () => {
   it("does NOT tag a failed eth_sendUserOperation (may have been accepted)", async () => {
     replies.eth_sendUserOperation = () => ({ error: "bundler busy" });
     const e = await burnError();
-    // Replaced by the role diagnosis, still untagged.
+    // Replaced by the role diagnosis, still untagged — and still carrying the
+    // signed userop's hash so the attempt can be looked up.
     expect((e as UserOpError).code).toBe("missing_role");
     expect(failedBeforeSubmit(e)).toBe(false);
+    expect(attemptedUserOpHash(e)).toMatch(/^0x[0-9a-f]{64}$/);
   });
 
   it("does NOT tag a failure after submit (reverted userop)", async () => {
@@ -141,11 +151,40 @@ describe("burnFromToken — failedBeforeSubmit", () => {
     const e = await burnError();
     expect((e as UserOpError).code).toBe("tx_failed");
     expect(failedBeforeSubmit(e)).toBe(false);
+    expect(attemptedUserOpHash(e)).toMatch(/^0x[0-9a-f]{64}$/);
   });
 
   it("treats anything it never saw as possibly submitted", () => {
     expect(failedBeforeSubmit(new Error("x"))).toBe(false);
     expect(failedBeforeSubmit("boom")).toBe(false);
     expect(failedBeforeSubmit(null)).toBe(false);
+  });
+});
+
+describe("getTxReceiptWithLogs", () => {
+  it("returns status and logs, null for an unknown hash", async () => {
+    replies.eth_getTransactionReceipt = (rpc) =>
+      rpc.params[0] === "0xknown"
+        ? {
+            result: {
+              transactionHash: "0xknown",
+              status: "0x1",
+              logs: [{ address: "0xt", topics: ["0xa"], data: "0x01" }],
+            },
+          }
+        : { result: null };
+    expect(await getTxReceiptWithLogs({ chainId: 100, txHash: "0xknown" })).toEqual({
+      transactionHash: "0xknown",
+      status: "success",
+      logs: [{ address: "0xt", topics: ["0xa"], data: "0x01" }],
+    });
+    expect(await getTxReceiptWithLogs({ chainId: 100, txHash: "0xother" })).toBeNull();
+  });
+
+  it("throws when the node can't be reached", async () => {
+    replies.eth_getTransactionReceipt = () => ({ status: 503 });
+    await expect(
+      getTxReceiptWithLogs({ chainId: 100, txHash: "0xknown" }),
+    ).rejects.toThrow();
   });
 });

@@ -8,6 +8,7 @@ import { prisma } from "@/services/db/prisma";
 import { ANNOTATION_TRIGGERS } from "@/services/transaction-annotation/annotate";
 import { resolveOrEnqueueAnnotation } from "@/services/transaction-annotation/pending";
 import {
+  attemptedUserOpHash,
   burnFromToken,
   failedBeforeSubmit,
   mintToken,
@@ -65,6 +66,8 @@ export type DirectMintResult =
 //   - `broadcast: true`  — it may have been sent: the submit call or the
 //     confirmation poll failed, or the burn CONFIRMED and our own bookkeeping
 //     after it failed (then `txHash` is set). Unknown errors land here too.
+//     `userOpHash` is set whenever the userop was handed to the bundler (or
+//     confirmed) — the handle to check the attempt on chain.
 // A thrown error (e.g. the TokenOperation insert) is not classified — treat it
 // like `broadcast: true`.
 export type DirectBurnResult =
@@ -74,6 +77,7 @@ export type DirectBurnResult =
       field?: "from" | "amount" | "note";
       broadcast: boolean;
       txHash?: string;
+      userOpHash?: string;
     };
 
 // Audit context for the annotation written on success. `trigger` is one of
@@ -211,14 +215,14 @@ export async function burnDirect(
 
   // Set once the burn confirmed on chain: a failure after that point is our
   // own bookkeeping, and the burn must not be reported as "not sent".
-  let burnedTxHash: string | null = null;
+  let burned: { txHash: string; userOpHash: string } | null = null;
   try {
     const { txHash, userOpHash } = await burnFromToken({
       fund,
       from: parsed.data.from as `0x${string}`,
       amount: amountUnits,
     });
-    burnedTxHash = txHash;
+    burned = { txHash, userOpHash };
     await prisma.tokenOperation.update({
       where: { id: op.id },
       data: { status: "CONFIRMED", txHash, confirmedAt: new Date() },
@@ -236,8 +240,13 @@ export async function burnDirect(
     revalidatePath("/token");
     return { ok: true, txHash, userOpHash };
   } catch (e) {
+    const userOpHash = burned?.userOpHash ?? attemptedUserOpHash(e);
+    // TokenOperation has no userop column (and this change adds no
+    // migration), so the attempted userop hash rides in the failure text —
+    // the one place an operator reading the row will look.
     const errorMessage =
-      e instanceof UserOpError ? `${e.code}: ${e.message}` : String(e);
+      (e instanceof UserOpError ? `${e.code}: ${e.message}` : String(e)) +
+      (userOpHash ? ` [userOp ${userOpHash}]` : "");
     await prisma.tokenOperation.update({
       where: { id: op.id },
       data: { status: "FAILED", errorMessage },
@@ -245,8 +254,9 @@ export async function burnDirect(
     console.error("[burnDirect] failed", op.id, e);
     return {
       error: t("tokenOps.errors.submitFailed"),
-      broadcast: burnedTxHash !== null || !failedBeforeSubmit(e),
-      ...(burnedTxHash ? { txHash: burnedTxHash } : {}),
+      broadcast: burned !== null || !failedBeforeSubmit(e),
+      ...(burned ? { txHash: burned.txHash } : {}),
+      ...(userOpHash ? { userOpHash } : {}),
     };
   }
 }

@@ -223,11 +223,13 @@ export type PayoutBurnClaimed = {
 };
 
 // An in-flight burn claim as the payout detail / status report it: non-null
-// only while a claim is taken and no burn is recorded yet. `source` "external"
-// is a treasury-key client's claim (ours); "api" is CP's own server-side burn.
+// only while a client claim (ours) is taken and no burn is recorded yet. CP
+// never reports its own server-side burn here. `claimId` pins a forced
+// release to exactly this claim; null only if an api omits it.
 export type PayoutBurnClaim = {
+  claimId: string | null;
   claimedAt: string; // RFC3339
-  source: "external" | "api";
+  source: "external";
 };
 
 // Result of the standalone fee-transfer (sweep) endpoint. A failure throws

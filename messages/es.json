@@ -1374,21 +1374,32 @@
         },
         "burnClaim": {
           "started": "Se inició una quema el {time} y no se ha confirmado.",
-          "hint": "Puede que siga en curso o que se haya interrumpido. Comprueba la cuenta del local en la cadena y luego registra la transacción de quema o libera la reserva.",
-          "apiSource": "Citizen Pay está realizando esta quema por su cuenta. Actualiza el estado en un momento.",
+          "hint": "Puede que siga en curso o que se haya interrumpido. Comprueba la cuenta del local en la cadena y luego registra la transacción de quema o, si no se quemó nada, libera la reserva.",
           "record": {
             "button": "Registrar quema",
             "title": "¿Registrar la transacción de quema?",
             "description": "Registra esta transacción como la quema del pago y lo liquida como una quema normal (las comisiones de la plataforma se transfieren al fondo). Usa solo una transacción que hayas comprobado en la cadena: la quema del neto de este pago desde la cuenta del local.",
             "label": "Hash de la transacción",
-            "confirm": "Registrar quema"
+            "confirm": "Registrar quema",
+            "verifyHint": "Primero se comprueba la transacción en la cadena: debe ser una quema exitosa del neto exacto de este pago desde la cuenta del local. También sirve un hash userOp."
           },
           "release": {
             "button": "Liberar",
             "title": "¿Liberar la reserva de quema?",
             "description": "Liberarla permite una nueva quema de este pago.",
             "warning": "Libera solo después de comprobar en la cadena que no se quemó nada para este pago. Si la quema anterior se completó, quemar de nuevo destruye dos veces los tokens del comercio.",
-            "confirm": "Liberar reserva"
+            "confirm": "Liberar reserva",
+            "availableAt": "Disponible a partir del {time}: una quema en curso puede tardar unos minutos en llegar a la cadena."
+          },
+          "attempt": {
+            "running": "Un intento desde esta página sigue marcado como en curso. Espera a que termine antes de actuar.",
+            "notSent": "El intento registrado falló antes de enviarse, así que no quemó nada. Liberar es seguro en cuanto el temporizador lo permita.",
+            "success": "La quema del intento está confirmada en la cadena. Regístrala abajo (el hash ya está rellenado).",
+            "reverted": "La userOp del intento se revirtió en la cadena, así que no quemó nada. Liberar es seguro en cuanto el temporizador lo permita.",
+            "pending": "La userOp del intento sigue pendiente en el bundler. Espera y vuelve a comprobarlo.",
+            "unknown": "No se pudo determinar el resultado del intento. Comprueba la userOp en la cadena antes de actuar.",
+            "userOp": "UserOp:",
+            "tx": "Transacción:"
           }
         },
         "feeTransfer": {
@@ -1528,10 +1539,19 @@
           "exportOrdersTruncated": "Uno de los pagos contiene demasiadas transacciones para exportarlas de una vez. Reduce el periodo e inténtalo de nuevo.",
           "burnInProgress": "Otro intento de quema de este pago empezó el {claimedAt} y sigue en curso o se interrumpió. Esta vez no se quemó nada. Usa el panel de la página del pago para registrar su transacción o liberarlo.",
           "burnClaimFailed": "No se pudo asegurar la quema con Citizen Pay, así que no se quemó nada. Vuelve a intentarlo en breve.",
-          "burnMayHaveBeenSent": "Es posible que la quema se haya enviado a la cadena, pero se desconoce el resultado. No reintentes: comprueba la cuenta del local en la cadena y luego registra el hash de la transacción de quema o libera la reserva desde la página del pago.",
+          "burnMayHaveBeenSent": "Es posible que la quema se haya enviado a la cadena, pero se desconoce el resultado. No reintentes: comprueba la cadena (con el hash userOp de abajo, si aparece) y luego registra el hash de la transacción de quema o libera la reserva desde la página del pago.",
           "duplicateBurn": "Este pago se ha quemado DOS VECES: la transacción {txHash} se registró además de una quema anterior. Se ha avisado a Citizen Pay. No vuelvas a quemar: contacta con Citizen Pay para conciliar.",
           "noBurnClaim": "Ya no hay ningún intento de quema en curso para este pago. Recarga la página.",
-          "releaseClaimFailed": "No se pudo liberar la reserva de quema. Vuelve a intentarlo en breve."
+          "releaseClaimFailed": "No se pudo liberar la reserva de quema. Vuelve a intentarlo en breve.",
+          "burnInProgressByCitizenPay": "Citizen Pay está quemando este pago ahora mismo. No se quemó nada desde aquí. Contacta con Citizen Pay si no se completa.",
+          "burnBookkeepingFailed": "La quema se completó y quedó registrada en Citizen Pay, pero no se pudo guardar en el historial de tokens del fondo. Revisa la página del token.",
+          "burnVerifyFailed": "No se pudo comprobar la transacción en la cadena. No se registró nada. Vuelve a intentarlo en breve.",
+          "burnHashNotFound": "Esa transacción no se encontró en la cadena (o aún no está confirmada). No se registró nada.",
+          "burnHashNotSuccessful": "Esa transacción falló en la cadena, así que no quemó nada. No se registró nada.",
+          "burnHashNotBurn": "Esa transacción no es una quema de los tokens de este local. No se registró nada.",
+          "burnHashWrongAmount": "Esa transacción quemó {found}, pero el neto de este pago es {expected}. No se registró nada.",
+          "releaseTooRecent": "Esta reserva de quema aún no se puede liberar: una quema en curso puede tardar unos minutos en llegar a la cadena. Se podrá liberar a partir del {releasableAt}.",
+          "releaseClaimChanged": "La reserva de quema cambió desde que se cargó la página (otro intento la tomó o se resolvió). La página se ha recargado: compruébalo de nuevo antes de actuar."
         }
       },
       "export": {

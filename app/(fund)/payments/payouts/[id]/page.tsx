@@ -19,6 +19,7 @@ import {
 import type { Payout, PayoutStatus } from "@/services/citizenpay/types";
 import { requireFundRole } from "@/services/auth/dal";
 import { requireCurrentFund } from "@/services/fund/server";
+import { FORCED_RELEASE_MIN_AGE_MS } from "@/services/payout/burn-claim-config";
 import { orderWalletCredit } from "@/services/payout/money";
 import { cn } from "@/lib/utils";
 
@@ -31,11 +32,12 @@ import { PayoutPeriodDialog } from "./period-dialog";
 import { getBankingStatus } from "../../../bank/data";
 import {
   getAllPayoutOrders,
+  getBurnAttempt,
   getPayoutLiveStatus,
   getPayoutSummary,
   getPlaceOnChainBalance,
 } from "../../data";
-import { PayoutProcess } from "../../payout-process";
+import { PayoutProcess, type BurnClaimView } from "../../payout-process";
 
 const STATUS_VARIANT: Record<
   PayoutStatus,
@@ -97,20 +99,43 @@ export default async function PayoutDetailPage({
   const backTab = payout.status === "complete" ? "completed" : "pending";
 
   // In-flight burn claim (a burn started but nothing recorded yet). /status is
-  // the live read; the detail carries it too, for when /status failed. The
-  // time is formatted here so server and client render the same string.
+  // the live read; the detail carries it too, for when /status failed. Times
+  // are formatted here so server and client render the same strings.
   const burnClaim = live ? live.burnClaim : payout.burnClaim;
-  const burnClaimView = burnClaim
-    ? {
-        source: burnClaim.source,
-        startedAt: Number.isNaN(Date.parse(burnClaim.claimedAt))
-          ? burnClaim.claimedAt
-          : format.dateTime(new Date(burnClaim.claimedAt), {
-              dateStyle: "medium",
-              timeStyle: "medium",
-            }),
-      }
-    : null;
+  let burnClaimView: BurnClaimView | null = null;
+  if (burnClaim && liveStatus === "pending") {
+    const claimedAtMs = Date.parse(burnClaim.claimedAt);
+    const known = !Number.isNaN(claimedAtMs);
+    const releasableAtMs = known ? claimedAtMs + FORCED_RELEASE_MIN_AGE_MS : 0;
+    const when = (ms: number) =>
+      format.dateTime(new Date(ms), { dateStyle: "medium", timeStyle: "medium" });
+    // What we know locally about the attempt behind the claim: where to look
+    // on chain, and a hash to prefill when it confirmed.
+    const { placeAccountAddress } = await getAllPayoutOrders(
+      fund.id,
+      fund.citizenPayApiKeyId,
+      fund.citizenPayApiKeyEnc,
+      id,
+    );
+    const attempt =
+      known && placeAccountAddress
+        ? await getBurnAttempt(
+            fund.id,
+            fund.tokenChainId,
+            placeAccountAddress,
+            payout.net,
+            burnClaim.claimedAt,
+          )
+        : null;
+    burnClaimView = {
+      claimId: burnClaim.claimId,
+      startedAt: known ? when(claimedAtMs) : burnClaim.claimedAt,
+      // Unknown claim time: let the server's own 10-minute check decide.
+      releasableAtMs,
+      releasableAtLabel: known ? when(releasableAtMs) : "",
+      attempt,
+    };
+  }
 
   return (
     <div className="space-y-6">

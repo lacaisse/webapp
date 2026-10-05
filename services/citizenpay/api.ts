@@ -183,11 +183,12 @@ export type PayoutDetailWire = PayoutListWire & {
 };
 
 // An in-flight burn claim, as `/payouts/{id}` and `/payouts/{id}/status`
-// report it. `source` is "external" for a claim a treasury-key client (us)
-// took via `burn-claim`, "api" for CP's own server-side burn.
+// report it — only ever a treasury-key client's claim (`source` "external");
+// CP's own server-side burn is not shown here.
 export type PayoutBurnClaimWire = {
+  claimId?: string;
   claimedAt: string; // RFC3339
-  source: "external" | "api";
+  source: "external";
 };
 
 // A draft payout: a computed summary of paid/refunded orders for one place
@@ -939,8 +940,10 @@ export const payouts = {
   // attempts can't both burn: one atomic UPDATE on CP's side, exactly one
   // caller gets a `claimId`. 409s (CitizenPayApiError):
   //   - `payout is already burnt` / `payout is already complete`;
+  //   - `payout is not pending` (e.g. payment-pending);
   //   - `burn already in progress` with `{ error, claimedAt, source }` in the
-  //     body — another claim (ours or CP's own burn) holds the payout.
+  //     body — another claim holds the payout; `source` "api" means CP itself
+  //     is burning it.
   burnClaim(
     creds: CitizenPayApiCredentials,
     payoutId: string,
@@ -953,11 +956,14 @@ export const payouts = {
     );
   },
   // Release a burn claim (204, empty body). Idempotent when there's no claim
-  // or the payout is already burned. With `claimId`: 409 `burn claim does not
-  // match` when another claim holds it. With `force: true` (no claimId
-  // needed): releases whatever external claim is there — for an attempt that
-  // was interrupted, only after a human checked the chain. Never releases CP's
-  // own api-side claim.
+  // or the payout is already burned.
+  //   - `claimId` alone: immediate release of exactly that claim (409 `burn
+  //     claim does not match` otherwise) — the burn's own pre-broadcast path.
+  //   - `force: true`: for an attempt that was interrupted, after a human
+  //     checked the chain. Refused with 409 `burn claim is too recent`
+  //     (`{error, claimedAt, releasableAt}`) until the claim is 10 minutes
+  //     old; with a `claimId` as well it must still match (pinned release).
+  // Never releases CP's own api-side claim.
   releaseBurnClaim(
     creds: CitizenPayApiCredentials,
     payoutId: string,

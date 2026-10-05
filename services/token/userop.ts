@@ -288,6 +288,33 @@ function markFailedBeforeSubmit(e: unknown): unknown {
   return e;
 }
 
+// The userop hash of an attempt that got as far as `eth_sendUserOperation`,
+// carried on its error the same way (symbol property, error otherwise
+// untouched).
+const ATTEMPTED_USEROP_HASH = Symbol("userop.attemptedHash");
+
+function attachUserOpHash(e: unknown, userOpHash: Hex): unknown {
+  if (e !== null && typeof e === "object") {
+    try {
+      Object.defineProperty(e, ATTEMPTED_USEROP_HASH, { value: userOpHash });
+    } catch {
+      // Frozen error: the hash is lost, nothing else changes.
+    }
+  }
+  return e;
+}
+
+/**
+ * The userop hash of the attempt that raised `e`, when it failed at or after
+ * `eth_sendUserOperation` — the handle to check that attempt on the bundler
+ * (`getUserOpTx`). Null for errors raised before submit or not seen here.
+ */
+export function attemptedUserOpHash(e: unknown): Hex | null {
+  if (e === null || typeof e !== "object") return null;
+  const v = (e as Record<symbol, unknown>)[ATTEMPTED_USEROP_HASH];
+  return typeof v === "string" ? (v as Hex) : null;
+}
+
 /**
  * True only when `e` is certain to have been raised before the userop was
  * handed to the bundler (`eth_sendUserOperation`), i.e. nothing can be on its
@@ -602,7 +629,7 @@ async function signUserOp(args: {
   entrypoint: Address;
   op: UserOp;
   privateKey: Hex;
-}): Promise<UserOp> {
+}): Promise<{ op: UserOp; hash: Hex }> {
   const hash = (await args.client.readContract({
     address: args.entrypoint,
     abi: ENTRYPOINT_ABI,
@@ -613,7 +640,7 @@ async function signUserOp(args: {
   // EIP-191 personal_sign over the raw hash bytes (NOT EIP-712).
   const account = privateKeyToAccount(args.privateKey);
   const signature = await account.signMessage({ message: { raw: hash } });
-  return { ...args.op, signature };
+  return { op: { ...args.op, signature }, hash };
 }
 
 async function submitUserOp(args: {
@@ -768,6 +795,43 @@ export async function getBundlerTxReceipt(args: {
   }
 }
 
+export type ReceiptLog = { address: string; topics: string[]; data: string };
+
+export type TxReceiptWithLogs = {
+  transactionHash: string;
+  status: "success" | "reverted";
+  logs: ReceiptLog[];
+};
+
+/**
+ * A full receipt (with logs) via the bundler's chain RPC — `null` when the
+ * node doesn't know the hash (not mined, or not a tx hash). Unlike
+ * `getBundlerTxReceipt` this THROWS on transport errors: a caller verifying a
+ * burn must not read "unreachable" as "not found".
+ */
+export async function getTxReceiptWithLogs(args: {
+  chainId: number;
+  txHash: string;
+}): Promise<TxReceiptWithLogs | null> {
+  const r = await bundlerRpcAt<{
+    transactionHash?: string;
+    status?: string;
+    logs?: { address?: string; topics?: string[]; data?: string }[];
+  } | null>(bundlerReadRpcUrl(args.chainId), "eth_getTransactionReceipt", [
+    args.txHash,
+  ]);
+  if (!r) return null;
+  return {
+    transactionHash: r.transactionHash ?? args.txHash,
+    status: r.status === "0x1" ? "success" : "reverted",
+    logs: (r.logs ?? []).map((l) => ({
+      address: l.address ?? "",
+      topics: l.topics ?? [],
+      data: l.data ?? "0x",
+    })),
+  };
+}
+
 // =============================================================================
 // Public API
 // =============================================================================
@@ -844,6 +908,7 @@ async function runUserOp(
   // Everything up to the signed userop is local or a read/sponsor call that
   // cannot put anything on chain — tag its failures (see failedBeforeSubmit).
   let signed: UserOp;
+  let signedHash: Hex;
   try {
     const prepared = await prepareUserOp({
       client: ctx.client,
@@ -861,12 +926,12 @@ async function runUserOp(
       paymasterType: ctx.paymasterType,
       op: prepared,
     });
-    signed = await signUserOp({
+    ({ op: signed, hash: signedHash } = await signUserOp({
       client: ctx.client,
       entrypoint: ctx.entrypoint,
       op: sponsored,
       privateKey: ctx.privateKey,
-    });
+    }));
   } catch (e) {
     throw markFailedBeforeSubmit(e);
   }
@@ -877,20 +942,28 @@ async function runUserOp(
   // `eth_sendUserOperation` returns the userop hash (the engine queues
   // on-chain submission asynchronously). We then poll the bundler for
   // the actual tx hash + terminal status.
-  const userOpHash = await submitUserOp({
-    chainId,
-    paymaster: ctx.paymaster,
-    entrypoint: ctx.entrypoint,
-    op: signed,
-    userOpData: opts.userOpData,
-    extraData: opts.extraData,
-  });
-  const txHash = await awaitUserOpSuccess({
-    chainId,
-    paymaster: ctx.paymaster,
-    userOpHash,
-  });
-  return { txHash, userOpHash };
+  //
+  // Every failure from here carries the userop hash we signed (the
+  // EntryPoint's `getUserOpHash`, i.e. the hash the bundler answers with), so
+  // an operator can look the attempt up on the bundler / chain.
+  try {
+    const userOpHash = await submitUserOp({
+      chainId,
+      paymaster: ctx.paymaster,
+      entrypoint: ctx.entrypoint,
+      op: signed,
+      userOpData: opts.userOpData,
+      extraData: opts.extraData,
+    });
+    const txHash = await awaitUserOpSuccess({
+      chainId,
+      paymaster: ctx.paymaster,
+      userOpHash,
+    });
+    return { txHash, userOpHash };
+  } catch (e) {
+    throw attachUserOpHash(e, signedHash);
+  }
 }
 
 /**
@@ -966,7 +1039,10 @@ export async function burnFromToken(args: {
         await assertBurnerRole(ctx);
       } catch (roleError) {
         // The role diagnosis replaces the original error; carry over whether
-        // that original failed before submit, or the caller would lose it.
+        // that original failed before submit (and the attempt's userop hash),
+        // or the caller would lose them.
+        const hash = attemptedUserOpHash(e);
+        if (hash) attachUserOpHash(roleError, hash);
         throw failedBeforeSubmit(e)
           ? markFailedBeforeSubmit(roleError)
           : roleError;
