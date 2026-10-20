@@ -5,6 +5,10 @@ import { getTranslations } from "next-intl/server";
 import { revalidatePath } from "next/cache";
 
 import { requireFundRole } from "@/services/auth/dal";
+import {
+  renameStampedHolderNames,
+  scheduleCardHolderNamePublish,
+} from "@/services/card/publish-holder-name";
 import { normalizeSerial } from "@/services/card/serial";
 import { parseCsv } from "@/services/csv/parse";
 import type { Prisma } from "@/services/db/generated/client";
@@ -135,6 +139,9 @@ export async function importMembersAction(input: {
   let created = 0;
   let updated = 0;
   let cardsLinked = 0;
+  // Cards whose public holder name this import changes (newly linked, or a
+  // renamed member's) — published to CitizenPay after the response.
+  const publishCardIds: string[] = [];
   const skipped: { row: number; reason: string }[] = [];
   // Serials / card numbers that didn't link: no existing card, or the card
   // belongs to another member. Reported, never provisioned.
@@ -225,10 +232,13 @@ export async function importMembersAction(input: {
     try {
       const existing = await prisma.member.findUnique({
         where: { fundId_email: { fundId: fund.id, email } },
-        select: { id: true, applicationData: true },
+        select: { id: true, firstName: true, lastName: true, applicationData: true },
       });
 
       let memberId: string;
+      // The member's name after this row — what a newly linked card is
+      // stamped with (update-only rows may carry no name columns).
+      let memberName = { firstName, lastName };
       if (existing) {
         // Typed explicitly: `tierId` only exists on the *unchecked* input, and
         // an inline `applicationData` object is enough to make inference pick
@@ -257,6 +267,19 @@ export async function importMembersAction(input: {
         await prisma.member.update({ where: { id: existing.id }, data });
         memberId = existing.id;
         updated++;
+        memberName = {
+          firstName: firstName || existing.firstName,
+          lastName: lastName || existing.lastName,
+        };
+        // Rename: same card-name rewrite as updateMemberProfileAction.
+        publishCardIds.push(
+          ...(await renameStampedHolderNames({
+            fundId: fund.id,
+            memberId,
+            oldName: `${existing.firstName} ${existing.lastName}`,
+            newName: `${memberName.firstName} ${memberName.lastName}`,
+          })),
+        );
       } else if (updateOnly) {
         // Backfill never creates — the email matched no member.
         skipped.push({ row: rowNum, reason: t("skip.noMatch") });
@@ -320,8 +343,10 @@ export async function importMembersAction(input: {
           select: { id: true, memberId: true },
         });
         if (card && (card.memberId === null || card.memberId === memberId)) {
-          await linkCardToMember(card.id, memberId, { firstName, lastName }, status);
+          const alreadyLinked = card.memberId === memberId;
+          await linkCardToMember(card.id, memberId, memberName, status, alreadyLinked);
           cardsLinked++;
+          if (!alreadyLinked) publishCardIds.push(card.id);
           rowCardHandled = true;
         } else if (card) {
           serialsNotFound.push(serial); // attached to another member
@@ -341,8 +366,10 @@ export async function importMembersAction(input: {
           select: { id: true, memberId: true },
         });
         if (card && (card.memberId === null || card.memberId === memberId)) {
-          await linkCardToMember(card.id, memberId, { firstName, lastName }, status);
+          const alreadyLinked = card.memberId === memberId;
+          await linkCardToMember(card.id, memberId, memberName, status, alreadyLinked);
           cardsLinked++;
+          if (!alreadyLinked) publishCardIds.push(card.id);
         } else {
           // No such card, or taken by another member — report, never create.
           cardNumbersNotFound.push(String(cardNumber));
@@ -353,6 +380,10 @@ export async function importMembersAction(input: {
       skipped.push({ row: rowNum, reason: t("skip.error") });
     }
   }
+
+  // Show the changed holder names on the cards' public wallets — after the
+  // response, bounded concurrency, stops on the first network failure.
+  scheduleCardHolderNamePublish(fund, publishCardIds);
 
   revalidatePath("/members");
   return {
@@ -429,6 +460,9 @@ async function linkCardToMember(
   memberId: string,
   name: { firstName: string; lastName: string },
   statusOverride: MemberStatus | undefined,
+  // Re-import of a card the member already holds: keep the card's own
+  // holderName (a dependant's card is named after the dependant).
+  alreadyLinked: boolean,
 ): Promise<void> {
   const holderName = `${name.firstName} ${name.lastName}`.trim();
   await prisma.$transaction(async (tx) => {
@@ -437,8 +471,9 @@ async function linkCardToMember(
       data: {
         memberId,
         formerMemberId: null,
-        // Don't blank an existing holder name during a nameless backfill.
-        ...(holderName ? { holderName } : {}),
+        // Don't blank an existing holder name during a nameless backfill,
+        // nor re-stamp a card the member already held.
+        ...(holderName && !alreadyLinked ? { holderName } : {}),
       },
     });
     await tx.member.update({

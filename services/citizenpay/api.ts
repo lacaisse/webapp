@@ -377,7 +377,7 @@ export type PaymentRequestStatus = {
 
 async function request<T>(
   creds: CitizenPayApiCredentials,
-  method: "GET" | "POST" | "PATCH" | "DELETE",
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
   path: string,
   options: {
     query?: Record<string, string | number | undefined | null>;
@@ -660,6 +660,24 @@ export const cards = {
     return request(creds, "PATCH", `/v2/treasury/cards/${encodeURIComponent(serial)}`, {
       body,
     });
+  },
+  // PUT /cards/{serial}/profile — the display name CP keeps for the card's
+  // on-chain account (`account_profiles`), shown on the public card wallet.
+  // `null` / "" resets it to CP's default `Card <serial>`. 404 when the serial
+  // doesn't resolve for the treasury's token. Short default timeout: this is
+  // display-only, best-effort traffic and must never hold a worker for long.
+  setHolderName(
+    creds: CitizenPayApiCredentials,
+    serial: string,
+    name: string | null,
+    opts: { timeoutMs?: number } = {},
+  ): Promise<{ account: string; name: string }> {
+    return request(
+      creds,
+      "PUT",
+      `/v2/treasury/cards/${encodeURIComponent(serial)}/profile`,
+      { body: { name }, timeoutMs: opts.timeoutMs ?? 3_000 },
+    );
   },
   balance(
     creds: CitizenPayApiCredentials,

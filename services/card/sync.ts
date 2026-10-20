@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import "server-only";
 
+import { holderDisplayName } from "@/services/card/holder-name";
 import { normalizeSerial } from "@/services/card/serial";
 import { getCitizenPayClient } from "@/services/citizenpay/client";
 import type {
@@ -118,11 +119,7 @@ export async function computeCardSyncPlan(
       plan.push.push({
         cardId: l.id,
         serialNumber: l.serialNumber,
-        holderName:
-          l.holderName ||
-          (l.member
-            ? `${l.member.firstName} ${l.member.lastName}`.trim()
-            : null),
+        holderName: holderDisplayName(l.member, l.holderName),
       });
     } else if (r.status !== l.status) {
       plan.statusUpdate.push({

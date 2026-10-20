@@ -620,6 +620,13 @@ export class LiveCitizenPayClient implements CitizenPayClient {
     });
   }
 
+  async setCardHolderName(
+    serialNumber: string,
+    name: string | null,
+  ): Promise<void> {
+    await apiCards.setHolderName(this.creds, serialNumber, name);
+  }
+
   async getCardSource(serialNumber: string): Promise<string | null> {
     try {
       const res = await apiCards.get(this.creds, serialNumber);

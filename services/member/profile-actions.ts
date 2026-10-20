@@ -5,6 +5,10 @@ import { getTranslations } from "next-intl/server";
 import { revalidatePath } from "next/cache";
 
 import { requireFundRole } from "@/services/auth/dal";
+import {
+  renameStampedHolderNames,
+  scheduleCardHolderNamePublish,
+} from "@/services/card/publish-holder-name";
 import { prisma } from "@/services/db/prisma";
 
 import { contributionApplies, isBelowTierMinimum } from "./contribution";
@@ -56,7 +60,12 @@ export async function updateMemberProfileAction(
 
   const member = await prisma.member.findFirst({
     where: { id: memberId, fundId: fund.id },
-    select: { id: true, tier: { select: { minContribution: true } } },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      tier: { select: { minContribution: true } },
+    },
   });
   if (!member) return { error: t("members.admin.errors.notFound" as never) };
 
@@ -115,6 +124,18 @@ export async function updateMemberProfileAction(
     }
     throw e;
   }
+
+  // Rename: carry the new name onto the cards stamped with the old one, then
+  // publish just those (plus unnamed cards) to CitizenPay's public wallet,
+  // after the response. A dependant's card, or one holding a stale name from
+  // an earlier rename, keeps its name and isn't re-sent.
+  const cardIds = await renameStampedHolderNames({
+    fundId: fund.id,
+    memberId: member.id,
+    oldName: `${member.firstName} ${member.lastName}`,
+    newName: `${parsed.data.firstName} ${parsed.data.lastName}`,
+  });
+  scheduleCardHolderNamePublish(fund, cardIds);
 
   revalidatePath("/members");
   revalidatePath(`/members/${member.id}`);
