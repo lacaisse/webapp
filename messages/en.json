@@ -3795,7 +3795,61 @@
       "manualBody": "Use the copy buttons above to copy each field and paste it into your banking app. Make sure to include the payment reference.",
       "help": "If you have any questions or problems with your payment, please contact {fundName}."
     },
-    "notConnected": "Bank details are not available yet. Please try again later or contact {fundName}."
+    "notConnected": "Bank details are not available yet. Please try again later or contact {fundName}.",
+    "topUp": {
+      "title": "Top up my card",
+      "greeting": "Hi {name}, choose an amount and pay it from your bank. The same amount is added to your card as soon as the payment is confirmed.",
+      "greetingNoName": "Choose an amount and pay it from your bank. The same amount is added to your card as soon as the payment is confirmed.",
+      "cardLabel": "Card {serial}",
+      "amount": "Amount",
+      "customAmount": "Other amount",
+      "customPlaceholder": "E.g. 15.00",
+      "amountHint": "Between {min} and {max}.",
+      "bank": "My bank",
+      "bankHint": "You'll be sent to your bank to confirm the payment.",
+      "iban": "My IBAN",
+      "ibanHint": "{bank} asks for the number of the account you'll pay from.",
+      "submit": "Pay {amount} with my bank",
+      "submitNoAmount": "Pay with my bank",
+      "redirecting": "Sending you to your bank…",
+      "secure": "Payment initiated through Ponto (Open Banking). {fundName} never sees your banking credentials.",
+      "noBanks": "The list of banks isn't available right now. Please try again later.",
+      "unavailable": "Online top-up isn't available yet. Please contact {fundName}.",
+      "cardBlocked": "This card is blocked and can't be topped up. Please contact {fundName}.",
+      "errors": {
+        "amountInvalid": "Enter a valid amount (e.g. 12.50).",
+        "amountMin": "The minimum amount is €1.",
+        "amountMax": "The maximum amount is €500.",
+        "bankRequired": "Choose your bank.",
+        "ibanInvalid": "Enter a valid IBAN.",
+        "ibanRequired": "Your bank asks for your IBAN.",
+        "unavailable": "Top-up isn't available for this card.",
+        "startFailed": "Couldn't start the payment. Please try again.",
+        "tooSoon": "A payment was just started for this card. Wait 30 seconds before trying again.",
+        "tooMany": "Several payments are already waiting for this card. Finish them at your bank or try again in an hour."
+      },
+      "return": {
+        "title": "Topping up my card",
+        "amount": "Amount",
+        "pendingTitle": "Waiting for the payment to be confirmed",
+        "pendingBody": "We're waiting for your bank to confirm. This usually takes a few seconds.",
+        "pendingLong": "Confirmation is taking longer than usual. You can close this page: your card will be credited automatically once the payment is confirmed.",
+        "signedTitle": "Payment received, your card is being credited",
+        "signedBody": "This only takes a moment.",
+        "mintedTitle": "Your card has been topped up",
+        "mintedBody": "{amount} has been added to your card.",
+        "expiredTitle": "Payment expired",
+        "expiredBody": "The payment wasn't confirmed in time. You can try again.",
+        "cancelledTitle": "Payment not completed",
+        "cancelledBody": "The payment was cancelled or didn't go through. You can try again.",
+        "mismatchTitle": "Payment not found",
+        "mismatchBody": "We can't find this payment. If your account was debited, please contact {fundName}.",
+        "checkFailed": "Couldn't check the payment right now. Retrying…",
+        "retry": "Top up again",
+        "verifyingTitle": "Payment received, credit being verified",
+        "verifyingBody": "Crediting your card is taking longer than usual. It will be added automatically; if it doesn't show up by tomorrow, contact {fundName}."
+      }
+    }
   },
   "onboardingSteps": {
     "errors": {

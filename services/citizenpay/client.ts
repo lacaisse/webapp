@@ -26,6 +26,7 @@ import type {
   BankTransactionsPage,
   CardOperationInput,
   CardOperationResult,
+  CitizenPayBank,
   CitizenPayCardDetail,
   CitizenPayInvite,
   CitizenPayProfile,
@@ -40,6 +41,7 @@ import type {
   ListCardsResult,
   ListPlacesResult,
   OperationStatusResult,
+  PaymentRequestState,
   Payout,
   PayoutBurnClaim,
   PayoutBurnClaimed,
@@ -58,6 +60,7 @@ import type {
   SetManualDeductionInput,
   SubmitMintInput,
   SubmittedOperation,
+  TopUpSignUrlInput,
 } from "./types";
 
 // Re-export the interface so existing imports `from "@/services/citizenpay/client"`
@@ -76,6 +79,22 @@ export type FundCredentials = {
 // =============================================================================
 // Mock implementation
 // =============================================================================
+
+// Mock treasury payment requests (open-banking top-up). The mock "bank" signs
+// instantly: topUpSignUrl records a signed request and sends the browser
+// straight back to the redirectUri. Kept on globalThis so dev HMR and the
+// per-call client instances share it.
+const mockPaymentRequests: Map<number, PaymentRequestState> = ((
+  globalThis as { __cpMockPaymentRequests?: Map<number, PaymentRequestState> }
+).__cpMockPaymentRequests ??= new Map());
+
+const MOCK_BANKS: CitizenPayBank[] = [
+  { id: "mock-belfius", name: "Belfius", country: "BE", logoUrl: null, paymentsEnabled: true, requiresDebtorIban: false },
+  { id: "mock-bnp", name: "BNP Paribas Fortis", country: "BE", logoUrl: null, paymentsEnabled: true, requiresDebtorIban: false },
+  { id: "mock-ing", name: "ING", country: "BE", logoUrl: null, paymentsEnabled: true, requiresDebtorIban: false },
+  { id: "mock-kbc", name: "KBC", country: "BE", logoUrl: null, paymentsEnabled: true, requiresDebtorIban: false },
+  { id: "mock-crelan", name: "Crelan", country: "BE", logoUrl: null, paymentsEnabled: true, requiresDebtorIban: true },
+];
 
 class MockCitizenPayClient implements CitizenPayClient {
   constructor(private readonly fundId: string) {}
@@ -867,6 +886,36 @@ class MockCitizenPayClient implements CitizenPayClient {
   async setTreasuryTopUpUrl(url: string | null): Promise<void> {
     this.log("setTreasuryTopUpUrl", { fundId: this.fundId, url });
     mockTreasuryTopUpUrls.set(this.fundId, url);
+  }
+
+  async listBanks(query: { country: string }): Promise<CitizenPayBank[]> {
+    this.log("listBanks", query);
+    return MOCK_BANKS.filter((b) => b.country === query.country);
+  }
+
+  topUpSignUrl(input: TopUpSignUrlInput): string {
+    // Never log the payer IBAN.
+    this.log("topUpSignUrl", { ...input, iban: input.iban ? "[redacted]" : undefined });
+    const id = 100_000 + mockPaymentRequests.size + 1;
+    mockPaymentRequests.set(id, {
+      paymentRequestId: id,
+      treasuryId: input.treasuryId,
+      status: "signed",
+      amountCents: input.amountCents,
+      account: input.accountAddress,
+      orderId: null,
+    });
+    const url = new URL(input.redirectUri);
+    url.searchParams.set("paymentRequestId", String(id));
+    return url.toString();
+  }
+
+  async getPaymentRequest(
+    treasuryId: string,
+    paymentRequestId: number,
+  ): Promise<PaymentRequestState | null> {
+    this.log("getPaymentRequest", { treasuryId, paymentRequestId });
+    return mockPaymentRequests.get(paymentRequestId) ?? null;
   }
 }
 

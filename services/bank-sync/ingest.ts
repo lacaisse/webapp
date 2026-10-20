@@ -10,6 +10,9 @@ import {
 import { getCitizenPayClient } from "@/services/citizenpay/client";
 import type { BankTransactionPayload } from "@/services/citizenpay/types";
 
+import { claimTopUpDeposit, linkTopUpDeposit } from "@/services/card-topup/settle";
+import { parseTopUpRemittance } from "@/services/card-topup/remittance";
+
 import { mintTierAllocation } from "./allocate";
 import { matchMember, type Match } from "./matching/match";
 import { isAllocationEligible } from "@/services/member/eligibility";
@@ -29,6 +32,12 @@ import { ANNOTATION_TRIGGERS } from "@/services/transaction-annotation/annotate"
 // Idempotency: BankTransaction has @@unique([fundId, externalId]). If a
 // cron re-run encounters the same payload, the upsert short-circuits and
 // we skip side effects (match + mint + email).
+//
+// Open-banking card top-ups (remittance "cp-<paymentRequestId>", see
+// services/card-topup) are recognised before member matching: they are
+// credited 1:1 by the top-up flow, so the row is linked to its CardTopUp
+// (matchMethod CARD_TOPUP) and never tier-minted, period-allocated or queued
+// for manual attribution.
 //
 // PAY_AND_GO vs FIXED_PERIOD: FIXED_PERIOD funds just record + tag the
 // transaction with the current open AllocationPeriod (if any). The period
@@ -214,6 +223,13 @@ async function ingestOne(
     return { matched: false, minted: false };
   }
 
+  // An open-banking card top-up (remittance "cp-<paymentRequestId>") is
+  // already credited 1:1 by its own flow: link it and stop here, before the
+  // member matching — an IBAN match would otherwise tier-mint it a second
+  // time, and a FIXED_PERIOD period close would batch-mint it.
+  const topUp = await ingestTopUpDeposit(fund, payload, existing, behavior);
+  if (topUp) return topUp;
+
   // INCOMING: ingest + try to match. FIXED_PERIOD rows get tagged with their
   // allocation period (created on demand — see resolveAllocationPeriod).
   // PAY_AND_GO funds don't use periods.
@@ -296,6 +312,130 @@ async function ingestOne(
   return { matched: true, minted };
 }
 
+// Returns null when the deposit isn't a top-up of this fund (no "cp-<id>"
+// remittance, or no CardTopUp / CP request behind it) — regular matching then
+// takes over. Otherwise the row is written matched (CARD_TOPUP, no period) and
+// the top-up is tied to it; on the live cron that also mints a top-up still
+// waiting for its credit (the deposit proves the payment). A top-up deposit
+// that can't be taken as is (amount differs, a second deposit for the same
+// request, treasury unverified) is held: stored unmatched with a note, and
+// member matching is skipped — it could tier-mint money the top-up already
+// credited.
+async function ingestTopUpDeposit(
+  fund: IngestionFund,
+  payload: BankTransactionPayload,
+  existing: { id: string } | null,
+  behavior: IngestBehavior,
+): Promise<IngestOneResult | null> {
+  const paymentRequestId = parseTopUpRemittance(
+    payload.remittanceInfo,
+    payload.counterpartReference,
+  );
+  if (paymentRequestId == null) return null;
+
+  // The mint needs the minter / token columns the ingestion subset lacks.
+  const topUpFund = await prisma.fund.findUnique({ where: { id: fund.id } });
+  if (!topUpFund) return null;
+  const live = behavior === "automated";
+  const claim = await claimTopUpDeposit(topUpFund, {
+    paymentRequestId,
+    amount: payload.amount,
+    live,
+    bankTransactionId: existing?.id ?? null,
+  });
+  if (!claim) return null;
+  if (claim.kind === "hold") {
+    await holdTopUpDeposit(fund.id, payload, existing, claim.note);
+    return { matched: false, minted: false };
+  }
+
+  const matched = {
+    memberId: claim.memberId,
+    cardId: claim.cardId,
+    matchedAt: new Date(),
+    matchMethod: "CARD_TOPUP" as const,
+    allocationPeriodId: null,
+  };
+  const bankTransactionId = existing
+    ? (
+        await prisma.bankTransaction.update({
+          where: { id: existing.id },
+          data: matched,
+          select: { id: true },
+        })
+      ).id
+    : (
+        await prisma.bankTransaction.create({
+          data: { ...payloadColumns(fund.id, payload), ...matched },
+          select: { id: true },
+        })
+      ).id;
+
+  const { linked, minted } = await linkTopUpDeposit(
+    topUpFund,
+    claim.topUpId,
+    bankTransactionId,
+    live,
+  );
+  if (!linked) {
+    // Another deposit carrying the same cp-<id> got linked first.
+    await prisma.bankTransaction.update({
+      where: { id: bankTransactionId },
+      data: {
+        memberId: null,
+        cardId: null,
+        matchedAt: null,
+        matchMethod: null,
+        notes: `Card top-up cp-${paymentRequestId} already has a bank deposit; this second one was held for review (not credited, not tier-minted).`,
+      },
+    });
+    return { matched: false, minted: false };
+  }
+  return { matched: true, minted };
+}
+
+// Store a held top-up deposit unmatched (it lands in the review queue) with a
+// note saying why. An admin note already on the row is kept.
+async function holdTopUpDeposit(
+  fundId: string,
+  payload: BankTransactionPayload,
+  existing: { id: string } | null,
+  note: string,
+): Promise<void> {
+  console.warn("[bank-sync] top-up deposit held for review", {
+    fundId,
+    externalId: payload.externalId,
+  });
+  if (existing) {
+    await prisma.bankTransaction.updateMany({
+      where: { id: existing.id, notes: null },
+      data: { notes: note },
+    });
+    return;
+  }
+  await prisma.bankTransaction.create({
+    data: { ...payloadColumns(fundId, payload), notes: note },
+  });
+}
+
+function payloadColumns(fundId: string, payload: BankTransactionPayload) {
+  return {
+    fundId,
+    externalId: payload.externalId,
+    direction: payload.direction,
+    amount: payload.amount,
+    currency: payload.currency,
+    occurredAt: new Date(payload.occurredAt),
+    counterpartName: payload.counterpartName ?? null,
+    counterpartIban: payload.counterpartIban ?? null,
+    counterpartReference: payload.counterpartReference ?? null,
+    remittanceInfo: payload.remittanceInfo ?? null,
+    rawData: payload.rawData
+      ? (payload.rawData as Prisma.InputJsonValue)
+      : undefined,
+  };
+}
+
 async function createBankTransaction(
   fundId: string,
   payload: BankTransactionPayload,
@@ -304,19 +444,7 @@ async function createBankTransaction(
 ): Promise<void> {
   await prisma.bankTransaction.create({
     data: {
-      fundId,
-      externalId: payload.externalId,
-      direction: payload.direction,
-      amount: payload.amount,
-      currency: payload.currency,
-      occurredAt: new Date(payload.occurredAt),
-      counterpartName: payload.counterpartName ?? null,
-      counterpartIban: payload.counterpartIban ?? null,
-      counterpartReference: payload.counterpartReference ?? null,
-      remittanceInfo: payload.remittanceInfo ?? null,
-      rawData: payload.rawData
-        ? (payload.rawData as Prisma.InputJsonValue)
-        : undefined,
+      ...payloadColumns(fundId, payload),
       memberId: match?.memberId ?? null,
       matchedAt: match ? new Date() : null,
       matchMethod: match?.method ?? null,

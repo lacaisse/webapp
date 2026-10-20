@@ -13,6 +13,7 @@ import type {
   BankTransactionsPage,
   CardOperationInput,
   CardOperationResult,
+  CitizenPayBank,
   CitizenPayCardDetail,
   CitizenPayInvite,
   CitizenPayProfile,
@@ -27,6 +28,7 @@ import type {
   ListCardsResult,
   ListPlacesResult,
   OperationStatusResult,
+  PaymentRequestState,
   Payout,
   PayoutBurnClaimed,
   PayoutBurnReport,
@@ -42,6 +44,7 @@ import type {
   SetManualDeductionInput,
   SubmitMintInput,
   SubmittedOperation,
+  TopUpSignUrlInput,
 } from "./types";
 
 export interface CitizenPayClient {
@@ -527,4 +530,32 @@ export interface CitizenPayClient {
    * services/citizenpay/sync-top-up-url.ts. Backed by PATCH /v2/treasury.
    */
   setTreasuryTopUpUrl(url: string | null): Promise<void>;
+
+  /**
+   * CP's public bank directory (Ponto financial institutions) for one
+   * country, in CP's order (most used first). The open-banking top-up page
+   * shows the ones with `paymentsEnabled`. Backed by `GET /v2/banks`.
+   */
+  listBanks(query: { country: string }): Promise<CitizenPayBank[]>;
+
+  /**
+   * The browser URL of CP's treasury sign door for a top-up-only payment
+   * request: CP creates the Ponto request toward the treasury business's bank
+   * account (remittance `cp-<paymentRequestId>`), then redirects to the
+   * payer's bank, which redirects back to `redirectUri` with
+   * `paymentRequestId=<id>` appended. CP does NOT mint for these requests —
+   * the caller credits the card. Backed by
+   * `GET /v2/treasury/{id}/payments/request/sign?topUpAmount=…&accountAddress=…`.
+   */
+  topUpSignUrl(input: TopUpSignUrlInput): string;
+
+  /**
+   * CP's stored state of a treasury payment request. Null when CP doesn't
+   * know the id (404). Backed by
+   * `GET /v2/treasury/{id}/payments/request/{paymentRequestId}`.
+   */
+  getPaymentRequest(
+    treasuryId: string,
+    paymentRequestId: number,
+  ): Promise<PaymentRequestState | null>;
 }

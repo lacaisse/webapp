@@ -3795,7 +3795,61 @@
       "manualBody": "Usa los botones de copia de arriba para copiar cada campo y pegarlo en tu aplicación bancaria. Asegúrate de incluir la referencia de pago.",
       "help": "Si tienes alguna pregunta o problema con tu pago, ponte en contacto con {fundName}."
     },
-    "notConnected": "Los datos bancarios aún no están disponibles. Inténtalo de nuevo más tarde o ponte en contacto con {fundName}."
+    "notConnected": "Los datos bancarios aún no están disponibles. Inténtalo de nuevo más tarde o ponte en contacto con {fundName}.",
+    "topUp": {
+      "title": "Recargar mi tarjeta",
+      "greeting": "Hola {name}, elige un importe y págalo desde tu banco. El mismo importe se añade a tu tarjeta en cuanto se confirma el pago.",
+      "greetingNoName": "Elige un importe y págalo desde tu banco. El mismo importe se añade a tu tarjeta en cuanto se confirma el pago.",
+      "cardLabel": "Tarjeta {serial}",
+      "amount": "Importe",
+      "customAmount": "Otro importe",
+      "customPlaceholder": "Ej. 15,00",
+      "amountHint": "Entre {min} y {max}.",
+      "bank": "Mi banco",
+      "bankHint": "Te redirigiremos a tu banco para confirmar el pago.",
+      "iban": "Mi IBAN",
+      "ibanHint": "{bank} pide el número de la cuenta con la que vas a pagar.",
+      "submit": "Pagar {amount} con mi banco",
+      "submitNoAmount": "Pagar con mi banco",
+      "redirecting": "Redirigiendo a tu banco…",
+      "secure": "Pago iniciado mediante Ponto (Open Banking). {fundName} nunca ve tus credenciales bancarias.",
+      "noBanks": "La lista de bancos no está disponible en este momento. Inténtalo de nuevo más tarde.",
+      "unavailable": "La recarga en línea aún no está disponible. Ponte en contacto con {fundName}.",
+      "cardBlocked": "Esta tarjeta está bloqueada y no se puede recargar. Ponte en contacto con {fundName}.",
+      "errors": {
+        "amountInvalid": "Introduce un importe válido (p. ej. 12,50).",
+        "amountMin": "El importe mínimo es 1 €.",
+        "amountMax": "El importe máximo es 500 €.",
+        "bankRequired": "Elige tu banco.",
+        "ibanInvalid": "Introduce un IBAN válido.",
+        "ibanRequired": "Tu banco pide tu IBAN.",
+        "unavailable": "La recarga no está disponible para esta tarjeta.",
+        "startFailed": "No se ha podido iniciar el pago. Inténtalo de nuevo.",
+        "tooSoon": "Se acaba de iniciar un pago para esta tarjeta. Espera 30 segundos antes de volver a intentarlo.",
+        "tooMany": "Ya hay varios pagos pendientes para esta tarjeta. Termínalos en tu banco o vuelve a intentarlo dentro de una hora."
+      },
+      "return": {
+        "title": "Recarga de mi tarjeta",
+        "amount": "Importe",
+        "pendingTitle": "Pago pendiente de confirmación",
+        "pendingBody": "Estamos esperando la confirmación de tu banco. Suele tardar unos segundos.",
+        "pendingLong": "La confirmación está tardando más de lo habitual. Puedes cerrar esta página: tu tarjeta se recargará automáticamente en cuanto se confirme el pago.",
+        "signedTitle": "Pago recibido, estamos recargando tu tarjeta",
+        "signedBody": "Solo tarda un momento.",
+        "mintedTitle": "Tu tarjeta se ha recargado",
+        "mintedBody": "Se han añadido {amount} a tu tarjeta.",
+        "expiredTitle": "Pago caducado",
+        "expiredBody": "El pago no se confirmó a tiempo. Puedes intentarlo de nuevo.",
+        "cancelledTitle": "Pago no completado",
+        "cancelledBody": "El pago se canceló o no se completó. Puedes intentarlo de nuevo.",
+        "mismatchTitle": "Pago no encontrado",
+        "mismatchBody": "No encontramos este pago. Si se ha cargado en tu cuenta, ponte en contacto con {fundName}.",
+        "checkFailed": "No se puede comprobar el pago ahora mismo. Reintentando…",
+        "retry": "Recargar de nuevo",
+        "verifyingTitle": "Pago recibido, verificando la recarga",
+        "verifyingBody": "La recarga de tu tarjeta está tardando más de lo habitual. Se añadirá automáticamente; si mañana no aparece, ponte en contacto con {fundName}."
+      }
+    }
   },
   "onboardingSteps": {
     "errors": {

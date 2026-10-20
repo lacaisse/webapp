@@ -431,6 +431,7 @@ model Fund {
   tokenAccounts             FundTokenAccount[] // named smart accounts (minter EOA + salt)
   txAnnotations             TransactionAnnotation[] // per-tx labels for on-chain history
   pendingAnnotations        PendingAnnotation[] // userOp hashes awaiting tx-hash resolution
+  cardTopUps                CardTopUp[] // open-banking card top-ups (PAY_AND_GO /pay/<serial>)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -729,6 +730,9 @@ model Member {
   // Transactional emails this member is the recipient of.
   emails Email[]
 
+  // Open-banking card top-ups (PAY_AND_GO /pay/<serial>).
+  cardTopUps CardTopUp[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -826,6 +830,9 @@ model Card {
   // Emails about this card (e.g. the CARD_ASSIGNED "your card is on its way"
   // notification). The notify status on the card detail page reads these.
   emails Email[]
+
+  // Open-banking top-ups the member started for this card (/pay/<serial>).
+  topUps CardTopUp[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1350,6 +1357,10 @@ model BankTransaction {
   // confirmation).
   emails Email[]
 
+  // The open-banking card top-up this deposit settles (remittance
+  // "cp-<paymentRequestId>"), when there is one.
+  cardTopUp CardTopUp?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1373,6 +1384,7 @@ enum BankMatchMethod {
   STRUCTURED_COMMUNICATION // Belgian OGM, base = card number (definite)
   IBAN // counterpart IBAN known for a member (auto)
   MANUAL // admin attributed it in the review queue
+  CARD_TOPUP // remittance "cp-<paymentRequestId>" of a CardTopUp (open-banking top-up; already credited, no tier mint)
 }
 
 // Learned IBAN → member mapping, per fund. Seeded from Member.iban and grown
@@ -1455,6 +1467,9 @@ model TokenOperation {
   // Transactional emails referencing this op (e.g. allocation confirmation).
   emails Email[]
 
+  // Set when this MINT credits an open-banking card top-up (CardTopUp).
+  cardTopUp CardTopUp?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1473,6 +1488,83 @@ enum TokenOperationStatus {
   PENDING // submitted to CP, awaiting confirmation
   CONFIRMED // CP confirmed the on-chain operation
   FAILED // CP rejected or the on-chain tx didn't confirm in time
+}
+
+// =============================================================================
+// Open-banking card top-ups (PAY_AND_GO)
+// =============================================================================
+// A member on /pay/<serial> picks an amount and their bank; we send them to
+// CitizenPay's treasury sign door (GET /v2/treasury/{id}/payments/request/sign
+// with topUpAmount + accountAddress), which creates a Ponto payment request
+// toward the fund's bank account (remittance "cp-<paymentRequestId>") and
+// redirects to the bank. CitizenPay does NOT mint for these top-up-only
+// requests — we do, 1:1, once CP reports the request signed
+// (services/card-topup/settle.ts).
+//
+// Lifecycle: PENDING → SIGNED → MINTED, or PENDING → EXPIRED / CANCELLED.
+// `citizenPayPaymentRequestId` is NULL until the bank redirect brings it back
+// (CP's sign door creates the request and redirects in one GET, so we can't
+// know it up front); bank-sync can also recover it from the deposit.
+// Idempotency: the mint is claimed by setting `tokenOperationId` with a
+// guarded updateMany (status = SIGNED, tokenOperationId IS NULL), so a double
+// poll / poll + cron never mints twice.
+model CardTopUp {
+  id     String @id @default(cuid())
+  fundId String
+  fund   Fund   @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  cardId String
+  card   Card   @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  // The card's holder when the top-up started (attribution on the MINT op).
+  memberId String?
+  member   Member? @relation(fields: [memberId], references: [id], onDelete: SetNull)
+
+  // Snapshot of Card.account at creation — the mint target, and what CP's
+  // payment request must echo back as `account`.
+  account String
+
+  // CitizenPay payment request id (remittance "cp-<id>"). Unique per fund so
+  // one signed request can only ever credit one top-up.
+  citizenPayPaymentRequestId Int?
+
+  amountCents Int
+  status      CardTopUpStatus @default(PENDING)
+
+  // The MINT that credited the card. Set when the mint is claimed (before the
+  // userop is sent); the top-up flips to MINTED once it confirms.
+  tokenOperationId String?         @unique
+  tokenOperation   TokenOperation? @relation(fields: [tokenOperationId], references: [id], onDelete: SetNull)
+
+  // The bank deposit carrying this top-up's remittance, once bank-sync sees it.
+  bankTransactionId String?          @unique
+  bankTransaction   BankTransaction? @relation(fields: [bankTransactionId], references: [id], onDelete: SetNull)
+
+  // Mint bookkeeping. `mintTxHash` / `mintUserOpHash` are written as soon as
+  // the userop is submitted (or its hash is known after a failure), so the
+  // sweep can finish a claimed row even if the TokenOperation update failed.
+  mintTxHash     String?
+  mintUserOpHash String?
+  // Pre-submit failures release the claim with a backoff: the next attempt
+  // waits until `nextMintAttemptAt`, and after MAX_MINT_ATTEMPTS it stops.
+  mintAttempts      Int       @default(0)
+  nextMintAttemptAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([fundId, citizenPayPaymentRequestId])
+  @@index([fundId, status])
+  @@index([cardId])
+  @@index([memberId])
+}
+
+enum CardTopUpStatus {
+  PENDING // sent to the bank, not signed yet (or id not known yet)
+  SIGNED // CP reports the payment request signed; mint due
+  MINTED // the paid amount was minted to the card
+  EXPIRED // CP gave up on the request unsigned
+  CANCELLED // the request was cancelled (at the bank or by CP)
 }
 
 // =============================================================================
