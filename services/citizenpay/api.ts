@@ -466,12 +466,17 @@ export type TreasuryWire = {
   slug?: string;
   symbol?: string;
   decimals?: number;
+  // `chain` is the chains row's chain_prefix ("100" for Gnosis treasuries
+  // registered through Flow 1, "Gnosis" for older rows); `chain_id` is the
+  // numeric EVM chain id CP answers next to it. Prefer chain_id.
   chain?: string;
+  chain_id?: number;
   token_address?: string;
   logo?: string;
   token?: {
     address?: string;
     chain?: string;
+    chain_id?: number;
     decimals?: number;
     name?: string;
     symbol?: string;

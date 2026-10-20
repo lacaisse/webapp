@@ -252,7 +252,6 @@ async function SettingsContent({
             <CardDescription>{t("citizenpay.description")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6 pb-4">
-            <CitizenPayForm fund={fundForForms} />
             <CitizenPayConnect
               status={{
                 treasuryId: fund.citizenPayFundId,
@@ -261,7 +260,9 @@ async function SettingsContent({
                   fund.citizenPayApiKeyUpdatedAt?.toISOString() ?? null,
                 flash: sp.connect ?? null,
               }}
-            />
+            >
+              <CitizenPayForm fund={fundForForms} />
+            </CitizenPayConnect>
           </CardContent>
         </Card>
       )}

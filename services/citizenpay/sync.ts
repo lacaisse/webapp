@@ -83,7 +83,8 @@ export async function fetchTokenInfo(
   return normaliseTreasury(wire);
 }
 
-function normaliseTreasury(wire: TreasuryWire): TokenInfo {
+/** Exported for tests; `fetchTokenInfo` is the caller. */
+export function normaliseTreasury(wire: TreasuryWire): TokenInfo {
   // Prefer nested `token.*` if present, fall back to top-level fields.
   const t = wire.token ?? {};
   const tokenAddress = t.address ?? wire.token_address ?? null;
@@ -96,9 +97,18 @@ function normaliseTreasury(wire: TreasuryWire): TokenInfo {
       ? decimalsRaw
       : null;
 
+  // Chain: CP answers a numeric `chain_id` next to `chain`; take that
+  // first. `chain` itself is the chains row's `chain_prefix` — "100" for
+  // treasuries registered through Flow 1, "Gnosis" for older ones — so the
+  // fallback accepts a numeric string before the name map.
+  const chainIdRaw = t.chain_id ?? wire.chain_id;
   const chainRaw = (t.chain ?? wire.chain ?? "").toString().toLowerCase().trim();
   let tokenChainId: number | null = null;
-  if (chainRaw) {
+  if (typeof chainIdRaw === "number" && Number.isInteger(chainIdRaw) && chainIdRaw > 0) {
+    tokenChainId = chainIdRaw;
+  } else if (/^[1-9][0-9]*$/.test(chainRaw)) {
+    tokenChainId = Number(chainRaw);
+  } else if (chainRaw) {
     const mapped = CHAIN_IDS[chainRaw];
     if (mapped !== undefined) {
       tokenChainId = mapped;

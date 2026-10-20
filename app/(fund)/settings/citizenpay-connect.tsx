@@ -3,7 +3,7 @@
 
 import { CheckCircle2, ExternalLink, KeyRound } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -17,25 +17,35 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
-// CitizenPay API-key handoff UI for the fund settings page. Sits below
-// the treasury_id form (CitizenPayForm).
+// CitizenPay handoff UI for the fund settings page. Wraps the manual
+// treasury_id form (CitizenPayForm, passed as `children`) so the layout
+// order is decided here.
 //
 // Three states:
-//   1. No treasury_id yet → nothing to show; the form above prompts entry.
+//   1. No treasury_id yet → "Register on Citizen Pay" (primary) on top:
+//      /api/citizenpay/register sends the admin to CP's treasury-
+//      registration page (Flow 1), where the token is created and the
+//      first key minted. The manual treasury_id form stays underneath as
+//      the fallback for a treasury that already exists on CP.
 //   2. Treasury set, no API key → "Issue API key via Citizen Pay" link
 //      (non-destructive, no confirm).
 //   3. Treasury + API key → status block + "Rotate API key" gated behind
 //      a confirmation dialog (rotation invalidates the previous key on
 //      CP's side immediately).
 //
-// Both buttons hit /api/citizenpay/connect — the route uses the existing
-// `citizenPayApiKeyId` to decide whether to label the new key "initial"
-// or "rotated" in CP's audit log.
+// The key buttons hit /api/citizenpay/connect — the route uses the
+// existing `citizenPayApiKeyId` to decide whether to label the new key
+// "initial" or "rotated" in CP's audit log. Both routes and the shared
+// callback report back through `?connect=<code>` on this tab.
 
 const SUCCESS_CODE = "ok";
 const KNOWN_USER_ERRORS = new Set([
   "not_configured",
   "not_connected",
+  "already_registered",
+  "registration_pending",
+  "treasury_mismatch",
+  "forbidden",
   "missing_params",
   "no_fund_host",
   "state_not_found",
@@ -55,7 +65,14 @@ export type CitizenPayConnectStatus = {
   flash: string | null;
 };
 
-export function CitizenPayConnect({ status }: { status: CitizenPayConnectStatus }) {
+export function CitizenPayConnect({
+  status,
+  children,
+}: {
+  status: CitizenPayConnectStatus;
+  /** The manual treasury-id form (CitizenPayForm). */
+  children?: ReactNode;
+}) {
   const t = useTranslations("fund.settings.citizenpay");
   const format = useFormatter();
   const hasTreasury = Boolean(status.treasuryId);
@@ -64,6 +81,19 @@ export function CitizenPayConnect({ status }: { status: CitizenPayConnectStatus 
   return (
     <div className="space-y-6">
       <ConnectFlash flash={status.flash} />
+
+      {hasTreasury ? null : <RegisterTreasuryBlock />}
+
+      {children ? (
+        <div className="space-y-3">
+          {hasTreasury ? null : (
+            <div className="text-sm font-medium text-muted-foreground">
+              {t("register.manualFallback")}
+            </div>
+          )}
+          {children}
+        </div>
+      ) : null}
 
       {hasTreasury ? (
         <div className="rounded-lg border bg-muted/30 p-4 space-y-1.5">
@@ -105,6 +135,30 @@ export function CitizenPayConnect({ status }: { status: CitizenPayConnectStatus 
       ) : null}
 
       {hasTreasury && (hasKey ? <RotateKeyButton /> : <IssueKeyButton />)}
+    </div>
+  );
+}
+
+function RegisterTreasuryBlock() {
+  const t = useTranslations("fund.settings.citizenpay");
+  // Plain <a> for the same reason as the key buttons: the route has GET
+  // side effects (mints a state row + 302s to CP) and <Link> would
+  // prefetch it.
+  return (
+    <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+      <div className="space-y-1">
+        <div className="text-sm font-medium">{t("register.title")}</div>
+        <p className="text-sm text-muted-foreground">
+          {t("register.description")}
+        </p>
+      </div>
+      <a
+        href="/api/citizenpay/register"
+        className={buttonVariants({ variant: "default" })}
+      >
+        <ExternalLink className="size-4" />
+        {t("register.cta")}
+      </a>
     </div>
   );
 }
@@ -183,6 +237,31 @@ function ConnectFlash({ flash }: { flash: string | null }) {
     return (
       <Alert variant="destructive">
         <AlertDescription>{t("connect.flash.notConnected")}</AlertDescription>
+      </Alert>
+    );
+  }
+  if (flash === "already_registered") {
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>
+          {t("connect.flash.alreadyRegistered")}
+        </AlertDescription>
+      </Alert>
+    );
+  }
+  if (flash === "registration_pending") {
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>
+          {t("connect.flash.registrationPending")}
+        </AlertDescription>
+      </Alert>
+    );
+  }
+  if (flash === "forbidden") {
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>{t("connect.flash.forbidden")}</AlertDescription>
       </Alert>
     );
   }
