@@ -3772,6 +3772,10 @@
     }
   },
   "cotisation": {
+    "cardNotFound": {
+      "title": "Deze kaart is niet geregistreerd bij dit fonds",
+      "description": "Geen enkele kaart met nummer <code>{serial}</code> hoort bij dit fonds, of ze is nog niet aan een lid toegewezen. Controleer de link of neem contact op met het fonds."
+    },
     "title": "Betaling van de maandelijkse bijdrage",
     "greeting": "Hallo {name}, gelieve uw maandelijkse bijdrage te betalen met behulp van onderstaande gegevens",
     "back": "Terug naar de website",
