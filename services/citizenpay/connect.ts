@@ -73,7 +73,9 @@ export class ConnectError extends Error {
       | "host_mismatch"
       | "pickup_failed"
       | "missing_params"
-      | "not_connected",
+      | "not_connected"
+      | "registration_pending"
+      | "treasury_mismatch",
     message: string,
   ) {
     super(message);
@@ -113,6 +115,11 @@ export async function initiateKeyIssue(args: {
  * stored registration (`name`, `symbol`, `decimals`, `chain`, …) — see
  * `register-prefill.ts`. CP keeps every query param except `redirect_uri`
  * as prefill, so only send what we actually want on the form.
+ *
+ * Refused (`registration_pending`) while an unconsumed, unexpired attempt
+ * exists for the fund: each attempt is a registration CP may still finish,
+ * and two of them landing would mean two treasuries for one fund.
+ * `consumeConnect` is the second line of defence (`treasury_mismatch`).
  */
 export async function initiateTreasuryRegistration(args: {
   fundId: string;
@@ -120,6 +127,12 @@ export async function initiateTreasuryRegistration(args: {
   prefill: RegistrationPrefill;
 }): Promise<{ redirectUrl: string }> {
   const baseUrl = requireBaseUrl();
+  if (await hasPendingAttempt(args.fundId)) {
+    throw new ConnectError(
+      "registration_pending",
+      "A registration started less than 30 minutes ago is still open",
+    );
+  }
   const fundState = await issueFundState(args.fundId, args.returnHost);
 
   const cpUrl = new URL(CP_TREASURY_REGISTER_PATH, baseUrl);
@@ -172,6 +185,27 @@ export async function consumeConnect(args: {
     pickupToken: args.pickupToken,
   });
 
+  const fundRow = await prisma.fund.findUnique({
+    where: { id: row.fundId },
+    select: {
+      citizenPayFundId: true,
+      tokenMinterEoaAddress: true,
+      payoutFeePercentage: true,
+      feeCollectionFrequency: true,
+    },
+  });
+
+  // A pickup for a different treasury than the one already on the fund
+  // (a second registration racing the first, or a key minted for the wrong
+  // treasury) must not re-point the fund. The key CP just minted is lost —
+  // acceptable, the alternative is a fund silently switching treasuries.
+  if (fundRow?.citizenPayFundId && fundRow.citizenPayFundId !== creds.treasury_id) {
+    throw new ConnectError(
+      "treasury_mismatch",
+      `Pickup is for treasury ${creds.treasury_id} but the fund is on ${fundRow.citizenPayFundId}`,
+    );
+  }
+
   // Best-effort: pull the treasury's token info so the Fund.token* cache
   // columns are populated as part of the same write. If CP is unreachable
   // we still persist credentials — a subsequent rotate or background sync
@@ -199,15 +233,6 @@ export async function consumeConnect(args: {
       }
     | null = null;
   if (tokenInfo) {
-    const fundRow = await prisma.fund.findUnique({
-      where: { id: row.fundId },
-      select: {
-        tokenMinterEoaAddress: true,
-        payoutFeePercentage: true,
-        feeCollectionFrequency: true,
-      },
-    });
-
     if (tokenInfo.citizenPayAccountFactoryAddress && fundRow?.tokenMinterEoaAddress) {
       smartAccountAddress = await deriveSmartAccountAddress({
         eoaAddress: fundRow.tokenMinterEoaAddress,
@@ -358,6 +383,15 @@ export function redirectUriFor(returnHost: string, fundState: string): string {
 // =============================================================================
 // Internal
 // =============================================================================
+
+/** An unconsumed, unexpired attempt — a handoff CP may still complete. */
+async function hasPendingAttempt(fundId: string): Promise<boolean> {
+  const pending = await prisma.citizenPayConnectAttempt.findFirst({
+    where: { fundId, consumedAt: null, expiresAt: { gt: new Date() } },
+    select: { state: true },
+  });
+  return pending !== null;
+}
 
 async function issueFundState(fundId: string, returnHost: string): Promise<string> {
   const fundState = randomBytes(32).toString("base64url");

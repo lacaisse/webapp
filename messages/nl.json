@@ -1967,7 +1967,9 @@
             "notConfigured": "Citizen Pay is nog niet geconfigureerd op deze omgeving — vraag de platformbeheerder om CITIZENPAY_API_BASE_URL in te stellen.",
             "notConnected": "Stel hierboven eerst de Citizen Pay treasury-id in voordat u een sleutel uitgeeft.",
             "failed": "Verbinding met Citizen Pay is mislukt. Probeer het opnieuw.",
-            "alreadyRegistered": "Dit fonds heeft al een Citizen Pay-treasury. Geef hieronder een API-sleutel uit of vernieuw ze om een nieuwe sleutel te krijgen."
+            "alreadyRegistered": "Dit fonds heeft al een Citizen Pay-treasury. Geef hieronder een API-sleutel uit of vernieuw ze om een nieuwe sleutel te krijgen.",
+            "registrationPending": "Een Citizen Pay-registratie die minder dan 30 minuten geleden is gestart, is nog open. Rond ze af in het Citizen Pay-tabblad of wacht tot ze verloopt voor u een nieuwe start.",
+            "forbidden": "Deze actie kan alleen vanaf de instellingenpagina van het fonds worden gestart."
           }
         }
       },

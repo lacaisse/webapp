@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { requireFundRole } from "@/services/auth/dal";
 import { initiateKeyIssue, ConnectError } from "@/services/citizenpay/connect";
 import { getCurrentFundDomain, getFundUrl } from "@/services/fund/server";
+import { isCrossSiteRequest } from "@/services/http/sec-fetch-site";
 
 // Mint (or rotate) the fund's CitizenPay API key against an existing
 // treasury. The treasury_id is set manually in settings beforehand; this
@@ -26,6 +27,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(target, { status: 302 });
   };
 
+  // A link on a foreign page must not be able to start a key rotation.
+  if (isCrossSiteRequest(request.headers)) return back("forbidden");
   if (!fund.citizenPayFundId) return back("not_connected");
   if (!host) return back("no_fund_host");
 

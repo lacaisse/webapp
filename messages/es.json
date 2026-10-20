@@ -1967,7 +1967,9 @@
             "notConfigured": "Citizen Pay aún no está configurado en este despliegue: pide al administrador de la plataforma que defina CITIZENPAY_API_BASE_URL.",
             "notConnected": "Define el ID de la tesorería de Citizen Pay arriba antes de emitir una clave.",
             "failed": "La conexión con Citizen Pay falló. Inténtalo de nuevo.",
-            "alreadyRegistered": "Este fondo ya tiene una tesorería en Citizen Pay. Para obtener una clave nueva, emita o renueve la clave API más abajo."
+            "alreadyRegistered": "Este fondo ya tiene una tesorería en Citizen Pay. Para obtener una clave nueva, emita o renueve la clave API más abajo.",
+            "registrationPending": "Un registro en Citizen Pay iniciado hace menos de 30 minutos sigue abierto. Termínelo en la pestaña de Citizen Pay o espere a que caduque antes de iniciar otro.",
+            "forbidden": "Esta acción solo puede iniciarse desde la página de configuración del fondo."
           }
         }
       },

@@ -1967,7 +1967,9 @@
             "notConfigured": "Citizen Pay isn't configured on this deployment yet — ask the platform admin to set CITIZENPAY_API_BASE_URL.",
             "notConnected": "Set the Citizen Pay treasury ID above before issuing a key.",
             "failed": "Citizen Pay connection failed. Please try again.",
-            "alreadyRegistered": "This fund already has a Citizen Pay treasury. To get a new key, issue or rotate the API key below."
+            "alreadyRegistered": "This fund already has a Citizen Pay treasury. To get a new key, issue or rotate the API key below.",
+            "registrationPending": "A Citizen Pay registration started less than 30 minutes ago is still open. Finish it in the Citizen Pay tab, or wait for it to expire before starting another.",
+            "forbidden": "This action can only be started from the fund's own settings page."
           }
         }
       },

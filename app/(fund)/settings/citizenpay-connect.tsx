@@ -43,6 +43,9 @@ const KNOWN_USER_ERRORS = new Set([
   "not_configured",
   "not_connected",
   "already_registered",
+  "registration_pending",
+  "treasury_mismatch",
+  "forbidden",
   "missing_params",
   "no_fund_host",
   "state_not_found",
@@ -243,6 +246,22 @@ function ConnectFlash({ flash }: { flash: string | null }) {
         <AlertDescription>
           {t("connect.flash.alreadyRegistered")}
         </AlertDescription>
+      </Alert>
+    );
+  }
+  if (flash === "registration_pending") {
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>
+          {t("connect.flash.registrationPending")}
+        </AlertDescription>
+      </Alert>
+    );
+  }
+  if (flash === "forbidden") {
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>{t("connect.flash.forbidden")}</AlertDescription>
       </Alert>
     );
   }

@@ -1967,7 +1967,9 @@
             "notConfigured": "Citizen Pay n'est pas configuré sur ce déploiement — demandez à l'administrateur de la plateforme de définir CITIZENPAY_API_BASE_URL.",
             "notConnected": "Renseignez l'identifiant de trésorerie Citizen Pay ci-dessus avant d'émettre une clé.",
             "failed": "La connexion à Citizen Pay a échoué. Veuillez réessayer.",
-            "alreadyRegistered": "Cette caisse a déjà une trésorerie Citizen Pay. Pour obtenir une nouvelle clé, émettez ou renouvelez la clé API ci-dessous."
+            "alreadyRegistered": "Cette caisse a déjà une trésorerie Citizen Pay. Pour obtenir une nouvelle clé, émettez ou renouvelez la clé API ci-dessous.",
+            "registrationPending": "Un enregistrement Citizen Pay commencé il y a moins de 30 minutes est encore en cours. Terminez-le dans l'onglet Citizen Pay, ou attendez son expiration avant d'en lancer un autre.",
+            "forbidden": "Cette action ne peut être lancée que depuis la page des paramètres de la caisse."
           }
         }
       },

@@ -25,12 +25,32 @@ export type RegistrationPrefill = {
   name: string;
   /** Token symbol; omitted from the query when the fund hasn't set one. */
   symbol?: string | null;
+  /** Label for the first API key, shown in CP's audit log. */
+  keyName?: string | null;
 };
+
+// CP's token deploy route requires ^[A-Z0-9]{2,8}$.
+const SYMBOL_MAX = 8;
+const SYMBOL_MIN = 2;
+
+/**
+ * Coerce a fund's free-text symbol into what CP's deploy route accepts:
+ * upper-case, A-Z0-9 only, at most 8 characters. Null when fewer than 2
+ * characters survive — better to leave CP's field empty than to pre-fill
+ * something the admin can't submit.
+ */
+export function normaliseSymbol(raw: string | null | undefined): string | null {
+  const cleaned = (raw ?? "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, SYMBOL_MAX);
+  return cleaned.length >= SYMBOL_MIN ? cleaned : null;
+}
 
 /**
  * The prefill query params for Flow 1, as `key → value`. Empty / blank
- * name and symbol are left out so CP's form shows its own placeholder
- * instead of a whitespace value.
+ * name, symbol and key name are left out so CP's form shows its own
+ * placeholder instead of a whitespace value.
  */
 export function buildRegistrationPrefill(
   prefill: RegistrationPrefill,
@@ -40,9 +60,11 @@ export function buildRegistrationPrefill(
   const out: Record<string, string> = {};
   const name = prefill.name.trim();
   if (name) out.name = name;
-  const symbol = prefill.symbol?.trim();
+  const symbol = normaliseSymbol(prefill.symbol);
   if (symbol) out.symbol = symbol;
   out.decimals = String(REGISTER_TOKEN_DECIMALS);
   out.chain = chainPrefix;
+  const keyName = prefill.keyName?.trim();
+  if (keyName) out.key_name = keyName;
   return out;
 }
