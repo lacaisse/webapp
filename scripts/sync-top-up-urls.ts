@@ -13,18 +13,24 @@
 //   NODE_ENV=production APP_DOMAIN=lacaisse.eu \
 //   DATABASE_URL='<prod-pooled>' APP_CRED_KEY=<hex> \
 //   CITIZENPAY_API_BASE_URL=<cp-base-url> \
-//     npx tsx scripts/sync-top-up-urls.ts            # dry run: prints the URLs
-//     npx tsx scripts/sync-top-up-urls.ts --apply    # writes them
+//     npx tsx scripts/sync-top-up-urls.ts            # dry run: prints the plan
+//     npx tsx scripts/sync-top-up-urls.ts --apply    # writes it
 //
 // Dry run is the default. `--apply` refuses to write anything unless every
 // computed URL is https (forgetting NODE_ENV/APP_DOMAIN would otherwise push
-// `http://…:3000` or `*.localhost` links to real treasuries). Logic lives in
-// scripts/lib/top-up-url-sync.ts.
+// `http://…:3000` or `*.localhost` links to real treasuries).
+//
+// DISABLED funds compute "no link", but the run only clears a link La Caisse
+// published itself (the fund's own /pay/{serial}): it reads the treasury's
+// current `top_up_url` first and leaves anything else — e.g. Brussels Pay's
+// CP checkout — in place, printed as "(leave: CP-managed URL)". The dry run
+// does that read too when APP_CRED_KEY + CITIZENPAY_API_BASE_URL are set.
+// Logic lives in scripts/lib/top-up-url-sync.ts.
 //
 // The service layer (client factory, api.ts, crypto/secret.ts, db/prisma.ts)
 // is `server-only` and won't load outside Next.js, so — like the other
 // scripts — this builds its own PrismaClient and inlines the decrypt + the
-// PATCH. Only the pure URL rule is shared with the app.
+// GET / PATCH. Only the pure URL rules are shared with the app.
 
 import "dotenv/config";
 import { createDecipheriv } from "node:crypto";
@@ -74,6 +80,32 @@ function decryptSecret(envelope: string): string {
   return Buffer.concat([decipher.update(ct), decipher.final()]).toString("utf8");
 }
 
+const CAN_CALL_CP =
+  Boolean(CITIZENPAY_API_BASE_URL) &&
+  Boolean(APP_CRED_KEY && /^[0-9a-fA-F]{64}$/.test(APP_CRED_KEY));
+
+function cpHeaders(apiKeyId: string, apiKey: string): Record<string, string> {
+  return {
+    "x-api-key-id": apiKeyId,
+    "x-api-key": apiKey,
+    "content-type": "application/json",
+    accept: "application/json",
+  };
+}
+
+// Mirrors services/citizenpay/live-client.ts::getTreasuryTopUpUrl.
+async function readTopUpUrl(apiKeyId: string, apiKey: string): Promise<string | null> {
+  const res = await fetch(new URL("/v2/treasury", CITIZENPAY_API_BASE_URL), {
+    headers: cpHeaders(apiKeyId, apiKey),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  }
+  const wire = (await res.json()) as { top_up_url?: string | null; topUpUrl?: string | null };
+  return wire.top_up_url ?? wire.topUpUrl ?? null;
+}
+
 // Mirrors services/citizenpay/api.ts::treasury.setTopUpUrl.
 async function setTopUpUrl(
   apiKeyId: string,
@@ -82,12 +114,7 @@ async function setTopUpUrl(
 ): Promise<void> {
   const res = await fetch(new URL("/v2/treasury", CITIZENPAY_API_BASE_URL), {
     method: "PATCH",
-    headers: {
-      "x-api-key-id": apiKeyId,
-      "x-api-key": apiKey,
-      "content-type": "application/json",
-      accept: "application/json",
-    },
+    headers: cpHeaders(apiKeyId, apiKey),
     body: JSON.stringify({ topUpUrl }),
     signal: AbortSignal.timeout(15_000),
   });
@@ -123,6 +150,13 @@ async function main() {
         decryptSecret(fund.citizenPayApiKeyEnc!),
         url,
       ),
+    read: CAN_CALL_CP
+      ? (fund) =>
+          readTopUpUrl(
+            fund.citizenPayApiKeyId!,
+            decryptSecret(fund.citizenPayApiKeyEnc!),
+          )
+      : undefined,
   });
 }
 

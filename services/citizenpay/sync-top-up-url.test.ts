@@ -12,13 +12,29 @@ vi.mock("next/server", () => ({
 
 import { encryptSecret } from "@/services/crypto/secret";
 
-import { getMockTreasuryTopUpUrl } from "./client";
+import { getCitizenPayClient, getMockTreasuryTopUpUrl } from "./client";
 import {
   scheduleTreasuryTopUpUrlSync,
   syncTreasuryTopUpUrl,
 } from "./sync-top-up-url";
 
 const KEY = "11".repeat(32);
+const OWN = "https://laclass.lacaisse.eu/pay/{serial}";
+// Brussels Pay's treasury points the wallet at CP's own checkout.
+const CP_CHECKOUT = "https://checkout.citizenpay.xyz/topup";
+const seed = (fund: { id: string }, url: string | null) =>
+  getCitizenPayClient({ ...fund, citizenPayApiKeyId: null, citizenPayApiKeyEnc: null })
+    .setTreasuryTopUpUrl(url);
+type FetchCall = [string, RequestInit];
+const liveTreasury = (topUpUrl: string | null) => {
+  const fetchMock = vi.fn(async (_input: string, init?: RequestInit) =>
+    init?.method === "PATCH"
+      ? new Response("{}", { status: 200 })
+      : Response.json({ slug: "bxl", top_up_url: topUpUrl }),
+  );
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+};
 let n = 0;
 const connected = (allocationMode: "PAY_AND_GO" | "FIXED_PERIOD" | "DISABLED") => ({
   id: `fund-${++n}`,
@@ -51,13 +67,50 @@ describe("syncTreasuryTopUpUrl", () => {
     expect(getMockTreasuryTopUpUrl(fund.id)).toBe(url);
   });
 
-  it.each(["DISABLED"] as const)("clears it for %s", async (mode) => {
-    const fund = connected(mode);
+  it("sets the cotisation link for a FIXED_PERIOD fund, over whatever was there", async () => {
+    const fund = connected("FIXED_PERIOD");
+    await seed(fund, CP_CHECKOUT);
+    await expect(syncTreasuryTopUpUrl(fund)).resolves.toEqual({ status: "synced", url: OWN });
+    expect(getMockTreasuryTopUpUrl(fund.id)).toBe(OWN);
+  });
+
+  it("clears a DISABLED fund's own stale /pay/{serial} link", async () => {
+    const fund = connected("DISABLED");
+    await seed(fund, OWN);
     await expect(syncTreasuryTopUpUrl(fund)).resolves.toEqual({
       status: "synced",
       url: null,
     });
     expect(getMockTreasuryTopUpUrl(fund.id)).toBeNull();
+  });
+
+  it("leaves a CP-managed URL on a DISABLED fund's treasury alone", async () => {
+    const fund = connected("DISABLED");
+    await seed(fund, CP_CHECKOUT);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await expect(syncTreasuryTopUpUrl(fund)).resolves.toEqual({
+      status: "skipped",
+      reason: "foreign_url",
+    });
+    expect(getMockTreasuryTopUpUrl(fund.id)).toBe(CP_CHECKOUT);
+    expect(warn).toHaveBeenCalledOnce();
+  });
+
+  it("leaves another fund's link alone too", async () => {
+    const fund = connected("DISABLED");
+    await seed(fund, "https://other.lacaisse.eu/pay/{serial}");
+    await expect(syncTreasuryTopUpUrl(fund)).resolves.toMatchObject({
+      reason: "foreign_url",
+    });
+  });
+
+  it("does nothing for a DISABLED fund whose treasury has no link", async () => {
+    const fund = connected("DISABLED");
+    await expect(syncTreasuryTopUpUrl(fund)).resolves.toEqual({
+      status: "skipped",
+      reason: "already_clear",
+    });
+    expect(getMockTreasuryTopUpUrl(fund.id)).toBeUndefined();
   });
 
   it("skips a fund that isn't connected to CitizenPay", async () => {
@@ -71,10 +124,11 @@ describe("syncTreasuryTopUpUrl", () => {
 
   it("sends PATCH /v2/treasury { topUpUrl } on the live client", async () => {
     vi.stubEnv("CITIZENPAY_API_BASE_URL", "https://cp.test");
-    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
-    vi.stubGlobal("fetch", fetchMock);
+    const fetchMock = liveTreasury(CP_CHECKOUT);
     await syncTreasuryTopUpUrl(connected("PAY_AND_GO"));
-    const [input, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    // Publishing a link doesn't read first — only a clear does.
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const [input, init] = fetchMock.mock.calls[0] as unknown as FetchCall;
     expect(new URL(input).pathname).toBe("/v2/treasury");
     expect(init.method).toBe("PATCH");
     expect(JSON.parse(String(init.body))).toEqual({
@@ -108,14 +162,42 @@ describe("syncTreasuryTopUpUrl", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("still clears (null) on the live API whatever the environment", async () => {
+  it("live: reads GET /v2/treasury top_up_url, then clears our own link (any environment)", async () => {
     vi.stubEnv("CITIZENPAY_API_BASE_URL", "https://cp.test");
     vi.stubEnv("NODE_ENV", "development");
-    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
-    vi.stubGlobal("fetch", fetchMock);
+    const fetchMock = liveTreasury(OWN);
     await expect(syncTreasuryTopUpUrl(connected("DISABLED"))).resolves.toEqual({
       status: "synced",
       url: null,
+    });
+    const calls = fetchMock.mock.calls as unknown as FetchCall[];
+    expect(calls.map(([u, i]) => [new URL(u).pathname, i?.method])).toEqual([
+      ["/v2/treasury", "GET"],
+      ["/v2/treasury", "PATCH"],
+    ]);
+    expect(JSON.parse(String(calls[1][1].body))).toEqual({ topUpUrl: null });
+  });
+
+  it("live: never PATCHes over a CP-managed URL (Brussels Pay)", async () => {
+    vi.stubEnv("CITIZENPAY_API_BASE_URL", "https://cp.test");
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fetchMock = liveTreasury(CP_CHECKOUT);
+    const bxl = { ...connected("DISABLED"), domain: "paybrussels.lacaisse.eu" };
+    await expect(syncTreasuryTopUpUrl(bxl)).resolves.toEqual({
+      status: "skipped",
+      reason: "foreign_url",
+    });
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect((fetchMock.mock.calls[0] as unknown as FetchCall)[1].method).toBe("GET");
+  });
+
+  it("live: clears nothing when the read fails", async () => {
+    vi.stubEnv("CITIZENPAY_API_BASE_URL", "https://cp.test");
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fetchMock = vi.fn(async () => new Response('{"error":"down"}', { status: 503 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(syncTreasuryTopUpUrl(connected("DISABLED"))).resolves.toMatchObject({
+      status: "failed",
     });
     expect(fetchMock).toHaveBeenCalledOnce();
   });

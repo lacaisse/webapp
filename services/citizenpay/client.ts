@@ -888,6 +888,11 @@ class MockCitizenPayClient implements CitizenPayClient {
     mockTreasuryTopUpUrls.set(this.fundId, url);
   }
 
+  async getTreasuryTopUpUrl(): Promise<string | null> {
+    this.log("getTreasuryTopUpUrl", { fundId: this.fundId });
+    return mockTreasuryTopUpUrls.get(this.fundId) ?? null;
+  }
+
   async listBanks(query: { country: string }): Promise<CitizenPayBank[]> {
     this.log("listBanks", query);
     return MOCK_BANKS.filter((b) => b.country === query.country);

@@ -6,7 +6,7 @@ import { after } from "next/server";
 import type { AllocationMode } from "@/services/db/generated/enums";
 
 import { getCitizenPayClient, type FundCredentials } from "./client";
-import { isPublishableTopUpUrl, topUpUrlFor } from "./top-up-url";
+import { isOwnTopUpUrl, isPublishableTopUpUrl, topUpUrlFor } from "./top-up-url";
 
 export type TopUpUrlFund = FundCredentials & {
   domain: string;
@@ -14,7 +14,10 @@ export type TopUpUrlFund = FundCredentials & {
 };
 
 export type TopUpUrlSyncResult =
-  | { status: "skipped"; reason: "not_connected" | "insecure_url" }
+  | {
+      status: "skipped";
+      reason: "not_connected" | "insecure_url" | "already_clear" | "foreign_url";
+    }
   | { status: "synced"; url: string | null }
   | { status: "failed"; url: string | null; error: unknown };
 
@@ -22,8 +25,13 @@ let warnedInsecure = false;
 
 /**
  * Push the fund's top-up URL (see top-up-url.ts) to its CitizenPay treasury:
- * the contribution link for PAY_AND_GO and FIXED_PERIOD, null (clears the wallet's "Add funds"
- * button) otherwise. No-op for a fund that isn't connected to CP yet.
+ * the contribution link for PAY_AND_GO and FIXED_PERIOD. No-op for a fund
+ * that isn't connected to CP yet.
+ *
+ * DISABLED funds compute null, but "clear" only ever removes a link La Caisse
+ * published itself: the treasury's current value is read first and anything
+ * else — a CP-managed URL such as CP's own checkout — is left in place
+ * (`foreign_url`, logged). If that read fails, nothing is cleared.
  *
  * Environment guard: against the live API, a URL that isn't https (a dev
  * server — `http://acme.localhost:3000/…` — pointed at a real CP) is never
@@ -54,7 +62,20 @@ export async function syncTreasuryTopUpUrl(
     return { status: "skipped", reason: "insecure_url" };
   }
   try {
-    await getCitizenPayClient(fund).setTreasuryTopUpUrl(url);
+    const client = getCitizenPayClient(fund);
+    if (url === null) {
+      const current = await client.getTreasuryTopUpUrl();
+      if (current === null) return { status: "skipped", reason: "already_clear" };
+      if (!isOwnTopUpUrl(fund, current)) {
+        console.warn(
+          "[citizenpay] leaving a top-up URL La Caisse didn't publish",
+          fund.id,
+          current,
+        );
+        return { status: "skipped", reason: "foreign_url" };
+      }
+    }
+    await client.setTreasuryTopUpUrl(url);
     return { status: "synced", url };
   } catch (error) {
     console.warn("[citizenpay] setTreasuryTopUpUrl failed", fund.id, error);
