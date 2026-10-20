@@ -202,6 +202,14 @@ export interface CitizenPayClient {
   ): Promise<void>;
 
   /**
+   * Publish the holder's display name for a card (shown on the public card
+   * wallet). `null` resets it to CitizenPay's default `Card <serial>`.
+   * Throws `CitizenPayApiError` on a non-2xx (404 when the serial doesn't
+   * resolve) — callers treat this as best-effort.
+   */
+  setCardHolderName(serialNumber: string, name: string | null): Promise<void>;
+
+  /**
    * Read a card's configured source serial (null when none / card unknown).
    * Narrow read for the card detail page — unlike `getCitizenPayCard` it
    * doesn't trigger the balance side-call.

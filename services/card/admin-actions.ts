@@ -7,6 +7,8 @@ import { parseUnits } from "viem";
 import { z } from "zod";
 
 import { requireFundRole } from "@/services/auth/dal";
+import { holderDisplayName } from "@/services/card/holder-name";
+import { publishCardHolderName } from "@/services/card/publish-holder-name";
 import { getCitizenPayClient } from "@/services/citizenpay/client";
 import { Prisma } from "@/services/db/generated/client";
 import type { CardStatus } from "@/services/db/generated/enums";
@@ -513,11 +515,7 @@ export async function pushOneCardAction(input: {
       serialNumber: card.serialNumber,
       fundId: fund.id,
       fundCitizenPayId: fund.citizenPayFundId,
-      holderName:
-        card.holderName ||
-        (card.member
-          ? `${card.member.firstName} ${card.member.lastName}`.trim()
-          : undefined),
+      holderName: holderDisplayName(card.member, card.holderName) ?? undefined,
     });
     if (registered.account && !card.account) {
       try {
@@ -531,6 +529,8 @@ export async function pushOneCardAction(input: {
         console.error("[card.sync] account backfill collision", card, e);
       }
     }
+    // registerCard doesn't carry the name — publish it separately.
+    await publishCardHolderName(fund, card.id);
     return { ok: true };
   } catch (e) {
     console.error("[card.sync] push failed", card.serialNumber, e);
@@ -966,6 +966,9 @@ export async function unassignCardAction(input: {
       data: { primaryCardId: null },
     }),
   ]);
+
+  // Reset the public wallet name to CP's default — the card is no longer held.
+  await publishCardHolderName(fund, card.id);
 
   revalidatePath("/cards");
   revalidatePath(`/cards/${card.id}`);

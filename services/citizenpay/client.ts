@@ -215,6 +215,13 @@ class MockCitizenPayClient implements CitizenPayClient {
     else mockCardSources.set(serialNumber, sourceSerial);
   }
 
+  async setCardHolderName(
+    serialNumber: string,
+    name: string | null,
+  ): Promise<void> {
+    this.log("setCardHolderName", { serialNumber, name });
+  }
+
   async getCardSource(serialNumber: string): Promise<string | null> {
     this.log("getCardSource", { serialNumber });
     return mockCardSources.get(serialNumber) ?? null;

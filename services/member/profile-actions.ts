@@ -5,6 +5,7 @@ import { getTranslations } from "next-intl/server";
 import { revalidatePath } from "next/cache";
 
 import { requireFundRole } from "@/services/auth/dal";
+import { publishMemberCardHolderNames } from "@/services/card/publish-holder-name";
 import { prisma } from "@/services/db/prisma";
 
 import { contributionApplies, isBelowTierMinimum } from "./contribution";
@@ -56,7 +57,12 @@ export async function updateMemberProfileAction(
 
   const member = await prisma.member.findFirst({
     where: { id: memberId, fundId: fund.id },
-    select: { id: true, tier: { select: { minContribution: true } } },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      tier: { select: { minContribution: true } },
+    },
   });
   if (!member) return { error: t("members.admin.errors.notFound" as never) };
 
@@ -114,6 +120,22 @@ export async function updateMemberProfileAction(
       };
     }
     throw e;
+  }
+
+  // Rename: cards stamp the holder's name at assignment (`Card.holderName`),
+  // so carry the new name onto the cards that still hold the old one — a
+  // dependant's card under its own name is left alone — then publish the
+  // member's cards to CitizenPay's public wallet (best-effort).
+  const oldName = `${member.firstName} ${member.lastName}`.trim();
+  const newName = `${parsed.data.firstName} ${parsed.data.lastName}`.trim();
+  if (newName !== oldName) {
+    if (oldName && newName) {
+      await prisma.card.updateMany({
+        where: { fundId: fund.id, memberId: member.id, holderName: oldName },
+        data: { holderName: newName },
+      });
+    }
+    await publishMemberCardHolderNames(fund, member.id);
   }
 
   revalidatePath("/members");

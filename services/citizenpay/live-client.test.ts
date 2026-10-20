@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 vi.mock("@/services/db/prisma", () => ({ prisma: {} }));
 
-import { payouts } from "./api";
+import { cards, payouts } from "./api";
 import { burnClaimFromWire, LiveCitizenPayClient } from "./live-client";
 
 const creds = { baseUrl: "https://cp.test", apiKeyId: "0xkey", apiKey: "secret" };
@@ -113,5 +113,24 @@ describe("burnClaimFromWire", () => {
     ).toEqual({ claimId: null, claimedAt: "2026-10-05T09:30:00Z", source: "external" });
     expect(burnClaimFromWire(null)).toBeNull();
     expect(burnClaimFromWire(undefined)).toBeNull();
+  });
+});
+
+describe("cards.setHolderName (PUT …/profile)", () => {
+  it.each([["Jane Doe"], [null]])("sends { name: %j }", async (name) => {
+    reply = { status: 200, body: { account: "0xabc", name: name ?? "Card S/1" } };
+    const res = await cards.setHolderName(creds, "S/1", name);
+    const { url, method, body } = calls[0];
+    expect(method).toBe("PUT");
+    expect(url.pathname).toBe("/v2/treasury/cards/S%2F1/profile");
+    expect(body).toEqual({ name });
+    expect(res.account).toBe("0xabc");
+  });
+
+  it("surfaces a 404 as CitizenPayApiError", async () => {
+    reply = { status: 404, body: { error: "card not found" } };
+    await expect(
+      new LiveCitizenPayClient(creds).setCardHolderName("S1", "Jane"),
+    ).rejects.toMatchObject({ status: 404 });
   });
 });

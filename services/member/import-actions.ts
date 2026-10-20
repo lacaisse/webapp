@@ -5,6 +5,7 @@ import { getTranslations } from "next-intl/server";
 import { revalidatePath } from "next/cache";
 
 import { requireFundRole } from "@/services/auth/dal";
+import { publishCardHolderNames } from "@/services/card/publish-holder-name";
 import { normalizeSerial } from "@/services/card/serial";
 import { parseCsv } from "@/services/csv/parse";
 import type { Prisma } from "@/services/db/generated/client";
@@ -135,6 +136,8 @@ export async function importMembersAction(input: {
   let created = 0;
   let updated = 0;
   let cardsLinked = 0;
+  // Published to CitizenPay after the loop (best-effort, see below).
+  const linkedCardIds: string[] = [];
   const skipped: { row: number; reason: string }[] = [];
   // Serials / card numbers that didn't link: no existing card, or the card
   // belongs to another member. Reported, never provisioned.
@@ -322,6 +325,7 @@ export async function importMembersAction(input: {
         if (card && (card.memberId === null || card.memberId === memberId)) {
           await linkCardToMember(card.id, memberId, { firstName, lastName }, status);
           cardsLinked++;
+          linkedCardIds.push(card.id);
           rowCardHandled = true;
         } else if (card) {
           serialsNotFound.push(serial); // attached to another member
@@ -343,6 +347,7 @@ export async function importMembersAction(input: {
         if (card && (card.memberId === null || card.memberId === memberId)) {
           await linkCardToMember(card.id, memberId, { firstName, lastName }, status);
           cardsLinked++;
+          linkedCardIds.push(card.id);
         } else {
           // No such card, or taken by another member — report, never create.
           cardNumbersNotFound.push(String(cardNumber));
@@ -353,6 +358,10 @@ export async function importMembersAction(input: {
       skipped.push({ row: rowNum, reason: t("skip.error") });
     }
   }
+
+  // Show each newly linked holder's name on their card's public wallet.
+  // Best-effort and after the loop, so a slow CP never stalls the import rows.
+  await publishCardHolderNames(fund, linkedCardIds);
 
   revalidatePath("/members");
   return {
