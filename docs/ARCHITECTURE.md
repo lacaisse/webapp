@@ -291,7 +291,7 @@ a CitizenPay **place** so it can accept the token and receive payouts. See
 Two entry points, one callback. A fund with no treasury yet uses
 `/api/citizenpay/register` ("Register on Citizen Pay" in settings): it redirects
 to CP's treasury-registration page with the fund's token name/symbol, 6
-decimals and the Gnosis chain pre-filled; CP creates the treasury (and lets the
+decimals and the Gnosis chain (prefix `100`) pre-filled; CP creates the treasury (and lets the
 admin deploy the token in place) and mints the first API key. A fund whose
 treasury already exists on CP pastes the `citizenPayFundId` into settings
 instead, then `/api/citizenpay/connect` redirects to CP to mint (or rotate) an

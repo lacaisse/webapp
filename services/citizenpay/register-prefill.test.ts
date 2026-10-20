@@ -7,15 +7,16 @@ import {
 } from "./register-prefill";
 
 describe("buildRegistrationPrefill", () => {
-  it("sends name, symbol, 6 decimals and the Gnosis chain prefix", () => {
+  it("sends name, symbol, 6 decimals and Gnosis' chain_prefix \"100\"", () => {
     expect(
       buildRegistrationPrefill({ name: "Caisse Locale", symbol: "CLASS" }),
     ).toEqual({
       name: "Caisse Locale",
       symbol: "CLASS",
       decimals: "6",
-      chain: DEFAULT_REGISTER_CHAIN_PREFIX,
+      chain: "100",
     });
+    expect(DEFAULT_REGISTER_CHAIN_PREFIX).toBe("100");
   });
 
   it("omits a missing or blank symbol and trims the name", () => {

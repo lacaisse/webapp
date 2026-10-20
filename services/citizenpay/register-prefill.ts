@@ -9,13 +9,15 @@
 // `slug`, `fee_percentage`, `logo`, `color`, `key_name` back out of it.
 // We send only the four we know: the token name/symbol the fund admin
 // already typed in La Caisse, 6 decimals (the only setup services/token/*
-// mints and burns on), and the Gnosis chain.
+// mints and burns on), and the Gnosis chain prefix.
 
-// `chain` is CP's `chain_prefix` for the chains row. The dashboard snaps an
-// unknown prefix back to its first configured chain, so a wrong value
-// degrades to "the admin picks the chain" rather than an error. Overridable
-// per deployment for a staging api whose chains table is keyed differently.
-export const DEFAULT_REGISTER_CHAIN_PREFIX = "Gnosis";
+// `chain` is CP's `chain_prefix` for the chains row — in production the
+// Gnosis row (chain_id 100, chain_name "Gnosis") has chain_prefix "100".
+// This must match exactly: the dashboard snaps an unknown prefix back to its
+// FIRST configured chain, which is the virtual "Citizen Pay" chain, so a
+// wrong value silently selects the wrong chain. Overridable per deployment
+// for an api whose chains table is keyed differently.
+export const DEFAULT_REGISTER_CHAIN_PREFIX = "100";
 export const REGISTER_TOKEN_DECIMALS = 6;
 
 export type RegistrationPrefill = {
