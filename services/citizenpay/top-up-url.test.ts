@@ -25,7 +25,14 @@ describe("topUpUrlFor", () => {
     ).toBe("https://funds.acme.com/pay/{serial}");
   });
 
-  it.each(["FIXED_PERIOD", "DISABLED"] as const)("returns null for %s", (mode) => {
+  it("links FIXED_PERIOD funds to the same page (their cotisation page)", () => {
+    prod();
+    expect(
+      topUpUrlFor({ domain: "laclass.lacaisse.eu", allocationMode: "FIXED_PERIOD" }),
+    ).toBe("https://laclass.lacaisse.eu/pay/{serial}");
+  });
+
+  it.each(["DISABLED"] as const)("returns null for %s", (mode) => {
     prod();
     expect(
       topUpUrlFor({ domain: "laclass.lacaisse.eu", allocationMode: mode }),

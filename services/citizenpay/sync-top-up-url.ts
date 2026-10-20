@@ -22,7 +22,7 @@ let warnedInsecure = false;
 
 /**
  * Push the fund's top-up URL (see top-up-url.ts) to its CitizenPay treasury:
- * the contribution link for PAY_AND_GO, null (clears the wallet's "Add funds"
+ * the contribution link for PAY_AND_GO and FIXED_PERIOD, null (clears the wallet's "Add funds"
  * button) otherwise. No-op for a fund that isn't connected to CP yet.
  *
  * Environment guard: against the live API, a URL that isn't https (a dev
