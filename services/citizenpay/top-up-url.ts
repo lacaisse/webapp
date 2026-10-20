@@ -23,3 +23,13 @@ export function topUpUrlFor(fund: {
   if (fund.allocationMode !== "PAY_AND_GO") return null;
   return `${getFundUrl(fund.domain)}/pay/${TOP_UP_SERIAL_PLACEHOLDER}`;
 }
+
+/**
+ * Whether a top-up URL may be sent to a real CitizenPay treasury: null (clear)
+ * always may; a link only when it's https. A dev host
+ * (`http://acme.localhost:3000/…`) or a prod domain built without
+ * NODE_ENV=production (`http://acme.lacaisse.eu:3000/…`) may not.
+ */
+export function isPublishableTopUpUrl(url: string | null): boolean {
+  return url === null || url.startsWith("https://");
+}

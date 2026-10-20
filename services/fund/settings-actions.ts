@@ -7,7 +7,7 @@ import { z } from "zod";
 
 import { requireFundRole } from "@/services/auth/dal";
 import { getCitizenPayClient } from "@/services/citizenpay/client";
-import { syncTreasuryTopUpUrl } from "@/services/citizenpay/sync-top-up-url";
+import { scheduleTreasuryTopUpUrlSync } from "@/services/citizenpay/sync-top-up-url";
 import { prisma } from "@/services/db/prisma";
 import { isSupportedLocale } from "@/services/i18n/config";
 
@@ -133,9 +133,9 @@ export async function updateGeneralSettingsAction(
   });
   // allocationMode decides whether the public card wallet shows an "Add
   // funds" button (PAY_AND_GO → the fund's /pay/{serial} page). Pushed on
-  // every save so re-saving also repairs a treasury that drifted; best-effort,
-  // never fails the save.
-  await syncTreasuryTopUpUrl(updated);
+  // every save so re-saving also repairs a treasury that drifted; runs after
+  // the response and never fails the save.
+  scheduleTreasuryTopUpUrlSync(updated);
   revalidatePath("/settings");
   return { ok: true };
 }
