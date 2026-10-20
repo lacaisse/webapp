@@ -1941,6 +1941,12 @@
         "description": "Connectez cette caisse à son compte Citizen Pay.",
         "account": "Identifiant Citizen Pay",
         "accountHint": "Identifiant de votre caisse sur Citizen Pay. Laissez vide pour déconnecter.",
+        "register": {
+          "title": "Enregistrer cette caisse sur Citizen Pay",
+          "description": "Votre trésorerie et son jeton sont créés sur la page Citizen Pay qu'ouvre ce bouton. Le nom et le symbole du jeton (onglet Jeton) sont pré-remplis ; la première clé API est émise à la fin et vous revenez directement ici.",
+          "cta": "S'enregistrer sur Citizen Pay",
+          "manualFallback": "Ou connecter une trésorerie Citizen Pay existante"
+        },
         "connect": {
           "issueKey": "Émettre la clé API via Citizen Pay",
           "rotateKey": "Renouveler la clé API",
@@ -1960,7 +1966,8 @@
             "ok": "Connexion à Citizen Pay mise à jour.",
             "notConfigured": "Citizen Pay n'est pas configuré sur ce déploiement — demandez à l'administrateur de la plateforme de définir CITIZENPAY_API_BASE_URL.",
             "notConnected": "Renseignez l'identifiant de trésorerie Citizen Pay ci-dessus avant d'émettre une clé.",
-            "failed": "La connexion à Citizen Pay a échoué. Veuillez réessayer."
+            "failed": "La connexion à Citizen Pay a échoué. Veuillez réessayer.",
+            "alreadyRegistered": "Cette caisse a déjà une trésorerie Citizen Pay. Pour obtenir une nouvelle clé, émettez ou renouvelez la clé API ci-dessous."
           }
         }
       },

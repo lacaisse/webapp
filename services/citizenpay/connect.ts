@@ -9,23 +9,36 @@ import { prisma } from "@/services/db/prisma";
 import { getFundUrl } from "@/services/fund/server";
 import { deriveSmartAccountAddress } from "@/services/token/smart-account";
 
+import {
+  buildRegistrationPrefill,
+  type RegistrationPrefill,
+} from "./register-prefill";
 import { fetchTokenInfo } from "./sync";
 
-// CitizenPay API-key handoff (Flow 2 in CP's spec: "Mint a new key for an
-// existing treasury"). We don't drive treasury *registration* from this
-// app — admins paste a pre-existing `citizenPayFundId` in settings, then
-// trigger this flow to mint (or rotate) the API key that pairs with it.
+// CitizenPay treasury handoffs. Two entry points, one callback:
 //
-// Flow:
-//   1. /api/citizenpay/connect mints a fund-state row, redirects to
-//      CP's /v2/treasury/keys/register with `treasury_id` + a
+//   Flow 1 — "Register a treasury" (`initiateTreasuryRegistration`): the
+//   fund has no `citizenPayFundId` yet. We send the admin to CP's
+//   /v2/treasury/register with the fund's name/symbol pre-filled; CP's
+//   dashboard creates the treasury (and, for Gnosis, lets the admin deploy
+//   the token right there), mints the first API key, and redirects back.
+//
+//   Flow 2 — "Mint a new key for an existing treasury" (`initiateKeyIssue`):
+//   the fund already carries a `citizenPayFundId` (either from Flow 1 or
+//   pasted by hand in settings); we send the admin to
+//   /v2/treasury/keys/register to mint (or rotate) the API key.
+//
+// Shared mechanics:
+//   1. The route mints a fund-state row and redirects to CP with a
 //      `redirect_uri` carrying our fund state in the path segment.
 //   2. CP confirms with the user + mints the key, then redirects back to
 //      /api/citizenpay/callback/<fundState>?state=<cpState>&pickup=<token>&treasury_id=<uuid>.
 //   3. The callback validates the fund state against
 //      CitizenPayConnectAttempt, POSTs CP's pickup endpoint exactly once
 //      to receive {api_key, api_key_id, treasury_id}, encrypts the key,
-//      and writes all three columns to the Fund.
+//      and writes all three columns to the Fund. Both flows deliver the
+//      same pickup shape, so the callback doesn't know (or care) which
+//      one it is finishing.
 //
 // CSRF: CP generates its own opaque `state`; we cannot trust it on its
 // own. So we mint a *fund state* (random, single-use, 30-min TTL) and
@@ -39,6 +52,7 @@ import { fetchTokenInfo } from "./sync";
 // `*.lacaisse.eu` registered for prod fund subdomains and `localhost` for
 // dev. Without it, step 1 fails before the user reaches CP.
 
+const CP_TREASURY_REGISTER_PATH = "/v2/treasury/register";
 const CP_KEYS_REGISTER_PATH = "/v2/treasury/keys/register";
 const CP_PICKUP_PATH = "/v2/treasury/register/pickup";
 
@@ -87,6 +101,34 @@ export async function initiateKeyIssue(args: {
   cpUrl.searchParams.set("treasury_id", args.treasuryId);
   cpUrl.searchParams.set("redirect_uri", redirectUriFor(args.returnHost, fundState));
   if (args.keyName) cpUrl.searchParams.set("key_name", args.keyName);
+  return { redirectUrl: cpUrl.toString() };
+}
+
+/**
+ * Mint a fund state, persist it, return the CP URL the browser should be
+ * redirected to to *register a new treasury* (Flow 1). Only meaningful
+ * while the fund has no `citizenPayFundId` — the route enforces that.
+ *
+ * Prefill keys are the ones CP's register page reads back out of the
+ * stored registration (`name`, `symbol`, `decimals`, `chain`, …) — see
+ * `register-prefill.ts`. CP keeps every query param except `redirect_uri`
+ * as prefill, so only send what we actually want on the form.
+ */
+export async function initiateTreasuryRegistration(args: {
+  fundId: string;
+  returnHost: string;
+  prefill: RegistrationPrefill;
+}): Promise<{ redirectUrl: string }> {
+  const baseUrl = requireBaseUrl();
+  const fundState = await issueFundState(args.fundId, args.returnHost);
+
+  const cpUrl = new URL(CP_TREASURY_REGISTER_PATH, baseUrl);
+  cpUrl.searchParams.set("redirect_uri", redirectUriFor(args.returnHost, fundState));
+  for (const [key, value] of Object.entries(
+    buildRegistrationPrefill(args.prefill),
+  )) {
+    cpUrl.searchParams.set(key, value);
+  }
   return { redirectUrl: cpUrl.toString() };
 }
 

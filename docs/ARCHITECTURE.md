@@ -136,7 +136,7 @@ app/
                       /verify-email, citizenpay invite landing
   api/
     auth/[...all]/    Better Auth handler
-    citizenpay/       connect, callback/[fundState], invite-callback
+    citizenpay/       register, connect, callback/[fundState], invite-callback
     cron/             5 Vercel cron handlers (see §7)
   auth/               cross-host exchange + logout route handlers
   _landing/ _policy/  marketing + legal page fragments
@@ -288,12 +288,18 @@ a CitizenPay **place** so it can accept the token and receive payouts. See
 [TREASURY_BUSINESS_INVITE.md](./TREASURY_BUSINESS_INVITE.md).
 
 ### Connecting a fund to CitizenPay
-The treasury is created out-of-band on CitizenPay's side. An admin pastes the
-`citizenPayFundId` into settings, then `/api/citizenpay/connect` redirects to CP
-to mint an API key. CP redirects back to
-`/api/citizenpay/callback/[fundState]`, which stores the (encrypted) key and
-fetches token metadata. The fund-state path segment is the CSRF guard. Details &
-rationale in [AGENTS.md → CitizenPay API-key handoff](../AGENTS.md) and
+Two entry points, one callback. A fund with no treasury yet uses
+`/api/citizenpay/register` ("Register on Citizen Pay" in settings): it redirects
+to CP's treasury-registration page with the fund's token name/symbol, 6
+decimals and the Gnosis chain pre-filled; CP creates the treasury (and lets the
+admin deploy the token in place) and mints the first API key. A fund whose
+treasury already exists on CP pastes the `citizenPayFundId` into settings
+instead, then `/api/citizenpay/connect` redirects to CP to mint (or rotate) an
+API key. Either way CP redirects back to
+`/api/citizenpay/callback/[fundState]`, which stores the treasury id and the
+(encrypted) key and fetches token metadata. The fund-state path segment is the
+CSRF guard. Details & rationale in
+[AGENTS.md → CitizenPay treasury handoff](../AGENTS.md) and
 [TREASURY_DASHBOARD_CONNECTIONS.md](./TREASURY_DASHBOARD_CONNECTIONS.md).
 
 ---
