@@ -510,6 +510,9 @@ export type TreasuryWire = {
 // the conversion.
 export type FeeCollectionFrequencyWire = "per_payment" | "monthly";
 
+// Budget for the best-effort top-up URL sync (treasury.setTopUpUrl).
+export const TOP_UP_URL_TIMEOUT_MS = 3_000;
+
 export const treasury = {
   get(creds: CitizenPayApiCredentials): Promise<TreasuryWire> {
     return request(creds, "GET", "/v2/treasury");
@@ -528,6 +531,21 @@ export const treasury = {
   ): Promise<{ success: boolean }> {
     return request(creds, "PATCH", "/v2/treasury", {
       body: { feePercentageBps, feeCollectionFrequency },
+    });
+  },
+  // Set (or clear, with null) the treasury's top-up URL — the link behind the
+  // public card wallet's "Add funds" button (tap.citizenpay.eu). The literal
+  // `{serial}` placeholder is expanded by the wallet with the card's serial,
+  // e.g. "https://acme.lacaisse.eu/pay/{serial}". Same PATCH as updateFee;
+  // CP echoes the treasury (incl. `topUpUrl`), which we don't need. Short
+  // timeout: it's a best-effort convenience sync and must not hold a request.
+  setTopUpUrl(
+    creds: CitizenPayApiCredentials,
+    topUpUrl: string | null,
+  ): Promise<unknown> {
+    return request(creds, "PATCH", "/v2/treasury", {
+      body: { topUpUrl },
+      timeoutMs: TOP_UP_URL_TIMEOUT_MS,
     });
   },
 };

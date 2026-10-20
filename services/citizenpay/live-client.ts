@@ -1038,6 +1038,10 @@ export class LiveCitizenPayClient implements CitizenPayClient {
       FEE_FREQUENCY_WIRE[config.collectionFrequency],
     );
   }
+
+  async setTreasuryTopUpUrl(url: string | null): Promise<void> {
+    await apiTreasury.setTopUpUrl(this.creds, url);
+  }
 }
 
 function wireToProfile(wire: {

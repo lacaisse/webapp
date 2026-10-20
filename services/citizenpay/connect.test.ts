@@ -21,6 +21,8 @@ vi.mock("@/services/token/smart-account", () => ({
   deriveSmartAccountAddress: vi.fn(async () => null),
 }));
 vi.mock("./sync", () => ({ fetchTokenInfo: vi.fn(async () => null) }));
+const schedule = vi.hoisted(() => vi.fn());
+vi.mock("./sync-top-up-url", () => ({ scheduleTreasuryTopUpUrlSync: schedule }));
 
 import {
   ConnectError,
@@ -40,6 +42,7 @@ beforeEach(() => {
     if (typeof table === "object") for (const fn of Object.values(table)) fn.mockReset();
   }
   prisma.$transaction.mockResolvedValue([]);
+  schedule.mockReset();
   prisma.citizenPayConnectAttempt.create.mockImplementation(async ({ data }) => data);
 });
 
@@ -145,5 +148,61 @@ describe("consumeConnect — treasury mismatch", () => {
     pickup("t-2");
     await expect(call()).resolves.toEqual({ treasuryId: "t-2", apiKeyId: "0xkey" });
     expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+  });
+});
+
+// Top-up URL wiring: once the credentials transaction commits, the fund row
+// it returned is handed to the deferred top-up sync — no extra read after the
+// commit that could fail a connect that already succeeded. Flow 1 and Flow 2
+// both finish in consumeConnect, so both publish the link.
+describe("consumeConnect — top-up URL", () => {
+  const attempt = {
+    state: "fs",
+    fundId: "f1",
+    returnHost: "laclass.lacaisse.eu",
+    consumedAt: null,
+    expiresAt: new Date(T0.getTime() + 60_000),
+  };
+  const connectedFund = {
+    id: "f1",
+    domain: "laclass.lacaisse.eu",
+    allocationMode: "PAY_AND_GO",
+    citizenPayApiKeyId: "0xkey",
+    citizenPayApiKeyEnc: "enc:secret",
+  };
+  const call = () =>
+    consumeConnect({
+      fundState: "fs",
+      cpState: "cs",
+      pickupToken: "pt",
+      callbackHost: "laclass.lacaisse.eu",
+    });
+
+  beforeEach(() => {
+    prisma.citizenPayConnectAttempt.findUnique.mockResolvedValue(attempt);
+    prisma.$transaction.mockResolvedValue([connectedFund, {}] as never);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({ api_key: "secret", api_key_id: "0xkey", treasury_id: "t-1" }),
+      ),
+    );
+  });
+
+  it.each([
+    ["Flow 1 (no treasury on the fund yet)", null],
+    ["Flow 2 (key for the fund's treasury)", "t-1"],
+  ])("schedules the sync with the committed row — %s", async (_flow, citizenPayFundId) => {
+    prisma.fund.findUnique.mockResolvedValue({ citizenPayFundId });
+    await expect(call()).resolves.toEqual({ treasuryId: "t-1", apiKeyId: "0xkey" });
+    expect(schedule).toHaveBeenCalledExactlyOnceWith(connectedFund);
+    // Only the pre-transaction read (treasury check + fee/minter fields).
+    expect(prisma.fund.findUnique).toHaveBeenCalledOnce();
+  });
+
+  it("doesn't schedule anything when the connect is refused", async () => {
+    prisma.fund.findUnique.mockResolvedValue({ citizenPayFundId: "t-other" });
+    await expect(code(call())).resolves.toBe("treasury_mismatch");
+    expect(schedule).not.toHaveBeenCalled();
   });
 });
