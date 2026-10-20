@@ -25,6 +25,10 @@ CREATE TABLE "CardTopUp" (
     "status" "CardTopUpStatus" NOT NULL DEFAULT 'PENDING',
     "tokenOperationId" TEXT,
     "bankTransactionId" TEXT,
+    "mintTxHash" TEXT,
+    "mintUserOpHash" TEXT,
+    "mintAttempts" INTEGER NOT NULL DEFAULT 0,
+    "nextMintAttemptAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 

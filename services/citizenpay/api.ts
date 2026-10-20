@@ -367,6 +367,9 @@ export type PaymentRequestStatus = {
   success: boolean;
   paymentRequestId: number;
   status: "pending" | "signed" | "expired" | "cancelled";
+  // The treasury the request belongs to. Added by CP api#224 (which also
+  // 404s a request read under another treasury's path); absent before it.
+  treasuryId?: string | null;
   signed: boolean;
   expired: boolean;
   amount: number;

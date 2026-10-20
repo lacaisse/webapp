@@ -9,13 +9,21 @@ export type TopUpRef = { amountCents: number; account: string };
 /**
  * Does CP's payment request describe THIS top-up? The id reaches us through
  * the browser (the bank redirect), so it is a claim to verify, not proof: the
- * request must be a top-up-only one (no order) for exactly this amount and
- * this card's account.
+ * request must belong to this fund's treasury (the money went to its bank
+ * account), be a top-up-only one (no order), for exactly this amount and this
+ * card's account.
+ *
+ * A response without `treasuryId` is a mismatch: until CP api#224 ships it
+ * (and 404s another treasury's request), a request signed on another
+ * treasury with our card's account and amount would otherwise pass. So
+ * nothing is minted from CP's status alone before api#224 is live.
  */
 export function paymentRequestMatches(
   topUp: TopUpRef,
   pr: PaymentRequestState,
+  treasuryId: string | null,
 ): boolean {
+  if (!treasuryId || pr.treasuryId !== treasuryId) return false;
   if (pr.orderId != null) return false;
   if (pr.amountCents !== topUp.amountCents) return false;
   if (!pr.account) return false;

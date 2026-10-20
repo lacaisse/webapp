@@ -3824,7 +3824,9 @@
         "ibanInvalid": "Enter a valid IBAN.",
         "ibanRequired": "Your bank asks for your IBAN.",
         "unavailable": "Top-up isn't available for this card.",
-        "startFailed": "Couldn't start the payment. Please try again."
+        "startFailed": "Couldn't start the payment. Please try again.",
+        "tooSoon": "A payment was just started for this card. Wait 30 seconds before trying again.",
+        "tooMany": "Several payments are already waiting for this card. Finish them at your bank or try again in an hour."
       },
       "return": {
         "title": "Topping up my card",
@@ -3843,7 +3845,9 @@
         "mismatchTitle": "Payment not found",
         "mismatchBody": "We can't find this payment. If your account was debited, please contact {fundName}.",
         "checkFailed": "Couldn't check the payment right now. Retrying…",
-        "retry": "Top up again"
+        "retry": "Top up again",
+        "verifyingTitle": "Payment received, credit being verified",
+        "verifyingBody": "Crediting your card is taking longer than usual. It will be added automatically; if it doesn't show up by tomorrow, contact {fundName}."
       }
     }
   },

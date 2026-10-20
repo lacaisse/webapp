@@ -1094,6 +1094,7 @@ export class LiveCitizenPayClient implements CitizenPayClient {
       );
       return {
         paymentRequestId: w.paymentRequestId,
+        treasuryId: w.treasuryId ?? null,
         status: w.status,
         amountCents: w.amount,
         account: w.account ?? null,

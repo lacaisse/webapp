@@ -3824,7 +3824,9 @@
         "ibanInvalid": "Saisissez un IBAN valide.",
         "ibanRequired": "Votre banque demande votre IBAN.",
         "unavailable": "Le rechargement n'est pas disponible pour cette carte.",
-        "startFailed": "Impossible de lancer le paiement. Veuillez réessayer."
+        "startFailed": "Impossible de lancer le paiement. Veuillez réessayer.",
+        "tooSoon": "Un paiement vient d'être lancé pour cette carte. Patientez 30 secondes avant de réessayer.",
+        "tooMany": "Plusieurs paiements sont déjà en attente pour cette carte. Terminez-les à votre banque ou réessayez dans une heure."
       },
       "return": {
         "title": "Rechargement de ma carte",
@@ -3843,7 +3845,9 @@
         "mismatchTitle": "Paiement introuvable",
         "mismatchBody": "Nous ne retrouvons pas ce paiement. Si votre compte a été débité, veuillez contacter {fundName}.",
         "checkFailed": "Impossible de vérifier le paiement pour le moment. Nouvelle tentative…",
-        "retry": "Recharger à nouveau"
+        "retry": "Recharger à nouveau",
+        "verifyingTitle": "Paiement reçu, crédit en cours de vérification",
+        "verifyingBody": "Le crédit de votre carte prend plus de temps que prévu. Il sera ajouté automatiquement ; s'il n'apparaît pas d'ici demain, contactez {fundName}."
       }
     }
   },

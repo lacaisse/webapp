@@ -3824,7 +3824,9 @@
         "ibanInvalid": "Geef een geldige IBAN in.",
         "ibanRequired": "Je bank vraagt je IBAN.",
         "unavailable": "Opwaarderen is niet beschikbaar voor deze kaart.",
-        "startFailed": "De betaling kon niet gestart worden. Probeer het opnieuw."
+        "startFailed": "De betaling kon niet gestart worden. Probeer het opnieuw.",
+        "tooSoon": "Er werd net een betaling gestart voor deze kaart. Wacht 30 seconden voor je het opnieuw probeert.",
+        "tooMany": "Er wachten al meerdere betalingen voor deze kaart. Rond ze af bij je bank of probeer het over een uur opnieuw."
       },
       "return": {
         "title": "Mijn kaart opwaarderen",
@@ -3843,7 +3845,9 @@
         "mismatchTitle": "Betaling niet gevonden",
         "mismatchBody": "We vinden deze betaling niet terug. Als je rekening gedebiteerd werd, neem dan contact op met {fundName}.",
         "checkFailed": "De betaling kan nu niet gecontroleerd worden. Nieuwe poging…",
-        "retry": "Opnieuw opwaarderen"
+        "retry": "Opnieuw opwaarderen",
+        "verifyingTitle": "Betaling ontvangen, opwaardering wordt nagekeken",
+        "verifyingBody": "Het opwaarderen van je kaart duurt langer dan verwacht. Het bedrag wordt automatisch toegevoegd; zie je het morgen nog niet, neem dan contact op met {fundName}."
       }
     }
   },

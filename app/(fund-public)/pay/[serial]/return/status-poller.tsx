@@ -102,11 +102,20 @@ export function TopUpStatusPoller({
           body: t("mintedBody", { amount }),
         };
       case "signed":
-        return {
-          icon: <Loader2 className="size-10 animate-spin text-primary" />,
-          title: t("signedTitle"),
-          body: t("signedBody"),
-        };
+        // Paid but not credited after the polling window: stop spinning and
+        // say the credit is being verified (the cron sweep finishes it, or
+        // an operator does) and who to contact.
+        return gaveUp
+          ? {
+              icon: <Clock className="size-10 text-muted-foreground" />,
+              title: t("verifyingTitle"),
+              body: t("verifyingBody", { fundName }),
+            }
+          : {
+              icon: <Loader2 className="size-10 animate-spin text-primary" />,
+              title: t("signedTitle"),
+              body: t("signedBody"),
+            };
       case "expired":
         return {
           icon: <Clock className="size-10 text-muted-foreground" />,

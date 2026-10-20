@@ -20,6 +20,10 @@ const db = vi.hoisted(() => ({
 
 function matches(row: Row, where: Record<string, unknown> = {}): boolean {
   for (const [key, cond] of Object.entries(where)) {
+    if (key === "OR") {
+      if (!(cond as Record<string, unknown>[]).some((c) => matches(row, c))) return false;
+      continue;
+    }
     if (key.includes("_")) {
       // compound unique, e.g. fundId_citizenPayPaymentRequestId
       if (!matches(row, cond as Record<string, unknown>)) return false;
@@ -37,6 +41,7 @@ function matches(row: Row, where: Record<string, unknown> = {}): boolean {
         } else if (value !== eq) return false;
       }
       if ("lt" in c && !((value as Date) < (c.lt as Date))) return false;
+      if ("lte" in c && !(value != null && (value as Date) <= (c.lte as Date))) return false;
       if ("gt" in c && !((value as Date) > (c.gt as Date))) return false;
       continue;
     }
@@ -133,12 +138,20 @@ vi.mock("@/services/citizenpay/client", () => ({
 const userop = vi.hoisted(() => ({
   mintToken: vi.fn(),
   failedBeforeSubmit: vi.fn(),
+  attemptedUserOpHash: vi.fn(),
 }));
 vi.mock("@/services/token/userop", () => ({
-  ...userop,
+  mintToken: userop.mintToken,
+  failedBeforeSubmit: userop.failedBeforeSubmit,
   UserOpError: class UserOpError extends Error {
-    code = "submit_failed";
+    constructor(
+      public code: string = "submit_failed",
+      message = "userop failed",
+    ) {
+      super(message);
+    }
   },
+  attemptedUserOpHash: userop.attemptedUserOpHash,
 }));
 
 const resolveOrEnqueueAnnotation = vi.hoisted(() => vi.fn());
@@ -151,10 +164,14 @@ vi.mock("@/services/transaction-annotation/annotate", () => ({
 
 import { Prisma } from "@/services/db/generated/client";
 
+import { UserOpError } from "@/services/token/userop";
+
 import {
   attachPaymentRequest,
   claimTopUpDeposit,
   linkTopUpDeposit,
+  MAX_MINT_ATTEMPTS,
+  mintCardTopUp,
   settleCardTopUp,
   sweepCardTopUps,
   type TopUpFund,
@@ -191,6 +208,10 @@ function seedTopUp(over: Partial<Row> = {}): Row {
     status: "PENDING",
     tokenOperationId: null,
     bankTransactionId: null,
+    mintTxHash: null,
+    mintUserOpHash: null,
+    mintAttempts: 0,
+    nextMintAttemptAt: null,
     createdAt: new Date(Date.now() - 5 * 60 * 1000),
     updatedAt: new Date(),
     ...over,
@@ -202,6 +223,7 @@ function seedTopUp(over: Partial<Row> = {}): Row {
 function cpRequest(over: Partial<PaymentRequestState> = {}): PaymentRequestState {
   return {
     paymentRequestId: 501,
+    treasuryId: "treasury-1",
     status: "signed",
     amountCents: 1250,
     account: ACCOUNT.toLowerCase(),
@@ -250,6 +272,7 @@ beforeEach(() => {
   cp.getPaymentRequest.mockResolvedValue(cpRequest());
   userop.mintToken.mockResolvedValue({ txHash: TX, userOpHash: "0xuserop" });
   userop.failedBeforeSubmit.mockReturnValue(false);
+  userop.attemptedUserOpHash.mockReturnValue(null);
 });
 
 describe("settleCardTopUp", () => {
@@ -344,16 +367,46 @@ describe("settleCardTopUp", () => {
     expect(userop.mintToken).not.toHaveBeenCalled();
   });
 
-  it("releases the claim when the mint failed before submit, so a retry mints", async () => {
+  it("releases the claim when the mint failed before submit, and retries after a backoff", async () => {
     const row = seedTopUp();
+    const now = new Date();
     userop.mintToken.mockRejectedValueOnce(new Error("sponsor refused"));
     userop.failedBeforeSubmit.mockReturnValueOnce(true);
-    expect(await settleCardTopUp(fund, row.id)).toBe("signed");
-    expect(db.cardTopUp[0]).toMatchObject({ status: "SIGNED", tokenOperationId: null });
+    expect(await settleCardTopUp(fund, row.id, now)).toBe("signed");
+    expect(db.cardTopUp[0]).toMatchObject({ status: "SIGNED", tokenOperationId: null, mintAttempts: 1 });
     expect(db.tokenOperation[0]).toMatchObject({ status: "FAILED" });
+    expect((db.cardTopUp[0].nextMintAttemptAt as Date).getTime()).toBe(now.getTime() + 60_000);
 
-    expect(await settleCardTopUp(fund, row.id)).toBe("minted");
+    // The next poll, 3 s later, waits out the backoff: no new op.
+    expect(await settleCardTopUp(fund, row.id, new Date(now.getTime() + 3_000))).toBe("signed");
+    expect(db.tokenOperation).toHaveLength(1);
+
+    expect(await settleCardTopUp(fund, row.id, new Date(now.getTime() + 61_000))).toBe("minted");
     expect(userop.mintToken).toHaveBeenCalledTimes(2);
+  });
+
+  it("treats a config-class UserOpError as pre-submit (PRE_SUBMIT_CODES)", async () => {
+    const row = seedTopUp();
+    userop.mintToken.mockRejectedValueOnce(new UserOpError("fund_not_provisioned" as never, "no 4337 stack"));
+    expect(await settleCardTopUp(fund, row.id)).toBe("signed");
+    expect(userop.failedBeforeSubmit).toHaveBeenCalled();
+    expect(db.cardTopUp[0]).toMatchObject({ tokenOperationId: null, mintAttempts: 1 });
+    expect(db.tokenOperation[0].errorMessage).toContain("fund_not_provisioned");
+  });
+
+  it("stops retrying after MAX_MINT_ATTEMPTS and the sweep flags it", async () => {
+    seedTopUp({ status: "SIGNED", mintAttempts: MAX_MINT_ATTEMPTS });
+    const stats = await sweepCardTopUps(fund);
+    expect(userop.mintToken).not.toHaveBeenCalled();
+    expect(stats).toMatchObject({ checked: 1, stuck: 1, minted: 0 });
+  });
+
+  it("only claims a SIGNED row (the claim's status clause)", async () => {
+    const row = seedTopUp({ status: "PENDING" });
+    const res = await mintCardTopUp(fund, { ...row, status: "SIGNED" } as never);
+    expect(res).toBe("already_claimed");
+    expect(userop.mintToken).not.toHaveBeenCalled();
+    expect(db.tokenOperation).toHaveLength(0); // the op rolled back
   });
 
   it("doesn't claim a mint on a fund that can't mint, and mints once it can", async () => {
@@ -365,13 +418,50 @@ describe("settleCardTopUp", () => {
     expect(await settleCardTopUp(fund, row.id)).toBe("minted");
   });
 
-  it("keeps the claim when the mint may be on chain (no automatic retry)", async () => {
+  it("keeps the claim when the mint may be on chain, and records the attempted userop", async () => {
     const row = seedTopUp();
     userop.mintToken.mockRejectedValueOnce(new Error("poll timed out"));
+    userop.attemptedUserOpHash.mockReturnValueOnce("0xattempted");
     expect(await settleCardTopUp(fund, row.id)).toBe("signed");
-    expect(db.cardTopUp[0].tokenOperationId).toBe(db.tokenOperation[0].id);
+    expect(db.cardTopUp[0]).toMatchObject({
+      tokenOperationId: db.tokenOperation[0].id,
+      mintUserOpHash: "0xattempted",
+    });
+    expect(db.tokenOperation[0]).toMatchObject({ status: "FAILED" });
+    expect(db.tokenOperation[0].errorMessage).toContain("[userOp 0xattempted]");
 
     expect(await settleCardTopUp(fund, row.id)).toBe("signed");
+    expect(userop.mintToken).toHaveBeenCalledTimes(1);
+  });
+
+  it("never fails a submitted mint on bookkeeping errors; the sweep repairs the op", async () => {
+    const row = seedTopUp();
+    const ops = prisma.tokenOperation as { update: ReturnType<typeof vi.fn> };
+    ops.update.mockRejectedValueOnce(new Error("db blip"));
+    resolveOrEnqueueAnnotation.mockRejectedValueOnce(new Error("bundler down"));
+    expect(await settleCardTopUp(fund, row.id)).toBe("minted");
+    expect(db.cardTopUp[0]).toMatchObject({ status: "MINTED", mintTxHash: TX });
+    expect(db.tokenOperation[0]).toMatchObject({ status: "PENDING" }); // not FAILED
+
+    await sweepCardTopUps(fund);
+    expect(db.tokenOperation[0]).toMatchObject({ status: "CONFIRMED", txHash: TX });
+    expect(userop.mintToken).toHaveBeenCalledTimes(1);
+  });
+
+  it("finishes a claimed row whose MINTED write failed, without minting again", async () => {
+    const row = seedTopUp();
+    const topUps = prisma.cardTopUp as { updateMany: ReturnType<typeof vi.fn> };
+    const real = topUps.updateMany.getMockImplementation() as (args: unknown) => Promise<unknown>;
+    topUps.updateMany.mockImplementation(async (args: { data: Record<string, unknown> }) => {
+      if (args.data.status === "MINTED" && args.data.mintTxHash) throw new Error("db blip");
+      return real(args);
+    });
+    expect(await settleCardTopUp(fund, row.id)).toBe("signed");
+    expect(db.tokenOperation[0]).toMatchObject({ status: "CONFIRMED", txHash: TX });
+    topUps.updateMany.mockImplementation(real);
+
+    expect(await settleCardTopUp(fund, row.id)).toBe("minted");
+    expect(db.cardTopUp[0]).toMatchObject({ status: "MINTED", mintTxHash: TX });
     expect(userop.mintToken).toHaveBeenCalledTimes(1);
   });
 });
@@ -391,6 +481,19 @@ describe("attachPaymentRequest", () => {
     cp.getPaymentRequest.mockResolvedValueOnce(null);
     expect(await attachPaymentRequest(fund, row.id, 999)).toBe("unknown");
     expect(db.cardTopUp[0].citizenPayPaymentRequestId).toBeNull();
+  });
+
+  it.each([
+    ["another treasury's request", "treasury-other"],
+    ["a response without treasuryId (before CP api#224)", null],
+  ])("rejects %s", async (_label, treasuryId) => {
+    cp.getPaymentRequest.mockResolvedValue(cpRequest({ treasuryId }));
+    const row = seedTopUp({ citizenPayPaymentRequestId: null });
+    expect(await attachPaymentRequest(fund, row.id, 501)).toBe("mismatch");
+    // …and a row that somehow has the id never mints on it either.
+    const withId = seedTopUp({ citizenPayPaymentRequestId: 777 });
+    expect(await settleCardTopUp(fund, withId.id)).toBe("pending");
+    expect(userop.mintToken).not.toHaveBeenCalled();
   });
 
   it("won't let a second top-up claim an id another one owns", async () => {
@@ -417,33 +520,81 @@ describe("sweepCardTopUps", () => {
     expect(db.cardTopUp.find((r) => r.id === "fresh")?.status).toBe("PENDING");
     expect(db.cardTopUp.find((r) => r.id === "orphan")?.status).toBe("EXPIRED");
   });
+
+  it("ages out old PENDING rows but never SIGNED ones (max-age exemption)", async () => {
+    const now = new Date();
+    const old = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
+    seedTopUp({ id: "old-pending", createdAt: old, updatedAt: old });
+    seedTopUp({ id: "old-signed", status: "SIGNED", createdAt: old, updatedAt: old });
+    const stats = await sweepCardTopUps(fund, now);
+    expect(cp.getPaymentRequest).not.toHaveBeenCalled(); // old PENDING not re-asked
+    expect(stats.minted).toBe(1);
+    expect(db.cardTopUp.find((r) => r.id === "old-signed")?.status).toBe("MINTED");
+    expect(db.cardTopUp.find((r) => r.id === "old-pending")?.status).toBe("PENDING");
+  });
+
+  it("flags minted top-ups whose deposit never showed up", async () => {
+    const now = new Date();
+    const sixDays = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000);
+    seedTopUp({ status: "MINTED", createdAt: sixDays, bankTransactionId: null });
+    seedTopUp({ status: "MINTED", createdAt: sixDays, bankTransactionId: "btx-ok" });
+    seedTopUp({ status: "MINTED", createdAt: new Date(now.getTime() - 60 * 60 * 1000) });
+    expect((await sweepCardTopUps(fund, now)).unreconciled).toBe(1);
+  });
 });
 
 describe("bank-sync: claimTopUpDeposit + linkTopUpDeposit", () => {
   it("recognises a deposit of a known top-up by its payment request id", async () => {
     const row = seedTopUp();
     const hit = await claimTopUpDeposit(fund, { paymentRequestId: 501, amount: "12.50", live: true });
-    expect(hit).toEqual({ topUpId: row.id, cardId: "card-1", memberId: "member-1" });
-    // A different amount is not this top-up.
+    expect(hit).toEqual({ kind: "topup", topUpId: row.id, cardId: "card-1", memberId: "member-1" });
+  });
+
+  it("holds a known top-up's deposit whose amount differs (no fall-through to matching)", async () => {
+    seedTopUp();
+    const hit = await claimTopUpDeposit(fund, { paymentRequestId: 501, amount: "12.00", live: true });
+    expect(hit).toMatchObject({ kind: "hold", reason: "amount_mismatch" });
+    expect(hit?.kind === "hold" && hit.note).toContain("cp-501");
+  });
+
+  it("holds a second deposit for a top-up that already has one", async () => {
+    seedTopUp({ status: "MINTED", bankTransactionId: "btx-1" });
     expect(
-      await claimTopUpDeposit(fund, { paymentRequestId: 501, amount: "12.00", live: true }),
-    ).toBeNull();
+      await claimTopUpDeposit(fund, { paymentRequestId: 501, amount: "12.50", live: true, bankTransactionId: "btx-2" }),
+    ).toMatchObject({ kind: "hold", reason: "duplicate_deposit" });
+    // The same deposit re-ingested is still its own.
+    expect(
+      await claimTopUpDeposit(fund, { paymentRequestId: 501, amount: "12.50", live: true, bankTransactionId: "btx-1" }),
+    ).toMatchObject({ kind: "topup" });
   });
 
   it("adopts the orphan top-up a member never came back from", async () => {
     db.card.push({ id: "card-1", fundId: fund.id, account: ACCOUNT, memberId: "member-1" });
     const orphan = seedTopUp({ citizenPayPaymentRequestId: null, status: "EXPIRED" });
     const hit = await claimTopUpDeposit(fund, { paymentRequestId: 501, amount: "12.50", live: true });
-    expect(hit?.topUpId).toBe(orphan.id);
+    expect(hit).toMatchObject({ kind: "topup", topUpId: orphan.id });
     expect(db.cardTopUp[0].citizenPayPaymentRequestId).toBe(501);
   });
 
   it("records a PAY_AND_GO top-up from the deposit when no row exists", async () => {
     db.card.push({ id: "card-1", fundId: fund.id, account: ACCOUNT, memberId: "member-1" });
     const hit = await claimTopUpDeposit(fund, { paymentRequestId: 501, amount: "12.50", live: true });
-    expect(hit).toMatchObject({ cardId: "card-1", memberId: "member-1" });
+    expect(hit).toMatchObject({ kind: "topup", cardId: "card-1", memberId: "member-1" });
     expect(db.cardTopUp).toHaveLength(1);
     expect(db.cardTopUp[0]).toMatchObject({ citizenPayPaymentRequestId: 501, amountCents: 1250, status: "PENDING" });
+  });
+
+  it("holds a top-up request for our card that CP can't tie to this treasury", async () => {
+    db.card.push({ id: "card-1", fundId: fund.id, account: ACCOUNT, memberId: "member-1" });
+    cp.getPaymentRequest.mockResolvedValueOnce(cpRequest({ treasuryId: null }));
+    expect(
+      await claimTopUpDeposit(fund, { paymentRequestId: 501, amount: "12.50", live: true }),
+    ).toMatchObject({ kind: "hold", reason: "unverified" });
+    cp.getPaymentRequest.mockResolvedValueOnce(cpRequest({ amountCents: 999 }));
+    expect(
+      await claimTopUpDeposit(fund, { paymentRequestId: 501, amount: "12.50", live: true }),
+    ).toMatchObject({ kind: "hold", reason: "amount_mismatch" });
+    expect(db.cardTopUp).toHaveLength(0);
   });
 
   it("leaves non-top-ups to regular matching", async () => {
@@ -461,8 +612,7 @@ describe("bank-sync: claimTopUpDeposit + linkTopUpDeposit", () => {
   it("links a minted top-up's deposit as its mint source without minting again", async () => {
     const row = seedTopUp();
     await settleCardTopUp(fund, row.id);
-    const minted = await linkTopUpDeposit(fund, row.id, "btx-1", true);
-    expect(minted).toBe(false);
+    expect(await linkTopUpDeposit(fund, row.id, "btx-1", true)).toEqual({ linked: true, minted: false });
     expect(userop.mintToken).toHaveBeenCalledTimes(1);
     expect(db.cardTopUp[0].bankTransactionId).toBe("btx-1");
     expect(db.tokenOperationSource).toEqual([
@@ -470,19 +620,27 @@ describe("bank-sync: claimTopUpDeposit + linkTopUpDeposit", () => {
     ]);
   });
 
+  it("refuses to attach a second deposit as a source of the existing mint", async () => {
+    const row = seedTopUp();
+    await settleCardTopUp(fund, row.id);
+    await linkTopUpDeposit(fund, row.id, "btx-1", true);
+    expect(await linkTopUpDeposit(fund, row.id, "btx-2", true)).toEqual({ linked: false, minted: false });
+    expect(db.tokenOperationSource).toHaveLength(1);
+  });
+
   it("mints a top-up CP had given up on once its deposit arrives", async () => {
     const row = seedTopUp({ status: "CANCELLED" });
-    expect(await linkTopUpDeposit(fund, row.id, "btx-1", true)).toBe(true);
+    expect(await linkTopUpDeposit(fund, row.id, "btx-1", true)).toEqual({ linked: true, minted: true });
     expect(db.cardTopUp[0]).toMatchObject({ status: "MINTED", bankTransactionId: "btx-1" });
     expect(db.tokenOperationSource).toHaveLength(1);
     // A replayed ingest is a no-op.
-    expect(await linkTopUpDeposit(fund, row.id, "btx-1", true)).toBe(false);
+    expect(await linkTopUpDeposit(fund, row.id, "btx-1", true)).toEqual({ linked: true, minted: false });
     expect(userop.mintToken).toHaveBeenCalledTimes(1);
   });
 
   it("only links during a backfill", async () => {
     const row = seedTopUp();
-    expect(await linkTopUpDeposit(fund, row.id, "btx-1", false)).toBe(false);
+    expect(await linkTopUpDeposit(fund, row.id, "btx-1", false)).toEqual({ linked: true, minted: false });
     expect(db.cardTopUp[0]).toMatchObject({ status: "PENDING", bankTransactionId: "btx-1" });
     expect(userop.mintToken).not.toHaveBeenCalled();
   });

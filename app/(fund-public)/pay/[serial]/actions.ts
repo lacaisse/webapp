@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { StartCardTopUpSchema } from "@/services/card-topup/amount";
 import {
+  checkStartThrottle,
   createPendingTopUp,
   findTopUpForCard,
   isTopUpReady,
@@ -19,6 +20,7 @@ import {
 } from "@/services/card-topup/settle";
 import { getCitizenPayClient } from "@/services/citizenpay/client";
 import { getFundUrl, requireCurrentFund } from "@/services/fund/server";
+import { takePollSlot } from "@/services/card-topup/throttle";
 
 // Public (no auth) actions behind the open-banking card top-up — see
 // ./page.tsx. Trust comes from the host-resolved fund, the card serial being
@@ -57,6 +59,11 @@ export async function startCardTopUpAction(
 
   const card = await loadTopUpCard(fund.id, serial);
   if (!card?.account || card.status === "BLOCKED") return unavailable;
+
+  // Cheap per-card throttle on a public action: one start per 30 s, and at
+  // most a few top-ups waiting at the bank at once.
+  const throttle = await checkStartThrottle(fund.id, card.id);
+  if (throttle) return { error: t(`cotisation.topUp.errors.${throttle}`) };
 
   // The bank must be one CP can initiate a payment at; some also need the
   // payer's IBAN before they show the signing page.
@@ -120,9 +127,16 @@ export async function pollCardTopUpAction(
   const { serial, topUpId, paymentRequestId } = parsed.data;
 
   const fund = await requireCurrentFund();
+  if (fund.allocationMode !== "PAY_AND_GO") return { status: "not_found" };
   const row = await findTopUpForCard(fund.id, serial, topUpId);
   if (!row) return { status: "not_found" };
   const amountCents = row.amountCents;
+
+  // Throttle: a top-up is checked against CP at most every 2 s per instance,
+  // however often its (public) poll is called; in between, the stored status.
+  if (!takePollSlot(row.id)) {
+    return { status: row.status.toLowerCase() as TopUpStatus, amountCents };
+  }
 
   try {
     if (row.citizenPayPaymentRequestId == null) {

@@ -316,7 +316,11 @@ async function ingestOne(
 // remittance, or no CardTopUp / CP request behind it) — regular matching then
 // takes over. Otherwise the row is written matched (CARD_TOPUP, no period) and
 // the top-up is tied to it; on the live cron that also mints a top-up still
-// waiting for its credit (the deposit proves the payment).
+// waiting for its credit (the deposit proves the payment). A top-up deposit
+// that can't be taken as is (amount differs, a second deposit for the same
+// request, treasury unverified) is held: stored unmatched with a note, and
+// member matching is skipped — it could tier-mint money the top-up already
+// credited.
 async function ingestTopUpDeposit(
   fund: IngestionFund,
   payload: BankTransactionPayload,
@@ -333,16 +337,21 @@ async function ingestTopUpDeposit(
   const topUpFund = await prisma.fund.findUnique({ where: { id: fund.id } });
   if (!topUpFund) return null;
   const live = behavior === "automated";
-  const topUp = await claimTopUpDeposit(topUpFund, {
+  const claim = await claimTopUpDeposit(topUpFund, {
     paymentRequestId,
     amount: payload.amount,
     live,
+    bankTransactionId: existing?.id ?? null,
   });
-  if (!topUp) return null;
+  if (!claim) return null;
+  if (claim.kind === "hold") {
+    await holdTopUpDeposit(fund.id, payload, existing, claim.note);
+    return { matched: false, minted: false };
+  }
 
   const matched = {
-    memberId: topUp.memberId,
-    cardId: topUp.cardId,
+    memberId: claim.memberId,
+    cardId: claim.cardId,
     matchedAt: new Date(),
     matchMethod: "CARD_TOPUP" as const,
     allocationPeriodId: null,
@@ -362,13 +371,51 @@ async function ingestTopUpDeposit(
         })
       ).id;
 
-  const minted = await linkTopUpDeposit(
+  const { linked, minted } = await linkTopUpDeposit(
     topUpFund,
-    topUp.topUpId,
+    claim.topUpId,
     bankTransactionId,
     live,
   );
+  if (!linked) {
+    // Another deposit carrying the same cp-<id> got linked first.
+    await prisma.bankTransaction.update({
+      where: { id: bankTransactionId },
+      data: {
+        memberId: null,
+        cardId: null,
+        matchedAt: null,
+        matchMethod: null,
+        notes: `Card top-up cp-${paymentRequestId} already has a bank deposit; this second one was held for review (not credited, not tier-minted).`,
+      },
+    });
+    return { matched: false, minted: false };
+  }
   return { matched: true, minted };
+}
+
+// Store a held top-up deposit unmatched (it lands in the review queue) with a
+// note saying why. An admin note already on the row is kept.
+async function holdTopUpDeposit(
+  fundId: string,
+  payload: BankTransactionPayload,
+  existing: { id: string } | null,
+  note: string,
+): Promise<void> {
+  console.warn("[bank-sync] top-up deposit held for review", {
+    fundId,
+    externalId: payload.externalId,
+  });
+  if (existing) {
+    await prisma.bankTransaction.updateMany({
+      where: { id: existing.id, notes: null },
+      data: { notes: note },
+    });
+    return;
+  }
+  await prisma.bankTransaction.create({
+    data: { ...payloadColumns(fundId, payload), notes: note },
+  });
 }
 
 function payloadColumns(fundId: string, payload: BankTransactionPayload) {

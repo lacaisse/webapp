@@ -10,8 +10,8 @@ import { prisma } from "@/services/db/prisma";
 // because it can only poll ops that *have* a txHash, so without this retry
 // they'd sit PENDING forever.
 //
-// Scope: MINT operations only. BURN/TRANSFER follow different rules — we
-// don't auto-retry them. Failed (status=FAILED) ops are also out of scope:
+// Scope: MINT operations only, and never a card top-up's (see the where).
+// BURN/TRANSFER follow different rules — we don't auto-retry them. Failed (status=FAILED) ops are also out of scope:
 // those got a verdict from CP and need admin attention.
 
 const BATCH_SIZE = 50;
@@ -28,6 +28,10 @@ export async function retryPendingMints(): Promise<RetryStats> {
       type: "MINT",
       status: "PENDING",
       txHash: null,
+      // An open-banking card top-up's mint is owned by its own flow
+      // (services/card-topup/settle.ts): its op sits PENDING with no txHash
+      // while mintToken waits, and re-submitting it here would mint twice.
+      cardTopUp: { is: null },
     },
     orderBy: { submittedAt: "asc" },
     take: BATCH_SIZE,

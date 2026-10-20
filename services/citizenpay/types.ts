@@ -601,6 +601,8 @@ export type TopUpSignUrlInput = {
 
 export type PaymentRequestState = {
   paymentRequestId: number;
+  // Null when CP doesn't report it (before api#224) — treated as a mismatch.
+  treasuryId: string | null;
   status: "pending" | "signed" | "expired" | "cancelled";
   amountCents: number;
   account: string | null;

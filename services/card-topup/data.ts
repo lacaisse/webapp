@@ -115,3 +115,33 @@ export async function findTopUpForCard(
     },
   });
 }
+
+// Per-card limits on starting a top-up (public action).
+const START_MIN_INTERVAL_MS = 30 * 1000;
+const MAX_OPEN_PER_CARD = 3;
+const OPEN_WINDOW_MS = 60 * 60 * 1000;
+
+/** Null when the card may start a top-up now, else the i18n error suffix. */
+export async function checkStartThrottle(
+  fundId: string,
+  cardId: string,
+  now: Date = new Date(),
+): Promise<"tooSoon" | "tooMany" | null> {
+  const recent = await prisma.cardTopUp.count({
+    where: {
+      fundId,
+      cardId,
+      createdAt: { gt: new Date(now.getTime() - START_MIN_INTERVAL_MS) },
+    },
+  });
+  if (recent > 0) return "tooSoon";
+  const open = await prisma.cardTopUp.count({
+    where: {
+      fundId,
+      cardId,
+      status: "PENDING",
+      createdAt: { gt: new Date(now.getTime() - OPEN_WINDOW_MS) },
+    },
+  });
+  return open >= MAX_OPEN_PER_CARD ? "tooMany" : null;
+}

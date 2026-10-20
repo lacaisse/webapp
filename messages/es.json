@@ -3824,7 +3824,9 @@
         "ibanInvalid": "Introduce un IBAN válido.",
         "ibanRequired": "Tu banco pide tu IBAN.",
         "unavailable": "La recarga no está disponible para esta tarjeta.",
-        "startFailed": "No se ha podido iniciar el pago. Inténtalo de nuevo."
+        "startFailed": "No se ha podido iniciar el pago. Inténtalo de nuevo.",
+        "tooSoon": "Se acaba de iniciar un pago para esta tarjeta. Espera 30 segundos antes de volver a intentarlo.",
+        "tooMany": "Ya hay varios pagos pendientes para esta tarjeta. Termínalos en tu banco o vuelve a intentarlo dentro de una hora."
       },
       "return": {
         "title": "Recarga de mi tarjeta",
@@ -3843,7 +3845,9 @@
         "mismatchTitle": "Pago no encontrado",
         "mismatchBody": "No encontramos este pago. Si se ha cargado en tu cuenta, ponte en contacto con {fundName}.",
         "checkFailed": "No se puede comprobar el pago ahora mismo. Reintentando…",
-        "retry": "Recargar de nuevo"
+        "retry": "Recargar de nuevo",
+        "verifyingTitle": "Pago recibido, verificando la recarga",
+        "verifyingBody": "La recarga de tu tarjeta está tardando más de lo habitual. Se añadirá automáticamente; si mañana no aparece, ponte en contacto con {fundName}."
       }
     }
   },

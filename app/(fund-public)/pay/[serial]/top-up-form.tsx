@@ -36,6 +36,49 @@ const FormSchema = z.object({
 });
 type FormValues = z.infer<typeof FormSchema>;
 
+function describedBy(...ids: (string | false | undefined | null)[]): string {
+  return ids.filter(Boolean).join(" ");
+}
+
+function rovingTabIndex(index: number, checkedIndex: number): 0 | -1 {
+  return index === (checkedIndex >= 0 ? checkedIndex : 0) ? 0 : -1;
+}
+
+// WAI-ARIA radio group keys: arrows (wrapping), Home, End — select the next
+// option and move focus to it.
+function onRadioKeyDown(
+  e: React.KeyboardEvent<HTMLButtonElement>,
+  index: number,
+  count: number,
+  select: (next: number) => void,
+) {
+  let next: number;
+  switch (e.key) {
+    case "ArrowRight":
+    case "ArrowDown":
+      next = (index + 1) % count;
+      break;
+    case "ArrowLeft":
+    case "ArrowUp":
+      next = (index - 1 + count) % count;
+      break;
+    case "Home":
+      next = 0;
+      break;
+    case "End":
+      next = count - 1;
+      break;
+    default:
+      return;
+  }
+  e.preventDefault();
+  select(next);
+  const radios = e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
+    '[role="radio"]',
+  );
+  radios?.[next]?.focus();
+}
+
 // Show a search box once the list is long enough to need one.
 const BANK_SEARCH_THRESHOLD = 8;
 
@@ -122,23 +165,41 @@ export function TopUpForm({
 
   const busy = pending || redirecting;
 
+  // Roving tabindex for the two radio groups: one tab stop (the checked
+  // option, else the first), arrow keys move + select.
+  const presetIndex = presetsCents.findIndex((c) => c === amountCents);
+  const bankIndex = visibleBanks.findIndex((b) => b.id === bankId);
+
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6" noValidate>
       {/* Amount */}
       <fieldset className="space-y-3" disabled={busy}>
         <legend className="text-sm font-medium">{t("amount")}</legend>
-        <div className="grid grid-cols-4 gap-2">
-          {presetsCents.map((cents) => {
+        <div
+          role="radiogroup"
+          aria-label={t("amount")}
+          className="grid grid-cols-4 gap-2"
+        >
+          {presetsCents.map((cents, index) => {
             const active = amountCents === cents;
+            const choose = () =>
+              form.setValue("amount", String(cents / 100), {
+                shouldValidate: true,
+              });
             return (
               <button
                 key={cents}
                 type="button"
-                aria-pressed={active}
-                onClick={() =>
-                  form.setValue("amount", String(cents / 100), {
-                    shouldValidate: true,
-                  })
+                role="radio"
+                aria-checked={active}
+                tabIndex={rovingTabIndex(index, presetIndex)}
+                onClick={choose}
+                onKeyDown={(e) =>
+                  onRadioKeyDown(e, index, presetsCents.length, (next) =>
+                    form.setValue("amount", String(presetsCents[next] / 100), {
+                      shouldValidate: true,
+                    }),
+                  )
                 }
                 className={cn(
                   "h-11 rounded-lg border text-base font-semibold transition-colors",
@@ -166,15 +227,16 @@ export function TopUpForm({
               placeholder={t("customPlaceholder")}
               className="h-10 pl-7"
               aria-invalid={!!errors.amount}
-              aria-describedby="topup-amount-hint"
+              aria-describedby={describedBy("topup-amount-hint", errors.amount && "topup-amount-error")}
               {...form.register("amount")}
             />
           </div>
-          {errors.amount ? (
-            <p className="text-sm text-destructive">{message(errors.amount)}</p>
-          ) : (
-            <p id="topup-amount-hint" className="text-xs text-muted-foreground">
-              {amountHint}
+          <p id="topup-amount-hint" className="text-xs text-muted-foreground">
+            {amountHint}
+          </p>
+          {errors.amount && (
+            <p id="topup-amount-error" role="alert" className="text-sm text-destructive">
+              {message(errors.amount)}
             </p>
           )}
         </div>
@@ -199,9 +261,11 @@ export function TopUpForm({
         <div
           role="radiogroup"
           aria-label={t("bank")}
+          aria-invalid={!!errors.bankId}
+          aria-describedby={describedBy("topup-bank-hint", errors.bankId && "topup-bank-error")}
           className="grid max-h-80 grid-cols-2 gap-2 overflow-y-auto p-0.5 sm:grid-cols-3"
         >
-          {visibleBanks.map((bank) => {
+          {visibleBanks.map((bank, index) => {
             const active = bank.id === bankId;
             return (
               <button
@@ -210,8 +274,16 @@ export function TopUpForm({
                 role="radio"
                 aria-checked={active}
                 aria-label={bank.name}
+                tabIndex={rovingTabIndex(index, bankIndex)}
                 onClick={() =>
                   form.setValue("bankId", bank.id, { shouldValidate: true })
+                }
+                onKeyDown={(e) =>
+                  onRadioKeyDown(e, index, visibleBanks.length, (next) =>
+                    form.setValue("bankId", visibleBanks[next].id, {
+                      shouldValidate: true,
+                    }),
+                  )
                 }
                 className={cn(
                   "flex h-14 items-center gap-2 rounded-lg border px-2.5 text-left text-sm transition-colors",
@@ -237,10 +309,13 @@ export function TopUpForm({
             );
           })}
         </div>
-        {errors.bankId ? (
-          <p className="text-sm text-destructive">{message(errors.bankId)}</p>
-        ) : (
-          <p className="text-xs text-muted-foreground">{t("bankHint")}</p>
+        <p id="topup-bank-hint" className="text-xs text-muted-foreground">
+          {t("bankHint")}
+        </p>
+        {errors.bankId && (
+          <p id="topup-bank-error" role="alert" className="text-sm text-destructive">
+            {message(errors.bankId)}
+          </p>
         )}
 
         {selectedBank?.requiresDebtorIban && (
@@ -253,13 +328,15 @@ export function TopUpForm({
               placeholder="BE00 0000 0000 0000"
               className="h-10 font-mono uppercase"
               aria-invalid={!!errors.iban}
+              aria-describedby={describedBy("topup-iban-hint", errors.iban && "topup-iban-error")}
               {...form.register("iban")}
             />
-            {errors.iban ? (
-              <p className="text-sm text-destructive">{message(errors.iban)}</p>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                {t("ibanHint", { bank: selectedBank.name })}
+            <p id="topup-iban-hint" className="text-xs text-muted-foreground">
+              {t("ibanHint", { bank: selectedBank.name })}
+            </p>
+            {errors.iban && (
+              <p id="topup-iban-error" role="alert" className="text-sm text-destructive">
+                {message(errors.iban)}
               </p>
             )}
           </div>
@@ -267,7 +344,7 @@ export function TopUpForm({
       </fieldset>
 
       {errors.root && (
-        <Alert variant="destructive">
+        <Alert variant="destructive" role="alert">
           <AlertDescription>{message(errors.root)}</AlertDescription>
         </Alert>
       )}

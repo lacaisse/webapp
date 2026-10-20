@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { isTopUpReady } from "@/services/card-topup/data";
 import { requireCurrentFund } from "@/services/fund/server";
 
 import { CotisationPaymentPage } from "./cotisation-page";
@@ -13,6 +14,10 @@ import { TopUpPage } from "./top-up-page";
 //     the card (./top-up-page.tsx, ./actions.ts, ./return/).
 //   - FIXED_PERIOD / DISABLED: the monthly cotisation by bank transfer —
 //     IBAN + reference + EPC QR (./cotisation-page.tsx), unchanged.
+//   - A PAY_AND_GO fund that can't take an open-banking top-up yet (not
+//     connected to a CP treasury, or no minter / 4337 stack) falls back to
+//     the transfer page too, so the reminder email's link still gets it paid
+//     (the deposit is matched by serial and tier-minted as before).
 
 export default async function PayPage({
   params,
@@ -22,7 +27,7 @@ export default async function PayPage({
   const fund = await requireCurrentFund();
   const { serial } = await params;
 
-  if (fund.allocationMode === "PAY_AND_GO") {
+  if (fund.allocationMode === "PAY_AND_GO" && isTopUpReady(fund)) {
     return <TopUpPage fund={fund} serial={serial} />;
   }
   return <CotisationPaymentPage fund={fund} serial={serial} />;

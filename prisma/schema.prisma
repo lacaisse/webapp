@@ -1540,6 +1540,16 @@ model CardTopUp {
   bankTransactionId String?          @unique
   bankTransaction   BankTransaction? @relation(fields: [bankTransactionId], references: [id], onDelete: SetNull)
 
+  // Mint bookkeeping. `mintTxHash` / `mintUserOpHash` are written as soon as
+  // the userop is submitted (or its hash is known after a failure), so the
+  // sweep can finish a claimed row even if the TokenOperation update failed.
+  mintTxHash     String?
+  mintUserOpHash String?
+  // Pre-submit failures release the claim with a backoff: the next attempt
+  // waits until `nextMintAttemptAt`, and after MAX_MINT_ATTEMPTS it stops.
+  mintAttempts      Int       @default(0)
+  nextMintAttemptAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

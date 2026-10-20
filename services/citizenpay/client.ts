@@ -894,10 +894,12 @@ class MockCitizenPayClient implements CitizenPayClient {
   }
 
   topUpSignUrl(input: TopUpSignUrlInput): string {
-    this.log("topUpSignUrl", input);
+    // Never log the payer IBAN.
+    this.log("topUpSignUrl", { ...input, iban: input.iban ? "[redacted]" : undefined });
     const id = 100_000 + mockPaymentRequests.size + 1;
     mockPaymentRequests.set(id, {
       paymentRequestId: id,
+      treasuryId: input.treasuryId,
       status: "signed",
       amountCents: input.amountCents,
       account: input.accountAddress,
