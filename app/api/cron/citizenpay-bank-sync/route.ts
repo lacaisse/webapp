@@ -2,6 +2,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { syncFundBankTransactions } from "@/services/bank-sync/ingest";
+import { sweepCardTopUps } from "@/services/card-topup/settle";
 import { cronGate } from "@/services/cron/guard";
 import { prisma } from "@/services/db/prisma";
 
@@ -9,6 +10,11 @@ import { prisma } from "@/services/db/prisma";
 // movements on each connected fund, mirrors them locally, matches to
 // members, and (for PAY_AND_GO funds) submits mints to CP. FIXED_PERIOD
 // funds accumulate until the period close cron handles batch minting.
+//
+// Then the open-banking card top-up safety net: top-ups still PENDING /
+// SIGNED a minute after they started are re-checked against CP and finished
+// (signed → mint, expired / cancelled → closed), so a member who closed the
+// tab after paying still gets credited. See services/card-topup/settle.ts.
 //
 // A fund is "connected" when Fund.citizenPayFundId is set. Funds without
 // it are skipped — there's nothing to ask CP about.
@@ -67,5 +73,24 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ funds: results });
+  // Funds with open top-ups (usually none): load the full row — the mint
+  // needs the minter / token columns.
+  const topUps: Record<string, unknown> = {};
+  const open = await prisma.cardTopUp.findMany({
+    where: { status: { in: ["PENDING", "SIGNED"] } },
+    distinct: ["fundId"],
+    select: { fundId: true },
+  });
+  for (const { fundId } of open) {
+    try {
+      const fund = await prisma.fund.findUnique({ where: { id: fundId } });
+      if (!fund?.citizenPayFundId) continue;
+      topUps[fundId] = await sweepCardTopUps(fund);
+    } catch (e) {
+      console.error("[bank-sync-cron] top-up sweep failed", fundId, e);
+      topUps[fundId] = { error: e instanceof Error ? e.message : "unknown" };
+    }
+  }
+
+  return NextResponse.json({ funds: results, topUps });
 }

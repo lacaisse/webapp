@@ -359,10 +359,14 @@ export type PaymentRequestCreated = {
   accountAddress: string;
 };
 
+// `status` is CP's stored state. Its payment-request cron moves a treasury
+// request to "signed" once Ponto reports it signed + closed, and to
+// "cancelled" when Ponto no longer knows it or it sat unsigned past CP's
+// 15-minute expiry; the handler itself can also answer "expired".
 export type PaymentRequestStatus = {
   success: boolean;
   paymentRequestId: number;
-  status: "pending" | "signed" | "expired";
+  status: "pending" | "signed" | "expired" | "cancelled";
   signed: boolean;
   expired: boolean;
   amount: number;
@@ -1253,6 +1257,42 @@ export const payments = {
       if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
     }
     return url.toString();
+  },
+};
+
+// =============================================================================
+// Banks (public directory of Ponto financial institutions)
+// =============================================================================
+
+// One bank a payer can be sent to. `paymentsEnabled` = Ponto can initiate a
+// payment there; `paymentDebtorAccountReferenceRequired` = the bank wants the
+// payer's IBAN up front (passed as `iban` on the sign door).
+export type BankWire = {
+  id: string;
+  name: string;
+  country: string;
+  logo?: string | null;
+  paymentsEnabled: boolean;
+  paymentDebtorAccountReferenceRequired?: boolean;
+};
+
+export type BankListWire = {
+  banks: BankWire[] | null;
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+
+export const banks = {
+  // GET /v2/banks — public; ordered by CP (popularity first). limit max 100.
+  list(
+    creds: CitizenPayApiCredentials,
+    query: { country?: string; limit?: number; page?: number } = {},
+  ): Promise<BankListWire> {
+    return request(creds, "GET", "/v2/banks", { query });
   },
 };
 

@@ -570,3 +570,39 @@ export type PayoutFeeConfig = {
   percent: string;
   collectionFrequency: "PER_PAYMENT" | "MONTHLY";
 };
+
+// =============================================================================
+// Open-banking card top-up (treasury payment requests)
+// =============================================================================
+
+// A bank the member can pay from (CP's public bank directory).
+export type CitizenPayBank = {
+  id: string;
+  name: string;
+  country: string;
+  logoUrl: string | null;
+  paymentsEnabled: boolean;
+  // The bank needs the payer's IBAN before it can show the signing page.
+  requiresDebtorIban: boolean;
+};
+
+// The browser redirect that creates a top-up-only treasury payment request
+// (no order) toward the fund's bank account and sends the payer to their
+// bank. CP appends `paymentRequestId=<id>` to `redirectUri` on the way back.
+export type TopUpSignUrlInput = {
+  treasuryId: string;
+  bankId: string;
+  redirectUri: string;
+  amountCents: number;
+  accountAddress: string;
+  // Payer IBAN, only for banks with `requiresDebtorIban`.
+  iban?: string;
+};
+
+export type PaymentRequestState = {
+  paymentRequestId: number;
+  status: "pending" | "signed" | "expired" | "cancelled";
+  amountCents: number;
+  account: string | null;
+  orderId: number | null;
+};

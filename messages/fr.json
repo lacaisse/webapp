@@ -3795,7 +3795,57 @@
       "manualBody": "Utilisez les boutons de copie ci-dessus pour copier chaque champ et les coller dans votre application bancaire. Assurez-vous d'inclure la référence de paiement.",
       "help": "Si vous avez des questions ou des problèmes avec votre paiement, veuillez contacter {fundName}."
     },
-    "notConnected": "Les coordonnées bancaires ne sont pas encore disponibles. Veuillez réessayer plus tard ou contacter {fundName}."
+    "notConnected": "Les coordonnées bancaires ne sont pas encore disponibles. Veuillez réessayer plus tard ou contacter {fundName}.",
+    "topUp": {
+      "title": "Recharger ma carte",
+      "greeting": "Bonjour {name}, choisissez un montant et payez-le depuis votre banque. Le même montant est ajouté à votre carte dès que le paiement est confirmé.",
+      "greetingNoName": "Choisissez un montant et payez-le depuis votre banque. Le même montant est ajouté à votre carte dès que le paiement est confirmé.",
+      "cardLabel": "Carte {serial}",
+      "amount": "Montant",
+      "customAmount": "Autre montant",
+      "customPlaceholder": "Ex. 15,00",
+      "amountHint": "Entre {min} et {max}.",
+      "bank": "Ma banque",
+      "bankHint": "Vous serez redirigé vers votre banque pour confirmer le paiement.",
+      "iban": "Mon IBAN",
+      "ibanHint": "{bank} demande le numéro du compte que vous allez utiliser.",
+      "submit": "Payer {amount} avec ma banque",
+      "submitNoAmount": "Payer avec ma banque",
+      "redirecting": "Redirection vers votre banque…",
+      "secure": "Paiement initié via Ponto (Open Banking). {fundName} ne voit jamais vos identifiants bancaires.",
+      "noBanks": "La liste des banques n'est pas disponible pour le moment. Veuillez réessayer plus tard.",
+      "unavailable": "Le rechargement en ligne n'est pas encore disponible. Veuillez contacter {fundName}.",
+      "cardBlocked": "Cette carte est bloquée et ne peut pas être rechargée. Veuillez contacter {fundName}.",
+      "errors": {
+        "amountInvalid": "Saisissez un montant valide (par ex. 12,50).",
+        "amountMin": "Le montant minimum est de 1 €.",
+        "amountMax": "Le montant maximum est de 500 €.",
+        "bankRequired": "Choisissez votre banque.",
+        "ibanInvalid": "Saisissez un IBAN valide.",
+        "ibanRequired": "Votre banque demande votre IBAN.",
+        "unavailable": "Le rechargement n'est pas disponible pour cette carte.",
+        "startFailed": "Impossible de lancer le paiement. Veuillez réessayer."
+      },
+      "return": {
+        "title": "Rechargement de ma carte",
+        "amount": "Montant",
+        "pendingTitle": "Paiement en attente de confirmation",
+        "pendingBody": "Nous attendons la confirmation de votre banque. Cela prend généralement quelques secondes.",
+        "pendingLong": "La confirmation prend plus de temps que prévu. Vous pouvez fermer cette page : votre carte sera créditée automatiquement dès que le paiement sera confirmé.",
+        "signedTitle": "Paiement reçu, votre carte est en cours de crédit",
+        "signedBody": "Cela ne prend que quelques instants.",
+        "mintedTitle": "Votre carte a été rechargée",
+        "mintedBody": "{amount} ont été ajoutés à votre carte.",
+        "expiredTitle": "Paiement expiré",
+        "expiredBody": "Le paiement n'a pas été confirmé à temps. Vous pouvez réessayer.",
+        "cancelledTitle": "Paiement non abouti",
+        "cancelledBody": "Le paiement a été annulé ou n'a pas abouti. Vous pouvez réessayer.",
+        "mismatchTitle": "Paiement introuvable",
+        "mismatchBody": "Nous ne retrouvons pas ce paiement. Si votre compte a été débité, veuillez contacter {fundName}.",
+        "checkFailed": "Impossible de vérifier le paiement pour le moment. Nouvelle tentative…",
+        "retry": "Recharger à nouveau"
+      }
+    }
   },
   "onboardingSteps": {
     "errors": {

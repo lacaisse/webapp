@@ -6,9 +6,11 @@ import { prisma } from "@/services/db/prisma";
 
 import {
   banking as apiBanking,
+  banks as apiBanks,
   businesses as apiBusinesses,
   cards as apiCards,
   invites as apiInvites,
+  payments as apiPayments,
   payouts as apiPayouts,
   places as apiPlaces,
   profiles as apiProfiles,
@@ -42,6 +44,7 @@ import type {
   CardOperationInput,
   CardOperationResult,
   CardStatus,
+  CitizenPayBank,
   CitizenPayCard,
   CitizenPayCardDetail,
   CitizenPayInvite,
@@ -57,6 +60,7 @@ import type {
   ListCardsResult,
   ListPlacesResult,
   OperationStatusResult,
+  PaymentRequestState,
   Payout,
   PayoutBurnClaim,
   PayoutBurnClaimed,
@@ -74,6 +78,7 @@ import type {
   SetManualDeductionInput,
   SubmitMintInput,
   SubmittedOperation,
+  TopUpSignUrlInput,
 } from "./types";
 
 // Adapts the OpenAPI-shaped low-level api.ts to the high-level interface the
@@ -1048,6 +1053,56 @@ export class LiveCitizenPayClient implements CitizenPayClient {
 
   async setTreasuryTopUpUrl(url: string | null): Promise<void> {
     await apiTreasury.setTopUpUrl(this.creds, url);
+  }
+
+  async listBanks(query: { country: string }): Promise<CitizenPayBank[]> {
+    const res = await apiBanks.list(this.creds, {
+      country: query.country,
+      limit: 100,
+    });
+    return (res.banks ?? []).map((b) => ({
+      id: b.id,
+      name: b.name,
+      country: b.country,
+      logoUrl: b.logo || null,
+      paymentsEnabled: b.paymentsEnabled,
+      requiresDebtorIban: b.paymentDebtorAccountReferenceRequired ?? false,
+    }));
+  }
+
+  topUpSignUrl(input: TopUpSignUrlInput): string {
+    // Top-up only: no orderId, no `amount` (that would create a place order
+    // and need a slug) — CP's sign door reads `topUpAmount` + `accountAddress`.
+    return apiPayments.signUrl(this.creds, input.treasuryId, {
+      bankId: input.bankId,
+      redirectUri: input.redirectUri,
+      topUpAmount: input.amountCents,
+      accountAddress: input.accountAddress,
+      iban: input.iban || undefined,
+    });
+  }
+
+  async getPaymentRequest(
+    treasuryId: string,
+    paymentRequestId: number,
+  ): Promise<PaymentRequestState | null> {
+    try {
+      const w = await apiPayments.getRequest(
+        this.creds,
+        treasuryId,
+        paymentRequestId,
+      );
+      return {
+        paymentRequestId: w.paymentRequestId,
+        status: w.status,
+        amountCents: w.amount,
+        account: w.account ?? null,
+        orderId: w.orderId ?? null,
+      };
+    } catch (e) {
+      if (e instanceof CitizenPayApiError && e.status === 404) return null;
+      throw e;
+    }
   }
 }
 

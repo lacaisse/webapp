@@ -3795,7 +3795,57 @@
       "manualBody": "Gebruik de kopieerknoppen hierboven om elk veld te kopiëren en in uw bankapp te plakken. Vergeet niet de betalingsreferentie te vermelden.",
       "help": "Als u vragen of problemen heeft met uw betaling, neem dan contact op met {fundName}."
     },
-    "notConnected": "De bankgegevens zijn nog niet beschikbaar. Probeer het later opnieuw of neem contact op met {fundName}."
+    "notConnected": "De bankgegevens zijn nog niet beschikbaar. Probeer het later opnieuw of neem contact op met {fundName}.",
+    "topUp": {
+      "title": "Mijn kaart opwaarderen",
+      "greeting": "Hallo {name}, kies een bedrag en betaal het vanuit je bank. Hetzelfde bedrag wordt op je kaart gezet zodra de betaling bevestigd is.",
+      "greetingNoName": "Kies een bedrag en betaal het vanuit je bank. Hetzelfde bedrag wordt op je kaart gezet zodra de betaling bevestigd is.",
+      "cardLabel": "Kaart {serial}",
+      "amount": "Bedrag",
+      "customAmount": "Ander bedrag",
+      "customPlaceholder": "Bv. 15,00",
+      "amountHint": "Tussen {min} en {max}.",
+      "bank": "Mijn bank",
+      "bankHint": "Je wordt naar je bank gestuurd om de betaling te bevestigen.",
+      "iban": "Mijn IBAN",
+      "ibanHint": "{bank} vraagt het nummer van de rekening waarmee je betaalt.",
+      "submit": "Betaal {amount} met mijn bank",
+      "submitNoAmount": "Betalen met mijn bank",
+      "redirecting": "Je wordt naar je bank gestuurd…",
+      "secure": "Betaling gestart via Ponto (Open Banking). {fundName} ziet nooit je bankgegevens.",
+      "noBanks": "De lijst met banken is momenteel niet beschikbaar. Probeer het later opnieuw.",
+      "unavailable": "Online opwaarderen is nog niet beschikbaar. Neem contact op met {fundName}.",
+      "cardBlocked": "Deze kaart is geblokkeerd en kan niet opgewaardeerd worden. Neem contact op met {fundName}.",
+      "errors": {
+        "amountInvalid": "Geef een geldig bedrag in (bv. 12,50).",
+        "amountMin": "Het minimumbedrag is € 1.",
+        "amountMax": "Het maximumbedrag is € 500.",
+        "bankRequired": "Kies je bank.",
+        "ibanInvalid": "Geef een geldige IBAN in.",
+        "ibanRequired": "Je bank vraagt je IBAN.",
+        "unavailable": "Opwaarderen is niet beschikbaar voor deze kaart.",
+        "startFailed": "De betaling kon niet gestart worden. Probeer het opnieuw."
+      },
+      "return": {
+        "title": "Mijn kaart opwaarderen",
+        "amount": "Bedrag",
+        "pendingTitle": "Betaling wacht op bevestiging",
+        "pendingBody": "We wachten op de bevestiging van je bank. Dat duurt meestal maar enkele seconden.",
+        "pendingLong": "De bevestiging duurt langer dan verwacht. Je mag deze pagina sluiten: je kaart wordt automatisch opgewaardeerd zodra de betaling bevestigd is.",
+        "signedTitle": "Betaling ontvangen, je kaart wordt opgewaardeerd",
+        "signedBody": "Dit duurt maar even.",
+        "mintedTitle": "Je kaart is opgewaardeerd",
+        "mintedBody": "{amount} is op je kaart gezet.",
+        "expiredTitle": "Betaling verlopen",
+        "expiredBody": "De betaling werd niet op tijd bevestigd. Je kunt het opnieuw proberen.",
+        "cancelledTitle": "Betaling niet voltooid",
+        "cancelledBody": "De betaling werd geannuleerd of ging niet door. Je kunt het opnieuw proberen.",
+        "mismatchTitle": "Betaling niet gevonden",
+        "mismatchBody": "We vinden deze betaling niet terug. Als je rekening gedebiteerd werd, neem dan contact op met {fundName}.",
+        "checkFailed": "De betaling kan nu niet gecontroleerd worden. Nieuwe poging…",
+        "retry": "Opnieuw opwaarderen"
+      }
+    }
   },
   "onboardingSteps": {
     "errors": {

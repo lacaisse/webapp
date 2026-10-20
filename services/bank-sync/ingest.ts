@@ -10,6 +10,9 @@ import {
 import { getCitizenPayClient } from "@/services/citizenpay/client";
 import type { BankTransactionPayload } from "@/services/citizenpay/types";
 
+import { claimTopUpDeposit, linkTopUpDeposit } from "@/services/card-topup/settle";
+import { parseTopUpRemittance } from "@/services/card-topup/remittance";
+
 import { mintTierAllocation } from "./allocate";
 import { matchMember, type Match } from "./matching/match";
 import { isAllocationEligible } from "@/services/member/eligibility";
@@ -29,6 +32,12 @@ import { ANNOTATION_TRIGGERS } from "@/services/transaction-annotation/annotate"
 // Idempotency: BankTransaction has @@unique([fundId, externalId]). If a
 // cron re-run encounters the same payload, the upsert short-circuits and
 // we skip side effects (match + mint + email).
+//
+// Open-banking card top-ups (remittance "cp-<paymentRequestId>", see
+// services/card-topup) are recognised before member matching: they are
+// credited 1:1 by the top-up flow, so the row is linked to its CardTopUp
+// (matchMethod CARD_TOPUP) and never tier-minted, period-allocated or queued
+// for manual attribution.
 //
 // PAY_AND_GO vs FIXED_PERIOD: FIXED_PERIOD funds just record + tag the
 // transaction with the current open AllocationPeriod (if any). The period
@@ -214,6 +223,13 @@ async function ingestOne(
     return { matched: false, minted: false };
   }
 
+  // An open-banking card top-up (remittance "cp-<paymentRequestId>") is
+  // already credited 1:1 by its own flow: link it and stop here, before the
+  // member matching — an IBAN match would otherwise tier-mint it a second
+  // time, and a FIXED_PERIOD period close would batch-mint it.
+  const topUp = await ingestTopUpDeposit(fund, payload, existing, behavior);
+  if (topUp) return topUp;
+
   // INCOMING: ingest + try to match. FIXED_PERIOD rows get tagged with their
   // allocation period (created on demand — see resolveAllocationPeriod).
   // PAY_AND_GO funds don't use periods.
@@ -296,6 +312,83 @@ async function ingestOne(
   return { matched: true, minted };
 }
 
+// Returns null when the deposit isn't a top-up of this fund (no "cp-<id>"
+// remittance, or no CardTopUp / CP request behind it) — regular matching then
+// takes over. Otherwise the row is written matched (CARD_TOPUP, no period) and
+// the top-up is tied to it; on the live cron that also mints a top-up still
+// waiting for its credit (the deposit proves the payment).
+async function ingestTopUpDeposit(
+  fund: IngestionFund,
+  payload: BankTransactionPayload,
+  existing: { id: string } | null,
+  behavior: IngestBehavior,
+): Promise<IngestOneResult | null> {
+  const paymentRequestId = parseTopUpRemittance(
+    payload.remittanceInfo,
+    payload.counterpartReference,
+  );
+  if (paymentRequestId == null) return null;
+
+  // The mint needs the minter / token columns the ingestion subset lacks.
+  const topUpFund = await prisma.fund.findUnique({ where: { id: fund.id } });
+  if (!topUpFund) return null;
+  const live = behavior === "automated";
+  const topUp = await claimTopUpDeposit(topUpFund, {
+    paymentRequestId,
+    amount: payload.amount,
+    live,
+  });
+  if (!topUp) return null;
+
+  const matched = {
+    memberId: topUp.memberId,
+    cardId: topUp.cardId,
+    matchedAt: new Date(),
+    matchMethod: "CARD_TOPUP" as const,
+    allocationPeriodId: null,
+  };
+  const bankTransactionId = existing
+    ? (
+        await prisma.bankTransaction.update({
+          where: { id: existing.id },
+          data: matched,
+          select: { id: true },
+        })
+      ).id
+    : (
+        await prisma.bankTransaction.create({
+          data: { ...payloadColumns(fund.id, payload), ...matched },
+          select: { id: true },
+        })
+      ).id;
+
+  const minted = await linkTopUpDeposit(
+    topUpFund,
+    topUp.topUpId,
+    bankTransactionId,
+    live,
+  );
+  return { matched: true, minted };
+}
+
+function payloadColumns(fundId: string, payload: BankTransactionPayload) {
+  return {
+    fundId,
+    externalId: payload.externalId,
+    direction: payload.direction,
+    amount: payload.amount,
+    currency: payload.currency,
+    occurredAt: new Date(payload.occurredAt),
+    counterpartName: payload.counterpartName ?? null,
+    counterpartIban: payload.counterpartIban ?? null,
+    counterpartReference: payload.counterpartReference ?? null,
+    remittanceInfo: payload.remittanceInfo ?? null,
+    rawData: payload.rawData
+      ? (payload.rawData as Prisma.InputJsonValue)
+      : undefined,
+  };
+}
+
 async function createBankTransaction(
   fundId: string,
   payload: BankTransactionPayload,
@@ -304,19 +397,7 @@ async function createBankTransaction(
 ): Promise<void> {
   await prisma.bankTransaction.create({
     data: {
-      fundId,
-      externalId: payload.externalId,
-      direction: payload.direction,
-      amount: payload.amount,
-      currency: payload.currency,
-      occurredAt: new Date(payload.occurredAt),
-      counterpartName: payload.counterpartName ?? null,
-      counterpartIban: payload.counterpartIban ?? null,
-      counterpartReference: payload.counterpartReference ?? null,
-      remittanceInfo: payload.remittanceInfo ?? null,
-      rawData: payload.rawData
-        ? (payload.rawData as Prisma.InputJsonValue)
-        : undefined,
+      ...payloadColumns(fundId, payload),
       memberId: match?.memberId ?? null,
       matchedAt: match ? new Date() : null,
       matchMethod: match?.method ?? null,
