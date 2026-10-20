@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { topUpUrlFor } from "./top-up-url";
+import { isOwnTopUpUrl, topUpUrlFor } from "./top-up-url";
 
 afterEach(() => vi.unstubAllEnvs());
 
@@ -49,5 +49,32 @@ describe("topUpUrlFor", () => {
     expect(
       topUpUrlFor({ domain: "acme.localhost", allocationMode: "PAY_AND_GO" }),
     ).toBe("http://acme.localhost:3000/pay/{serial}");
+  });
+});
+
+describe("isOwnTopUpUrl", () => {
+  const fund = { domain: "paybrussels.lacaisse.eu" };
+
+  it("recognises the fund's own /pay/{serial} link", () => {
+    prod();
+    expect(isOwnTopUpUrl(fund, "https://paybrussels.lacaisse.eu/pay/{serial}")).toBe(true);
+  });
+
+  it("recognises the production form from a dev environment", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("APP_DOMAIN", "localhost");
+    expect(isOwnTopUpUrl(fund, "https://paybrussels.lacaisse.eu/pay/{serial}")).toBe(true);
+    expect(isOwnTopUpUrl(fund, "http://paybrussels.localhost:3000/pay/{serial}")).toBe(true);
+  });
+
+  it.each([
+    ["CP's own checkout", "https://checkout.citizenpay.xyz/topup"],
+    ["another fund's link", "https://laclass.lacaisse.eu/pay/{serial}"],
+    ["an expanded serial", "https://paybrussels.lacaisse.eu/pay/04A2B7C9D1"],
+    ["another path on the fund", "https://paybrussels.lacaisse.eu/join"],
+    ["nothing", null],
+  ])("rejects %s", (_label, url) => {
+    prod();
+    expect(isOwnTopUpUrl(fund, url)).toBe(false);
   });
 });

@@ -510,6 +510,12 @@ export type TreasuryWire = {
   // CP confirms the contract.
   fee_collection_frequency?: string;
   feeCollectionFrequency?: string;
+  // The wallet's "Add funds" link (api#221), `{serial}` placeholder intact —
+  // whatever is set right now, which may be a value CP manages itself (e.g.
+  // its own checkout) rather than one we published. snake_case is what CP
+  // answers; camelCase accepted like the fee fields.
+  top_up_url?: string | null;
+  topUpUrl?: string | null;
 };
 
 // Wire spelling of the fee collection cadence. Maps 1:1 to the Prisma
@@ -517,12 +523,15 @@ export type TreasuryWire = {
 // the conversion.
 export type FeeCollectionFrequencyWire = "per_payment" | "monthly";
 
-// Budget for the best-effort top-up URL sync (treasury.setTopUpUrl).
+// Budget for the best-effort top-up URL sync (its GET + PATCH /v2/treasury).
 export const TOP_UP_URL_TIMEOUT_MS = 3_000;
 
 export const treasury = {
-  get(creds: CitizenPayApiCredentials): Promise<TreasuryWire> {
-    return request(creds, "GET", "/v2/treasury");
+  get(
+    creds: CitizenPayApiCredentials,
+    opts: { timeoutMs?: number } = {},
+  ): Promise<TreasuryWire> {
+    return request(creds, "GET", "/v2/treasury", { timeoutMs: opts.timeoutMs });
   },
   // Set the platform fee on merchant payments: the rate in integer basis
   // points (250 = 2.5%) and the cadence at which CP collects it

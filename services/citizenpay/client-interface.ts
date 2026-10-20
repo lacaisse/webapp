@@ -532,6 +532,14 @@ export interface CitizenPayClient {
   setTreasuryTopUpUrl(url: string | null): Promise<void>;
 
   /**
+   * The treasury's current top-up URL as CP holds it (null when none). Read
+   * before clearing so the sync only ever removes a link La Caisse published
+   * itself — a treasury may carry a CP-managed value (e.g. CP's own checkout)
+   * that isn't ours to touch. Backed by GET /v2/treasury (`top_up_url`).
+   */
+  getTreasuryTopUpUrl(): Promise<string | null>;
+
+  /**
    * CP's public bank directory (Ponto financial institutions) for one
    * country, in CP's order (most used first). The open-banking top-up page
    * shows the ones with `paymentsEnabled`. Backed by `GET /v2/banks`.

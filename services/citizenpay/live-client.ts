@@ -16,6 +16,7 @@ import {
   profiles as apiProfiles,
   treasury as apiTreasury,
   PROFILES_BATCH_MAX,
+  TOP_UP_URL_TIMEOUT_MS,
   type CitizenPayApiCredentials,
   CitizenPayApiError,
   type InviteWire,
@@ -1053,6 +1054,13 @@ export class LiveCitizenPayClient implements CitizenPayClient {
 
   async setTreasuryTopUpUrl(url: string | null): Promise<void> {
     await apiTreasury.setTopUpUrl(this.creds, url);
+  }
+
+  async getTreasuryTopUpUrl(): Promise<string | null> {
+    const wire = await apiTreasury.get(this.creds, {
+      timeoutMs: TOP_UP_URL_TIMEOUT_MS,
+    });
+    return wire.top_up_url ?? wire.topUpUrl ?? null;
   }
 
   async listBanks(query: { country: string }): Promise<CitizenPayBank[]> {
