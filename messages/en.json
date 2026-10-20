@@ -3772,6 +3772,10 @@
     }
   },
   "cotisation": {
+    "cardNotFound": {
+      "title": "This card isn't registered with this fund",
+      "description": "No card with number <code>{serial}</code> belongs to this fund, or it isn't assigned to a member yet. Check the link, or contact the fund."
+    },
     "title": "Monthly contribution payment",
     "greeting": "Hello {name}, please make your monthly contribution using the details below",
     "back": "Back to website",

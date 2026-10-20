@@ -3772,6 +3772,10 @@
     }
   },
   "cotisation": {
+    "cardNotFound": {
+      "title": "Esta tarjeta no está registrada en este fondo",
+      "description": "Ninguna tarjeta con el número <code>{serial}</code> pertenece a este fondo, o aún no está asignada a un miembro. Comprueba el enlace o contacta con el fondo."
+    },
     "title": "Pago de la cuota mensual",
     "greeting": "Hola {name}, realiza tu cuota mensual utilizando los datos que aparecen a continuación",
     "back": "Volver al sitio web",

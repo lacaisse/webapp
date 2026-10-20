@@ -3772,6 +3772,10 @@
     }
   },
   "cotisation": {
+    "cardNotFound": {
+      "title": "Cette carte n'est pas enregistrée dans cette caisse",
+      "description": "Aucune carte portant le numéro <code>{serial}</code> n'appartient à cette caisse, ou elle n'est pas encore attribuée à un membre. Vérifiez le lien ou contactez la caisse."
+    },
     "title": "Paiement de la cotisation mensuelle",
     "greeting": "Bonjour {name}, veuillez effectuer votre cotisation mensuelle en utilisant les informations ci-dessous",
     "back": "Retour au site web",
