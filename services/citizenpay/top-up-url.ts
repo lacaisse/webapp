@@ -8,8 +8,10 @@ import { getFundUrl } from "@/services/fund/host";
 // card's serial, landing the member on the fund's contribution page
 // (app/(fund-public)/pay/[serial]).
 //
-// Only PAY_AND_GO funds mint per deposit, so only they get the button:
-// FIXED_PERIOD and DISABLED funds return null (CP then hides it).
+// PAY_AND_GO funds get the open-banking top-up there; FIXED_PERIOD funds get
+// their cotisation page (IBAN + EPC QR for the monthly contribution), which is
+// what the previous wallet linked for them. DISABLED funds take no money from
+// members, so they return null and CP hides the button.
 //
 // Pure: host arithmetic via services/fund/host.ts (same scheme/port logic as
 // every other cross-host fund link — https in production, http + PORT in dev,
@@ -20,7 +22,7 @@ export function topUpUrlFor(fund: {
   domain: string;
   allocationMode: AllocationMode;
 }): string | null {
-  if (fund.allocationMode !== "PAY_AND_GO") return null;
+  if (fund.allocationMode === "DISABLED") return null;
   return `${getFundUrl(fund.domain)}/pay/${TOP_UP_SERIAL_PLACEHOLDER}`;
 }
 

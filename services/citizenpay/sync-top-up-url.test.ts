@@ -51,7 +51,7 @@ describe("syncTreasuryTopUpUrl", () => {
     expect(getMockTreasuryTopUpUrl(fund.id)).toBe(url);
   });
 
-  it.each(["FIXED_PERIOD", "DISABLED"] as const)("clears it for %s", async (mode) => {
+  it.each(["DISABLED"] as const)("clears it for %s", async (mode) => {
     const fund = connected(mode);
     await expect(syncTreasuryTopUpUrl(fund)).resolves.toEqual({
       status: "synced",

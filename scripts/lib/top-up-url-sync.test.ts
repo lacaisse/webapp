@@ -5,7 +5,7 @@ import { probeTopUpUrl, runTopUpUrlSync } from "./top-up-url-sync";
 
 const funds = [
   { domain: "laclass.lacaisse.eu", allocationMode: "PAY_AND_GO" as const },
-  { domain: "other.lacaisse.eu", allocationMode: "FIXED_PERIOD" as const },
+  { domain: "other.lacaisse.eu", allocationMode: "DISABLED" as const },
 ];
 
 function prodEnv() {
@@ -28,7 +28,7 @@ describe("scripts/sync-top-up-urls", () => {
     expect(code).toBe(0);
     expect(push).not.toHaveBeenCalled();
     expect(lines.join("\n")).toContain("https://laclass.lacaisse.eu/pay/{serial}");
-    expect(lines.join("\n")).toContain("other.lacaisse.eu [FIXED_PERIOD] → (clear)");
+    expect(lines.join("\n")).toContain("other.lacaisse.eu [DISABLED] → (clear)");
   });
 
   it("writes with --apply when every URL is https", async () => {
