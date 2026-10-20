@@ -31,17 +31,15 @@ const RANK = { info: 0, low: 1, moderate: 2, high: 3, critical: 4 };
 // accept risks we no longer carry. See git history for the old entries and
 // their triage rationale — they're the template for writing the next one.
 const ALLOWLIST = {
-  "GHSA-ggr8-5vv4-36mx": {
-    pkg: "deepmerge-ts (transitive via prisma → @prisma/config)",
+  // 2026-10-20: `npm audit fix` moved next (16.4.2), prisma (7.10.1), sharp,
+  // undici, proxy-addr, http-cache-semantics, source-map-js, engine.io and
+  // @modelcontextprotocol/sdk past their advisories, and the 2026-08 entries
+  // (deepmerge-ts, mysql2) cleared with prisma/better-auth and were removed.
+  "GHSA-vfj7-8cjw-p6xm": {
+    pkg: "braces (transitive via eslint-config-next → @next/eslint-plugin-next → fast-glob → micromatch, and via the shadcn CLI)",
     reason:
-      "Stack exhaustion when merging recursive object graphs. deepmerge-ts is reached only by the Prisma CLI merging our own repo-authored prisma.config.ts — never attacker-supplied input — and @prisma/config is not in the runtime bundle (PrismaClient comes from the generated client, not the prisma package). The advisory's fix range (>=8.0.0) isn't shipped by any prisma release: latest 7.9.1 still pins 7.1.5, and npm's only 'fix' is a breaking downgrade to prisma 6. Clears when @prisma/config bumps its deepmerge-ts range.",
-    reviewBy: "2026-10-01",
-  },
-  "GHSA-3f6p-5ww8-9rcr": {
-    pkg: "mysql2 (transitive via better-auth and prisma)",
-    reason:
-      "Auth plugin downgrade leaking plaintext credentials against a MySQL server. mysql2 is pulled in as an optional DB dialect of better-auth (our instance uses only the Prisma adapter — see services/auth/better-auth.ts) and by the Prisma CLI; we run exclusively against Postgres (DATABASE_URL/DIRECT_URL) and never construct a mysql2 connection anywhere in the app. Same blocker as the deepmerge-ts entry above: the only 'fix' npm offers is a breaking downgrade to prisma 6.19.3. Clears when better-auth/prisma bump their mysql2 range past 3.22.0.",
-    reviewBy: "2026-10-01",
+      "Stack exhaustion on deeply nested brace patterns. NOT fixable today: the advisory lists no patched version (GitHub: patched_versions null) and 3.0.3 is the newest braces on npm, so every consumer of micromatch carries it; npm's only 'fix' is a breaking downgrade to eslint-config-next 14 / shadcn 1. Both reach braces only from dev tooling run by hand on repo-authored globs (the Next lint plugin, the shadcn CLI) — never the app at runtime, never attacker-supplied patterns. Re-check for a braces release past 3.0.3 and drop this entry the day one ships.",
+    reviewBy: "2026-12-01",
   },
 };
 
