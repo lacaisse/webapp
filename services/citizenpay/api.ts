@@ -530,6 +530,19 @@ export const treasury = {
       body: { feePercentageBps, feeCollectionFrequency },
     });
   },
+  // Set (or clear, with null) the treasury's top-up URL — the link behind the
+  // public card wallet's "Add funds" button (tap.citizenpay.eu). The literal
+  // `{serial}` placeholder is expanded by the wallet with the card's serial,
+  // e.g. "https://acme.lacaisse.eu/pay/{serial}". Same PATCH as updateFee;
+  // CP echoes the treasury (incl. `topUpUrl`), which we don't need.
+  setTopUpUrl(
+    creds: CitizenPayApiCredentials,
+    topUpUrl: string | null,
+  ): Promise<unknown> {
+    return request(creds, "PATCH", "/v2/treasury", {
+      body: { topUpUrl },
+    });
+  },
 };
 
 // =============================================================================

@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import { requireFundRole } from "@/services/auth/dal";
 import { getCitizenPayClient } from "@/services/citizenpay/client";
+import { syncTreasuryTopUpUrl } from "@/services/citizenpay/sync-top-up-url";
 import { prisma } from "@/services/db/prisma";
 import { isSupportedLocale } from "@/services/i18n/config";
 
@@ -120,7 +121,23 @@ const GeneralSchema = z.object({
 export async function updateGeneralSettingsAction(
   input: z.infer<typeof GeneralSchema>,
 ): Promise<SettingsResult> {
-  return runUpdate(GeneralSchema, input, "/settings");
+  const t = await getTranslations();
+  const { fund } = await requireFundRole("ADMIN");
+  const parsed = GeneralSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: t(parsed.error.issues[0].message as never) };
+  }
+  const updated = await prisma.fund.update({
+    where: { id: fund.id },
+    data: parsed.data,
+  });
+  // allocationMode decides whether the public card wallet shows an "Add
+  // funds" button (PAY_AND_GO → the fund's /pay/{serial} page). Pushed on
+  // every save so re-saving also repairs a treasury that drifted; best-effort,
+  // never fails the save.
+  await syncTreasuryTopUpUrl(updated);
+  revalidatePath("/settings");
+  return { ok: true };
 }
 
 // --- Branding ------------------------------------------------------------

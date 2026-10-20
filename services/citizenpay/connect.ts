@@ -14,6 +14,7 @@ import {
   type RegistrationPrefill,
 } from "./register-prefill";
 import { fetchTokenInfo } from "./sync";
+import { syncTreasuryTopUpUrl } from "./sync-top-up-url";
 
 // CitizenPay treasury handoffs. Two entry points, one callback:
 //
@@ -361,6 +362,21 @@ export async function consumeConnect(args: {
       console.warn("[citizenpay] default token account upsert failed", e);
     }
   }
+
+  // Publish the fund's contribution link as the treasury's top-up URL so a
+  // freshly connected (or re-keyed) PAY_AND_GO fund gets the wallet's "Add
+  // funds" button right away. Best-effort — syncTreasuryTopUpUrl never throws.
+  const connected = await prisma.fund.findUnique({
+    where: { id: row.fundId },
+    select: {
+      id: true,
+      domain: true,
+      allocationMode: true,
+      citizenPayApiKeyId: true,
+      citizenPayApiKeyEnc: true,
+    },
+  });
+  if (connected) await syncTreasuryTopUpUrl(connected);
 
   return { treasuryId: creds.treasury_id, apiKeyId: creds.api_key_id };
 }

@@ -78,6 +78,8 @@ export type FundCredentials = {
 // =============================================================================
 
 class MockCitizenPayClient implements CitizenPayClient {
+  constructor(private readonly fundId: string) {}
+
   private log(method: string, details: Record<string, unknown>): void {
     console.log(`[citizenpay:mock] ${method}`, details);
   }
@@ -853,6 +855,26 @@ class MockCitizenPayClient implements CitizenPayClient {
       collectionFrequency: config.collectionFrequency,
     });
   }
+
+  async setTreasuryTopUpUrl(url: string | null): Promise<void> {
+    this.log("setTreasuryTopUpUrl", { fundId: this.fundId, url });
+    mockTreasuryTopUpUrls.set(this.fundId, url);
+  }
+}
+
+// Top-up URLs pushed per fund this session (same process lifetime as the other
+// mock state). Read back with getMockTreasuryTopUpUrl in tests.
+const mockTreasuryTopUpUrls = new Map<string, string | null>();
+
+/**
+ * The last top-up URL the mock client recorded for a fund: `undefined` when
+ * nothing was pushed, `null` when it was cleared. Test/dev helper only — the
+ * live client has no local state.
+ */
+export function getMockTreasuryTopUpUrl(
+  fundId: string,
+): string | null | undefined {
+  return mockTreasuryTopUpUrls.get(fundId);
 }
 
 // The pending fixtures, lifted to module scope so `completePayout` can move one
@@ -1023,7 +1045,7 @@ export function getCitizenPayClient(fund: FundCredentials): CitizenPayClient {
       );
       warnedNoBaseUrl = true;
     }
-    return new MockCitizenPayClient();
+    return new MockCitizenPayClient(fund.id);
   }
 
   if (!fund.citizenPayApiKeyId || !fund.citizenPayApiKeyEnc) {

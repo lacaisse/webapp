@@ -509,4 +509,14 @@ export interface CitizenPayClient {
    * payout's `payoutFees`, not the processor commission withheld at source.
    */
   setPayoutFeeConfig(config: PayoutFeeConfig): Promise<void>;
+
+  /**
+   * Set (or clear, with null) the treasury's top-up URL — what the public
+   * card wallet's "Add funds" button opens. Carries a literal `{serial}`
+   * placeholder the wallet expands per card. We are canonical: the value is
+   * derived from the fund's domain + allocation mode
+   * (services/citizenpay/top-up-url.ts) and pushed by
+   * services/citizenpay/sync-top-up-url.ts. Backed by PATCH /v2/treasury.
+   */
+  setTreasuryTopUpUrl(url: string | null): Promise<void>;
 }
