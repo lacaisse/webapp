@@ -9,7 +9,7 @@ import { dispatchCardAssignedEmail, type CardAssignedFund } from "@/services/car
 import { getCitizenPayClient } from "@/services/citizenpay/client";
 import { prisma } from "@/services/db/prisma";
 import { nextCardNumber } from "@/services/card/numbering";
-import { publishCardHolderName } from "@/services/card/publish-holder-name";
+import { scheduleCardHolderNamePublish } from "@/services/card/publish-holder-name";
 import { normalizeSerial } from "@/services/card/serial";
 import {
   sendMemberActivated,
@@ -201,7 +201,7 @@ export async function activateMemberAction(input: {
   });
 
   // Show the new holder's name on the card's public wallet (best-effort).
-  await publishCardHolderName(fund, card.id);
+  scheduleCardHolderNamePublish(fund, card.id);
 
   // Submit the referral mint to CitizenPay outside the transaction. On
   // success we stamp the tx hash; on failure the op stays PENDING and the
@@ -369,7 +369,7 @@ export async function addCardAction(input: {
       data: { memberId: member.id, holderName, formerMemberId: null },
       select: { id: true, serialNumber: true, number: true },
     });
-    await publishCardHolderName(fund, card.id);
+    scheduleCardHolderNamePublish(fund, card.id);
     await sendAddCardEmail(fund, card, member);
     revalidatePath("/members");
     return { ok: true };
@@ -407,7 +407,7 @@ export async function addCardAction(input: {
   });
 
   // registerCard doesn't carry the name — publish it separately.
-  await publishCardHolderName(fund, card.id);
+  scheduleCardHolderNamePublish(fund, card.id);
   await sendAddCardEmail(fund, card, member);
 
   revalidatePath("/members");

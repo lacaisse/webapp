@@ -664,17 +664,19 @@ export const cards = {
   // PUT /cards/{serial}/profile — the display name CP keeps for the card's
   // on-chain account (`account_profiles`), shown on the public card wallet.
   // `null` / "" resets it to CP's default `Card <serial>`. 404 when the serial
-  // doesn't resolve for the treasury's token.
+  // doesn't resolve for the treasury's token. Short default timeout: this is
+  // display-only, best-effort traffic and must never hold a worker for long.
   setHolderName(
     creds: CitizenPayApiCredentials,
     serial: string,
     name: string | null,
+    opts: { timeoutMs?: number } = {},
   ): Promise<{ account: string; name: string }> {
     return request(
       creds,
       "PUT",
       `/v2/treasury/cards/${encodeURIComponent(serial)}/profile`,
-      { body: { name } },
+      { body: { name }, timeoutMs: opts.timeoutMs ?? 3_000 },
     );
   },
   balance(

@@ -5,7 +5,10 @@ import { getTranslations } from "next-intl/server";
 import { revalidatePath } from "next/cache";
 
 import { requireFundRole } from "@/services/auth/dal";
-import { publishMemberCardHolderNames } from "@/services/card/publish-holder-name";
+import {
+  renameStampedHolderNames,
+  scheduleCardHolderNamePublish,
+} from "@/services/card/publish-holder-name";
 import { prisma } from "@/services/db/prisma";
 
 import { contributionApplies, isBelowTierMinimum } from "./contribution";
@@ -122,21 +125,17 @@ export async function updateMemberProfileAction(
     throw e;
   }
 
-  // Rename: cards stamp the holder's name at assignment (`Card.holderName`),
-  // so carry the new name onto the cards that still hold the old one — a
-  // dependant's card under its own name is left alone — then publish the
-  // member's cards to CitizenPay's public wallet (best-effort).
-  const oldName = `${member.firstName} ${member.lastName}`.trim();
-  const newName = `${parsed.data.firstName} ${parsed.data.lastName}`.trim();
-  if (newName !== oldName) {
-    if (oldName && newName) {
-      await prisma.card.updateMany({
-        where: { fundId: fund.id, memberId: member.id, holderName: oldName },
-        data: { holderName: newName },
-      });
-    }
-    await publishMemberCardHolderNames(fund, member.id);
-  }
+  // Rename: carry the new name onto the cards stamped with the old one, then
+  // publish just those (plus unnamed cards) to CitizenPay's public wallet,
+  // after the response. A dependant's card, or one holding a stale name from
+  // an earlier rename, keeps its name and isn't re-sent.
+  const cardIds = await renameStampedHolderNames({
+    fundId: fund.id,
+    memberId: member.id,
+    oldName: `${member.firstName} ${member.lastName}`,
+    newName: `${parsed.data.firstName} ${parsed.data.lastName}`,
+  });
+  scheduleCardHolderNamePublish(fund, cardIds);
 
   revalidatePath("/members");
   revalidatePath(`/members/${member.id}`);

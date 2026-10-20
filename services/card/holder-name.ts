@@ -36,3 +36,33 @@ export function publishedHolderName(card: {
   if (!card.memberId) return null;
   return holderDisplayName(card.member, card.holderName);
 }
+
+export type BackfillDecision =
+  | { kind: "publish"; name: string }
+  | { kind: "noName" }
+  | { kind: "stale"; holderName: string; memberName: string };
+
+/**
+ * What the one-off backfill (scripts/sync-holder-names.ts) does with a card.
+ * Renames made before holder names were published never touched
+ * `Card.holderName`, and `holderDisplayName` prefers it — so a card whose own
+ * name differs from its member's CURRENT name may carry an old (e.g. maiden)
+ * name. Those are held back for review instead of published. (A dependant's
+ * card legitimately differs too; review tells the two apart.)
+ */
+export function backfillDecision(card: {
+  memberId: string | null;
+  holderName: string | null;
+  member: HolderNameMember | null;
+}): BackfillDecision {
+  const name = publishedHolderName(card);
+  if (!name) return { kind: "noName" };
+  const own = card.holderName?.trim();
+  const memberName = card.member
+    ? `${card.member.firstName} ${card.member.lastName}`.trim()
+    : "";
+  if (own && memberName && own !== memberName) {
+    return { kind: "stale", holderName: own, memberName };
+  }
+  return { kind: "publish", name };
+}

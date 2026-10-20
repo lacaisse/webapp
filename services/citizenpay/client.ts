@@ -219,7 +219,8 @@ class MockCitizenPayClient implements CitizenPayClient {
     serialNumber: string,
     name: string | null,
   ): Promise<void> {
-    this.log("setCardHolderName", { serialNumber, name });
+    // Never log the name itself — only whether this is a set or a reset.
+    this.log("setCardHolderName", { serialNumber, reset: name === null });
   }
 
   async getCardSource(serialNumber: string): Promise<string | null> {

@@ -8,7 +8,7 @@ import { z } from "zod";
 
 import { requireFundRole } from "@/services/auth/dal";
 import { holderDisplayName } from "@/services/card/holder-name";
-import { publishCardHolderName } from "@/services/card/publish-holder-name";
+import { scheduleCardHolderNamePublish } from "@/services/card/publish-holder-name";
 import { getCitizenPayClient } from "@/services/citizenpay/client";
 import { Prisma } from "@/services/db/generated/client";
 import type { CardStatus } from "@/services/db/generated/enums";
@@ -530,7 +530,7 @@ export async function pushOneCardAction(input: {
       }
     }
     // registerCard doesn't carry the name — publish it separately.
-    await publishCardHolderName(fund, card.id);
+    scheduleCardHolderNamePublish(fund, card.id);
     return { ok: true };
   } catch (e) {
     console.error("[card.sync] push failed", card.serialNumber, e);
@@ -968,7 +968,7 @@ export async function unassignCardAction(input: {
   ]);
 
   // Reset the public wallet name to CP's default — the card is no longer held.
-  await publishCardHolderName(fund, card.id);
+  scheduleCardHolderNamePublish(fund, card.id);
 
   revalidatePath("/cards");
   revalidatePath(`/cards/${card.id}`);

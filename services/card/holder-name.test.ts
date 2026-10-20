@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, expect, it } from "vitest";
 
-import { holderDisplayName, publishedHolderName } from "./holder-name";
+import {
+  backfillDecision,
+  holderDisplayName,
+  publishedHolderName,
+} from "./holder-name";
 
 const jane = { firstName: "Jane", lastName: "Doe" };
 
@@ -48,5 +52,31 @@ describe("publishedHolderName", () => {
     expect(
       publishedHolderName({ memberId: null, holderName: "Jane Doe", member: null }),
     ).toBeNull();
+  });
+});
+
+describe("backfillDecision (scripts/sync-holder-names.ts)", () => {
+  it("publishes a card stamped with the member's current name", () => {
+    expect(
+      backfillDecision({ memberId: "m1", holderName: "Jane Doe", member: jane }),
+    ).toEqual({ kind: "publish", name: "Jane Doe" });
+  });
+
+  it("publishes the member's name for an unnamed card", () => {
+    expect(
+      backfillDecision({ memberId: "m1", holderName: null, member: jane }),
+    ).toEqual({ kind: "publish", name: "Jane Doe" });
+  });
+
+  it("holds back a card whose holderName differs from the member's current name", () => {
+    expect(
+      backfillDecision({ memberId: "m1", holderName: "Jane Maiden", member: jane }),
+    ).toEqual({ kind: "stale", holderName: "Jane Maiden", memberName: "Jane Doe" });
+  });
+
+  it("skips an unassigned card", () => {
+    expect(
+      backfillDecision({ memberId: null, holderName: "Jane Doe", member: null }),
+    ).toEqual({ kind: "noName" });
   });
 });
