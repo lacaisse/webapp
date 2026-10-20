@@ -73,32 +73,82 @@ export async function listTransfers(opts: {
 
 // `alchemy_getAssetTransfers` filters by `fromAddress` OR `toAddress`, never
 // the disjunction. To show all transfers involving a single wallet we run
-// the two queries in parallel and merge. Pagination piggy-backs on each
-// stream's own pageKey: the cursor we surface to callers encodes both keys
-// so each "page" advances both streams together — the merge stays in block-
-// desc order across pages because each stream is independently desc-sorted.
-// When a stream runs out, we stop querying it; once both are exhausted, the
-// next cursor is null.
+// the two queries in parallel and merge.
+//
+// Pagination is a block cutoff, not Alchemy's per-stream `pageKey`. The
+// first version of this loader paged each stream with its own pageKey and
+// encoded both in the cursor, assuming the merge would stay in block order
+// across pages. It doesn't: when one stream is busy (a card that mostly
+// pays) and the other quiet (rare top-ups), the quiet stream's page reaches
+// years further back than the busy one's, so page 1 ended in July while
+// page 2 started back in December. Every page now queries both streams over
+// `[0x0, toBlock]` (toBlock = cursor, `latest` on the first page) with
+// `maxCount = pageSize` and no pageKey. A stream that returned a `pageKey`
+// was truncated: it is complete only for blocks strictly above its oldest
+// returned block (rows in that block may continue past the cut). So:
+//
+//   - neither stream truncated → the range is exhausted: emit everything,
+//     no next cursor;
+//   - else cutoff = max over truncated streams of their oldest block; emit
+//     rows with block > cutoff (complete in both streams) and continue at
+//     `toBlock = cutoff`. Alchemy's toBlock is inclusive, so the held-back
+//     rows at the cutoff come back on the next page, and none of them was
+//     emitted here, so there are no duplicates.
+//
+// A page therefore holds between 1 and 2 × pageSize rows. Callers that
+// walk the whole history (token audit, payouts, the MCP tools) only need
+// the cursor to run dry, which it does; the dashboard tables just show a
+// slightly uneven page length.
 
-type AccountCursor = { f?: string | null; t?: string | null };
+const HEX_BLOCK = /^0x[0-9a-f]+$/i;
 
-function encodeAccountCursor(c: AccountCursor): string | null {
-  const f = c.f ?? null;
-  const t = c.t ?? null;
-  if (f == null && t == null) return null;
-  return Buffer.from(JSON.stringify({ f, t })).toString("base64url");
+export function encodeBlockCursor(toBlock: bigint): string {
+  return Buffer.from(
+    JSON.stringify({ b: `0x${toBlock.toString(16)}` }),
+  ).toString("base64url");
 }
 
-function decodeAccountCursor(s: string | null): AccountCursor | null {
+/**
+ * The `toBlock` (hex) a cursor carries, or null when the cursor is malformed
+ * — including a cursor from the old two-pageKey scheme still sitting in a
+ * bookmarked `?cursor=` URL. Callers treat null as "first page" rather than
+ * failing the request: the cursor is a convenience, the data is the same.
+ */
+export function decodeBlockCursor(s: string | null | undefined): string | null {
   if (!s) return null;
   try {
-    const parsed = JSON.parse(
+    const parsed: unknown = JSON.parse(
       Buffer.from(s, "base64url").toString("utf8"),
-    ) as AccountCursor;
-    return parsed;
+    );
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      return null;
+    }
+    const b = (parsed as Record<string, unknown>).b;
+    if (typeof b !== "string" || !HEX_BLOCK.test(b)) return null;
+    return `0x${BigInt(b).toString(16)}`;
   } catch {
     return null;
   }
+}
+
+function blockOf(t: AlchemyTransfer): bigint {
+  return BigInt(t.blockNum || "0x0");
+}
+
+// Alchemy's ERC-20 uniqueId is `${hash}:log:${logIndex}` (decimal); the log
+// index is block-wide, so it orders rows within one block.
+function logIndexOf(t: AlchemyTransfer): number {
+  const m = /:log:(\d+)$/.exec(t.uniqueId);
+  return m ? Number(m[1]) : -1;
+}
+
+/** Block desc, then log index desc. */
+function compareDesc(a: AlchemyTransfer, b: AlchemyTransfer): number {
+  const ab = blockOf(a);
+  const bb = blockOf(b);
+  if (bb > ab) return 1;
+  if (bb < ab) return -1;
+  return logIndexOf(b) - logIndexOf(a);
 }
 
 export async function listTransfersForAccount(opts: {
@@ -113,54 +163,58 @@ export async function listTransfersForAccount(opts: {
     throw new Error(`Alchemy: unsupported chain id ${opts.chainId}`);
   }
 
-  const decoded = decodeAccountCursor(opts.cursor ?? null);
-  // First page: query both directions. Subsequent pages: only query a
-  // direction if its pageKey from the previous page is non-null.
-  const queryFrom = decoded == null || decoded.f != null;
-  const queryTo = decoded == null || decoded.t != null;
+  const toBlock = decodeBlockCursor(opts.cursor) ?? "latest";
 
-  const empty: { transfers: AlchemyTransfer[]; pageKey?: string } = {
-    transfers: [],
-  };
-  const [fromPage, toPage] = await Promise.all([
-    queryFrom
-      ? fetchTransfersPage(network, {
-          contractAddress: opts.contractAddress,
-          pageSize: opts.pageSize,
-          pageKey: decoded?.f ?? null,
-          fromAddress: opts.account,
-        })
-      : Promise.resolve(empty),
-    queryTo
-      ? fetchTransfersPage(network, {
-          contractAddress: opts.contractAddress,
-          pageSize: opts.pageSize,
-          pageKey: decoded?.t ?? null,
-          toAddress: opts.account,
-        })
-      : Promise.resolve(empty),
+  const query = (dir: { fromAddress?: string; toAddress?: string }) =>
+    fetchTransfersPage(network, {
+      contractAddress: opts.contractAddress,
+      pageSize: opts.pageSize,
+      toBlock,
+      ...dir,
+    });
+  const streams = await Promise.all([
+    query({ fromAddress: opts.account }),
+    query({ toAddress: opts.account }),
   ]);
 
-  // Dedupe self-transfers (same uniqueId from both queries) and sort by
-  // block number descending. blockNum is a hex string — compare as bigint.
+  // Dedupe self-transfers (same uniqueId from both queries), then order.
   const byId = new Map<string, AlchemyTransfer>();
-  for (const t of fromPage.transfers) byId.set(t.uniqueId, t);
-  for (const t of toPage.transfers) byId.set(t.uniqueId, t);
-  const transfers = [...byId.values()].sort((a, b) => {
-    const av = BigInt(a.blockNum || "0x0");
-    const bv = BigInt(b.blockNum || "0x0");
-    if (bv > av) return 1;
-    if (bv < av) return -1;
-    return 0;
-  });
+  for (const s of streams) for (const t of s.transfers) byId.set(t.uniqueId, t);
+  const merged = [...byId.values()].sort(compareDesc);
+
+  // Oldest block of each truncated stream (one that returned a pageKey).
+  const truncatedOldest: bigint[] = [];
+  for (const s of streams) {
+    if (!s.pageKey || s.transfers.length === 0) continue;
+    let oldest = blockOf(s.transfers[0]!);
+    for (const t of s.transfers) if (blockOf(t) < oldest) oldest = blockOf(t);
+    truncatedOldest.push(oldest);
+  }
+
+  let transfers: AlchemyTransfer[];
+  let nextPageKey: string | null;
+  if (truncatedOldest.length === 0) {
+    transfers = merged;
+    nextPageKey = null;
+  } else {
+    const cutoff = truncatedOldest.reduce((a, b) => (b > a ? b : a));
+    transfers = merged.filter((t) => blockOf(t) > cutoff);
+    if (transfers.length > 0) {
+      nextPageKey = encodeBlockCursor(cutoff);
+    } else {
+      // Pathological: a whole stream page sits inside the cutoff block (at
+      // least pageSize transfers of this token for one account in one
+      // block). Holding everything back would loop forever on the same
+      // cursor, so we emit the rows of that block we have and skip past it,
+      // accepting that its rows beyond the first pageSize per stream are
+      // lost. Rows below the cutoff (from the other stream) are not emitted:
+      // they come back on the next page.
+      transfers = merged.filter((t) => blockOf(t) === cutoff);
+      nextPageKey = cutoff > BigInt(0) ? encodeBlockCursor(cutoff - BigInt(1)) : null;
+    }
+  }
 
   await hydrateMissingTimestamps(network, transfers);
-
-  const nextPageKey = encodeAccountCursor({
-    f: fromPage.pageKey ?? null,
-    t: toPage.pageKey ?? null,
-  });
-
   return { transfers, nextPageKey };
 }
 
