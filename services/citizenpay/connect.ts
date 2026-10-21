@@ -15,6 +15,7 @@ import {
 } from "./register-prefill";
 import { fetchTokenInfo } from "./sync";
 import { scheduleTreasuryTopUpUrlSync } from "./sync-top-up-url";
+import { scheduleEnsureMinterRoles } from "./token-roles";
 
 // CitizenPay treasury handoffs. Two entry points, one callback:
 //
@@ -360,6 +361,20 @@ export async function consumeConnect(args: {
       });
     } catch (e) {
       console.warn("[citizenpay] default token account upsert failed", e);
+    }
+  }
+
+  // Ask CP to grant that Safe MINTER_ROLE + BURNER_ROLE on the treasury's
+  // token, so the fund can mint without anyone granting it by hand. Best-
+  // effort and idempotent (a re-key of a fund that already has the role is a
+  // no-op on CP's side); the grant waits for a UserOp receipt, so it runs
+  // after the redirect is sent. A token CP didn't deploy comes back
+  // "unsupported" — the settings Token tab shows the status and a retry.
+  if (smartAccountAddress && connectedFund?.tokenAddress) {
+    try {
+      scheduleEnsureMinterRoles(row.fundId);
+    } catch (e) {
+      console.warn("[citizenpay] minter role grant scheduling failed", e);
     }
   }
 

@@ -1772,7 +1772,17 @@
           "permissionLabel": "Permission d'émission",
           "permissionGranted": "Active",
           "permissionMissing": "Manquante",
-          "permissionUnknown": "Inconnue"
+          "permissionUnknown": "Inconnue",
+          "grant": {
+            "button": "Accorder la permission d'émission",
+            "pending": "Attribution…",
+            "hint": "Demande à Citizen Pay d'accorder à ce smart account les rôles d'émission et de destruction sur le jeton de la trésorerie.",
+            "granted": "Permission d'émission accordée. La caisse peut maintenant émettre et détruire des jetons.",
+            "already": "Le smart account dispose déjà de la permission d'émission.",
+            "unsupported": "Citizen Pay ne peut pas accorder ce rôle sur ce jeton : il n'a pas été déployé par Citizen Pay. L'administrateur du jeton doit accorder MINTER_ROLE (et BURNER_ROLE si le jeton en a un) au smart account ci-dessus.",
+            "failed": "L'attribution n'a pas abouti. Réessayez dans quelques minutes.",
+            "detail": "Détail : {detail}"
+          }
         },
         "topUps": {
           "title": "Recharges au terminal",

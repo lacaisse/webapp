@@ -1772,7 +1772,17 @@
           "permissionLabel": "Permiso de acuñación",
           "permissionGranted": "Activo",
           "permissionMissing": "Ausente",
-          "permissionUnknown": "Desconocido"
+          "permissionUnknown": "Desconocido",
+          "grant": {
+            "button": "Conceder permiso de acuñación",
+            "pending": "Concediendo…",
+            "hint": "Pide a Citizen Pay que conceda a esta cuenta inteligente los roles de acuñación y quema sobre el token de la tesorería.",
+            "granted": "Permiso de acuñación concedido. Este fondo ya puede acuñar y quemar.",
+            "already": "La cuenta inteligente ya tiene el permiso de acuñación.",
+            "unsupported": "Citizen Pay no puede conceder el rol sobre este token: no lo desplegó Citizen Pay. El administrador del token debe conceder MINTER_ROLE (y BURNER_ROLE si el token lo tiene) a la cuenta inteligente de arriba.",
+            "failed": "La concesión no se completó. Inténtalo de nuevo en unos minutos.",
+            "detail": "Detalles: {detail}"
+          }
         },
         "topUps": {
           "title": "Recargas en terminal",
