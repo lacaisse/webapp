@@ -39,13 +39,16 @@ export async function CotisationPaymentPage({
   serial: string;
 }) {
 
-  // serialNumber is globally unique — scope the match to the current fund so a
-  // card from another fund can't render on this host. Needs a member (for the
-  // greeting + tier); unattached cards 404.
-  const card = await prisma.card.findUnique({
-    where: { serialNumber: serial },
+  // serialNumber is unique per fund (the same physical card can be enrolled in
+  // several funds) — scope the match to the current fund so another fund's
+  // row never renders on this host. Needs a member (for the greeting + tier);
+  // unattached cards 404.
+  const card = await prisma.card.findFirst({
+    where: {
+      fundId: fund.id,
+      serialNumber: { equals: serial, mode: "insensitive" },
+    },
     select: {
-      fundId: true,
       serialNumber: true,
       member: {
         select: {
@@ -57,7 +60,7 @@ export async function CotisationPaymentPage({
       },
     },
   });
-  if (!card || card.fundId !== fund.id || !card.member) notFound();
+  if (!card || !card.member) notFound();
 
   const t = await getTranslations("cotisation");
   const format = await getFormatter();

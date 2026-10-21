@@ -7,6 +7,7 @@ import { Tabs, resolveActiveTab } from "@/components/ui/tabs";
 import { requireCurrentFund } from "@/services/fund/server";
 
 import { CardsTable } from "./cards-table";
+import { CardEnrollmentRequestsPanel } from "./enrollment-requests-panel";
 import { CardSyncDialog } from "./sync-dialog";
 import { NumberImportDialog } from "./number-import-dialog";
 import { TableSkeleton } from "../token/skeleton";
@@ -53,6 +54,10 @@ export default async function CardsPage({
         />
         <TableSearch placeholder={t("searchPlaceholder")} />
       </div>
+
+      <Suspense fallback={null}>
+        <CardEnrollmentRequestsPanel fundId={fund.id} />
+      </Suspense>
 
       <Suspense
         // Distinct key per (tab, page, q) so React tears down the prior

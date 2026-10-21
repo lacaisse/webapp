@@ -700,7 +700,7 @@
       "numberImport": {
         "button": "Importer les numéros",
         "title": "Importer les numéros de carte",
-        "description": "Importez ou collez un CSV avec en-têtes, puis choisissez les colonnes serial et numéro. Les serials inconnus sont enregistrés auprès de CitizenPay et créés ici.",
+        "description": "Importez ou collez un CSV avec en-têtes, puis choisissez les colonnes serial et numéro. Les serials inconnus sont enregistrés auprès de CitizenPay et créés ici. Les serials qui appartiennent à une autre caisse ne sont pas créés : une demande est envoyée à cette caisse.",
         "fileLabel": "Fichier CSV",
         "pasteLabel": "Ou collez les lignes",
         "import": "Importer",
@@ -709,8 +709,47 @@
         "close": "Fermer",
         "result": "{applied} numéro(s) appliqué(s) ; {provisioned} nouvelle(s) carte(s) créée(s) ; {displaced} déplacé(s).",
         "skipped": "{count} serial(s) non créé(s)",
+        "requested": "{count, plural, one {# serial appartient} other {# serials appartiennent}} à une autre caisse — une demande a été envoyée",
+        "requestedItem": "{serial} ({fund})",
         "serialColumn": "Colonne serial",
         "numberColumn": "Colonne numéro"
+      },
+      "enrollmentRequests": {
+        "incomingTitle": "Demandes pour vos cartes",
+        "incomingDescription": "D'autres caisses demandent à utiliser des cartes émises par cette caisse. En acceptant, la carte est enregistrée dans leur caisse ; votre solde sur la carte n'est pas modifié.",
+        "outgoingTitle": "Cartes demandées à d'autres caisses",
+        "outgoingDescription": "Cartes émises par une autre caisse que cette caisse a demandé à utiliser. Elles sont ajoutées ici dès que la caisse émettrice accepte.",
+        "columns": {
+          "serial": "Série",
+          "number": "N° carte",
+          "fund": "Caisse",
+          "details": "Détails",
+          "requested": "Demandée le",
+          "status": "Statut"
+        },
+        "status": {
+          "PENDING": "En attente",
+          "ACCEPTED": "Acceptée",
+          "REJECTED": "Refusée",
+          "CANCELLED": "Annulée"
+        },
+        "accept": "Accepter",
+        "accepting": "Acceptation…",
+        "reject": "Refuser",
+        "rejecting": "Refus…",
+        "rejectTitle": "Refuser cette demande ?",
+        "rejectDescription": "{fund} ne pourra pas utiliser la carte {serial}. Elle pourra envoyer une nouvelle demande plus tard.",
+        "cancel": "Annuler la demande",
+        "cancelling": "Annulation…",
+        "cancelTitle": "Annuler cette demande ?",
+        "cancelDescription": "La demande envoyée à {fund} pour la carte {serial} est retirée. Vous pourrez redemander la carte plus tard.",
+        "confirmReject": "Refuser la demande",
+        "confirmCancel": "Annuler la demande",
+        "dismiss": "Retour",
+        "requestedNumber": "Numéro {number}",
+        "forMember": "Pour {name}",
+        "holder": "Porteur : {name}",
+        "viewCard": "Voir la carte"
       }
     },
     "allocations": {
@@ -2483,7 +2522,9 @@
         "cancel": "Annuler",
         "confirm": "Ajouter la carte",
         "adding": "Ajout…",
-        "serialRequired": "Le numéro de série de la carte est requis."
+        "close": "Fermer",
+        "serialRequired": "Le numéro de série de la carte est requis.",
+        "requested": "Demande envoyée à {fund}. La carte sera ajoutée ici dès que cette caisse l'aura acceptée."
       },
       "mint": {
         "button": "Émettre des jetons",
@@ -2859,6 +2900,19 @@
           "empty": "Aucune ligne valide dans le CSV.",
           "noMatches": "Aucun serial ne correspond à une carte de cette caisse.",
           "columnMissing": "Choisissez une colonne serial et une colonne numéro."
+        }
+      },
+      "enrollmentRequest": {
+        "errors": {
+          "notFound": "Demande introuvable.",
+          "notPending": "Cette demande a déjà été traitée.",
+          "requesterNotConnected": "La caisse demandeuse n'est pas encore connectée à CitizenPay.",
+          "numberTaken": "Une autre carte utilise déjà le numéro demandé.",
+          "failed": "Impossible de traiter la demande. Réessayez dans un instant."
+        },
+        "email": {
+          "subject": "Carte {serial} demandée par {requesterFund}",
+          "body": "{requesterFund} souhaite utiliser la carte {serial}, enregistrée auprès de {issuerFund}. Examinez la demande ici : {link}\n\nSi vous acceptez, {requesterFund} pourra recharger et débiter cette carte dans sa propre caisse. Votre propre solde sur la carte n'est pas modifié."
         }
       },
       "source": {

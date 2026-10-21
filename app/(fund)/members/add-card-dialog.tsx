@@ -35,10 +35,27 @@ export function AddCardDialog({
   const [serial, setSerial] = useState("");
   const [holderName, setHolderName] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // Set when the serial belongs to another fund: the card isn't added yet,
+  // a request went to that fund instead. The dialog stays open to say so.
+  const [requestedFrom, setRequestedFrom] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  const onOpenChange = (next: boolean) => {
+    if (!next && pending) return;
+    setOpen(next);
+    if (!next) {
+      setError(null);
+      if (requestedFrom) {
+        setRequestedFrom(null);
+        setSerial("");
+        setHolderName("");
+      }
+    }
+  };
 
   const onSubmit = () => {
     setError(null);
+    setRequestedFrom(null);
     if (!serial.trim()) {
       setError(t("serialRequired"));
       return;
@@ -53,6 +70,10 @@ export function AddCardDialog({
         setError(result.error);
         return;
       }
+      if (result.requested) {
+        setRequestedFrom(result.requested.fundName);
+        return;
+      }
       setOpen(false);
       setSerial("");
       setHolderName("");
@@ -60,7 +81,7 @@ export function AddCardDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger render={<Button variant="outline" size="sm" />}>
         {t("button")}
       </DialogTrigger>
@@ -104,17 +125,26 @@ export function AddCardDialog({
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
+        {requestedFrom && (
+          <Alert>
+            <AlertDescription>
+              {t("requested", { fund: requestedFrom })}
+            </AlertDescription>
+          </Alert>
+        )}
         <DialogFooter>
           <Button
             variant="outline"
-            onClick={() => setOpen(false)}
+            onClick={() => onOpenChange(false)}
             disabled={pending}
           >
-            {t("cancel")}
+            {requestedFrom ? t("close") : t("cancel")}
           </Button>
-          <Button onClick={onSubmit} disabled={pending}>
-            {pending ? t("adding") : t("confirm")}
-          </Button>
+          {!requestedFrom && (
+            <Button onClick={onSubmit} disabled={pending}>
+              {pending ? t("adding") : t("confirm")}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

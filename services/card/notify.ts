@@ -116,3 +116,39 @@ export async function dispatchCardAssignedEmail(args: {
   });
   return after?.status === "SENT" ? "SENT" : "FAILED";
 }
+
+// Fail-soft CARD_ASSIGNED ("your card is on its way") send for flows that just
+// bound a card to a member — the add-card dialog and the cross-fund enrollment
+// accept (services/card/enrollment-requests.ts). Skipped while the fund's
+// member emails are paused; a send failure is logged and swallowed, never
+// failing the flow that bound the card (#69).
+export async function sendCardAssignedEmailSafe(args: {
+  fund: CardAssignedFund & { confirmationEmailsPausedAt: Date | null };
+  card: { id: string; serialNumber: string; number: number | null };
+  member: { id: string } & CardForNotify["member"];
+  logTag: string;
+}): Promise<void> {
+  const { fund, card, member } = args;
+  if (fund.confirmationEmailsPausedAt) return;
+  try {
+    await dispatchCardAssignedEmail({
+      fund,
+      card: {
+        id: card.id,
+        serialNumber: card.serialNumber,
+        number: card.number,
+        memberId: member.id,
+        member: {
+          email: member.email,
+          firstName: member.firstName,
+          lastName: member.lastName,
+          address: member.address,
+          postalCode: member.postalCode,
+          city: member.city,
+        },
+      },
+    });
+  } catch (e) {
+    console.error(`[${args.logTag}] card-assigned email dispatch failed`, card.id, e);
+  }
+}

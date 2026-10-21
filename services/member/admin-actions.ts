@@ -5,7 +5,12 @@ import { getTranslations } from "next-intl/server";
 import { revalidatePath } from "next/cache";
 
 import { requireFundRole } from "@/services/auth/dal";
-import { dispatchCardAssignedEmail, type CardAssignedFund } from "@/services/card/notify";
+import { findForeignCards, requestCardEnrollment } from "@/services/card/enrollment-requests";
+import {
+  dispatchCardAssignedEmail,
+  sendCardAssignedEmailSafe,
+  type CardAssignedFund,
+} from "@/services/card/notify";
 import { getCitizenPayClient } from "@/services/citizenpay/client";
 import { prisma } from "@/services/db/prisma";
 import { nextCardNumber } from "@/services/card/numbering";
@@ -291,19 +296,25 @@ export async function activateMemberAction(input: {
   return { ok: true };
 }
 
-export type AddCardResult = { ok: true } | { error: string };
+export type AddCardResult =
+  | { ok: true; requested?: { fundName: string } }
+  | { error: string };
 
 // Issue an additional card to an already-ACTIVE member (5.3.2). Used for
 // dependants — spouse, children. The new card binds to the same member;
 // at CitizenPay it'll be wired to share the primary's wallet so the
 // spending limit lives on the primary card, not the new one.
+//
+// A serial issued by ANOTHER fund isn't created here: the fund files a
+// CardEnrollmentRequest with the issuer (carrying the member + holder name)
+// and returns `requested`. The card row appears once the issuer accepts.
 export async function addCardAction(input: {
   memberId: string;
   cardSerial: string;
   holderName?: string;
 }): Promise<AddCardResult> {
   const t = await getTranslations();
-  const { fund } = await requireFundRole("OPERATOR");
+  const { user, fund } = await requireFundRole("OPERATOR");
 
   const cardSerial = normalizeSerial(input.cardSerial);
   if (!cardSerial) {
@@ -343,10 +354,12 @@ export async function addCardAction(input: {
   // row is one we should link, not reject (#211 — the prior check flagged ANY
   // existing row, attached or not, as "taken").
   const existing = await prisma.card.findFirst({
-    where: { serialNumber: { equals: cardSerial, mode: "insensitive" } },
+    where: {
+      fundId: fund.id,
+      serialNumber: { equals: cardSerial, mode: "insensitive" },
+    },
     select: {
       id: true,
-      fundId: true,
       serialNumber: true,
       number: true,
       memberId: true,
@@ -356,9 +369,8 @@ export async function addCardAction(input: {
   });
 
   if (existing) {
-    // Bound to a member already, or a card row from another fund (serial
-    // numbers are globally unique) — genuinely taken.
-    if (existing.memberId || existing.fundId !== fund.id) {
+    // Bound to a member already — genuinely taken.
+    if (existing.memberId) {
       return { error: t("members.admin.errors.serialTaken" as never) };
     }
     if (existing.status === "BLOCKED" || existing.reportedLostAt) {
@@ -373,6 +385,28 @@ export async function addCardAction(input: {
     await sendAddCardEmail(fund, card, member);
     revalidatePath("/members");
     return { ok: true };
+  }
+
+  // No local row, but another fund issued this serial: ask the issuer to let
+  // us enroll it instead of registering a duplicate. No CP call, no local
+  // row, no CARD_ASSIGNED email until the issuer accepts.
+  const foreign = (await findForeignCards(fund.id, [cardSerial])).get(cardSerial);
+  if (foreign) {
+    try {
+      await requestCardEnrollment({
+        requesterFund: { id: fund.id, name: fund.name, domain: fund.domain },
+        requestedById: user.id,
+        card: foreign,
+        memberId: member.id,
+        holderName,
+      });
+    } catch (e) {
+      console.error("[addCard] enrollment request failed", cardSerial, e);
+      return { error: t("members.admin.errors.generic" as never) };
+    }
+    revalidatePath("/members");
+    revalidatePath("/cards");
+    return { ok: true, requested: { fundName: foreign.fund.name } };
   }
 
   // No local row yet — this is a brand-new physical card. Register with
@@ -416,7 +450,8 @@ export async function addCardAction(input: {
 
 // Same CARD_ASSIGNED ("your card is on its way") email as activation —
 // dependant cards need it too, gated only by the fund-wide member-email
-// pause. A send failure never fails the add-card flow (#69).
+// pause. A send failure never fails the add-card flow (#69). The body is
+// shared with the cross-fund enrollment accept (services/card/notify.ts).
 async function sendAddCardEmail(
   fund: CardAssignedFund & { confirmationEmailsPausedAt: Date | null },
   card: { id: string; serialNumber: string; number: number | null },
@@ -430,28 +465,7 @@ async function sendAddCardEmail(
     city: string | null;
   },
 ) {
-  if (fund.confirmationEmailsPausedAt) return;
-  try {
-    await dispatchCardAssignedEmail({
-      fund,
-      card: {
-        id: card.id,
-        serialNumber: card.serialNumber,
-        number: card.number,
-        memberId: member.id,
-        member: {
-          email: member.email,
-          firstName: member.firstName,
-          lastName: member.lastName,
-          address: member.address,
-          postalCode: member.postalCode,
-          city: member.city,
-        },
-      },
-    });
-  } catch (e) {
-    console.error("[addCard] card-assigned email dispatch failed", card.id, e);
-  }
+  await sendCardAssignedEmailSafe({ fund, card, member, logTag: "addCard" });
 }
 
 export type InviteMemberResult =

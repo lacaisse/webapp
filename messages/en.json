@@ -700,7 +700,7 @@
       "numberImport": {
         "button": "Import numbers",
         "title": "Import card numbers",
-        "description": "Upload or paste a CSV with headers, then choose the serial and number columns. Serials not yet on file are registered with CitizenPay and created here.",
+        "description": "Upload or paste a CSV with headers, then choose the serial and number columns. Serials not yet on file are registered with CitizenPay and created here. Serials that belong to another fund are not created: a request is sent to that fund instead.",
         "fileLabel": "CSV file",
         "pasteLabel": "Or paste rows",
         "import": "Import",
@@ -709,8 +709,47 @@
         "close": "Close",
         "result": "Applied {applied} number(s); provisioned {provisioned} new card(s); {displaced} displaced.",
         "skipped": "{count} serial(s) couldn't be provisioned",
+        "requested": "{count, plural, one {# serial belongs} other {# serials belong}} to another fund — a request was sent",
+        "requestedItem": "{serial} ({fund})",
         "serialColumn": "Serial column",
         "numberColumn": "Number column"
+      },
+      "enrollmentRequests": {
+        "incomingTitle": "Requests for your cards",
+        "incomingDescription": "Other funds asking to use cards issued by this fund. Accepting enrolls the card in their fund; your balance on the card is not affected.",
+        "outgoingTitle": "Cards requested from other funds",
+        "outgoingDescription": "Cards issued by another fund that this fund asked to use. They are added here once the issuing fund accepts.",
+        "columns": {
+          "serial": "Serial",
+          "number": "Number",
+          "fund": "Fund",
+          "details": "Details",
+          "requested": "Requested",
+          "status": "Status"
+        },
+        "status": {
+          "PENDING": "Pending",
+          "ACCEPTED": "Accepted",
+          "REJECTED": "Rejected",
+          "CANCELLED": "Cancelled"
+        },
+        "accept": "Accept",
+        "accepting": "Accepting…",
+        "reject": "Reject",
+        "rejecting": "Rejecting…",
+        "rejectTitle": "Reject this request?",
+        "rejectDescription": "{fund} won't be able to use card {serial}. They can send a new request later.",
+        "cancel": "Cancel request",
+        "cancelling": "Cancelling…",
+        "cancelTitle": "Cancel this request?",
+        "cancelDescription": "The request to {fund} for card {serial} is withdrawn. You can request the card again later.",
+        "confirmReject": "Reject request",
+        "confirmCancel": "Cancel request",
+        "dismiss": "Back",
+        "requestedNumber": "Number {number}",
+        "forMember": "For {name}",
+        "holder": "Holder: {name}",
+        "viewCard": "View card"
       }
     },
     "allocations": {
@@ -2483,7 +2522,9 @@
         "cancel": "Cancel",
         "confirm": "Add card",
         "adding": "Adding…",
-        "serialRequired": "Card serial number is required."
+        "close": "Close",
+        "serialRequired": "Card serial number is required.",
+        "requested": "Request sent to {fund}. The card will be added here once they accept it."
       },
       "mint": {
         "button": "Mint tokens",
@@ -2859,6 +2900,19 @@
           "empty": "No valid rows found in the CSV.",
           "noMatches": "None of the serials matched a card in this fund.",
           "columnMissing": "Pick both a serial and a number column."
+        }
+      },
+      "enrollmentRequest": {
+        "errors": {
+          "notFound": "Request not found.",
+          "notPending": "This request has already been decided.",
+          "requesterNotConnected": "The requesting fund isn't connected to CitizenPay yet.",
+          "numberTaken": "Another card already uses the requested number.",
+          "failed": "Couldn't process the request. Try again shortly."
+        },
+        "email": {
+          "subject": "Card {serial} requested by {requesterFund}",
+          "body": "{requesterFund} would like to use card {serial}, which is registered to {issuerFund}. Review the request here: {link}\n\nIf you accept, {requesterFund} will be able to top up and charge this card in its own fund. Your own balance on the card is not affected."
         }
       },
       "source": {

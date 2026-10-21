@@ -37,6 +37,7 @@ export function NumberImportDialog() {
     provisioned: number;
     displaced: number;
     skipped: string[];
+    requested: Array<{ serial: string; fundName: string }>;
   } | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -161,11 +162,33 @@ export function NumberImportDialog() {
           {result && (
             <Alert variant={result.skipped.length ? "warning" : "default"}>
               <AlertDescription>
-                {t("result", {
-                  applied: result.applied,
-                  provisioned: result.provisioned,
-                  displaced: result.displaced,
-                })}
+                {/* Nothing applied but serials were requested from their
+                    issuing fund: lead with that, not a "0 applied" line. */}
+                {(result.applied > 0 || result.requested.length === 0) &&
+                  t("result", {
+                    applied: result.applied,
+                    provisioned: result.provisioned,
+                    displaced: result.displaced,
+                  })}
+                {result.requested.length > 0 && (
+                  <div
+                    className={
+                      result.applied > 0 ? "mt-1 text-xs" : undefined
+                    }
+                  >
+                    {t("requested", { count: result.requested.length })}:{" "}
+                    <span className="font-mono text-xs">
+                      {result.requested
+                        .map((r) =>
+                          t("requestedItem", {
+                            serial: r.serial,
+                            fund: r.fundName,
+                          }),
+                        )
+                        .join(", ")}
+                    </span>
+                  </div>
+                )}
                 {result.skipped.length > 0 && (
                   <div className="mt-1 font-mono text-xs">
                     {t("skipped", { count: result.skipped.length })}:{" "}
