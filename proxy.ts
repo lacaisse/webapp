@@ -2,6 +2,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/services/db/prisma";
 import { toCanonicalFundDomain } from "@/services/fund/host";
+import {
+  LOCALE_COOKIE,
+  LOCALE_COOKIE_OPTIONS,
+  langParamRedirect,
+} from "@/services/i18n/lang-param";
 
 // Next 16 renamed `middleware.ts` to `proxy.ts` (function `proxy`).
 // Two responsibilities:
@@ -13,6 +18,8 @@ import { toCanonicalFundDomain } from "@/services/fund/host";
 //      doesn't re-parse Host. Read via services/fund/server.ts.
 //   3. Emit the `frame-ancestors` CSP for the fund's embeddable widgets
 //      (`/embed/*`), from the allowlist the same fund lookup already returns.
+//   4. Turn a `?lang=<locale>` on a GET/HEAD into the `locale` cookie plus a
+//      redirect to the same URL without it (services/i18n/lang-param.ts).
 //
 // Session refresh is NOT done here — Better Auth uses DB-backed sessions
 // looked up on-demand by services/auth/dal.ts#getCurrentUser; the
@@ -41,6 +48,28 @@ export async function proxy(request: NextRequest) {
   request.headers.set("x-pathname", request.nextUrl.pathname);
   if (request.nextUrl.search) {
     request.headers.set("x-search", request.nextUrl.search);
+  }
+
+  // `?lang=` from another origin (the Citizen Pay wallet's "Add funds" link):
+  // persist it as the `locale` cookie and redirect to the same URL without
+  // it, so the choice is one-shot and the cookie stays the single source of
+  // truth. Keeping the param in the URL and letting it win over the cookie
+  // would make the in-page LocaleSwitcher (sets the cookie, revalidates the
+  // same URL) look broken. GET/HEAD only — server actions POST and must reach
+  // the app untouched. Any host type; before the fund lookup so it costs no
+  // DB round-trip. Unsupported values fall through to the normal flow.
+  if (request.method === "GET" || request.method === "HEAD") {
+    const langRedirect = langParamRedirect(new URL(request.nextUrl.href));
+    if (langRedirect) {
+      const redirect = NextResponse.redirect(langRedirect.target, 307);
+      redirect.cookies.set(
+        LOCALE_COOKIE,
+        langRedirect.locale,
+        LOCALE_COOKIE_OPTIONS,
+      );
+      redirect.headers.set("Content-Security-Policy", "frame-ancestors 'self'");
+      return redirect;
+    }
   }
 
   const baseDomain = process.env.APP_DOMAIN ?? "localhost";
