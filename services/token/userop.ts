@@ -902,8 +902,12 @@ async function runUserOp(
     saltNonce?: bigint;
     userOpData?: unknown;
     extraData?: unknown;
+    // `false`: return as soon as the bundler accepted the userop (`txHash`
+    // null) instead of polling it to a terminal state. The caller then owns
+    // the resolution of `userOpHash` to the settlement tx (`getUserOpTx`).
+    awaitConfirmation?: boolean;
   } = {},
-): Promise<{ txHash: Hex; userOpHash: Hex }> {
+): Promise<{ txHash: Hex | null; userOpHash: Hex }> {
   const chainId = ctx.fund.tokenChainId;
   // Everything up to the signed userop is local or a read/sponsor call that
   // cannot put anything on chain — tag its failures (see failedBeforeSubmit).
@@ -955,6 +959,7 @@ async function runUserOp(
       userOpData: opts.userOpData,
       extraData: opts.extraData,
     });
+    if (opts.awaitConfirmation === false) return { txHash: null, userOpHash };
     const txHash = await awaitUserOpSuccess({
       chainId,
       paymaster: ctx.paymaster,
@@ -964,6 +969,18 @@ async function runUserOp(
   } catch (e) {
     throw attachUserOpHash(e, signedHash);
   }
+}
+
+// `runUserOp` with the confirmation wait — the contract every existing caller
+// relies on (`txHash` is the settlement hash).
+async function runUserOpConfirmed(
+  ctx: FundContext,
+  callData: Hex,
+  opts: Parameters<typeof runUserOp>[2] = {},
+): Promise<{ txHash: Hex; userOpHash: Hex }> {
+  return confirmed(
+    await runUserOp(ctx, callData, { ...opts, awaitConfirmation: true }),
+  );
 }
 
 /**
@@ -985,25 +1002,31 @@ export async function call(args: {
     args.value ?? BigInt(0),
     args.data,
   );
-  return await runUserOp(ctx, callData, {
+  return await runUserOpConfirmed(ctx, callData, {
     userOpData: args.userOpData,
     extraData: args.extraData,
   });
 }
 
-export async function mintToken(args: {
+type MintArgs = {
   fund: FundMinterContext;
   to: Address;
   amount: bigint;
   userOpData?: unknown;
   extraData?: unknown;
-}): Promise<{ txHash: Hex; userOpHash: Hex }> {
+};
+
+async function mintUserOp(
+  args: MintArgs,
+  awaitConfirmation: boolean,
+): Promise<{ txHash: Hex | null; userOpHash: Hex }> {
   const ctx = loadFundContext(args.fund);
   const callData = safeMintCallData(ctx.token, args.to, args.amount);
   try {
     return await runUserOp(ctx, callData, {
       userOpData: args.userOpData,
       extraData: args.extraData,
+      awaitConfirmation,
     });
   } catch (e) {
     if (e instanceof UserOpError && e.code === "submit_failed") {
@@ -1013,13 +1036,18 @@ export async function mintToken(args: {
   }
 }
 
-export async function burnFromToken(args: {
+type BurnArgs = {
   fund: FundMinterContext;
   from: Address;
   amount: bigint;
   userOpData?: unknown;
   extraData?: unknown;
-}): Promise<{ txHash: Hex; userOpHash: Hex }> {
+};
+
+async function burnUserOp(
+  args: BurnArgs,
+  awaitConfirmation: boolean,
+): Promise<{ txHash: Hex | null; userOpHash: Hex }> {
   let ctx: FundContext;
   let callData: Hex;
   try {
@@ -1032,6 +1060,7 @@ export async function burnFromToken(args: {
     return await runUserOp(ctx, callData, {
       userOpData: args.userOpData,
       extraData: args.extraData,
+      awaitConfirmation,
     });
   } catch (e) {
     if (e instanceof UserOpError && e.code === "submit_failed") {
@@ -1050,6 +1079,53 @@ export async function burnFromToken(args: {
     }
     throw e;
   }
+}
+
+function confirmed(r: {
+  txHash: Hex | null;
+  userOpHash: Hex;
+}): { txHash: Hex; userOpHash: Hex } {
+  if (!r.txHash) {
+    throw new UserOpError("tx_failed", `UserOp ${r.userOpHash} has no tx hash`);
+  }
+  return { txHash: r.txHash, userOpHash: r.userOpHash };
+}
+
+/** Mint, polling the bundler until the userop settled: `txHash` is the settlement tx. */
+export async function mintToken(
+  args: MintArgs,
+): Promise<{ txHash: Hex; userOpHash: Hex }> {
+  return confirmed(await mintUserOp(args, true));
+}
+
+/**
+ * Mint, returning as soon as the bundler accepted the userop. Acceptance is
+ * the success — settlement normally follows within seconds — and the caller
+ * owns the resolution of `userOpHash` to the mined tx (`getUserOpTx`, as the
+ * annotation queue and the reconcile action do). A throw means the bundler
+ * did not take the op (or the call to it failed: `attemptedUserOpHash` then
+ * carries the signed hash to check).
+ */
+export async function submitMintToken(
+  args: MintArgs,
+): Promise<{ userOpHash: Hex }> {
+  const { userOpHash } = await mintUserOp(args, false);
+  return { userOpHash };
+}
+
+/** Burn from `from`, polling the bundler until the userop settled. */
+export async function burnFromToken(
+  args: BurnArgs,
+): Promise<{ txHash: Hex; userOpHash: Hex }> {
+  return confirmed(await burnUserOp(args, true));
+}
+
+/** Burn, returning once the bundler accepted the userop — see `submitMintToken`. */
+export async function submitBurnFromToken(
+  args: BurnArgs,
+): Promise<{ userOpHash: Hex }> {
+  const { userOpHash } = await burnUserOp(args, false);
+  return { userOpHash };
 }
 
 /**
@@ -1071,7 +1147,7 @@ export async function transferFromAccount(args: {
 }): Promise<{ txHash: Hex; userOpHash: Hex }> {
   const ctx = loadFundContext(args.fund);
   const callData = safeTransferCallData(ctx.token, args.to, args.amount);
-  return await runUserOp(ctx, callData, {
+  return await runUserOpConfirmed(ctx, callData, {
     sender: args.sender,
     saltNonce: args.saltNonce,
     userOpData: args.userOpData,

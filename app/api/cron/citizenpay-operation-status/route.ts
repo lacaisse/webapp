@@ -25,7 +25,14 @@ export async function GET(request: NextRequest) {
   if (gate) return gate;
 
   const ops = await prisma.tokenOperation.findMany({
-    where: { status: "PENDING", txHash: { not: null } },
+    where: {
+      status: "PENDING",
+      txHash: { not: null },
+      // Terminal top-ups resolve their own userop hashes against the bundler
+      // (services/topup-orders/run.ts) — CP's unconditional CONFIRMED here
+      // would freeze the userop hash on the row before the mined tx replaces it.
+      type: { notIn: ["TOPUP", "TOPUP_REVERSAL"] },
+    },
     orderBy: { submittedAt: "asc" },
     take: BATCH_SIZE,
     select: {

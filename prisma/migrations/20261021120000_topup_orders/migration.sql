@@ -13,7 +13,8 @@ ALTER TYPE "TokenOperationType" ADD VALUE 'TOPUP';
 ALTER TYPE "TokenOperationType" ADD VALUE 'TOPUP_REVERSAL';
 
 -- AlterTable
-ALTER TABLE "TokenOperation" ADD COLUMN "topUpOrderId" INTEGER,
+ALTER TABLE "TokenOperation" ADD COLUMN "userOpHash" TEXT,
+ADD COLUMN "topUpOrderId" INTEGER,
 ADD COLUMN "topUpSerial" TEXT,
 ADD COLUMN "topUpPlaceName" TEXT;
 

@@ -42,6 +42,7 @@ function op(
     type: "TOPUP",
     status,
     txHash: status === "CONFIRMED" ? `0xhash${topUpOrderId}` : null,
+    userOpHash: status === "CONFIRMED" ? `0xuo${topUpOrderId}` : null,
     topUpOrderId,
     ...overrides,
   };
@@ -62,7 +63,7 @@ describe("planTopUpOrders", () => {
     expect(a).toMatchObject({ kind: "burn", units: BigInt(1250) });
   });
 
-  it("never mints an order whose tokens already moved: only the report is resent", () => {
+  it("never mints an order whose userop settled: only the report is resent, with the userop hash", () => {
     const [a] = planTopUpOrders([order(1)], [op(1, "CONFIRMED")], {
       decimals: 6,
       now: NOW,
@@ -71,8 +72,17 @@ describe("planTopUpOrders", () => {
       kind: "report",
       order: expect.objectContaining({ orderId: 1 }),
       opId: "op-1-CONFIRMED",
-      txHash: "0xhash1",
+      txHash: "0xuo1",
     });
+  });
+
+  it("falls back to txHash for a settled op without a userop hash", () => {
+    const [a] = planTopUpOrders(
+      [order(1)],
+      [op(1, "CONFIRMED", { userOpHash: null })],
+      { decimals: 6, now: NOW },
+    );
+    expect(a).toMatchObject({ kind: "report", txHash: "0xhash1" });
   });
 
   it("retries after a FAILED attempt", () => {
@@ -83,13 +93,21 @@ describe("planTopUpOrders", () => {
     expect(a.kind).toBe("mint");
   });
 
-  it("leaves an order with a PENDING op alone (in flight or needs an operator)", () => {
+  it("leaves an order with a PENDING op alone (being submitted, or awaiting the bundler)", () => {
     const [a] = planTopUpOrders(
       [order(1)],
       [op(1, "FAILED"), op(1, "PENDING")],
       { decimals: 6, now: NOW },
     );
     expect(a).toMatchObject({ kind: "skip", reason: "in_flight" });
+    // Submitted but not yet resolved: still not a report — CP may already
+    // have been told, and the hash is only final once the bundler says so.
+    const [b] = planTopUpOrders(
+      [order(1)],
+      [op(1, "PENDING", { txHash: "0xuo1", userOpHash: "0xuo1" })],
+      { decimals: 6, now: NOW },
+    );
+    expect(b).toMatchObject({ kind: "skip", reason: "in_flight" });
   });
 
   it("keys idempotency by order id AND op type: a mint does not block the reversal", () => {

@@ -273,10 +273,15 @@ cron (`services/topup-orders/run.ts`) does that per connected fund, bounded to
 25 orders a run, each fund isolated from the others. Citizen Pay's 10-minute
 claim is the lock between concurrent runs; the local `TokenOperation` of type
 `TOPUP` / `TOPUP_REVERSAL` keyed by `topUpOrderId` is the memory across runs
-(`services/topup-orders/plan.ts`): an order whose tokens already moved is never
-minted again — only its report is resent; an order whose op is still PENDING
-(a run died mid-userop) is left to an operator. A failure before the userop
-was sent marks the op FAILED and the order is retried once the claim expires.
+(`services/topup-orders/plan.ts`). Acceptance by the bundler is the success:
+the report goes to Citizen Pay right after `eth_sendUserOperation`, with the
+userop hash, and each run first resolves the fund's submitted ops against the
+bundler so the history row gains the mined tx hash (the userop hash stays on
+`TokenOperation.userOpHash`). An order whose userop settled is never minted
+again — only its report is resent; one still PENDING is left alone; only a
+refused submission marks the op FAILED, and the order is retried once the claim
+expires. A submission that reverts, or stays unknown to the bundler for an hour,
+is failed and surfaced.
 There is no alert channel: failures go to the logs and to `Fund.topUpOrdersRun*`,
 shown on Settings → Token; the member's history shows "Top-up paid at <place>".
 

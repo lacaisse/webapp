@@ -10,10 +10,12 @@ import type { TopUpOrder } from "@/services/citizenpay/types";
 //
 // Idempotency has two layers. Citizen Pay's 10-minute claim is the lock
 // between concurrent runs; the local TokenOperation keyed by order id is the
-// memory across runs: an order whose tokens we already moved (a CONFIRMED op
-// with a hash) is never minted again — only its report is retried — and an
-// order whose op is still PENDING (a run died mid-mint, or the userop may be
-// on chain) is left to an operator rather than retried blind.
+// memory across runs: an order whose userop settled (a CONFIRMED op) is never
+// minted again — only its report is retried, with the userop hash — and an
+// order whose op is still PENDING (a run is submitting it, or its userop is
+// awaiting resolution against the bundler) is left alone rather than retried
+// blind. Only a FAILED op (the bundler refused the userop, or it never
+// settled) frees the order for another attempt.
 
 export const MAX_TOPUP_ORDERS_PER_RUN = 25;
 
@@ -27,11 +29,12 @@ export type LocalTopUpOp = {
   type: TopUpOpType;
   status: "PENDING" | "CONFIRMED" | "FAILED";
   txHash: string | null;
+  userOpHash: string | null;
   topUpOrderId: number | null;
 };
 
 export type TopUpSkipReason =
-  | "in_flight" // a local op is still PENDING: a run is working on it, or died mid-mint
+  | "in_flight" // a local op is still PENDING: being submitted, or awaiting the bundler
   | "claimed" // CP lists a live claim (ours from a failed attempt, or another runner's)
   | "amount_invalid" // not a positive amount representable in the token's decimals
   | "bounded"; // over the per-run limit — next tick
@@ -40,8 +43,9 @@ export type TopUpAction =
   | { kind: "mint"; order: TopUpOrder; units: bigint }
   | { kind: "burn"; order: TopUpOrder; units: bigint }
   | {
-      // Tokens already moved for this order (local CONFIRMED op) but CP still
-      // lists it: the credit / reverse report didn't land — resend it.
+      // The userop settled for this order (local CONFIRMED op) but CP still
+      // lists it: the credit / reverse report didn't land — resend it with the
+      // hash the bundler returned (CP keys on userop hashes).
       kind: "report";
       order: TopUpOrder;
       opId: string;
@@ -75,7 +79,9 @@ export function planTopUpOrders(
     const ops = localOps.filter(
       (op) => op.topUpOrderId === order.orderId && op.type === type,
     );
-    const done = ops.find((op) => op.status === "CONFIRMED" && op.txHash);
+    const done = ops.find(
+      (op) => op.status === "CONFIRMED" && (op.userOpHash || op.txHash),
+    );
     const inFlight = ops.some((op) => op.status === "PENDING");
 
     if (inFlight) {
@@ -99,7 +105,7 @@ export function planTopUpOrders(
         kind: "report",
         order,
         opId: done.id,
-        txHash: done.txHash as string,
+        txHash: (done.userOpHash ?? done.txHash) as string,
       });
       continue;
     }

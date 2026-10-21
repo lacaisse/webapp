@@ -10,12 +10,14 @@ import {
   type FundCredentials,
 } from "@/services/citizenpay/client";
 import type { TopUpOrder, TopUpOrderState } from "@/services/citizenpay/types";
+import { Prisma } from "@/services/db/generated/client";
 import { prisma } from "@/services/db/prisma";
 import {
   attemptedUserOpHash,
-  burnFromToken,
   failedBeforeSubmit,
-  mintToken,
+  getUserOpTx,
+  submitBurnFromToken,
+  submitMintToken,
   UserOpError,
   type FundMinterContext,
 } from "@/services/token/userop";
@@ -38,15 +40,19 @@ import {
 // then refunded) are burned back from it.
 //
 // Per order: claim (CP's 10-minute lock — a 409 means another attempt holds
-// it, skip) → TokenOperation PENDING keyed by the order id → mint / burn via
-// the shared userop path → op CONFIRMED with the tx hash → credit / reverse
-// report with {claimId, txHash}. Anything after the userop resolved is
-// bookkeeping: logged, never thrown, never FAILED — the next tick finds the
-// CONFIRMED op and only resends the report (plan.ts "report"). A failure
-// before the userop was sent marks the op FAILED and the order is retried
-// once the claim expires; a failure that may have reached the chain keeps the
-// op PENDING with the userop hash in its error text, and plan.ts leaves the
-// order to an operator (ReconcileOperationButton on the member page).
+// it, skip) → TokenOperation PENDING keyed by the order id → submit the
+// userop through the bundler. Acceptance by the bundler IS the success:
+// settlement follows within seconds, so the credit / reverse report
+// `{claimId, txHash}` goes to CP right away with the userop hash the bundler
+// returned (CP keys on userop hashes), and the op keeps that hash as `txHash`
+// + `userOpHash`. Every run first resolves the fund's submitted ops against
+// the bundler (`getUserOpTx`, as the annotation queue and the reconcile action
+// do): settled → CONFIRMED with the mined tx as `txHash`; reverted / timed
+// out, or still unknown after STALE_SUBMISSION_MS → FAILED (logged — CP was
+// told credited). Only a submission failure (the bundler refused the op, or
+// nothing was sent) marks the op FAILED at once, and the order is retried once
+// the claim expires. A failed report is logged and resent on a later tick, once
+// the op is CONFIRMED (plan.ts "report"); the tokens are never moved twice.
 //
 // There is no alert channel in this app: failures go to console.error (Vercel
 // logs) and to Fund.topUpOrdersRun* for Settings → Token.
@@ -59,24 +65,31 @@ export type TopUpRunFund = FundMinterContext &
 
 export type TopUpRunStats = {
   listed: number;
-  minted: number;
-  reversed: number;
+  minted: number; // mint userops the bundler accepted this run
+  reversed: number; // burn userops the bundler accepted this run
   reported: number; // report-only resends that landed
+  confirmed: number; // earlier submissions resolved to a mined tx this run
   skipped: number;
   failed: number;
   errors: string[];
 };
 
 // Injectable seams for the unit test (and nothing else): the CP client and
-// the two userop entry points. Prisma is used directly.
+// the bundler entry points. Prisma is used directly.
 export type TopUpRunDeps = {
   client: CitizenPayClient;
-  mint: typeof mintToken;
-  burn: typeof burnFromToken;
+  submitMint: typeof submitMintToken;
+  submitBurn: typeof submitBurnFromToken;
+  resolve: typeof getUserOpTx;
   now: Date;
 };
 
 const STATES: TopUpOrderState[] = ["pending", "reversal_pending"];
+
+// A submitted userop the bundler still doesn't resolve after this long never
+// made it (a send call that timed out without the bundler taking it): fail the
+// op so the order can be retried.
+export const STALE_SUBMISSION_MS = 60 * 60 * 1000;
 
 // UserOpError codes raised while building the userop, before anything is
 // handed to the bundler (same list as services/card-topup/settle.ts).
@@ -96,14 +109,16 @@ export async function runTopUpOrders(
     minted: 0,
     reversed: 0,
     reported: 0,
+    confirmed: 0,
     skipped: 0,
     failed: 0,
     errors: [],
   };
   const deps: TopUpRunDeps = {
     client: overrides.client ?? getCitizenPayClient(fund),
-    mint: overrides.mint ?? mintToken,
-    burn: overrides.burn ?? burnFromToken,
+    submitMint: overrides.submitMint ?? submitMintToken,
+    submitBurn: overrides.submitBurn ?? submitBurnFromToken,
+    resolve: overrides.resolve ?? getUserOpTx,
     now: overrides.now ?? new Date(),
   };
 
@@ -116,6 +131,8 @@ export async function runTopUpOrders(
       return stats;
     }
     const decimals = fund.tokenDecimals;
+
+    await resolveSubmitted(fund, deps, stats);
 
     let budget = MAX_TOPUP_ORDERS_PER_RUN;
     for (const state of STATES) {
@@ -141,6 +158,7 @@ export async function runTopUpOrders(
           type: true,
           status: true,
           txHash: true,
+          userOpHash: true,
           topUpOrderId: true,
         },
       });
@@ -198,6 +216,88 @@ export async function runTopUpOrders(
   return stats;
 }
 
+// Resolve the fund's submitted top-up userops (PENDING with a hash) against
+// the bundler. Settled → CONFIRMED and the mined tx replaces the userop hash
+// (kept on `userOpHash`); reverted / timed out, or unknown for too long →
+// FAILED. Failures here are logged and counted — CP was already told
+// credited, so an operator has to look.
+async function resolveSubmitted(
+  fund: TopUpRunFund,
+  deps: TopUpRunDeps,
+  stats: TopUpRunStats,
+): Promise<void> {
+  const ops = await prisma.tokenOperation.findMany({
+    where: {
+      fundId: fund.id,
+      type: { in: ["TOPUP", "TOPUP_REVERSAL"] },
+      status: "PENDING",
+      txHash: { not: null },
+    },
+    orderBy: { submittedAt: "asc" },
+    take: 50,
+    select: { id: true, txHash: true, submittedAt: true, topUpOrderId: true },
+  });
+
+  for (const op of ops) {
+    if (!op.txHash) continue;
+    const ids = { fundId: fund.id, orderId: op.topUpOrderId, opId: op.id };
+    let res: Awaited<ReturnType<typeof getUserOpTx>>;
+    try {
+      res = await deps.resolve(fund.tokenChainId, op.txHash);
+    } catch (e) {
+      console.warn("[topup-orders] resolve failed; next tick", ids, e);
+      continue;
+    }
+
+    if (res.status === "success" && res.txHash) {
+      const minedTx = res.txHash;
+      try {
+        await prisma.tokenOperation.update({
+          where: { id: op.id },
+          data: { status: "CONFIRMED", txHash: minedTx, confirmedAt: new Date() },
+        });
+      } catch (e) {
+        // Two userops of one bundle settle in the same tx, and `txHash` is
+        // unique: keep the userop hash on this row (still CONFIRMED).
+        if (!isUniqueViolation(e)) throw e;
+        await prisma.tokenOperation.update({
+          where: { id: op.id },
+          data: { status: "CONFIRMED", confirmedAt: new Date() },
+        });
+        console.warn("[topup-orders] mined tx shared with another op", {
+          ...ids,
+          txHash: minedTx,
+        });
+      }
+      stats.confirmed += 1;
+      continue;
+    }
+
+    const stale =
+      deps.now.getTime() - op.submittedAt.getTime() > STALE_SUBMISSION_MS;
+    if (res.status === "reverted" || res.status === "timeout" || stale) {
+      const errorMessage =
+        res.status === "reverted" || res.status === "timeout"
+          ? `userop ${res.status} on chain [userOp ${op.txHash}]`
+          : `userop not settled after ${STALE_SUBMISSION_MS / 60_000} min [userOp ${op.txHash}]`;
+      await bestEffort("fail op", ids, () =>
+        prisma.tokenOperation.update({
+          where: { id: op.id },
+          data: { status: "FAILED", errorMessage },
+        }),
+      );
+      stats.failed += 1;
+      stats.errors.push(`order ${op.topUpOrderId}: ${errorMessage}`);
+      console.error("[topup-orders] submitted userop did not settle", {
+        ...ids,
+        status: res.status,
+        txHash: res.txHash,
+      });
+    }
+    // Still pending / submitted and young: next tick.
+  }
+}
+
 async function settleOne(
   fund: TopUpRunFund,
   deps: TopUpRunDeps,
@@ -222,14 +322,14 @@ async function settleOne(
     throw e;
   }
 
-  // 2. A report-only resend: the tokens moved in an earlier run.
+  // 2. A report-only resend: the userop already settled in an earlier run.
   if (action.kind === "report") {
     const ok = await report(deps, order, { claimId, txHash: action.txHash }, stats, ids);
     if (ok) stats.reported += 1;
     return;
   }
 
-  // 3. Record, then move the tokens.
+  // 3. Record, then hand the userop to the bundler.
   const card = await prisma.card.findFirst({
     where: {
       fundId: fund.id,
@@ -253,38 +353,39 @@ async function settleOne(
     select: { id: true },
   });
 
-  let moved: { txHash: string; userOpHash: string };
+  let userOpHash: string;
   try {
-    moved =
+    ({ userOpHash } =
       action.kind === "mint"
-        ? await deps.mint({
+        ? await deps.submitMint({
             fund,
             to: order.cardAddress as `0x${string}`,
             amount: action.units,
           })
-        : await deps.burn({
+        : await deps.submitBurn({
             fund,
             from: order.cardAddress as `0x${string}`,
             amount: action.units,
-          });
+          }));
   } catch (e) {
-    await recordFailure(op.id, e, ids);
+    await recordSubmitFailure(op.id, e, ids);
     stats.failed += 1;
     stats.errors.push(`order ${order.orderId}: ${errorText(e)}`);
     return;
   }
 
-  // Submitted and confirmed by the bundler: only bookkeeping from here on.
-  await bestEffort("confirm op", { ...ids, opId: op.id }, () =>
+  // Accepted by the bundler: the top-up is done from CP's point of view.
+  // Only bookkeeping from here on — logged, never thrown, never FAILED.
+  await bestEffort("record userop", { ...ids, opId: op.id }, () =>
     prisma.tokenOperation.update({
       where: { id: op.id },
-      data: { status: "CONFIRMED", txHash: moved.txHash, confirmedAt: new Date() },
+      data: { txHash: userOpHash, userOpHash },
     }),
   );
   if (action.kind === "mint") stats.minted += 1;
   else stats.reversed += 1;
 
-  await report(deps, order, { claimId, txHash: moved.txHash }, stats, ids);
+  await report(deps, order, { claimId, txHash: userOpHash }, stats, ids);
 
   const trigger =
     action.kind === "mint"
@@ -294,7 +395,7 @@ async function settleOne(
     resolveOrEnqueueAnnotation({
       fundId: fund.id,
       chainId: fund.tokenChainId,
-      userOpHash: moved.userOpHash,
+      userOpHash,
       kind: trigger,
       note: order.placeName
         ? `Top-up order ${order.orderId} at ${order.placeName}`
@@ -305,9 +406,9 @@ async function settleOne(
   );
 }
 
-// Tell CP the tokens moved. A 409 `already credited` means an earlier report
-// landed — done. Any other failure is logged and counted; the CONFIRMED op
-// makes the next tick resend just the report.
+// Tell CP the tokens are on their way (userop hash). A 409 `already credited`
+// means an earlier report landed — done. Any other failure is logged and
+// counted; once the op is CONFIRMED the next tick resends just the report.
 async function report(
   deps: TopUpRunDeps,
   order: TopUpOrder,
@@ -341,7 +442,13 @@ async function report(
   }
 }
 
-async function recordFailure(
+// The bundler did not take the userop — or the call to it failed. Nothing
+// sent (tagged pre-submit, a build-time code, or no attempted hash) → FAILED,
+// retried once the claim expires. A send call that failed after the userop
+// was signed and handed over may still have been accepted: keep the attempt's
+// hash on the row and let `resolveSubmitted` decide (settled → CONFIRMED and
+// reported on the next tick; unknown for STALE_SUBMISSION_MS → FAILED).
+async function recordSubmitFailure(
   opId: string,
   e: unknown,
   ids: { fundId: string; orderId: number },
@@ -349,25 +456,31 @@ async function recordFailure(
   const userOpHash = attemptedUserOpHash(e);
   const preSubmit =
     failedBeforeSubmit(e) ||
-    (e instanceof UserOpError && PRE_SUBMIT_CODES.has(e.code));
+    (e instanceof UserOpError && PRE_SUBMIT_CODES.has(e.code)) ||
+    !userOpHash;
   const errorMessage =
     (e instanceof UserOpError ? `${e.code}: ${e.message}` : String(e)) +
     (userOpHash ? ` [userOp ${userOpHash}]` : "");
-  console.error("[topup-orders] userop failed", {
+  console.error("[topup-orders] submit failed", {
     ...ids,
     opId,
     preSubmit,
     userOpHash,
     error: errorMessage,
   });
-  // Nothing was sent → FAILED, retried once the claim expires. Possibly on
-  // chain → stays PENDING (plan.ts "in_flight") for an operator to reconcile;
-  // minting again blind could credit the card twice.
   await bestEffort("mark op", { ...ids, opId }, () =>
     prisma.tokenOperation.update({
       where: { id: opId },
-      data: preSubmit ? { status: "FAILED", errorMessage } : { errorMessage },
+      data: preSubmit
+        ? { status: "FAILED", errorMessage }
+        : { errorMessage, txHash: userOpHash, userOpHash },
     }),
+  );
+}
+
+function isUniqueViolation(e: unknown): boolean {
+  return (
+    e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002"
   );
 }
 
