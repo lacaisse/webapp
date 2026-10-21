@@ -167,7 +167,9 @@
         "BANK_SYNC": "Dépôt bancaire (auto)",
         "PERIOD_CLOSE": "Clôture de période",
         "ALLOCATION_RUN": "Lancement d'allocation",
-        "CARD_TRANSFER": "Transfert de carte"
+        "CARD_TRANSFER": "Transfert de carte",
+        "TERMINAL_TOPUP": "Recharge au terminal (auto)",
+        "TERMINAL_TOPUP_REVERSAL": "Annulation de recharge au terminal (auto)"
       },
       "edit": "Annoter",
       "title": "Annoter la transaction",
@@ -444,7 +446,9 @@
         "type": {
           "MINT": "Allocation",
           "BURN": "Destruction",
-          "TRANSFER": "Transfert"
+          "TRANSFER": "Transfert",
+          "TOPUP": "Recharge au terminal",
+          "TOPUP_REVERSAL": "Annulation de recharge"
         },
         "status": {
           "PENDING": "en attente",
@@ -540,7 +544,12 @@
           "period": "Période",
           "amount": "Montant",
           "status": "Statut",
-          "empty": "Aucune opération pour le moment."
+          "empty": "Aucune opération pour le moment.",
+          "types": {
+            "TOPUP": "Recharge payée chez {place}",
+            "TOPUP_REVERSAL": "Recharge annulée chez {place}"
+          },
+          "unknownPlace": "un terminal"
         },
         "bank": {
           "title": "Mouvements bancaires",
@@ -1764,6 +1773,16 @@
           "permissionGranted": "Active",
           "permissionMissing": "Manquante",
           "permissionUnknown": "Inconnue"
+        },
+        "topUps": {
+          "title": "Recharges au terminal",
+          "description": "Les recharges que les membres paient sur un terminal Citizen Pay sont émises sur leur carte par cette caisse chaque minute.",
+          "lastRunLabel": "Dernière exécution",
+          "mintedLabel": "Émises",
+          "reversedLabel": "Annulées",
+          "failedLabel": "Échecs",
+          "errorLabel": "Dernière erreur",
+          "neverRan": "Aucune exécution pour l’instant."
         }
       },
       "onboarding": {

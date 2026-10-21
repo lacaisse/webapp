@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { CheckCircle2, Coins, HelpCircle, XCircle } from "lucide-react";
-import { getTranslations } from "next-intl/server";
+import { getFormatter, getTranslations } from "next-intl/server";
 
 import { CopyButton } from "@/components/copy-button";
 import { checkMinterRole, type RoleStatus } from "@/services/token/permissions";
@@ -32,6 +32,7 @@ export async function TokenInfo({
   token,
   minter,
   connected,
+  topUpRun,
 }: {
   token: {
     address: string | null;
@@ -46,8 +47,18 @@ export async function TokenInfo({
     smartAccountAddress: string | null;
   };
   connected: boolean;
+  // Last run of the terminal top-up cron (app/api/cron/topups) for this
+  // fund — see Fund.topUpOrdersRun*.
+  topUpRun: {
+    at: Date | null;
+    minted: number;
+    reversed: number;
+    failed: number;
+    error: string | null;
+  };
 }) {
   const t = await getTranslations("fund.settings.token");
+  const format = await getFormatter();
   const hasAny =
     token.address ||
     token.name ||
@@ -174,6 +185,49 @@ export async function TokenInfo({
             </>
           )}
         </dl>
+      </div>
+
+      <div className="space-y-3 border-t pt-6">
+        <div>
+          <h3 className="text-sm font-medium">{t("topUps.title")}</h3>
+          <p className="text-xs text-muted-foreground">
+            {t("topUps.description")}
+          </p>
+        </div>
+
+        {topUpRun.at ? (
+          <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1.5 text-sm">
+            <dt className="text-muted-foreground">{t("topUps.lastRunLabel")}</dt>
+            <dd>
+              {format.dateTime(topUpRun.at, {
+                dateStyle: "medium",
+                timeStyle: "short",
+              })}
+            </dd>
+
+            <dt className="text-muted-foreground">{t("topUps.mintedLabel")}</dt>
+            <dd className="tabular-nums">{topUpRun.minted}</dd>
+
+            <dt className="text-muted-foreground">{t("topUps.reversedLabel")}</dt>
+            <dd className="tabular-nums">{topUpRun.reversed}</dd>
+
+            <dt className="text-muted-foreground">{t("topUps.failedLabel")}</dt>
+            <dd className={topUpRun.failed > 0 ? "text-destructive tabular-nums" : "tabular-nums"}>
+              {topUpRun.failed}
+            </dd>
+
+            {topUpRun.error && (
+              <>
+                <dt className="text-muted-foreground">{t("topUps.errorLabel")}</dt>
+                <dd className="font-mono text-xs break-all text-destructive">
+                  {topUpRun.error}
+                </dd>
+              </>
+            )}
+          </dl>
+        ) : (
+          <p className="text-sm text-muted-foreground">{t("topUps.neverRan")}</p>
+        )}
       </div>
     </div>
   );

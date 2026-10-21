@@ -14,6 +14,7 @@ import {
   payouts as apiPayouts,
   places as apiPlaces,
   profiles as apiProfiles,
+  topups as apiTopups,
   treasury as apiTreasury,
   PROFILES_BATCH_MAX,
   TOP_UP_URL_TIMEOUT_MS,
@@ -31,6 +32,7 @@ import {
   type RecomputedPayoutWire,
   type BankTransactionWire,
   type FeeCollectionFrequencyWire,
+  type TopUpOrderWire,
 } from "./api";
 import type { CitizenPayClient } from "./client-interface";
 import type {
@@ -80,6 +82,10 @@ import type {
   SubmitMintInput,
   SubmittedOperation,
   TopUpSignUrlInput,
+  TopUpOrder,
+  TopUpOrderClaim,
+  TopUpOrderReport,
+  TopUpOrderState,
 } from "./types";
 
 // Adapts the OpenAPI-shaped low-level api.ts to the high-level interface the
@@ -1113,6 +1119,59 @@ export class LiveCitizenPayClient implements CitizenPayClient {
       throw e;
     }
   }
+
+  async listTopUpOrders(state: TopUpOrderState): Promise<TopUpOrder[]> {
+    const w = await apiTopups.list(this.creds, state);
+    return (w.topups ?? []).map(topUpOrderFromWire);
+  }
+
+  async claimTopUpOrder(orderId: number): Promise<TopUpOrderClaim> {
+    const res = await apiTopups.claim(this.creds, orderId);
+    // A 2xx without a claim id would let the mint run unguarded — fail closed.
+    if (!res || typeof res.claimId !== "string" || !res.claimId) {
+      throw new Error("topup claim returned no claimId");
+    }
+    return { claimId: res.claimId, expiresAt: parseDate(res.expiresAt) };
+  }
+
+  async creditTopUpOrder(
+    orderId: number,
+    report: TopUpOrderReport,
+  ): Promise<void> {
+    await apiTopups.credit(this.creds, orderId, report);
+  }
+
+  async reverseTopUpOrder(
+    orderId: number,
+    report: TopUpOrderReport,
+  ): Promise<void> {
+    await apiTopups.reverse(this.creds, orderId, report);
+  }
+}
+
+function parseDate(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+// Wire → internal top-up order. Exported for the request-shape tests. Order
+// ids and amounts are numbers on the wire; a string (older api) is coerced so
+// the local idempotency key (TokenOperation.topUpOrderId, an Int) stays one
+// value per order.
+export function topUpOrderFromWire(w: TopUpOrderWire): TopUpOrder {
+  return {
+    orderId: Number(w.orderId),
+    serial: w.serial,
+    cardAddress: w.cardAddress,
+    amountCents: Number(w.amount),
+    token: w.token,
+    placeId: w.placeId == null ? null : String(w.placeId),
+    placeName: w.placeName ?? null,
+    paidAt: parseDate(w.paidAt),
+    state: w.state as TopUpOrder["state"],
+    claimedAt: parseDate(w.claimedAt),
+  };
 }
 
 function wireToProfile(wire: {

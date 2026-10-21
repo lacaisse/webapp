@@ -608,3 +608,28 @@ export type PaymentRequestState = {
   account: string | null;
   orderId: number | null;
 };
+
+// A top-up a member paid at a Citizen Pay terminal (pay-pos in `topup` mode),
+// settled on CP's side and waiting for the issuer to move tokens on chain:
+// `pending` → mint `amountCents` to `cardAddress`; `reversal_pending` → the
+// credited top-up was refunded, burn it back. See services/topup-orders/.
+export type TopUpOrderState = "pending" | "reversal_pending";
+
+export type TopUpOrder = {
+  orderId: number;
+  serial: string;
+  cardAddress: string;
+  amountCents: number;
+  token: string;
+  placeId: string | null;
+  placeName: string | null;
+  paidAt: Date | null;
+  state: TopUpOrderState;
+  // Set while another claim is live (ours from a run that died, or someone
+  // else's). CP refuses a second claim until it expires.
+  claimedAt: Date | null;
+};
+
+export type TopUpOrderClaim = { claimId: string; expiresAt: Date | null };
+
+export type TopUpOrderReport = { claimId: string; txHash: string };

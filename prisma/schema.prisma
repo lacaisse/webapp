@@ -276,6 +276,15 @@ model Fund {
   tokenMinterSmartAccountAddress String?
   tokenMintEnabledAt             DateTime?
 
+  // Last run of the terminal top-up cron (app/api/cron/topups) for this fund:
+  // when, how many orders were minted / reversed, how many failed, and the
+  // last failure text. Shown read-only on Settings → Token.
+  topUpOrdersRunAt       DateTime?
+  topUpOrdersRunMinted   Int       @default(0)
+  topUpOrdersRunReversed Int       @default(0)
+  topUpOrdersRunFailed   Int       @default(0)
+  topUpOrdersRunError    String?
+
   // Allocation mode. FIXED_PERIOD runs auto-allocations on a recurring
   // cadence (period entries live in a separate AllocationPeriod model
   // TBD); PAY_AND_GO mints immediately when CitizenPay reports a deposit.
@@ -1467,6 +1476,15 @@ model TokenOperation {
   // Transactional emails referencing this op (e.g. allocation confirmation).
   emails Email[]
 
+  // For TOPUP / TOPUP_REVERSAL: the Citizen Pay order the member paid at a
+  // terminal (GET /v2/treasury/topups). The order id is the idempotency key —
+  // the top-up cron never mints an order that already has a non-FAILED op of
+  // the same type (services/topup-orders/plan.ts). Serial + place name are
+  // snapshots for the history ("Top-up paid at <place>").
+  topUpOrderId   Int?
+  topUpSerial    String?
+  topUpPlaceName String?
+
   // Set when this MINT credits an open-banking card top-up (CardTopUp).
   cardTopUp CardTopUp?
 
@@ -1476,12 +1494,15 @@ model TokenOperation {
   @@index([fundId, status])
   @@index([memberId])
   @@index([tierId])
+  @@index([fundId, topUpOrderId])
 }
 
 enum TokenOperationType {
   MINT // create new tokens for a member's primary card
   BURN // destroy tokens (e.g. correction)
   TRANSFER // move tokens between accounts
+  TOPUP // mint to a card for a top-up paid at a Citizen Pay terminal
+  TOPUP_REVERSAL // burn from a card: a terminal top-up refunded / reversed
 }
 
 enum TokenOperationStatus {

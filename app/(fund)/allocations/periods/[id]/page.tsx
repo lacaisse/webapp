@@ -29,7 +29,7 @@ import { AttributeDialog } from "@/app/(fund)/allocations/bank-transaction-actio
 import { maskValue } from "@/lib/privacy";
 import { fetchFundPeriods } from "@/app/(fund)/bank/data";
 import { findAllocationPlans } from "@/services/allocation-periods/run";
-import { Prisma } from "@/services/db/generated/client";
+import { Prisma, type TokenOperationType } from "@/services/db/generated/client";
 import { prisma } from "@/services/db/prisma";
 import { requireFundRole } from "@/services/auth/dal";
 import { requireCurrentFund } from "@/services/fund/server";
@@ -818,7 +818,7 @@ function depositAllocation(
 //   - failed:  only FAILED/QUEUED attempts so far → "Retry"
 //   - notSent: no email yet → "Send"
 function mintNotification(op: {
-  type: "MINT" | "BURN" | "TRANSFER";
+  type: TokenOperationType;
   status: "PENDING" | "CONFIRMED" | "FAILED";
   hasEmail: boolean;
   emailStatuses: Array<"QUEUED" | "SENT" | "FAILED">;

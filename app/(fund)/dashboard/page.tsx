@@ -571,7 +571,7 @@ async function RecentActivity() {
                   )}
                 </TableCell>
                 <TableCell className="text-right font-medium tabular-nums">
-                  {op.type === "BURN" ? "−" : ""}
+                  {op.type === "BURN" || op.type === "TOPUP_REVERSAL" ? "−" : ""}
                   {tokens(op.amount)}
                 </TableCell>
               </TableRow>
