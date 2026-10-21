@@ -1379,3 +1379,93 @@ export const banking = {
     });
   },
 };
+
+// =============================================================================
+// Terminal top-ups (top-up by payment, issuer-mints variant)
+// =============================================================================
+// A pay-pos terminal in `topup` mode sells a "Card top-up <serial>" order the
+// member pays by Viva or QR. On a real chain Citizen Pay does not mint: the
+// settled order stays `pending` here until the treasury partner mints it to
+// the card and reports the hash (app/api/cron/topups). Orders are scoped to
+// the treasury of the API key. `amount` is integer cents of the order total
+// (the processor commission is the issuer's cost, not the member's).
+
+export type TopUpOrderStateWire =
+  | "pending" // paid, not yet credited on chain
+  | "credited"
+  | "failed"
+  | "reversal_pending" // credited, then refunded / reversed — burn due
+  | "reversed";
+
+export type TopUpOrderWire = {
+  orderId: number;
+  serial: string;
+  // The card's account under the treasury's card instance — mint / burn
+  // target, nothing to derive on our side.
+  cardAddress: string;
+  amount: number; // cents
+  token: string; // token contract address
+  placeId?: string | number | null;
+  placeName?: string | null;
+  paidAt?: string | null; // RFC3339
+  state: TopUpOrderStateWire;
+  // Set while a claim is live (10 minutes); null / absent otherwise.
+  claimedAt?: string | null;
+};
+
+export type TopUpOrdersWire = { topups: TopUpOrderWire[] | null };
+
+// 10-minute claim, like the payout burn-claim: exactly one caller gets a
+// `claimId`; a second claim while one is live is 409 "claim in progress".
+export type TopUpClaimWire = { claimId: string; expiresAt: string };
+
+export type TopUpReportWire = { claimId: string; txHash: string };
+
+export const topups = {
+  list(
+    creds: CitizenPayApiCredentials,
+    state: "pending" | "reversal_pending",
+  ): Promise<TopUpOrdersWire> {
+    return request(creds, "GET", "/v2/treasury/topups", { query: { state } });
+  },
+  // 409 texts: `claim in progress`, `already credited`, `not pending`.
+  claim(
+    creds: CitizenPayApiCredentials,
+    orderId: number,
+  ): Promise<TopUpClaimWire> {
+    return request(
+      creds,
+      "POST",
+      `/v2/treasury/topups/${encodeURIComponent(String(orderId))}/claim`,
+      { timeoutMs: 30_000 },
+    );
+  },
+  // Report the mint: sets `topup_state = credited` + the hash. 409 texts:
+  // `already credited`, `not pending`, `claim does not match`.
+  credit(
+    creds: CitizenPayApiCredentials,
+    orderId: number,
+    body: TopUpReportWire,
+  ): Promise<unknown> {
+    return request(
+      creds,
+      "POST",
+      `/v2/treasury/topups/${encodeURIComponent(String(orderId))}/credit`,
+      { body, timeoutMs: 30_000 },
+    );
+  },
+  // Report the burn of a refunded top-up: sets `topup_state = reversed`.
+  // Same 409 texts as `credit`.
+  reverse(
+    creds: CitizenPayApiCredentials,
+    orderId: number,
+    body: TopUpReportWire,
+  ): Promise<unknown> {
+    return request(
+      creds,
+      "POST",
+      `/v2/treasury/topups/${encodeURIComponent(String(orderId))}/reverse`,
+      { body, timeoutMs: 30_000 },
+    );
+  },
+};

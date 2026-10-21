@@ -38,6 +38,8 @@ export const ANNOTATION_TRIGGERS = {
   adminDirectMint: "ADMIN_DIRECT_MINT", // ad-hoc mint to a raw address (/token)
   adminDirectBurn: "ADMIN_DIRECT_BURN", // ad-hoc burn from a raw address (/token)
   cardTopUp: "CARD_TOPUP",
+  terminalTopUp: "TERMINAL_TOPUP", // cron: mint a top-up paid at a Citizen Pay terminal
+  terminalTopUpReversal: "TERMINAL_TOPUP_REVERSAL", // cron: burn a refunded terminal top-up
   cardWithdrawal: "CARD_WITHDRAWAL",
   cardTransfer: "CARD_TRANSFER", // card-to-card balance move (mint + burn legs)
   accountMint: "ACCOUNT_MINT",

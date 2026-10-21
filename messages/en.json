@@ -167,7 +167,9 @@
         "BANK_SYNC": "Bank deposit (auto)",
         "PERIOD_CLOSE": "Period close",
         "ALLOCATION_RUN": "Allocation run",
-        "CARD_TRANSFER": "Card transfer"
+        "CARD_TRANSFER": "Card transfer",
+        "TERMINAL_TOPUP": "Terminal top-up (auto)",
+        "TERMINAL_TOPUP_REVERSAL": "Terminal top-up reversal (auto)"
       },
       "edit": "Annotate",
       "title": "Annotate transaction",
@@ -444,7 +446,9 @@
         "type": {
           "MINT": "Allocation",
           "BURN": "Burn",
-          "TRANSFER": "Transfer"
+          "TRANSFER": "Transfer",
+          "TOPUP": "Terminal top-up",
+          "TOPUP_REVERSAL": "Top-up reversal"
         },
         "status": {
           "PENDING": "pending",
@@ -540,7 +544,12 @@
           "period": "Period",
           "amount": "Amount",
           "status": "Status",
-          "empty": "No token operations yet."
+          "empty": "No token operations yet.",
+          "types": {
+            "TOPUP": "Top-up paid at {place}",
+            "TOPUP_REVERSAL": "Top-up reversed at {place}"
+          },
+          "unknownPlace": "a terminal"
         },
         "bank": {
           "title": "Bank transactions",
@@ -1764,6 +1773,16 @@
           "permissionGranted": "Active",
           "permissionMissing": "Missing",
           "permissionUnknown": "Unknown"
+        },
+        "topUps": {
+          "title": "Terminal top-ups",
+          "description": "Top-ups members pay at a Citizen Pay terminal are minted to their card by this fund every minute.",
+          "lastRunLabel": "Last run",
+          "mintedLabel": "Minted",
+          "reversedLabel": "Reversed",
+          "failedLabel": "Failed",
+          "errorLabel": "Last error",
+          "neverRan": "No run yet."
         }
       },
       "onboarding": {

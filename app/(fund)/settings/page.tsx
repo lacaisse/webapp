@@ -214,6 +214,13 @@ async function SettingsContent({
               connected={Boolean(
                 fund.citizenPayFundId && fund.citizenPayApiKeyId,
               )}
+              topUpRun={{
+                at: fund.topUpOrdersRunAt,
+                minted: fund.topUpOrdersRunMinted,
+                reversed: fund.topUpOrdersRunReversed,
+                failed: fund.topUpOrdersRunFailed,
+                error: fund.topUpOrdersRunError,
+              }}
             />
           </CardContent>
         </Card>

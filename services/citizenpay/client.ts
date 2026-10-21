@@ -61,6 +61,10 @@ import type {
   SubmitMintInput,
   SubmittedOperation,
   TopUpSignUrlInput,
+  TopUpOrder,
+  TopUpOrderClaim,
+  TopUpOrderReport,
+  TopUpOrderState,
 } from "./types";
 
 // Re-export the interface so existing imports `from "@/services/citizenpay/client"`
@@ -922,6 +926,126 @@ class MockCitizenPayClient implements CitizenPayClient {
     this.log("getPaymentRequest", { treasuryId, paymentRequestId });
     return mockPaymentRequests.get(paymentRequestId) ?? null;
   }
+
+  async listTopUpOrders(state: TopUpOrderState): Promise<TopUpOrder[]> {
+    this.log("listTopUpOrders", { state });
+    return [...mockTopUpOrders.values()]
+      .filter((r) => r.state === state)
+      .map((r) => ({
+        ...r.order,
+        state,
+        claimedAt: liveClaim(r) ? r.claim!.claimedAt : null,
+      }));
+  }
+
+  async claimTopUpOrder(orderId: number): Promise<TopUpOrderClaim> {
+    this.log("claimTopUpOrder", { orderId });
+    const row = mockTopUpOrders.get(orderId);
+    if (!row) throw new CitizenPayApiError("topup not found", 404, { error: "topup not found" });
+    if (row.state === "credited") refuseTopUp("already credited");
+    if (row.state !== "pending" && row.state !== "reversal_pending") refuseTopUp("not pending");
+    if (liveClaim(row)) {
+      throw new CitizenPayApiError("claim in progress", 409, {
+        error: "claim in progress",
+        claimedAt: row.claim!.claimedAt.toISOString(),
+      });
+    }
+    const now = new Date();
+    row.claim = {
+      claimId: randomBytes(16).toString("hex"),
+      claimedAt: now,
+      expiresAt: new Date(now.getTime() + MOCK_TOPUP_CLAIM_TTL_MS),
+    };
+    return { claimId: row.claim.claimId, expiresAt: row.claim.expiresAt };
+  }
+
+  async creditTopUpOrder(orderId: number, report: TopUpOrderReport): Promise<void> {
+    this.log("creditTopUpOrder", { orderId, ...report });
+    const row = mockTopUpOrders.get(orderId);
+    if (!row) throw new CitizenPayApiError("topup not found", 404, { error: "topup not found" });
+    if (row.state === "credited") refuseTopUp("already credited");
+    if (row.state !== "pending") refuseTopUp("not pending");
+    if (!liveClaim(row) || row.claim!.claimId !== report.claimId) refuseTopUp("claim does not match");
+    row.state = "credited";
+    row.txHash = report.txHash;
+    row.claim = null;
+  }
+
+  async reverseTopUpOrder(orderId: number, report: TopUpOrderReport): Promise<void> {
+    this.log("reverseTopUpOrder", { orderId, ...report });
+    const row = mockTopUpOrders.get(orderId);
+    if (!row) throw new CitizenPayApiError("topup not found", 404, { error: "topup not found" });
+    if (row.state !== "reversal_pending") refuseTopUp("not pending");
+    if (!liveClaim(row) || row.claim!.claimId !== report.claimId) refuseTopUp("claim does not match");
+    row.state = "reversed";
+    row.txHash = report.txHash;
+    row.claim = null;
+  }
+}
+
+// Mock terminal top-ups (top-up by payment). Nothing seeds them in dev — the
+// pos flow lives on Citizen Pay's side — so the cron finds an empty list unless
+// a test (or a dev script) calls seedMockTopUpOrder. State mirrors CP's order
+// columns: pending → credited → reversal_pending → reversed, plus the
+// 10-minute claim that gates every transition. Kept on globalThis like the
+// other mock state.
+export const MOCK_TOPUP_CLAIM_TTL_MS = 10 * 60 * 1000;
+
+type MockTopUpState = TopUpOrderState | "credited" | "reversed";
+type MockTopUpRow = {
+  order: Omit<TopUpOrder, "state" | "claimedAt">;
+  state: MockTopUpState;
+  claim: { claimId: string; claimedAt: Date; expiresAt: Date } | null;
+  txHash: string | null;
+};
+const mockTopUpOrders: Map<number, MockTopUpRow> = ((
+  globalThis as { __cpMockTopUpOrders?: Map<number, MockTopUpRow> }
+).__cpMockTopUpOrders ??= new Map());
+
+function liveClaim(row: MockTopUpRow): boolean {
+  return !!row.claim && row.claim.expiresAt.getTime() > Date.now();
+}
+
+function refuseTopUp(error: string): never {
+  throw new CitizenPayApiError(error, 409, { error });
+}
+
+/** Dev / test seam: register a settled terminal top-up the mock will list. */
+export function seedMockTopUpOrder(input: {
+  orderId: number;
+  serial: string;
+  cardAddress: string;
+  amountCents: number;
+  token?: string;
+  placeId?: string | null;
+  placeName?: string | null;
+  paidAt?: Date | null;
+  state?: MockTopUpState;
+}): void {
+  mockTopUpOrders.set(input.orderId, {
+    order: {
+      orderId: input.orderId,
+      serial: input.serial,
+      cardAddress: input.cardAddress,
+      amountCents: input.amountCents,
+      token: input.token ?? "0xmock-token",
+      placeId: input.placeId ?? null,
+      placeName: input.placeName ?? null,
+      paidAt: input.paidAt ?? new Date(),
+    },
+    state: input.state ?? "pending",
+    claim: null,
+    txHash: null,
+  });
+}
+
+/** Test seam: the mock's view of one order (state, live claim, reported hash). */
+export function getMockTopUpOrder(
+  orderId: number,
+): { state: MockTopUpState; claimed: boolean; txHash: string | null } | null {
+  const row = mockTopUpOrders.get(orderId);
+  if (!row) return null;
+  return { state: row.state, claimed: liveClaim(row), txHash: row.txHash };
 }
 
 // Top-up URLs pushed per fund this session (same process lifetime as the other

@@ -45,6 +45,10 @@ import type {
   SubmitMintInput,
   SubmittedOperation,
   TopUpSignUrlInput,
+  TopUpOrder,
+  TopUpOrderClaim,
+  TopUpOrderReport,
+  TopUpOrderState,
 } from "./types";
 
 export interface CitizenPayClient {
@@ -566,4 +570,35 @@ export interface CitizenPayClient {
     treasuryId: string,
     paymentRequestId: number,
   ): Promise<PaymentRequestState | null>;
+
+  /**
+   * Terminal top-ups awaiting the issuer: `pending` orders to mint to the card,
+   * `reversal_pending` orders to burn back. Only the treasury's own token.
+   * Backed by `GET /v2/treasury/topups?state=…`.
+   */
+  listTopUpOrders(state: TopUpOrderState): Promise<TopUpOrder[]>;
+
+  /**
+   * Take the 10-minute claim on an order BEFORE minting / burning, so exactly
+   * one attempt moves tokens. Throws CitizenPayApiError 409 `claim in
+   * progress` while another claim is live, `already credited` / `not pending`
+   * when there is nothing left to do. Backed by
+   * `POST /v2/treasury/topups/{orderId}/claim`.
+   */
+  claimTopUpOrder(orderId: number): Promise<TopUpOrderClaim>;
+
+  /**
+   * Report the mint of a `pending` top-up (CP sets `credited` + the hash).
+   * 409 `already credited` means a previous report landed — the caller treats
+   * it as done; `claim does not match` means the claim expired and must be
+   * retaken. Backed by `POST /v2/treasury/topups/{orderId}/credit`.
+   */
+  creditTopUpOrder(orderId: number, report: TopUpOrderReport): Promise<void>;
+
+  /**
+   * Report the burn of a `reversal_pending` top-up (CP sets `reversed`). Same
+   * 409 rules as `creditTopUpOrder`. Backed by
+   * `POST /v2/treasury/topups/{orderId}/reverse`.
+   */
+  reverseTopUpOrder(orderId: number, report: TopUpOrderReport): Promise<void>;
 }

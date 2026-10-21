@@ -137,7 +137,7 @@ app/
   api/
     auth/[...all]/    Better Auth handler
     citizenpay/       register, connect, callback/[fundState], invite-callback
-    cron/             5 Vercel cron handlers (see §7)
+    cron/             8 Vercel cron handlers (see §7)
   auth/               cross-host exchange + logout route handlers
   _landing/ _policy/  marketing + legal page fragments
   privacy/ terms/ source/ licenses/   static-ish pages
@@ -260,6 +260,30 @@ are authorized with `CRON_SECRET`.
 | `citizenpay-mint-retry` | every 10 min | Retry failed mints. |
 | `citizenpay-bank-sync` | every 15 min | Pull deposits, mirror to `BankTransaction`, match members, mint (PAY_AND_GO). |
 | `citizenpay-period-close` | every 30 min | Batch-mint allocations for periods past cutoff (FIXED_PERIOD). |
+| `annotation-resolve` | every 2 min | Resolve queued transaction annotations against the chain. |
+| `payment-reminders` | monthly | Remind members with unpaid contributions. |
+| `topups` | every minute | Terminal top-ups: claim each `pending` order on `GET /v2/treasury/topups`, mint it to the card with the fund's minter Safe, report `credit {claimId, txHash}`; burn + `reverse` the `reversal_pending` ones. |
+
+### Terminal top-ups (top-up by payment, issuer mints)
+
+A member taps a card on a Citizen Pay pay-pos terminal in top-up mode and pays
+by Viva or QR. On a real chain Citizen Pay does not mint: the settled order
+stays `pending` on its side until the issuer moves the tokens. The `topups`
+cron (`services/topup-orders/run.ts`) does that per connected fund, bounded to
+25 orders a run, each fund isolated from the others. Citizen Pay's 10-minute
+claim is the lock between concurrent runs; the local `TokenOperation` of type
+`TOPUP` / `TOPUP_REVERSAL` keyed by `topUpOrderId` is the memory across runs
+(`services/topup-orders/plan.ts`). Acceptance by the bundler is the success:
+the report goes to Citizen Pay right after `eth_sendUserOperation`, with the
+userop hash, and each run first resolves the fund's submitted ops against the
+bundler so the history row gains the mined tx hash (the userop hash stays on
+`TokenOperation.userOpHash`). An order whose userop settled is never minted
+again — only its report is resent; one still PENDING is left alone; only a
+refused submission marks the op FAILED, and the order is retried once the claim
+expires. A submission that reverts, or stays unknown to the bundler for an hour,
+is failed and surfaced.
+There is no alert channel: failures go to the logs and to `Fund.topUpOrdersRun*`,
+shown on Settings → Token; the member's history shows "Top-up paid at <place>".
 
 ---
 

@@ -167,7 +167,9 @@
         "BANK_SYNC": "Depósito bancario (auto)",
         "PERIOD_CLOSE": "Cierre de período",
         "ALLOCATION_RUN": "Ejecución de asignación",
-        "CARD_TRANSFER": "Transferencia de tarjeta"
+        "CARD_TRANSFER": "Transferencia de tarjeta",
+        "TERMINAL_TOPUP": "Recarga en terminal (auto)",
+        "TERMINAL_TOPUP_REVERSAL": "Reversión de recarga en terminal (auto)"
       },
       "edit": "Anotar",
       "title": "Anotar transacción",
@@ -444,7 +446,9 @@
         "type": {
           "MINT": "Asignación",
           "BURN": "Destrucción",
-          "TRANSFER": "Transferencia"
+          "TRANSFER": "Transferencia",
+          "TOPUP": "Recarga en terminal",
+          "TOPUP_REVERSAL": "Reversión de recarga"
         },
         "status": {
           "PENDING": "pendiente",
@@ -540,7 +544,12 @@
           "period": "Período",
           "amount": "Importe",
           "status": "Estado",
-          "empty": "Aún no hay operaciones de tokens."
+          "empty": "Aún no hay operaciones de tokens.",
+          "types": {
+            "TOPUP": "Recarga pagada en {place}",
+            "TOPUP_REVERSAL": "Recarga revertida en {place}"
+          },
+          "unknownPlace": "un terminal"
         },
         "bank": {
           "title": "Transacciones bancarias",
@@ -1764,6 +1773,16 @@
           "permissionGranted": "Activo",
           "permissionMissing": "Ausente",
           "permissionUnknown": "Desconocido"
+        },
+        "topUps": {
+          "title": "Recargas en terminal",
+          "description": "Las recargas que los miembros pagan en un terminal de Citizen Pay las emite este fondo en su tarjeta cada minuto.",
+          "lastRunLabel": "Última ejecución",
+          "mintedLabel": "Emitidas",
+          "reversedLabel": "Revertidas",
+          "failedLabel": "Fallos",
+          "errorLabel": "Último error",
+          "neverRan": "Todavía no se ha ejecutado."
         }
       },
       "onboarding": {

@@ -523,7 +523,13 @@ async function MemberDetail({
                   <TableCell className="text-sm text-muted-foreground">
                     {format.dateTime(op.submittedAt, { dateStyle: "medium" })}
                   </TableCell>
-                  <TableCell className="text-sm">{op.type}</TableCell>
+                  <TableCell className="text-sm">
+                    {op.type === "TOPUP" || op.type === "TOPUP_REVERSAL"
+                      ? t(`tokenOps.types.${op.type}`, {
+                          place: op.topUpPlaceName ?? t("tokenOps.unknownPlace"),
+                        })
+                      : op.type}
+                  </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {op.tier?.name ?? "—"}
                   </TableCell>

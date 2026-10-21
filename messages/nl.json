@@ -167,7 +167,9 @@
         "BANK_SYNC": "Bankstorting (auto)",
         "PERIOD_CLOSE": "Periodeafsluiting",
         "ALLOCATION_RUN": "Allocatierun",
-        "CARD_TRANSFER": "Kaartoverboeking"
+        "CARD_TRANSFER": "Kaartoverboeking",
+        "TERMINAL_TOPUP": "Opwaardering aan terminal (auto)",
+        "TERMINAL_TOPUP_REVERSAL": "Terugdraaiing opwaardering aan terminal (auto)"
       },
       "edit": "Annoteren",
       "title": "Transactie annoteren",
@@ -444,7 +446,9 @@
         "type": {
           "MINT": "Toekenning",
           "BURN": "Vernietiging",
-          "TRANSFER": "Overdracht"
+          "TRANSFER": "Overdracht",
+          "TOPUP": "Opwaardering aan terminal",
+          "TOPUP_REVERSAL": "Terugdraaiing opwaardering"
         },
         "status": {
           "PENDING": "in behandeling",
@@ -540,7 +544,12 @@
           "period": "Periode",
           "amount": "Bedrag",
           "status": "Status",
-          "empty": "Nog geen tokenbewerkingen."
+          "empty": "Nog geen tokenbewerkingen.",
+          "types": {
+            "TOPUP": "Opwaardering betaald bij {place}",
+            "TOPUP_REVERSAL": "Opwaardering teruggedraaid bij {place}"
+          },
+          "unknownPlace": "een terminal"
         },
         "bank": {
           "title": "Banktransacties",
@@ -1764,6 +1773,16 @@
           "permissionGranted": "Actief",
           "permissionMissing": "Ontbreekt",
           "permissionUnknown": "Onbekend"
+        },
+        "topUps": {
+          "title": "Opwaarderingen aan de terminal",
+          "description": "Opwaarderingen die leden aan een Citizen Pay-terminal betalen, worden elke minuut door dit fonds op hun kaart uitgegeven.",
+          "lastRunLabel": "Laatste uitvoering",
+          "mintedLabel": "Uitgegeven",
+          "reversedLabel": "Teruggedraaid",
+          "failedLabel": "Mislukt",
+          "errorLabel": "Laatste fout",
+          "neverRan": "Nog geen uitvoering."
         }
       },
       "onboarding": {
