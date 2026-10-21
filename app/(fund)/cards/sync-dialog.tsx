@@ -22,6 +22,7 @@ import {
   previewCardSyncAction,
   pushOneCardAction,
   pushOneCardStatusAction,
+  requestOneCardEnrollmentAction,
   revalidateCardsAfterSyncAction,
   type CardSyncItemResult,
   type CardSyncPlanWire,
@@ -31,17 +32,19 @@ import {
 // the type so the runStep helper can be generic over the execute fn.
 type CardSyncItemResultLike = CardSyncItemResult;
 
-// Three-step sync UX, driven client-side so we can render real progress:
+// Four-step sync UX, driven client-side so we can render real progress:
 //   1. import   — pull CP-only cards into local
-//   2. status   — push local status to CP for mismatches
-//   3. push     — push local-only cards to CP
+//   2. request  — CP-only cards another fund issued: ask the issuer to
+//                 accept (no local row until they do)
+//   3. status   — push local status to CP for mismatches
+//   4. push     — push local-only cards to CP
 //
 // The preview action returns the full plan (item lists, not just counts).
 // On confirm, the client iterates each step's items sequentially and
 // updates per-step state after every per-item server-action round-trip.
 // One revalidatePath at the end refreshes the /cards table.
 
-type StepKey = "import" | "status" | "push";
+type StepKey = "import" | "request" | "status" | "push";
 
 type StepState = {
   total: number;
@@ -65,6 +68,12 @@ type DialogState =
 function emptySteps(plan: CardSyncPlanWire): Record<StepKey, StepState> {
   return {
     import: { total: plan.import.length, done: 0, errors: 0, phase: "pending" },
+    request: {
+      total: plan.requestEnrollment.length,
+      done: 0,
+      errors: 0,
+      phase: "pending",
+    },
     status: {
       total: plan.statusUpdate.length,
       done: 0,
@@ -149,6 +158,9 @@ export function CardSyncDialog() {
     await runStep("import", plan.import, (i) =>
       importOneCardAction({ serialNumber: i.serialNumber }),
     );
+    await runStep("request", plan.requestEnrollment, (i) =>
+      requestOneCardEnrollmentAction({ serialNumber: i.serialNumber }),
+    );
     await runStep("status", plan.statusUpdate, (i) =>
       pushOneCardStatusAction({ cardId: i.cardId }),
     );
@@ -167,6 +179,7 @@ export function CardSyncDialog() {
   const planTotal =
     state.kind === "preview"
       ? state.plan.import.length +
+        state.plan.requestEnrollment.length +
         state.plan.statusUpdate.length +
         state.plan.push.length
       : 0;
@@ -216,6 +229,14 @@ export function CardSyncDialog() {
                     })}
                   />
                 )}
+                {state.plan.requestEnrollment.length > 0 && (
+                  <SummaryRow
+                    label={t("summary.requestEnrollment", {
+                      count: state.plan.requestEnrollment.length,
+                      issuers: issuerNames(state.plan.requestEnrollment),
+                    })}
+                  />
+                )}
                 {state.plan.statusUpdate.length > 0 && (
                   <SummaryRow
                     label={t("summary.statusUpdate", {
@@ -238,6 +259,7 @@ export function CardSyncDialog() {
         {(state.kind === "running" || state.kind === "done") && (
           <div className="space-y-3">
             <StepRow stepKey="import" step={state.steps.import} t={t} />
+            <StepRow stepKey="request" step={state.steps.request} t={t} />
             <StepRow stepKey="status" step={state.steps.status} t={t} />
             <StepRow stepKey="push" step={state.steps.push} t={t} />
           </div>
@@ -273,6 +295,13 @@ export function CardSyncDialog() {
       </DialogContent>
     </Dialog>
   );
+}
+
+// Distinct issuer fund names, in plan order, for the request summary row.
+function issuerNames(
+  items: CardSyncPlanWire["requestEnrollment"],
+): string {
+  return [...new Set(items.map((i) => i.issuerFundName))].join(", ");
 }
 
 function SummaryRow({ label }: { label: string }) {
