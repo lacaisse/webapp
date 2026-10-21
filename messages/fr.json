@@ -2251,6 +2251,7 @@
       "noteTooLong": "L'annotation est trop longue (280 caractères max).",
       "tokenNotConfigured": "Cette caisse n'a pas encore de jeton configuré — connectez-vous d'abord à Citizen Pay.",
       "submitFailed": "L'envoi on-chain a échoué. Consultez le journal des opérations pour plus de détails.",
+      "minterRoleMissing": "Le compte émetteur {safe} ne détient pas le rôle MINTER_ROLE sur le jeton {token}. L'émission est refusée tant que Citizen Pay n'a pas accordé ce rôle.",
       "memberNotFound": "Membre introuvable dans cette caisse.",
       "memberNotActive": "L'émission manuelle est réservée aux membres actifs.",
       "noPrimaryAccount": "La carte principale de ce membre n'a pas encore été enregistrée chez Citizen Pay."

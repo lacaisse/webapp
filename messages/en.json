@@ -2251,6 +2251,7 @@
       "noteTooLong": "Annotation is too long (max 280 characters).",
       "tokenNotConfigured": "This fund has no token configured yet — connect to Citizen Pay first.",
       "submitFailed": "On-chain submission failed. Check the operation log for details.",
+      "minterRoleMissing": "The minter account {safe} does not hold MINTER_ROLE on token {token}. Minting is refused until Citizen Pay grants that role.",
       "memberNotFound": "Member not found in this fund.",
       "memberNotActive": "Manual mints are only allowed for active members.",
       "noPrimaryAccount": "This member's primary card hasn't been registered with Citizen Pay yet."

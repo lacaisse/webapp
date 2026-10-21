@@ -10,6 +10,7 @@ import { requireCurrentFund } from "@/services/fund/server";
 
 import { HoldersTable } from "./holders-table";
 import { ManualBurnButton, ManualMintButton } from "./manual-mint-burn";
+import { MinterRoleWarning } from "./minter-role-warning";
 import { TableSkeleton } from "./skeleton";
 import { TotalSupplyBadge } from "./total-supply-badge";
 import { TransfersTable } from "./transfers-table";
@@ -107,6 +108,19 @@ export default async function TokenExplorerPage({
               {fund.tokenAddress}
             </span>
           </div>
+        )}
+        {hasToken && (
+          <Suspense fallback={null}>
+            <MinterRoleWarning
+              fund={{
+                tokenAddress: fund.tokenAddress,
+                tokenChainId: fund.tokenChainId,
+                tokenMinterSmartAccountAddress:
+                  fund.tokenMinterSmartAccountAddress,
+                tokenMintEnabledAt: fund.tokenMintEnabledAt,
+              }}
+            />
+          </Suspense>
         )}
       </header>
 

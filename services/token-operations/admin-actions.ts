@@ -144,7 +144,11 @@ export async function manualMintDirectAction(
   const t = await getTranslations();
   const { fund, user } = await requireFundRole("ADMIN");
   return mintDirect(
-    { fund, userId: user.id, t: (key) => t(key as never) },
+    {
+      fund,
+      userId: user.id,
+      t: (key, values) => t(key as never, values as never),
+    },
     input,
     audit,
   );
@@ -165,7 +169,11 @@ export async function manualBurnDirectAction(
   const t = await getTranslations();
   const { fund, user } = await requireFundRole("ADMIN");
   return burnDirect(
-    { fund, userId: user.id, t: (key) => t(key as never) },
+    {
+      fund,
+      userId: user.id,
+      t: (key, values) => t(key as never, values as never),
+    },
     input,
     audit,
   );
