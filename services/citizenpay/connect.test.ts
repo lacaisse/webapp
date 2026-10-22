@@ -10,6 +10,7 @@ const prisma = vi.hoisted(() => ({
     findUnique: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
+    updateMany: vi.fn(),
   },
   fund: { findUnique: vi.fn(), update: vi.fn() },
   fundTokenAccount: { upsert: vi.fn() },
@@ -27,9 +28,11 @@ const scheduleRoles = vi.hoisted(() => vi.fn());
 vi.mock("./token-roles", () => ({ scheduleEnsureMinterRoles: scheduleRoles }));
 
 import {
+  cancelPendingRegistration,
   ConnectError,
   consumeConnect,
   initiateTreasuryRegistration,
+  resumeTreasuryRegistration,
 } from "./connect";
 
 const T0 = new Date("2026-10-20T10:00:00Z");
@@ -111,6 +114,120 @@ describe("initiateTreasuryRegistration", () => {
       chain: "100",
       key_name: "La Caisse — initial 2026-10-20",
     });
+  });
+});
+
+// Back (or a closed tab) during the CP form leaves the attempt open for 30
+// minutes. "Resume" sends the admin back to CP with the *same* fund state —
+// no new row, so there is still exactly one state CP can land on.
+describe("resumeTreasuryRegistration", () => {
+  const args = {
+    fundId: "f1",
+    returnHost: "acme.lacaisse.eu",
+    prefill: { name: "Acme", symbol: "acme", keyName: "La Caisse — initial 2026-10-20" },
+  };
+
+  it("rebuilds the CP URL for the pending fund state without minting a new one", async () => {
+    prisma.citizenPayConnectAttempt.findFirst.mockResolvedValue({ state: "pending-1" });
+    const { redirectUrl } = await resumeTreasuryRegistration(args);
+    expect(prisma.citizenPayConnectAttempt.findFirst).toHaveBeenCalledWith({
+      where: { fundId: "f1", consumedAt: null, expiresAt: { gt: T0 } },
+      select: { state: true },
+    });
+    expect(prisma.citizenPayConnectAttempt.create).not.toHaveBeenCalled();
+
+    const url = new URL(redirectUrl);
+    expect(url.origin + url.pathname).toBe("https://cp.test/v2/treasury/register");
+    expect(url.searchParams.get("redirect_uri")).toBe(
+      "https://acme.lacaisse.eu/api/citizenpay/callback/pending-1",
+    );
+    expect(Object.fromEntries(url.searchParams)).toMatchObject({
+      name: "Acme",
+      symbol: "ACME",
+      decimals: "6",
+      chain: "100",
+      key_name: "La Caisse — initial 2026-10-20",
+    });
+  });
+
+  it("hands CP the same URL a fresh start would, apart from the state", async () => {
+    prisma.citizenPayConnectAttempt.findFirst.mockResolvedValue(null);
+    const fresh = new URL((await initiateTreasuryRegistration(args)).redirectUrl);
+    const minted = prisma.citizenPayConnectAttempt.create.mock.calls[0][0].data.state;
+
+    prisma.citizenPayConnectAttempt.findFirst.mockResolvedValue({ state: minted });
+    const resumed = new URL((await resumeTreasuryRegistration(args)).redirectUrl);
+    expect(resumed.toString()).toBe(fresh.toString());
+  });
+
+  it("refuses when nothing is pending (consumed or expired meanwhile)", async () => {
+    prisma.citizenPayConnectAttempt.findFirst.mockResolvedValue(null);
+    await expect(code(resumeTreasuryRegistration(args))).resolves.toBe(
+      "no_pending_registration",
+    );
+    expect(prisma.citizenPayConnectAttempt.create).not.toHaveBeenCalled();
+  });
+});
+
+// "Start over" expires the pending attempts so a new registration can start
+// right away; a CP tab still open on the old form then fails at the callback.
+describe("cancelPendingRegistration", () => {
+  it("expires the fund's pending attempts as of now and reports how many", async () => {
+    prisma.citizenPayConnectAttempt.updateMany.mockResolvedValue({ count: 1 });
+    await expect(cancelPendingRegistration("f1")).resolves.toBe(1);
+    expect(prisma.citizenPayConnectAttempt.updateMany).toHaveBeenCalledExactlyOnceWith({
+      where: { fundId: "f1", consumedAt: null, expiresAt: { gt: T0 } },
+      data: { expiresAt: T0 },
+    });
+  });
+
+  it("lets a new registration start, and the old state is rejected as expired", async () => {
+    // Before: one open attempt → a fresh start is refused.
+    const old = {
+      state: "old",
+      fundId: "f1",
+      returnHost: "acme.lacaisse.eu",
+      consumedAt: null,
+      expiresAt: new Date(T0.getTime() + 10 * 60 * 1000),
+    };
+    prisma.citizenPayConnectAttempt.findFirst.mockResolvedValue({ state: old.state });
+    const args = { fundId: "f1", returnHost: "acme.lacaisse.eu", prefill: { name: "Acme" } };
+    await expect(code(initiateTreasuryRegistration(args))).resolves.toBe("registration_pending");
+
+    // Cancel: the row's expiresAt becomes "now", so the pending query (gt now)
+    // no longer finds it...
+    prisma.citizenPayConnectAttempt.updateMany.mockImplementation(async ({ data }) => {
+      old.expiresAt = data.expiresAt;
+      return { count: 1 };
+    });
+    await cancelPendingRegistration("f1");
+    expect(old.expiresAt).toEqual(T0);
+    prisma.citizenPayConnectAttempt.findFirst.mockResolvedValue(null);
+
+    // ...a new registration mints a different state...
+    const { redirectUrl } = await initiateTreasuryRegistration(args);
+    const minted = prisma.citizenPayConnectAttempt.create.mock.calls[0][0].data.state;
+    expect(minted).not.toBe("old");
+    expect(redirectUrl).toContain(encodeURIComponent(`/callback/${minted}`));
+
+    // ...and the stale CP tab coming back a moment later on the old state is
+    // refused before any pickup happens.
+    vi.setSystemTime(new Date(T0.getTime() + 1000));
+    prisma.citizenPayConnectAttempt.findUnique.mockResolvedValue(old);
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    await expect(
+      code(
+        consumeConnect({
+          fundState: "old",
+          cpState: "cp",
+          pickupToken: "pt",
+          callbackHost: "acme.lacaisse.eu",
+        }),
+      ),
+    ).resolves.toBe("state_expired");
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 });
 

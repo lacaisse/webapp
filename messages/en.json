@@ -2013,7 +2013,9 @@
           "title": "Register this fund on Citizen Pay",
           "description": "Your treasury and its token are created on the Citizen Pay page this button opens. The token name and symbol from the Token tab are pre-filled; the first API key is issued at the end and you come straight back here.",
           "cta": "Register on Citizen Pay",
-          "manualFallback": "Or connect an existing Citizen Pay treasury"
+          "manualFallback": "Or connect an existing Citizen Pay treasury",
+          "resume": "Resume registration",
+          "startOver": "Start over"
         },
         "connect": {
           "issueKey": "Issue API key via Citizen Pay",
@@ -2036,7 +2038,7 @@
             "notConnected": "Set the Citizen Pay treasury ID above before issuing a key.",
             "failed": "Citizen Pay connection failed. Please try again.",
             "alreadyRegistered": "This fund already has a Citizen Pay treasury. To get a new key, issue or rotate the API key below.",
-            "registrationPending": "A Citizen Pay registration started less than 30 minutes ago is still open. Finish it in the Citizen Pay tab, or wait for it to expire before starting another.",
+            "registrationPending": "A Citizen Pay registration started less than 30 minutes ago is still open. Resume it to get back to the Citizen Pay form, or start over to cancel it and begin a new one.",
             "forbidden": "This action can only be started from the fund's own settings page."
           }
         }
@@ -2974,6 +2976,69 @@
           "emptyInitial": "Start typing to find a card.",
           "clear": "Clear",
           "noName": "No holder"
+        }
+      },
+      "charge": {
+        "button": "Charge at a merchant",
+        "title": "Charge the card at a merchant",
+        "description": "Collect a sale from {holderLabel}'s card that the merchant's terminal failed to take. The sale is recorded on the merchant's side like any terminal payment.",
+        "merchantLabel": "Merchant",
+        "merchantPlaceholder": "Pick a merchant",
+        "merchantRequired": "Pick a merchant.",
+        "saleLabel": "Sale",
+        "ordersLoading": "Looking up uncollected sales…",
+        "noOpenOrders": "This merchant has no uncollected terminal sale; enter the amount below.",
+        "newSale": "A sale the terminal never recorded",
+        "newSaleHint": "Enter the amount and what was sold below.",
+        "createdOrder": "Order #{id} was created for this sale; this attempt charges it.",
+        "amountLabel": "Amount",
+        "descriptionLabel": "Description",
+        "descriptionPlaceholder": "What was sold (optional)",
+        "confirm": "Charge",
+        "confirmAmount": "Charge {amount}",
+        "failedWithOrder": "Order #{id} was created on the merchant's side and stays unpaid: fix the problem and charge again, it will be used.",
+        "status": {
+          "pending": "pending",
+          "cancelled": "cancelled",
+          "failed": "failed",
+          "paid": "paid"
+        },
+        "pin": {
+          "description": "This card has a PIN. Ask the cardholder to enter it; it is hashed in the browser and never stored.",
+          "label": "Card PIN",
+          "hint": "The PIN is only used to confirm this charge.",
+          "required": "Enter the card PIN.",
+          "confirm": "Confirm with PIN"
+        },
+        "done": {
+          "body": "Charged. Order #{id} is paid and will appear in the merchant's sales.",
+          "unsettled": "The card paid, but Citizen Pay could not finish recording order #{id}. It has been flagged on their side; do not charge again.",
+          "existing": "This attempt had already succeeded earlier; no second charge was made."
+        },
+        "unknown": {
+          "body": "Citizen Pay could not tell whether the transfer went through. Order #{id} is being confirmed.",
+          "noOrder": "Citizen Pay could not tell whether the transfer went through; the order is being confirmed.",
+          "next": "Do not charge this sale again. Check the merchant's sales in a few minutes: the order will be paid, or open again for another try."
+        },
+        "errors": {
+          "invalidInput": "Invalid charge request.",
+          "amountInvalid": "Enter a positive amount with up to 2 decimals.",
+          "merchantNotFound": "Merchant not found or not connected to Citizen Pay.",
+          "ordersFailed": "Could not load the merchant's uncollected sales.",
+          "cardNotFound": "Citizen Pay does not know this card.",
+          "cardBlocked": "This card is blocked and cannot be charged.",
+          "pinInvalid": "Wrong PIN.",
+          "pinLocked": "Too many wrong PINs; the card is temporarily locked. Try again later.",
+          "insufficient": "The card's balance does not cover this amount.",
+          "alreadyPaid": "This sale has already been paid.",
+          "beingCharged": "This sale is being charged or confirmed right now.",
+          "orderNotFound": "Sale not found.",
+          "badgeBlocked": "This badge is blocked.",
+          "badgeLost": "This badge was reported lost.",
+          "badgeNotAssigned": "This badge is not assigned to anyone.",
+          "noDestination": "The merchant has no account to receive the payment yet.",
+          "placeNotFound": "Citizen Pay does not know this merchant for this fund.",
+          "unknown": "No answer came back. Charging again is safe: the same sale will be reused rather than charged twice."
         }
       }
     }

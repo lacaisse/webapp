@@ -1974,7 +1974,9 @@
           "title": "Registrar este fondo en Citizen Pay",
           "description": "Su tesorería y su token se crean en la página de Citizen Pay que abre este botón. El nombre y el símbolo del token (pestaña Token) se rellenan automáticamente; la primera clave API se emite al final y vuelve directamente aquí.",
           "cta": "Registrarse en Citizen Pay",
-          "manualFallback": "O conectar una tesorería de Citizen Pay existente"
+          "manualFallback": "O conectar una tesorería de Citizen Pay existente",
+          "resume": "Reanudar el registro",
+          "startOver": "Empezar de nuevo"
         },
         "connect": {
           "issueKey": "Emitir clave de API mediante Citizen Pay",
@@ -1997,7 +1999,7 @@
             "notConnected": "Define el ID de la tesorería de Citizen Pay arriba antes de emitir una clave.",
             "failed": "La conexión con Citizen Pay falló. Inténtalo de nuevo.",
             "alreadyRegistered": "Este fondo ya tiene una tesorería en Citizen Pay. Para obtener una clave nueva, emita o renueve la clave API más abajo.",
-            "registrationPending": "Un registro en Citizen Pay iniciado hace menos de 30 minutos sigue abierto. Termínelo en la pestaña de Citizen Pay o espere a que caduque antes de iniciar otro.",
+            "registrationPending": "Un registro en Citizen Pay iniciado hace menos de 30 minutos sigue abierto. Reanúdelo para volver al formulario de Citizen Pay, o empiece de nuevo para cancelarlo e iniciar otro.",
             "forbidden": "Esta acción solo puede iniciarse desde la página de configuración del fondo."
           }
         }
@@ -2916,6 +2918,69 @@
           "emptyInitial": "Empieza a escribir para encontrar una tarjeta.",
           "clear": "Borrar",
           "noName": "Sin titular"
+        }
+      },
+      "charge": {
+        "button": "Cobrar en un comercio",
+        "title": "Cobrar la tarjeta en un comercio",
+        "description": "Cobrar de la tarjeta de {holderLabel} una venta que el terminal del comercio no pudo cobrar. La venta se registra del lado del comercio como cualquier pago en terminal.",
+        "merchantLabel": "Comercio",
+        "merchantPlaceholder": "Elige un comercio",
+        "merchantRequired": "Elige un comercio.",
+        "saleLabel": "Venta",
+        "ordersLoading": "Buscando ventas sin cobrar…",
+        "noOpenOrders": "Este comercio no tiene ninguna venta en terminal sin cobrar; introduce el importe abajo.",
+        "newSale": "Una venta que el terminal no registró",
+        "newSaleHint": "Introduce abajo el importe y lo que se vendió.",
+        "createdOrder": "El pedido n.º {id} se creó para esta venta; este intento lo cobra.",
+        "amountLabel": "Importe",
+        "descriptionLabel": "Descripción",
+        "descriptionPlaceholder": "Lo que se vendió (opcional)",
+        "confirm": "Cobrar",
+        "confirmAmount": "Cobrar {amount}",
+        "failedWithOrder": "El pedido n.º {id} se creó del lado del comercio y sigue sin pagar: corrige el problema y vuelve a cobrar, se reutilizará.",
+        "status": {
+          "pending": "pendiente",
+          "cancelled": "cancelado",
+          "failed": "fallido",
+          "paid": "pagado"
+        },
+        "pin": {
+          "description": "Esta tarjeta tiene PIN. Pide al titular que lo introduzca; se cifra en el navegador y nunca se guarda.",
+          "label": "PIN de la tarjeta",
+          "hint": "El PIN solo sirve para confirmar este cobro.",
+          "required": "Introduce el PIN de la tarjeta.",
+          "confirm": "Confirmar con PIN"
+        },
+        "done": {
+          "body": "Cobrado. El pedido n.º {id} está pagado y aparecerá en las ventas del comercio.",
+          "unsettled": "La tarjeta pagó, pero Citizen Pay no pudo terminar de registrar el pedido n.º {id}. Se ha marcado de su lado; no vuelvas a cobrar.",
+          "existing": "Este intento ya había tenido éxito antes; no se hizo un segundo cobro."
+        },
+        "unknown": {
+          "body": "Citizen Pay no pudo saber si la transferencia se realizó. El pedido n.º {id} se está confirmando.",
+          "noOrder": "Citizen Pay no pudo saber si la transferencia se realizó; el pedido se está confirmando.",
+          "next": "No vuelvas a cobrar esta venta. Revisa las ventas del comercio en unos minutos: el pedido estará pagado, o abierto de nuevo para otro intento."
+        },
+        "errors": {
+          "invalidInput": "Solicitud de cobro no válida.",
+          "amountInvalid": "Introduce un importe positivo con hasta 2 decimales.",
+          "merchantNotFound": "Comercio no encontrado o no conectado a Citizen Pay.",
+          "ordersFailed": "No se pudieron cargar las ventas sin cobrar del comercio.",
+          "cardNotFound": "Citizen Pay no conoce esta tarjeta.",
+          "cardBlocked": "Esta tarjeta está bloqueada y no se puede cobrar.",
+          "pinInvalid": "PIN incorrecto.",
+          "pinLocked": "Demasiados PIN incorrectos; la tarjeta está bloqueada temporalmente. Inténtalo más tarde.",
+          "insufficient": "El saldo de la tarjeta no cubre este importe.",
+          "alreadyPaid": "Esta venta ya se ha pagado.",
+          "beingCharged": "Esta venta se está cobrando o confirmando ahora mismo.",
+          "orderNotFound": "Venta no encontrada.",
+          "badgeBlocked": "Esta credencial está bloqueada.",
+          "badgeLost": "Esta credencial se declaró perdida.",
+          "badgeNotAssigned": "Esta credencial no está asignada a nadie.",
+          "noDestination": "El comercio aún no tiene cuenta para recibir el pago.",
+          "placeNotFound": "Citizen Pay no conoce este comercio para esta caja.",
+          "unknown": "No llegó ninguna respuesta. Volver a cobrar es seguro: se reutilizará la misma venta en lugar de cobrarla dos veces."
         }
       }
     }
