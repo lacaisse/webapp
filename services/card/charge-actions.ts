@@ -114,7 +114,13 @@ export async function listOpenMerchantOrdersAction(input: {
     );
     return { orders };
   } catch (e) {
-    console.error("[card] listOpenMerchantOrders failed", input.merchantId, e);
+    // Logged by the place CP knows, read from our row — never the caller's
+    // merchantId as typed (CodeQL: log injection).
+    console.error(
+      "[card] listOpenMerchantOrders failed for place",
+      merchant.citizenPayPlaceId,
+      e,
+    );
     return { error: t("cards.admin.charge.errors.ordersFailed" as never) };
   }
 }
