@@ -2977,6 +2977,69 @@
           "clear": "Effacer",
           "noName": "Sans titulaire"
         }
+      },
+      "charge": {
+        "button": "Débiter chez un commerçant",
+        "title": "Débiter la carte chez un commerçant",
+        "description": "Encaisser depuis la carte de {holderLabel} une vente que le terminal du commerçant n'a pas pu prendre. La vente est enregistrée côté commerçant comme n'importe quel paiement au terminal.",
+        "merchantLabel": "Commerçant",
+        "merchantPlaceholder": "Choisissez un commerçant",
+        "merchantRequired": "Choisissez un commerçant.",
+        "saleLabel": "Vente",
+        "ordersLoading": "Recherche des ventes non encaissées…",
+        "noOpenOrders": "Ce commerçant n'a aucune vente au terminal non encaissée ; saisissez le montant ci-dessous.",
+        "newSale": "Une vente que le terminal n'a pas enregistrée",
+        "newSaleHint": "Saisissez le montant et ce qui a été vendu ci-dessous.",
+        "createdOrder": "La commande n°{id} a été créée pour cette vente ; cette tentative la débite.",
+        "amountLabel": "Montant",
+        "descriptionLabel": "Description",
+        "descriptionPlaceholder": "Ce qui a été vendu (facultatif)",
+        "confirm": "Débiter",
+        "confirmAmount": "Débiter {amount}",
+        "failedWithOrder": "La commande n°{id} a été créée côté commerçant et reste impayée : corrigez le problème et débitez à nouveau, elle sera réutilisée.",
+        "status": {
+          "pending": "en attente",
+          "cancelled": "annulée",
+          "failed": "échouée",
+          "paid": "payée"
+        },
+        "pin": {
+          "description": "Cette carte a un code PIN. Demandez au titulaire de le saisir ; il est haché dans le navigateur et jamais conservé.",
+          "label": "Code PIN de la carte",
+          "hint": "Le code PIN ne sert qu'à confirmer ce débit.",
+          "required": "Saisissez le code PIN de la carte.",
+          "confirm": "Confirmer avec le PIN"
+        },
+        "done": {
+          "body": "Débité. La commande n°{id} est payée et apparaîtra dans les ventes du commerçant.",
+          "unsettled": "La carte a payé, mais Citizen Pay n'a pas pu finir d'enregistrer la commande n°{id}. Elle a été signalée de leur côté ; ne débitez pas à nouveau.",
+          "existing": "Cette tentative avait déjà réussi plus tôt ; aucun second débit n'a été effectué."
+        },
+        "unknown": {
+          "body": "Citizen Pay n'a pas pu dire si le transfert a abouti. La commande n°{id} est en cours de confirmation.",
+          "noOrder": "Citizen Pay n'a pas pu dire si le transfert a abouti ; la commande est en cours de confirmation.",
+          "next": "Ne débitez pas cette vente à nouveau. Vérifiez les ventes du commerçant dans quelques minutes : la commande sera payée, ou à nouveau ouverte pour un nouvel essai."
+        },
+        "errors": {
+          "invalidInput": "Demande de débit invalide.",
+          "amountInvalid": "Saisissez un montant positif avec au plus 2 décimales.",
+          "merchantNotFound": "Commerçant introuvable ou non connecté à Citizen Pay.",
+          "ordersFailed": "Impossible de charger les ventes non encaissées du commerçant.",
+          "cardNotFound": "Citizen Pay ne connaît pas cette carte.",
+          "cardBlocked": "Cette carte est bloquée et ne peut pas être débitée.",
+          "pinInvalid": "Code PIN incorrect.",
+          "pinLocked": "Trop de codes PIN incorrects ; la carte est temporairement verrouillée. Réessayez plus tard.",
+          "insufficient": "Le solde de la carte ne couvre pas ce montant.",
+          "alreadyPaid": "Cette vente a déjà été payée.",
+          "beingCharged": "Cette vente est en cours de débit ou de confirmation.",
+          "orderNotFound": "Vente introuvable.",
+          "badgeBlocked": "Ce badge est bloqué.",
+          "badgeLost": "Ce badge a été déclaré perdu.",
+          "badgeNotAssigned": "Ce badge n'est attribué à personne.",
+          "noDestination": "Le commerçant n'a pas encore de compte pour recevoir le paiement.",
+          "placeNotFound": "Citizen Pay ne connaît pas ce commerçant pour cette caisse.",
+          "unknown": "Aucune réponse n'est revenue. Débiter à nouveau est sans risque : la même vente sera réutilisée plutôt que débitée deux fois."
+        }
       }
     }
   },

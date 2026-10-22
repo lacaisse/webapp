@@ -35,6 +35,7 @@ import { CardNumberEdit } from "./card-number-edit";
 import { CardSourcePicker, type SourceOption } from "./source-picker";
 import { CardTransfersTable } from "./transfers-table";
 import { NotifyCardButton } from "./notify-card-button";
+import { ChargeCardDialog } from "./charge-card-dialog";
 import { TransferDialog } from "./transfer-dialog";
 import { UnassignCardButton } from "../unassign-card-button";
 
@@ -100,6 +101,23 @@ export default async function CardDetailPage({
     fund.tokenDecimals != null &&
     card.account != null;
   const tapLink = buildCardLink(card.serialNumber, await resolveTreasurySlug(fund));
+  // Where the card can be charged for an uncollected sale: the fund's active
+  // merchants connected to Citizen Pay. Empty hides nothing but disables the
+  // button — the admin sees the feature exists.
+  const chargeableMerchants =
+    canShowBalance && card.status !== "BLOCKED"
+      ? (
+          await prisma.merchant.findMany({
+            where: {
+              fundId: fund.id,
+              status: "ACTIVE",
+              citizenPayPlaceId: { not: null },
+            },
+            orderBy: [{ position: "asc" }, { name: "asc" }],
+            select: { id: true, name: true, citizenPayPlaceId: true },
+          })
+        ).map((m) => ({ id: m.id, name: m.name, placeId: m.citizenPayPlaceId! }))
+      : null;
 
   return (
     <>
@@ -112,6 +130,15 @@ export default async function CardDetailPage({
           {t("back")}
         </Link>
         <div className="flex flex-wrap items-center justify-end gap-2">
+          {chargeableMerchants !== null && (
+            <ChargeCardDialog
+              cardId={card.id}
+              serialNumber={card.serialNumber}
+              holderLabel={holderDisplay}
+              tokenSymbol={fund.tokenSymbol}
+              merchants={chargeableMerchants}
+            />
+          )}
           {canShowBalance && (
             <TransferDialog
               cardId={card.id}

@@ -11,6 +11,9 @@ import type {
   BankingStatus,
   BankTransactionPayloadPage,
   BankTransactionsPage,
+  CardChargeCardInput,
+  CardChargeOnPlaceInput,
+  CardChargeResult,
   CardOperationInput,
   CardOperationResult,
   CitizenPayBank,
@@ -27,6 +30,7 @@ import type {
   ListCardsInput,
   ListCardsResult,
   ListPlacesResult,
+  OpenPlaceOrder,
   OperationStatusResult,
   PaymentRequestState,
   Payout,
@@ -39,16 +43,16 @@ import type {
   PayoutOrdersPage,
   PayoutPeriod,
   PayoutStatusDetail,
-  RegisteredCard,
   RegisterCardInput,
+  RegisteredCard,
   SetManualDeductionInput,
   SubmitMintInput,
   SubmittedOperation,
-  TopUpSignUrlInput,
   TopUpOrder,
   TopUpOrderClaim,
   TopUpOrderReport,
   TopUpOrderState,
+  TopUpSignUrlInput,
 } from "./types";
 
 export interface CitizenPayClient {
@@ -76,6 +80,41 @@ export interface CitizenPayClient {
    * blocked card is a no-op.
    */
   blockCard(serialNumber: string): Promise<void>;
+
+  /**
+   * The uncollected terminal sales on a merchant's place (pending, cancelled
+   * once stale, failed) — what `chargeCardForOrder` can charge, newest
+   * first. Empty for a place with nothing open.
+   */
+  listOpenPlaceOrders(placeId: string): Promise<OpenPlaceOrder[]>;
+
+  /**
+   * Charge a card for one of those sales. CP claims the order first so a
+   * double submit never pays twice, then settles it as the terminal would
+   * have. Throws CitizenPayApiError on refusal: 428 when the card has a PIN
+   * and none was sent (resend with `pinHash`), 403 invalid pin / blocked
+   * card / badge, 402 insufficient balance, 409 already paid or being
+   * charged, 502 outcome unknown (the order is being confirmed — never
+   * retry).
+   */
+  chargeCardForOrder(
+    orderId: number,
+    input: CardChargeCardInput,
+  ): Promise<CardChargeResult>;
+
+  /**
+   * Charge a card for a sale the terminal never recorded: CP creates the
+   * order on the place as the terminal would have, then charges. Every
+   * refusal is applied before the order exists, except a charge that fails
+   * after creation (402/500): the error body then names the order
+   * (`orderId`, `orderStatus: "pending"`) and the next attempt goes through
+   * `chargeCardForOrder`. A retry with the same `idempotencyKey` continues
+   * with the order the first attempt created.
+   */
+  chargeCardOnPlace(
+    placeId: string,
+    input: CardChargeOnPlaceInput,
+  ): Promise<CardChargeResult>;
 
   /** Reverse of `blockCard`. Idempotent. */
   unblockCard(serialNumber: string): Promise<void>;

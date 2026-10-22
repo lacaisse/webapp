@@ -633,3 +633,43 @@ export type TopUpOrder = {
 export type TopUpOrderClaim = { claimId: string; expiresAt: Date | null };
 
 export type TopUpOrderReport = { claimId: string; txHash: string };
+
+// =============================================================================
+// Card charge (admin charge-on-card towards a merchant)
+// =============================================================================
+// An uncollected terminal sale on a merchant's place — the pay-pos rang it up
+// and never settled it — that a card can still be charged for.
+export type OpenPlaceOrder = {
+  id: number;
+  createdAt: string; // ISO 8601
+  totalCents: number; // what the card pays
+  status: string; // pending | cancelled | failed
+  description: string | null;
+  terminalName: string | null;
+};
+
+export type CardChargeCardInput = {
+  serialNumber: string;
+  // Client digest of the card PIN (services/card/pin-hash), sent on the
+  // api's 428. Null on the first attempt.
+  pinHash: string | null;
+};
+
+export type CardChargeOnPlaceInput = CardChargeCardInput & {
+  amountCents: number;
+  description: string | null;
+  // Minted once per attempt series and kept across retries, so a retry
+  // after an unknown outcome finds the order the first attempt created
+  // instead of creating a second one.
+  idempotencyKey: string;
+};
+
+// The card paid the place. Refusals are thrown as CitizenPayApiError (status
+// + body) — the action turns them into what the dialog shows.
+export type CardChargeResult = {
+  orderId: number;
+  txHash: string;
+  status: string;
+  settled: boolean;
+  existing: boolean;
+};
