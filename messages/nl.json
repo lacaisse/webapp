@@ -2907,6 +2907,69 @@
           "clear": "Wissen",
           "noName": "Geen houder"
         }
+      },
+      "charge": {
+        "button": "Afrekenen bij een handelaar",
+        "title": "De kaart afrekenen bij een handelaar",
+        "description": "Int van de kaart van {holderLabel} een verkoop die de terminal van de handelaar niet kon innen. De verkoop wordt aan de kant van de handelaar geregistreerd zoals elke terminalbetaling.",
+        "merchantLabel": "Handelaar",
+        "merchantPlaceholder": "Kies een handelaar",
+        "merchantRequired": "Kies een handelaar.",
+        "saleLabel": "Verkoop",
+        "ordersLoading": "Niet-geïnde verkopen opzoeken…",
+        "noOpenOrders": "Deze handelaar heeft geen niet-geïnde terminalverkoop; voer hieronder het bedrag in.",
+        "newSale": "Een verkoop die de terminal niet heeft geregistreerd",
+        "newSaleHint": "Voer hieronder het bedrag en wat er verkocht is in.",
+        "createdOrder": "Bestelling #{id} is aangemaakt voor deze verkoop; deze poging rekent ze af.",
+        "amountLabel": "Bedrag",
+        "descriptionLabel": "Omschrijving",
+        "descriptionPlaceholder": "Wat er verkocht is (optioneel)",
+        "confirm": "Afrekenen",
+        "confirmAmount": "{amount} afrekenen",
+        "failedWithOrder": "Bestelling #{id} is aan de kant van de handelaar aangemaakt en blijft onbetaald: los het probleem op en reken opnieuw af, ze wordt hergebruikt.",
+        "status": {
+          "pending": "in afwachting",
+          "cancelled": "geannuleerd",
+          "failed": "mislukt",
+          "paid": "betaald"
+        },
+        "pin": {
+          "description": "Deze kaart heeft een pincode. Vraag de kaarthouder die in te voeren; ze wordt in de browser gehasht en nooit bewaard.",
+          "label": "Pincode van de kaart",
+          "hint": "De pincode dient alleen om deze afrekening te bevestigen.",
+          "required": "Voer de pincode van de kaart in.",
+          "confirm": "Bevestigen met pincode"
+        },
+        "done": {
+          "body": "Afgerekend. Bestelling #{id} is betaald en verschijnt in de verkopen van de handelaar.",
+          "unsettled": "De kaart heeft betaald, maar Citizen Pay kon bestelling #{id} niet volledig registreren. Ze is aan hun kant gemarkeerd; reken niet opnieuw af.",
+          "existing": "Deze poging was eerder al geslaagd; er is geen tweede afrekening gedaan."
+        },
+        "unknown": {
+          "body": "Citizen Pay kon niet zeggen of de overdracht gelukt is. Bestelling #{id} wordt bevestigd.",
+          "noOrder": "Citizen Pay kon niet zeggen of de overdracht gelukt is; de bestelling wordt bevestigd.",
+          "next": "Reken deze verkoop niet opnieuw af. Controleer de verkopen van de handelaar over enkele minuten: de bestelling is dan betaald, of opnieuw open voor een nieuwe poging."
+        },
+        "errors": {
+          "invalidInput": "Ongeldige afrekening.",
+          "amountInvalid": "Voer een positief bedrag met maximaal 2 decimalen in.",
+          "merchantNotFound": "Handelaar niet gevonden of niet verbonden met Citizen Pay.",
+          "ordersFailed": "De niet-geïnde verkopen van de handelaar konden niet geladen worden.",
+          "cardNotFound": "Citizen Pay kent deze kaart niet.",
+          "cardBlocked": "Deze kaart is geblokkeerd en kan niet afgerekend worden.",
+          "pinInvalid": "Verkeerde pincode.",
+          "pinLocked": "Te veel verkeerde pincodes; de kaart is tijdelijk vergrendeld. Probeer later opnieuw.",
+          "insufficient": "Het saldo van de kaart dekt dit bedrag niet.",
+          "alreadyPaid": "Deze verkoop is al betaald.",
+          "beingCharged": "Deze verkoop wordt op dit moment afgerekend of bevestigd.",
+          "orderNotFound": "Verkoop niet gevonden.",
+          "badgeBlocked": "Deze badge is geblokkeerd.",
+          "badgeLost": "Deze badge is als verloren gemeld.",
+          "badgeNotAssigned": "Deze badge is aan niemand toegewezen.",
+          "noDestination": "De handelaar heeft nog geen rekening om de betaling te ontvangen.",
+          "placeNotFound": "Citizen Pay kent deze handelaar niet voor deze kas.",
+          "unknown": "Er kwam geen antwoord terug. Opnieuw afrekenen is veilig: dezelfde verkoop wordt hergebruikt in plaats van twee keer afgerekend."
+        }
       }
     }
   },

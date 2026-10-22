@@ -11,6 +11,7 @@ import {
   cards as apiCards,
   invites as apiInvites,
   payments as apiPayments,
+  orders as apiOrders,
   payouts as apiPayouts,
   places as apiPlaces,
   profiles as apiProfiles,
@@ -31,7 +32,9 @@ import {
   type PayoutOrderWire,
   type RecomputedPayoutWire,
   type BankTransactionWire,
+  type CardChargeResultWire,
   type FeeCollectionFrequencyWire,
+  type OpenOrderWire,
   type TopUpOrderWire,
 } from "./api";
 import type { CitizenPayClient } from "./client-interface";
@@ -44,6 +47,9 @@ import type {
   BankTransactionPayload,
   BankTransactionPayloadPage,
   BankTransactionsPage,
+  CardChargeCardInput,
+  CardChargeOnPlaceInput,
+  CardChargeResult,
   CardOperationInput,
   CardOperationResult,
   CardStatus,
@@ -62,6 +68,7 @@ import type {
   ListCardsInput,
   ListCardsResult,
   ListPlacesResult,
+  OpenPlaceOrder,
   OperationStatusResult,
   PaymentRequestState,
   Payout,
@@ -76,16 +83,16 @@ import type {
   PayoutOrdersPage,
   PayoutPeriod,
   PayoutStatusDetail,
-  RegisteredCard,
   RegisterCardInput,
+  RegisteredCard,
   SetManualDeductionInput,
   SubmitMintInput,
   SubmittedOperation,
-  TopUpSignUrlInput,
   TopUpOrder,
   TopUpOrderClaim,
   TopUpOrderReport,
   TopUpOrderState,
+  TopUpSignUrlInput,
 } from "./types";
 
 // Adapts the OpenAPI-shaped low-level api.ts to the high-level interface the
@@ -282,6 +289,29 @@ function statusFromWire(s: "active" | "inactive" | "blocked"): CardStatus {
   if (s === "active") return "ACTIVE";
   if (s === "blocked") return "BLOCKED";
   return "INACTIVE";
+}
+
+function openOrderFromWire(w: OpenOrderWire): OpenPlaceOrder {
+  return {
+    id: w.id,
+    createdAt: w.date,
+    totalCents: w.total,
+    status: w.status,
+    description: w.description ?? null,
+    terminalName: w.terminalName ?? null,
+  };
+}
+
+function cardChargeFromWire(w: CardChargeResultWire): CardChargeResult {
+  return {
+    orderId: w.orderId,
+    txHash: w.txHash,
+    status: w.status,
+    // Missing reads as settled: only an explicit false means CP could not
+    // finish the bookkeeping.
+    settled: w.settled !== false,
+    existing: w.existing === true,
+  };
 }
 
 function cardFromWire(w: {
@@ -547,6 +577,38 @@ export class LiveCitizenPayClient implements CitizenPayClient {
       toCents(input.amount),
     );
     return { txHash: result.txHash };
+  }
+
+  async listOpenPlaceOrders(placeId: string): Promise<OpenPlaceOrder[]> {
+    // One page is plenty: a place with 50+ uncollected sales is a terminal
+    // problem, not a dialog's.
+    const res = await apiPlaces.openOrders(this.creds, placeId, { limit: 50 });
+    return (res.orders ?? []).map(openOrderFromWire);
+  }
+
+  async chargeCardForOrder(
+    orderId: number,
+    input: CardChargeCardInput,
+  ): Promise<CardChargeResult> {
+    const res = await apiOrders.chargeCard(this.creds, orderId, {
+      serial: input.serialNumber,
+      ...(input.pinHash ? { pin_hash: input.pinHash } : {}),
+    });
+    return cardChargeFromWire(res);
+  }
+
+  async chargeCardOnPlace(
+    placeId: string,
+    input: CardChargeOnPlaceInput,
+  ): Promise<CardChargeResult> {
+    const res = await apiPlaces.chargeCard(this.creds, placeId, {
+      serial: input.serialNumber,
+      amount: input.amountCents,
+      ...(input.description ? { description: input.description } : {}),
+      ...(input.pinHash ? { pin_hash: input.pinHash } : {}),
+      idempotencyKey: input.idempotencyKey,
+    });
+    return cardChargeFromWire(res);
   }
 
   async listCitizenPayCards(

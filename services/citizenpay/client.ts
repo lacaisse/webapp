@@ -24,6 +24,9 @@ import type {
   BankingStatus,
   BankTransactionPayloadPage,
   BankTransactionsPage,
+  CardChargeCardInput,
+  CardChargeOnPlaceInput,
+  CardChargeResult,
   CardOperationInput,
   CardOperationResult,
   CitizenPayBank,
@@ -40,6 +43,7 @@ import type {
   ListCardsInput,
   ListCardsResult,
   ListPlacesResult,
+  OpenPlaceOrder,
   OperationStatusResult,
   PaymentRequestState,
   Payout,
@@ -55,16 +59,16 @@ import type {
   PayoutPeriod,
   PayoutStatus,
   PayoutStatusDetail,
-  RegisteredCard,
   RegisterCardInput,
+  RegisteredCard,
   SetManualDeductionInput,
   SubmitMintInput,
   SubmittedOperation,
-  TopUpSignUrlInput,
   TopUpOrder,
   TopUpOrderClaim,
   TopUpOrderReport,
   TopUpOrderState,
+  TopUpSignUrlInput,
 } from "./types";
 
 // Re-export the interface so existing imports `from "@/services/citizenpay/client"`
@@ -99,6 +103,59 @@ const MOCK_BANKS: CitizenPayBank[] = [
   { id: "mock-kbc", name: "KBC", country: "BE", logoUrl: null, paymentsEnabled: true, requiresDebtorIban: false },
   { id: "mock-crelan", name: "Crelan", country: "BE", logoUrl: null, paymentsEnabled: true, requiresDebtorIban: true },
 ];
+
+// Mock uncollected terminal sales, per place, for the admin charge-on-card
+// dialog: every place starts with two open sales; charging one flips it to
+// paid (it drops out of the list), a manual charge adds a paid one. The
+// serial drives the refusals so each branch of the dialog can be exercised
+// in dev — see mockChargeRefusal. Kept on globalThis like the payment
+// requests so HMR and per-call clients share it.
+type MockOpenOrder = OpenPlaceOrder & { placeId: string; paid: boolean; key: string | null };
+const mockOpenOrders: Map<number, MockOpenOrder> = ((
+  globalThis as { __cpMockOpenOrders?: Map<number, MockOpenOrder> }
+).__cpMockOpenOrders ??= new Map());
+const mockSeededPlaces: Set<string> = ((
+  globalThis as { __cpMockSeededPlaces?: Set<string> }
+).__cpMockSeededPlaces ??= new Set());
+let mockOrderSeq = 90_000;
+
+function mockSeedOpenOrders(placeId: string): void {
+  if (mockSeededPlaces.has(placeId)) return;
+  mockSeededPlaces.add(placeId);
+  const now = Date.now();
+  const seed: Array<Pick<MockOpenOrder, "totalCents" | "status" | "description" | "terminalName"> & { ageMs: number }> = [
+    { totalCents: 1250, status: "cancelled", description: null, terminalName: "Bar", ageMs: 3 * 3_600_000 },
+    { totalCents: 480, status: "failed", description: "Coffee", terminalName: "Counter", ageMs: 40 * 60_000 },
+  ];
+  for (const o of seed) {
+    const id = ++mockOrderSeq;
+    mockOpenOrders.set(id, {
+      id,
+      placeId,
+      createdAt: new Date(now - o.ageMs).toISOString(),
+      totalCents: o.totalCents,
+      status: o.status,
+      description: o.description,
+      terminalName: o.terminalName,
+      paid: false,
+      key: null,
+    });
+  }
+}
+
+// The mock card's answer, by serial suffix (case-insensitive): "…PIN" has a
+// PIN (428 until a pin_hash is sent), "…BAD" refuses every PIN, "…POOR"
+// cannot cover the amount, "…BLOCKED" is blocked, "…LOST" is a lost badge.
+// Anything else pays.
+function mockChargeRefusal(serial: string, pinHash: string | null): { status: number; error: string } | null {
+  const s = serial.toUpperCase();
+  if (s.endsWith("BLOCKED")) return { status: 403, error: "card is blocked" };
+  if (s.endsWith("LOST")) return { status: 403, error: "badge lost" };
+  if (s.endsWith("PIN") && !pinHash) return { status: 428, error: "card pin required" };
+  if (s.endsWith("BAD")) return { status: pinHash ? 403 : 428, error: pinHash ? "invalid card pin" : "card pin required" };
+  if (s.endsWith("POOR")) return { status: 402, error: "insufficient card balance" };
+  return null;
+}
 
 class MockCitizenPayClient implements CitizenPayClient {
   constructor(private readonly fundId: string) {}
@@ -210,6 +267,77 @@ class MockCitizenPayClient implements CitizenPayClient {
   ): Promise<CardOperationResult> {
     this.log("withdrawFromCard", input);
     return { txHash: `0x${randomBytes(32).toString("hex")}` };
+  }
+
+  async listOpenPlaceOrders(placeId: string): Promise<OpenPlaceOrder[]> {
+    this.log("listOpenPlaceOrders", { placeId });
+    mockSeedOpenOrders(placeId);
+    return [...mockOpenOrders.values()]
+      .filter((o) => o.placeId === placeId && !o.paid)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map(({ id, createdAt, totalCents, status, description, terminalName }) => ({
+        id, createdAt, totalCents, status, description, terminalName,
+      }));
+  }
+
+  async chargeCardForOrder(
+    orderId: number,
+    input: CardChargeCardInput,
+  ): Promise<CardChargeResult> {
+    this.log("chargeCardForOrder", { orderId, serial: input.serialNumber, pin: input.pinHash !== null });
+    const order = mockOpenOrders.get(orderId);
+    if (!order) throw new CitizenPayApiError("order not found", 404, { error: "order not found" });
+    if (order.paid) {
+      throw new CitizenPayApiError("order already paid", 409, { error: "order already paid", orderId, orderStatus: "paid" });
+    }
+    const refusal = mockChargeRefusal(input.serialNumber, input.pinHash);
+    if (refusal) throw new CitizenPayApiError(refusal.error, refusal.status, { error: refusal.error });
+    order.paid = true;
+    order.status = "paid";
+    return { orderId, txHash: `0x${randomBytes(32).toString("hex")}`, status: "paid", settled: true, existing: false };
+  }
+
+  async chargeCardOnPlace(
+    placeId: string,
+    input: CardChargeOnPlaceInput,
+  ): Promise<CardChargeResult> {
+    this.log("chargeCardOnPlace", { placeId, serial: input.serialNumber, amountCents: input.amountCents, pin: input.pinHash !== null, key: input.idempotencyKey });
+    mockSeedOpenOrders(placeId);
+    // A key already used on this place continues with its order, as live.
+    const existing = [...mockOpenOrders.values()].find((o) => o.placeId === placeId && o.key === input.idempotencyKey);
+    if (existing?.paid) {
+      return { orderId: existing.id, txHash: `0x${"ee".repeat(32)}`, status: "paid", settled: true, existing: true };
+    }
+    const refusal = mockChargeRefusal(input.serialNumber, input.pinHash);
+    // Before the order exists: PIN, blocked, badge. Nothing is created.
+    if (refusal && refusal.status !== 402) {
+      throw new CitizenPayApiError(refusal.error, refusal.status, { error: refusal.error });
+    }
+    const order: MockOpenOrder = existing ?? {
+      id: ++mockOrderSeq,
+      placeId,
+      createdAt: new Date().toISOString(),
+      totalCents: input.amountCents,
+      status: "pending",
+      description: input.description,
+      terminalName: null,
+      paid: false,
+      key: input.idempotencyKey,
+    };
+    mockOpenOrders.set(order.id, order);
+    if (refusal) {
+      // Created, then the card could not cover it: the order stays pending
+      // and the body names it with the route to retry it.
+      throw new CitizenPayApiError(refusal.error, refusal.status, {
+        error: refusal.error,
+        orderId: order.id,
+        orderStatus: "pending",
+        retry: `/v2/treasury/orders/${order.id}/charge-card`,
+      });
+    }
+    order.paid = true;
+    order.status = "paid";
+    return { orderId: order.id, txHash: `0x${randomBytes(32).toString("hex")}`, status: "paid", settled: true, existing: false };
   }
 
   async listCitizenPayCards(

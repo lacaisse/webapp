@@ -758,6 +758,106 @@ export const places = {
       { query },
     );
   },
+  // GET …/places/{id}/orders?open=true — the place's uncollected terminal
+  // sales (pending, cancelled once stale, failed), newest first: what
+  // `orders.chargeCard` can charge a card for.
+  openOrders(
+    creds: CitizenPayApiCredentials,
+    placeId: string,
+    query: { limit?: number; offset?: number } = {},
+  ): Promise<PaginatedOpenOrders> {
+    return request(
+      creds,
+      "GET",
+      `/v2/treasury/places/${encodeURIComponent(placeId)}/orders`,
+      { query: { ...query, open: "true" } },
+    );
+  },
+  // POST …/places/{id}/charge-card — a sale the terminal never recorded:
+  // CP creates the order on the place as the terminal would have, then
+  // charges the card for it. Refusals come back as CitizenPayApiError with
+  // the statuses documented on the api (428 = the card has a PIN, resend
+  // with `pin_hash`; 402 = nothing sent, the created order is named in the
+  // body with the route to retry it; 502 = outcome unknown, never retry).
+  // The 30 s timeout covers the on-chain submission.
+  chargeCard(
+    creds: CitizenPayApiCredentials,
+    placeId: string,
+    body: {
+      serial: string;
+      amount: number; // cents
+      description?: string;
+      pin_hash?: string;
+      idempotencyKey?: string;
+    },
+  ): Promise<CardChargeResultWire> {
+    return request(
+      creds,
+      "POST",
+      `/v2/treasury/places/${encodeURIComponent(placeId)}/charge-card`,
+      { body, timeoutMs: 30_000 },
+    );
+  },
+};
+
+// Uncollected terminal sale, as GET …/places/{id}/orders?open=true lists it.
+export type OpenOrderWire = {
+  id: number;
+  date: string;
+  total: number; // cents — what the card pays
+  fees: number;
+  payoutFee: number;
+  due: number;
+  status: "pending" | "cancelled" | "failed" | string;
+  type: string;
+  description?: string | null;
+  terminalId?: string | null;
+  terminalName?: string | null;
+};
+
+export type PaginatedOpenOrders = {
+  orders: OpenOrderWire[] | null;
+  total: number;
+  limit: number;
+  offset: number;
+};
+
+// Both charge-card routes' 200.
+export type CardChargeResultWire = {
+  success: boolean;
+  orderId: number;
+  txHash: string;
+  // The order's status: "paid" when fully settled. `settled: false` means
+  // the funds moved but CP could not finish the bookkeeping (alerted on
+  // their side, reconciled by hand) — the card has paid, never retry.
+  status: string;
+  settled: boolean;
+  // Place route only: the idempotency key's order was already paid by an
+  // earlier attempt; this is that charge, not a new one.
+  existing?: boolean;
+};
+
+// =============================================================================
+// Orders (treasury-wide, by id)
+// =============================================================================
+
+export const orders = {
+  // POST /v2/treasury/orders/{orderId}/charge-card — pay an uncollected
+  // terminal sale (one of `places.openOrders`) with a card; CP claims the
+  // order before any money moves, so a double submit can never pay twice.
+  // Same refusal statuses as `places.chargeCard`.
+  chargeCard(
+    creds: CitizenPayApiCredentials,
+    orderId: number,
+    body: { serial: string; pin_hash?: string },
+  ): Promise<CardChargeResultWire> {
+    return request(
+      creds,
+      "POST",
+      `/v2/treasury/orders/${encodeURIComponent(String(orderId))}/charge-card`,
+      { body, timeoutMs: 30_000 },
+    );
+  },
 };
 
 // =============================================================================
