@@ -68,6 +68,10 @@ export type ChargeCardOutcome =
       ok: false;
       pinRequired: false;
       error: string;
+      // The i18n key behind `error` when the refusal is one we name
+      // (services/card/charge-errors), null when `error` is CP's own
+      // sentence. The dialog branches on this, never on the text.
+      errorKey: string | null;
       orderId: number | null;
       orderStatus: string | null;
     };
@@ -123,37 +127,47 @@ export async function chargeCardAction(
 
   const refuse = (
     error: string,
-    extra: { orderId?: number | null; orderStatus?: string | null } = {},
+    extra: {
+      errorKey?: string | null;
+      orderId?: number | null;
+      orderStatus?: string | null;
+    } = {},
   ): ChargeCardOutcome => ({
     ok: false,
     pinRequired: false,
     error,
+    errorKey: extra.errorKey ?? null,
     orderId: extra.orderId ?? null,
     orderStatus: extra.orderStatus ?? null,
   });
+  // A refusal of ours, by key.
+  const refuseKey = (
+    key: string,
+    extra: { orderId?: number | null; orderStatus?: string | null } = {},
+  ): ChargeCardOutcome => refuse(t(key as never), { ...extra, errorKey: key });
 
   const parsed = ChargeCardSchema.safeParse(input);
   if (!parsed.success) {
-    return refuse(t("cards.admin.charge.errors.invalidInput" as never));
+    return refuseKey("cards.admin.charge.errors.invalidInput");
   }
   const data = parsed.data;
   if ((data.orderId === null) === (data.amountCents === null)) {
-    return refuse(t("cards.admin.charge.errors.invalidInput" as never));
+    return refuseKey("cards.admin.charge.errors.invalidInput");
   }
 
   const card = await prisma.card.findFirst({
     where: { id: data.cardId, fundId: fund.id },
     select: { id: true, serialNumber: true, status: true, memberId: true },
   });
-  if (!card) return refuse(t("cards.admin.errors.notFound" as never));
+  if (!card) return refuseKey("cards.admin.errors.notFound");
   if (card.status === "BLOCKED") {
-    return refuse(t("cards.admin.charge.errors.cardBlocked" as never));
+    return refuseKey("cards.admin.charge.errors.cardBlocked");
   }
   // The serial goes to CP exactly as stored — it is the salt of the PIN
   // digest the dialog computed from the same string.
   const serial = card.serialNumber;
   if (!SERIAL_RE.test(serial)) {
-    return refuse(t("cards.admin.charge.errors.cardNotFound" as never));
+    return refuseKey("cards.admin.charge.errors.cardNotFound");
   }
 
   const merchant = await prisma.merchant.findFirst({
@@ -161,10 +175,27 @@ export async function chargeCardAction(
     select: { id: true, citizenPayPlaceId: true },
   });
   if (!merchant?.citizenPayPlaceId) {
-    return refuse(t("cards.admin.charge.errors.merchantNotFound" as never));
+    return refuseKey("cards.admin.charge.errors.merchantNotFound");
   }
 
   const cp = getCitizenPayClient(fund);
+  // An order is charged only when it sits on the chosen merchant's place:
+  // the api scopes an order by token, not by place, so without this a stale
+  // or tampered orderId would pay another merchant while the dialog names
+  // this one. The open list is what the dialog offered (plus an order the
+  // manual route created, still pending there).
+  if (data.orderId !== null) {
+    let open: OpenPlaceOrder[];
+    try {
+      open = await cp.listOpenPlaceOrders(merchant.citizenPayPlaceId);
+    } catch (e) {
+      console.error("[card] chargeCard: open orders of", merchant.id, e);
+      return refuseKey("cards.admin.charge.errors.ordersFailed");
+    }
+    if (!open.some((o) => o.id === data.orderId)) {
+      return refuseKey("cards.admin.charge.errors.orderNotFound");
+    }
+  }
   try {
     const result =
       data.orderId !== null
@@ -203,10 +234,9 @@ export async function chargeCardAction(
           `[card] chargeCard refused: status ${e.status}, order ${orderId ?? "-"}`,
         );
       }
-      return refuse(key ? t(key as never) : e.message, {
-        orderId,
-        orderStatus,
-      });
+      return key
+        ? refuseKey(key, { orderId, orderStatus })
+        : refuse(e.message, { orderId, orderStatus });
     }
     // The call itself failed (network, timeout) before an answer came back.
     // Trying again is safe: a manual retry carries the same idempotency
@@ -214,7 +244,7 @@ export async function chargeCardAction(
     // charge) rather than a second one; a retry on an order the first
     // attempt paid is refused by CP's claim.
     console.error("[card] chargeCard failed", card.id, merchant.id, e);
-    return refuse(t("cards.admin.charge.errors.unknown" as never));
+    return refuseKey("cards.admin.charge.errors.unknown");
   }
 }
 

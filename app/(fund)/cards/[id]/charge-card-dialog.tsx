@@ -241,7 +241,7 @@ function ChargeCardForm({
     }
     // A wrong PIN is asked again, whatever else this dialog knows (an order
     // it created included): the next attempt would only get another 428.
-    if (outcome.error === tRoot("cards.admin.charge.errors.pinInvalid")) {
+    if (outcome.errorKey === "cards.admin.charge.errors.pinInvalid") {
       setPin("");
       setStep("pin");
       setError(outcome.error);
@@ -341,9 +341,6 @@ function ChargeCardForm({
                   </p>
                 ) : (
                   <div className="space-y-2">
-                    {ordersError && (
-                      <p className="text-xs text-destructive">{ordersError}</p>
-                    )}
                     {openOrders.map((o) => (
                       <OrderOption
                         key={o.id}
@@ -371,10 +368,14 @@ function ChargeCardForm({
                       checked={orderChoice === ""}
                       onChange={() => setOrderChoice("")}
                       title={t("newSale")}
+                      // When the open sales could not be read, say so here
+                      // rather than "none": the sale may well exist.
                       detail={
-                        openOrders.length === 0
-                          ? t("noOpenOrders")
-                          : t("newSaleHint")
+                        ordersError
+                          ? `${ordersError} ${t("newSaleHint")}`
+                          : openOrders.length === 0
+                            ? t("noOpenOrders")
+                            : t("newSaleHint")
                       }
                     />
                   </div>

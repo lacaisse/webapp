@@ -117,7 +117,11 @@ const mockOpenOrders: Map<number, MockOpenOrder> = ((
 const mockSeededPlaces: Set<string> = ((
   globalThis as { __cpMockSeededPlaces?: Set<string> }
 ).__cpMockSeededPlaces ??= new Set());
-let mockOrderSeq = 90_000;
+// On globalThis too: a module-level counter restarts at the base on every
+// dev reload and would hand out ids the map already holds.
+const mockOrderIds: { next: number } = ((
+  globalThis as { __cpMockOrderIds?: { next: number } }
+).__cpMockOrderIds ??= { next: 90_000 });
 
 function mockSeedOpenOrders(placeId: string): void {
   if (mockSeededPlaces.has(placeId)) return;
@@ -128,7 +132,7 @@ function mockSeedOpenOrders(placeId: string): void {
     { totalCents: 480, status: "failed", description: "Coffee", terminalName: "Counter", ageMs: 40 * 60_000 },
   ];
   for (const o of seed) {
-    const id = ++mockOrderSeq;
+    const id = ++mockOrderIds.next;
     mockOpenOrders.set(id, {
       id,
       placeId,
@@ -314,7 +318,7 @@ class MockCitizenPayClient implements CitizenPayClient {
       throw new CitizenPayApiError(refusal.error, refusal.status, { error: refusal.error });
     }
     const order: MockOpenOrder = existing ?? {
-      id: ++mockOrderSeq,
+      id: ++mockOrderIds.next,
       placeId,
       createdAt: new Date().toISOString(),
       totalCents: input.amountCents,
