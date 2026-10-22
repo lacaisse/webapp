@@ -3,8 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // computeCardSyncPlan: a CP-listed serial with no local row is imported —
 // unless another fund issued it and this fund holds no ACCEPTED enrollment
-// request for it, in which case it goes to `requestEnrollment` so the run asks
-// the issuer instead of creating a row.
+// request for it. Then it goes to `requestEnrollment` (no request yet: the
+// run asks the issuer instead of creating a row) or to `awaitingIssuer` (a
+// request is already on file: shown, never re-filed).
 vi.mock("server-only", () => ({}));
 
 const enrollment = vi.hoisted(() => ({ findForeignCards: vi.fn() }));
@@ -107,24 +108,65 @@ describe("computeCardSyncPlan — serials issued by another fund", () => {
 
     expect(plan.import.map((i) => i.serialNumber)).toEqual(["NEW1"]);
     expect(plan.requestEnrollment).toEqual([]);
+    expect(plan.awaitingIssuer).toEqual([]);
     expect(enrollment.findForeignCards).toHaveBeenCalledWith("fund-1", ["NEW1"]);
   });
 
-  it("routes a foreign serial without an accepted request to requestEnrollment", async () => {
+  it("routes a foreign serial this fund never asked for to requestEnrollment", async () => {
     cp.listCitizenPayCards.mockResolvedValue({
       cards: [remote("foreign1"), remote("NEW1")],
       pagination: { page: 1, limit: 100, total: 2, totalPages: 1 },
     });
     enrollment.findForeignCards.mockResolvedValue(new Map([["FOREIGN1", foreignCard]]));
-    prisma.cardEnrollmentRequest.findMany.mockResolvedValue([
-      { cardId: "card-x", status: "PENDING" },
-    ]);
 
     const plan = await computeCardSyncPlan(fund);
 
     expect(plan.import.map((i) => i.serialNumber)).toEqual(["NEW1"]);
-    expect(plan.requestEnrollment).toEqual([
-      { serialNumber: "foreign1", card: foreignCard, requestStatus: "PENDING" },
+    expect(plan.requestEnrollment).toEqual([{ serialNumber: "foreign1", card: foreignCard }]);
+    expect(plan.awaitingIssuer).toEqual([]);
+  });
+
+  it.each(["PENDING", "REJECTED", "CANCELLED"] as const)(
+    "lists a foreign serial with a %s request under awaitingIssuer, not requestEnrollment",
+    async (status) => {
+      cp.listCitizenPayCards.mockResolvedValue({
+        cards: [remote("foreign1")],
+        pagination: { page: 1, limit: 100, total: 1, totalPages: 1 },
+      });
+      enrollment.findForeignCards.mockResolvedValue(new Map([["FOREIGN1", foreignCard]]));
+      prisma.cardEnrollmentRequest.findMany.mockResolvedValue([{ cardId: "card-x", status }]);
+
+      const plan = await computeCardSyncPlan(fund);
+
+      expect(plan.import).toEqual([]);
+      expect(plan.requestEnrollment).toEqual([]);
+      expect(plan.awaitingIssuer).toEqual([
+        { serialNumber: "foreign1", card: foreignCard, requestStatus: status },
+      ]);
+    },
+  );
+
+  it("splits foreign serials between the two buckets by request state", async () => {
+    const foreignCard2 = { ...foreignCard, id: "card-y", serialNumber: "FOREIGN2" };
+    cp.listCitizenPayCards.mockResolvedValue({
+      cards: [remote("FOREIGN1"), remote("FOREIGN2")],
+      pagination: { page: 1, limit: 100, total: 2, totalPages: 1 },
+    });
+    enrollment.findForeignCards.mockResolvedValue(
+      new Map([
+        ["FOREIGN1", foreignCard],
+        ["FOREIGN2", foreignCard2],
+      ]),
+    );
+    prisma.cardEnrollmentRequest.findMany.mockResolvedValue([
+      { cardId: "card-y", status: "REJECTED" },
+    ]);
+
+    const plan = await computeCardSyncPlan(fund);
+
+    expect(plan.requestEnrollment).toEqual([{ serialNumber: "FOREIGN1", card: foreignCard }]);
+    expect(plan.awaitingIssuer).toEqual([
+      { serialNumber: "FOREIGN2", card: foreignCard2, requestStatus: "REJECTED" },
     ]);
   });
 
@@ -142,6 +184,7 @@ describe("computeCardSyncPlan — serials issued by another fund", () => {
 
     expect(plan.import.map((i) => i.serialNumber)).toEqual(["FOREIGN1"]);
     expect(plan.requestEnrollment).toEqual([]);
+    expect(plan.awaitingIssuer).toEqual([]);
   });
 
   it("leaves local rows and source accounts out of the foreign check", async () => {

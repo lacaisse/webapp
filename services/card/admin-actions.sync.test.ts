@@ -119,6 +119,18 @@ describe("importOneCardAction — issuer rule", () => {
     expect(prisma.card.create).not.toHaveBeenCalled();
   });
 
+  it("never revives a decided request for a serial another fund issued", async () => {
+    sync.findSerialsAwaitingIssuerAcceptance.mockResolvedValue(
+      new Map([["FOREIGN1", { card: foreignCard, requestStatus: "REJECTED" }]]),
+    );
+
+    const res = await importOneCardAction({ serialNumber: "FOREIGN1" });
+
+    expect(res).toEqual({ ok: true });
+    expect(enrollment.requestCardEnrollment).not.toHaveBeenCalled();
+    expect(prisma.card.create).not.toHaveBeenCalled();
+  });
+
   it("does nothing when the fund already holds the serial", async () => {
     prisma.card.findFirst.mockResolvedValue({ id: "card-own" });
 
@@ -131,9 +143,9 @@ describe("importOneCardAction — issuer rule", () => {
 });
 
 describe("requestOneCardEnrollmentAction", () => {
-  it("files the request with the issuer's card", async () => {
+  it("files the request with the issuer's card when this fund has none", async () => {
     sync.findSerialsAwaitingIssuerAcceptance.mockResolvedValue(
-      new Map([["FOREIGN1", { card: foreignCard, requestStatus: "REJECTED" }]]),
+      new Map([["FOREIGN1", { card: foreignCard, requestStatus: null }]]),
     );
 
     const res = await requestOneCardEnrollmentAction({ serialNumber: "FOREIGN1" });
@@ -143,16 +155,24 @@ describe("requestOneCardEnrollmentAction", () => {
     expect(prisma.card.create).not.toHaveBeenCalled();
   });
 
-  it("leaves a PENDING request untouched", async () => {
-    sync.findSerialsAwaitingIssuerAcceptance.mockResolvedValue(
-      new Map([["FOREIGN1", { card: foreignCard, requestStatus: "PENDING" }]]),
-    );
+  // A request already on file is the issuer's move: PENDING must keep the
+  // details the add-card flow put on it, and a decided (REJECTED/CANCELLED)
+  // one must not be revived to PENDING — that would mail the issuer's staff
+  // on every sync. Re-requesting is a deliberate act from the add-card flow.
+  it.each(["PENDING", "REJECTED", "CANCELLED"] as const)(
+    "leaves an existing %s request untouched",
+    async (requestStatus) => {
+      sync.findSerialsAwaitingIssuerAcceptance.mockResolvedValue(
+        new Map([["FOREIGN1", { card: foreignCard, requestStatus }]]),
+      );
 
-    const res = await requestOneCardEnrollmentAction({ serialNumber: "FOREIGN1" });
+      const res = await requestOneCardEnrollmentAction({ serialNumber: "FOREIGN1" });
 
-    expect(res).toEqual({ ok: true });
-    expect(enrollment.requestCardEnrollment).not.toHaveBeenCalled();
-  });
+      expect(res).toEqual({ ok: true });
+      expect(enrollment.requestCardEnrollment).not.toHaveBeenCalled();
+      expect(prisma.card.create).not.toHaveBeenCalled();
+    },
+  );
 
   it("is a no-op when nothing awaits acceptance any more (accepted since preview)", async () => {
     const res = await requestOneCardEnrollmentAction({ serialNumber: "FOREIGN1" });
@@ -177,12 +197,14 @@ describe("requestOneCardEnrollmentAction", () => {
 });
 
 describe("previewCardSyncAction", () => {
-  it("sends the request bucket to the dialog with the issuer's name", async () => {
+  it("sends the request and awaiting buckets to the dialog with the issuer's name", async () => {
+    const foreignCard2 = { ...foreignCard, id: "card-y", serialNumber: "FOREIGN2" };
     sync.computeCardSyncPlan.mockResolvedValue({
       push: [],
       import: [{ serialNumber: "NEW1", status: "INACTIVE", account: null, createdAt: "" }],
-      requestEnrollment: [
-        { serialNumber: "FOREIGN1", card: foreignCard, requestStatus: null },
+      requestEnrollment: [{ serialNumber: "FOREIGN1", card: foreignCard }],
+      awaitingIssuer: [
+        { serialNumber: "FOREIGN2", card: foreignCard2, requestStatus: "PENDING" },
       ],
       statusUpdate: [],
     });
@@ -196,6 +218,9 @@ describe("previewCardSyncAction", () => {
         requestEnrollment: [{ serialNumber: "FOREIGN1", issuerFundName: "Other Fund" }],
         statusUpdate: [],
         push: [],
+        awaitingIssuer: [
+          { serialNumber: "FOREIGN2", issuerFundName: "Other Fund", status: "PENDING" },
+        ],
       },
     });
   });

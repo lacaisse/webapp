@@ -43,6 +43,10 @@ type CardSyncItemResultLike = CardSyncItemResult;
 // On confirm, the client iterates each step's items sequentially and
 // updates per-step state after every per-item server-action round-trip.
 // One revalidatePath at the end refreshes the /cards table.
+//
+// `plan.awaitingIssuer` (foreign serials this fund already asked for) is
+// informational: it is shown in the preview but is not a step and does not
+// count toward "something to sync".
 
 type StepKey = "import" | "request" | "status" | "push";
 
@@ -176,6 +180,9 @@ export function CardSyncDialog() {
     );
   }
 
+  // Work the run would do. `awaitingIssuer` is deliberately left out: an
+  // open request is the issuer's move, not ours, so it must not keep the
+  // dialog from reporting "everything is in sync".
   const planTotal =
     state.kind === "preview"
       ? state.plan.import.length +
@@ -215,12 +222,13 @@ export function CardSyncDialog() {
 
         {state.kind === "preview" && (
           <div className="space-y-2">
-            {planTotal === 0 ? (
+            {planTotal === 0 && (
               <Alert>
                 <CheckCircle2 className="size-4" />
                 <AlertDescription>{t("nothingToSync")}</AlertDescription>
               </Alert>
-            ) : (
+            )}
+            {(planTotal > 0 || state.plan.awaitingIssuer.length > 0) && (
               <ul className="space-y-1.5 text-sm">
                 {state.plan.import.length > 0 && (
                   <SummaryRow
@@ -248,6 +256,19 @@ export function CardSyncDialog() {
                   <SummaryRow
                     label={t("summary.push", {
                       count: state.plan.push.length,
+                    })}
+                  />
+                )}
+                {state.plan.awaitingIssuer.length > 0 && (
+                  <SummaryRow
+                    muted
+                    label={t("summary.awaitingIssuer", {
+                      count: state.plan.awaitingIssuer.length,
+                      issuers: issuerNames(state.plan.awaitingIssuer),
+                      statuses: requestStatuses(
+                        state.plan.awaitingIssuer,
+                        tRoot,
+                      ),
                     })}
                   />
                 )}
@@ -297,17 +318,40 @@ export function CardSyncDialog() {
   );
 }
 
-// Distinct issuer fund names, in plan order, for the request summary row.
-function issuerNames(
-  items: CardSyncPlanWire["requestEnrollment"],
-): string {
+// Distinct issuer fund names, in plan order, for the request summary rows.
+function issuerNames(items: Array<{ issuerFundName: string }>): string {
   return [...new Set(items.map((i) => i.issuerFundName))].join(", ");
 }
 
-function SummaryRow({ label }: { label: string }) {
+// Distinct request states, in plan order, labelled like the requests panel
+// ("pending", "rejected", …) for the awaiting-issuer row.
+function requestStatuses(
+  items: CardSyncPlanWire["awaitingIssuer"],
+  tRoot: ReturnType<typeof useTranslations>,
+): string {
+  return [...new Set(items.map((i) => i.status))]
+    .map((s) =>
+      tRoot(`fund.cards.enrollmentRequests.status.${s}` as never).toLowerCase(),
+    )
+    .join(", ");
+}
+
+// `muted` marks a row that reports a state the run won't act on (nothing to
+// confirm), as opposed to a piece of work the confirm button will do.
+function SummaryRow({ label, muted = false }: { label: string; muted?: boolean }) {
   return (
-    <li className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2">
-      <span className="size-1.5 rounded-full bg-primary" />
+    <li
+      className={cn(
+        "flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2",
+        muted && "text-muted-foreground",
+      )}
+    >
+      <span
+        className={cn(
+          "size-1.5 rounded-full",
+          muted ? "bg-muted-foreground/40" : "bg-primary",
+        )}
+      />
       {label}
     </li>
   );

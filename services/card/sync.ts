@@ -39,12 +39,21 @@ export type CardSyncPlan = {
   // them because this fund enrolled the card at CP directly, or a bulk
   // enrollment went through before the local create failed). The issuer has
   // to accept before this fund gets a row — the run files a
-  // CardEnrollmentRequest instead of importing. See
-  // `findSerialsAwaitingIssuerAcceptance`.
+  // CardEnrollmentRequest instead of importing. Only serials this fund has
+  // NO request for yet land here. See `findSerialsAwaitingIssuerAcceptance`.
   requestEnrollment: Array<{
     serialNumber: string;
     card: ForeignCard;
-    requestStatus: CardEnrollmentRequestStatus | null;
+  }>;
+  // Same situation, but this fund already filed a request that the issuer
+  // has not accepted (PENDING, or decided REJECTED / CANCELLED). The run
+  // never touches these — re-filing would flip a decided request back to
+  // PENDING and mail the issuer's staff on every sync — so they are shown
+  // for information only and do not count as work to do.
+  awaitingIssuer: Array<{
+    serialNumber: string;
+    card: ForeignCard;
+    requestStatus: CardEnrollmentRequestStatus;
   }>;
   // Local is authoritative for status — if CP differs, push ours.
   statusUpdate: Array<{
@@ -153,6 +162,7 @@ export async function computeCardSyncPlan(
     push: [],
     import: [],
     requestEnrollment: [],
+    awaitingIssuer: [],
     statusUpdate: [],
   };
 
@@ -198,7 +208,8 @@ export async function computeCardSyncPlan(
   });
   // A serial another fund issued is theirs to accept — route it to a request
   // rather than a local row (the issuer-acceptance rule the number import and
-  // the add-card flow already follow).
+  // the add-card flow already follow). With a request already on file the
+  // serial is only reported (`awaitingIssuer`), never re-requested.
   const awaiting = await findSerialsAwaitingIssuerAcceptance(
     fund.id,
     cpOnly.map((r) => r.serialNumber),
@@ -206,11 +217,18 @@ export async function computeCardSyncPlan(
   for (const r of cpOnly) {
     const foreign = awaiting.get(normalizeSerial(r.serialNumber));
     if (foreign) {
-      plan.requestEnrollment.push({
-        serialNumber: r.serialNumber,
-        card: foreign.card,
-        requestStatus: foreign.requestStatus,
-      });
+      if (foreign.requestStatus === null) {
+        plan.requestEnrollment.push({
+          serialNumber: r.serialNumber,
+          card: foreign.card,
+        });
+      } else {
+        plan.awaitingIssuer.push({
+          serialNumber: r.serialNumber,
+          card: foreign.card,
+          requestStatus: foreign.requestStatus,
+        });
+      }
       continue;
     }
     // `account` isn't on the list endpoint — the run path fetches it

@@ -2874,6 +2874,7 @@
           "push": "{count, plural, one {Push # card to Citizen Pay} other {Push # cards to Citizen Pay}}",
           "import": "{count, plural, one {Import # card from Citizen Pay} other {Import # cards from Citizen Pay}}",
           "requestEnrollment": "{count, plural, one {# card was issued by another fund ({issuers}) and needs the issuer's acceptance — a request will be sent} other {# cards were issued by another fund ({issuers}) and need the issuer's acceptance — requests will be sent}}",
+          "awaitingIssuer": "{count, plural, one {# card is waiting on another fund ({issuers}) — request {statuses}, nothing to send} other {# cards are waiting on another fund ({issuers}) — requests {statuses}, nothing to send}}",
           "statusUpdate": "{count, plural, one {Update # card status on Citizen Pay} other {Update # card statuses on Citizen Pay}}"
         },
         "nothingToSync": "Everything is already in sync.",
