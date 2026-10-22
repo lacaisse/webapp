@@ -11,9 +11,16 @@ import { holderDisplayName } from "@/services/card/holder-name";
 import { scheduleCardHolderNamePublish } from "@/services/card/publish-holder-name";
 import { getCitizenPayClient } from "@/services/citizenpay/client";
 import { Prisma } from "@/services/db/generated/client";
-import type { CardStatus } from "@/services/db/generated/enums";
+import type {
+  CardEnrollmentRequestStatus,
+  CardStatus,
+} from "@/services/db/generated/enums";
 import { prisma } from "@/services/db/prisma";
-import { findForeignCards, requestCardEnrollment } from "@/services/card/enrollment-requests";
+import {
+  findForeignCards,
+  requestCardEnrollment,
+  type ForeignCard,
+} from "@/services/card/enrollment-requests";
 import { nextCardNumber } from "@/services/card/numbering";
 import { normalizeSerial } from "@/services/card/serial";
 import { parseCsv } from "@/services/csv/parse";
@@ -26,7 +33,7 @@ import {
   type FundMinterContext,
 } from "@/services/token/userop";
 
-import { computeCardSyncPlan } from "./sync";
+import { computeCardSyncPlan, findSerialsAwaitingIssuerAcceptance } from "./sync";
 
 // Card lifecycle is two independent dimensions:
 //   - `status` (ACTIVE / INACTIVE / BLOCKED): only BLOCKED makes CitizenPay's
@@ -378,20 +385,36 @@ export async function setCardsStatusAction(input: {
 // "X of Y" progress per step. Steps run in this order:
 //
 //   1. importOne   — pull CP-only cards into local
-//   2. pushStatus  — push local status to CP for mismatches
-//   3. pushOne     — push local-only cards to CP
+//   2. requestOne  — CP-only cards another fund issued: ask the issuer
+//   3. pushStatus  — push local status to CP for mismatches
+//   4. pushOne     — push local-only cards to CP
 //
 // Per-item actions never throw — they return { ok | error } so the
 // dialog can keep running and surface a count of failures at the end.
 // Local is authoritative; we never delete on either side from the sync
 // flow (delete-from-CP exists separately when needed).
+//
+// Issuer rule: a serial that another La Caisse fund issued never gets a
+// local row from the sync — the issuer accepts a CardEnrollmentRequest
+// first (see services/card/enrollment-requests.ts). The plan sorts such
+// serials into `requestEnrollment` (no request yet — the run files one) or
+// `awaitingIssuer` (a request is already on file — shown, never touched),
+// and `importOneCardAction` re-checks at run time so a stale plan can't
+// slip one through.
 
 export type CardSyncPlanWire = {
   // Items the client iterates. Each entry has just what the per-item
-  // action needs (serial for import, cardId for the others).
+  // action needs (serial for import / request, cardId for the others).
   import: Array<{ serialNumber: string }>;
+  requestEnrollment: Array<{ serialNumber: string; issuerFundName: string }>;
   statusUpdate: Array<{ cardId: string; serialNumber: string }>;
   push: Array<{ cardId: string; serialNumber: string }>;
+  // Informational only: the dialog lists these but runs nothing for them.
+  awaitingIssuer: Array<{
+    serialNumber: string;
+    issuerFundName: string;
+    status: CardEnrollmentRequestStatus;
+  }>;
 };
 
 export type CardSyncPreviewResult =
@@ -408,6 +431,10 @@ export async function previewCardSyncAction(): Promise<CardSyncPreviewResult> {
       ok: true,
       plan: {
         import: plan.import.map((i) => ({ serialNumber: i.serialNumber })),
+        requestEnrollment: plan.requestEnrollment.map((i) => ({
+          serialNumber: i.serialNumber,
+          issuerFundName: i.card.fund.name,
+        })),
         statusUpdate: plan.statusUpdate.map((i) => ({
           cardId: i.cardId,
           serialNumber: i.serialNumber,
@@ -415,6 +442,11 @@ export async function previewCardSyncAction(): Promise<CardSyncPreviewResult> {
         push: plan.push.map((i) => ({
           cardId: i.cardId,
           serialNumber: i.serialNumber,
+        })),
+        awaitingIssuer: plan.awaitingIssuer.map((i) => ({
+          serialNumber: i.serialNumber,
+          issuerFundName: i.card.fund.name,
+          status: i.requestStatus,
         })),
       },
     };
@@ -429,7 +461,7 @@ export type CardSyncItemResult = { ok: true } | { error: string };
 export async function importOneCardAction(input: {
   serialNumber: string;
 }): Promise<CardSyncItemResult> {
-  const { fund } = await requireFundRole("OPERATOR");
+  const { user, fund } = await requireFundRole("OPERATOR");
 
   // Already-exists is fine — concurrent sync runs, or a manual addCard
   // that landed between preview and execute. Treat as success.
@@ -441,6 +473,14 @@ export async function importOneCardAction(input: {
     select: { id: true },
   });
   if (existing) return { ok: true };
+
+  // Another fund's serial is never imported, whatever the plan said: file
+  // the request with the issuer instead (same outcome as the request step).
+  const awaiting = await findSerialsAwaitingIssuerAcceptance(fund.id, [
+    input.serialNumber,
+  ]);
+  const foreign = awaiting.get(normalizeSerial(input.serialNumber));
+  if (foreign) return requestEnrollmentFor(fund, user.id, foreign);
 
   let detail;
   try {
@@ -471,6 +511,60 @@ export async function importOneCardAction(input: {
   } catch (e) {
     console.error("[card.sync] import create failed", input.serialNumber, e);
     return { error: input.serialNumber };
+  }
+}
+
+/**
+ * Sync step for a CP-listed serial another fund issued: ask the issuer to
+ * accept this fund on the card. An ACCEPTED request (or the issuer's card
+ * gone) between preview and run means there's nothing left to ask — the
+ * next sync imports the serial as usual. A request already on file, whatever
+ * its state, is left alone (see `requestEnrollmentFor`).
+ */
+export async function requestOneCardEnrollmentAction(input: {
+  serialNumber: string;
+}): Promise<CardSyncItemResult> {
+  const { user, fund } = await requireFundRole("OPERATOR");
+
+  const existing = await prisma.card.findFirst({
+    where: {
+      fundId: fund.id,
+      serialNumber: { equals: input.serialNumber, mode: "insensitive" },
+    },
+    select: { id: true },
+  });
+  if (existing) return { ok: true };
+
+  const awaiting = await findSerialsAwaitingIssuerAcceptance(fund.id, [
+    input.serialNumber,
+  ]);
+  const foreign = awaiting.get(normalizeSerial(input.serialNumber));
+  if (!foreign) return { ok: true };
+  return requestEnrollmentFor(fund, user.id, foreign);
+}
+
+// Files this fund's request for a foreign card — only when it has none yet.
+// Any existing request is left untouched: re-filing a PENDING one would
+// refresh its details (wiping a member binding or holder name the add-card
+// flow put on it), and re-filing a REJECTED or CANCELLED one would revive it
+// to PENDING and mail the issuer's staff again on every sync. The admin
+// re-requests a decided card deliberately, from the add-card flow.
+async function requestEnrollmentFor(
+  fund: { id: string; name: string; domain: string },
+  requestedById: string,
+  foreign: { card: ForeignCard; requestStatus: CardEnrollmentRequestStatus | null },
+): Promise<CardSyncItemResult> {
+  if (foreign.requestStatus !== null) return { ok: true };
+  try {
+    await requestCardEnrollment({
+      requesterFund: { id: fund.id, name: fund.name, domain: fund.domain },
+      requestedById,
+      card: foreign.card,
+    });
+    return { ok: true };
+  } catch (e) {
+    console.error("[card.sync] enrollment request failed", foreign.card.serialNumber, e);
+    return { error: foreign.card.serialNumber };
   }
 }
 

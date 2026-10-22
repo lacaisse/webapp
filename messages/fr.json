@@ -2884,12 +2884,15 @@
         "summary": {
           "push": "{count, plural, one {Pousser # carte vers Citizen Pay} other {Pousser # cartes vers Citizen Pay}}",
           "import": "{count, plural, one {Importer # carte depuis Citizen Pay} other {Importer # cartes depuis Citizen Pay}}",
+          "requestEnrollment": "{count, plural, one {# carte a été émise par une autre caisse ({issuers}) et doit être acceptée par celle-ci — une demande sera envoyée} other {# cartes ont été émises par une autre caisse ({issuers}) et doivent être acceptées par celle-ci — des demandes seront envoyées}}",
+          "awaitingIssuer": "{count, plural, one {# carte est en attente d’une autre caisse ({issuers}) — demande : {statuses}, rien à envoyer} other {# cartes sont en attente d’une autre caisse ({issuers}) — demandes : {statuses}, rien à envoyer}}",
           "statusUpdate": "{count, plural, one {Mettre à jour # statut de carte sur Citizen Pay} other {Mettre à jour # statuts de cartes sur Citizen Pay}}"
         },
         "nothingToSync": "Tout est déjà synchronisé.",
         "confirm": "Synchroniser maintenant",
         "steps": {
           "import": "Importation depuis Citizen Pay",
+          "request": "Demande d’acceptation à la caisse émettrice",
           "status": "Réconciliation des statuts",
           "push": "Envoi des nouvelles cartes vers Citizen Pay"
         },

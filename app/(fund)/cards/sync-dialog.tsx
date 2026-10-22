@@ -22,6 +22,7 @@ import {
   previewCardSyncAction,
   pushOneCardAction,
   pushOneCardStatusAction,
+  requestOneCardEnrollmentAction,
   revalidateCardsAfterSyncAction,
   type CardSyncItemResult,
   type CardSyncPlanWire,
@@ -31,17 +32,23 @@ import {
 // the type so the runStep helper can be generic over the execute fn.
 type CardSyncItemResultLike = CardSyncItemResult;
 
-// Three-step sync UX, driven client-side so we can render real progress:
+// Four-step sync UX, driven client-side so we can render real progress:
 //   1. import   — pull CP-only cards into local
-//   2. status   — push local status to CP for mismatches
-//   3. push     — push local-only cards to CP
+//   2. request  — CP-only cards another fund issued: ask the issuer to
+//                 accept (no local row until they do)
+//   3. status   — push local status to CP for mismatches
+//   4. push     — push local-only cards to CP
 //
 // The preview action returns the full plan (item lists, not just counts).
 // On confirm, the client iterates each step's items sequentially and
 // updates per-step state after every per-item server-action round-trip.
 // One revalidatePath at the end refreshes the /cards table.
+//
+// `plan.awaitingIssuer` (foreign serials this fund already asked for) is
+// informational: it is shown in the preview but is not a step and does not
+// count toward "something to sync".
 
-type StepKey = "import" | "status" | "push";
+type StepKey = "import" | "request" | "status" | "push";
 
 type StepState = {
   total: number;
@@ -65,6 +72,12 @@ type DialogState =
 function emptySteps(plan: CardSyncPlanWire): Record<StepKey, StepState> {
   return {
     import: { total: plan.import.length, done: 0, errors: 0, phase: "pending" },
+    request: {
+      total: plan.requestEnrollment.length,
+      done: 0,
+      errors: 0,
+      phase: "pending",
+    },
     status: {
       total: plan.statusUpdate.length,
       done: 0,
@@ -149,6 +162,9 @@ export function CardSyncDialog() {
     await runStep("import", plan.import, (i) =>
       importOneCardAction({ serialNumber: i.serialNumber }),
     );
+    await runStep("request", plan.requestEnrollment, (i) =>
+      requestOneCardEnrollmentAction({ serialNumber: i.serialNumber }),
+    );
     await runStep("status", plan.statusUpdate, (i) =>
       pushOneCardStatusAction({ cardId: i.cardId }),
     );
@@ -164,9 +180,13 @@ export function CardSyncDialog() {
     );
   }
 
+  // Work the run would do. `awaitingIssuer` is deliberately left out: an
+  // open request is the issuer's move, not ours, so it must not keep the
+  // dialog from reporting "everything is in sync".
   const planTotal =
     state.kind === "preview"
       ? state.plan.import.length +
+        state.plan.requestEnrollment.length +
         state.plan.statusUpdate.length +
         state.plan.push.length
       : 0;
@@ -202,17 +222,26 @@ export function CardSyncDialog() {
 
         {state.kind === "preview" && (
           <div className="space-y-2">
-            {planTotal === 0 ? (
+            {planTotal === 0 && (
               <Alert>
                 <CheckCircle2 className="size-4" />
                 <AlertDescription>{t("nothingToSync")}</AlertDescription>
               </Alert>
-            ) : (
+            )}
+            {(planTotal > 0 || state.plan.awaitingIssuer.length > 0) && (
               <ul className="space-y-1.5 text-sm">
                 {state.plan.import.length > 0 && (
                   <SummaryRow
                     label={t("summary.import", {
                       count: state.plan.import.length,
+                    })}
+                  />
+                )}
+                {state.plan.requestEnrollment.length > 0 && (
+                  <SummaryRow
+                    label={t("summary.requestEnrollment", {
+                      count: state.plan.requestEnrollment.length,
+                      issuers: issuerNames(state.plan.requestEnrollment),
                     })}
                   />
                 )}
@@ -230,6 +259,19 @@ export function CardSyncDialog() {
                     })}
                   />
                 )}
+                {state.plan.awaitingIssuer.length > 0 && (
+                  <SummaryRow
+                    muted
+                    label={t("summary.awaitingIssuer", {
+                      count: state.plan.awaitingIssuer.length,
+                      issuers: issuerNames(state.plan.awaitingIssuer),
+                      statuses: requestStatuses(
+                        state.plan.awaitingIssuer,
+                        tRoot,
+                      ),
+                    })}
+                  />
+                )}
               </ul>
             )}
           </div>
@@ -238,6 +280,7 @@ export function CardSyncDialog() {
         {(state.kind === "running" || state.kind === "done") && (
           <div className="space-y-3">
             <StepRow stepKey="import" step={state.steps.import} t={t} />
+            <StepRow stepKey="request" step={state.steps.request} t={t} />
             <StepRow stepKey="status" step={state.steps.status} t={t} />
             <StepRow stepKey="push" step={state.steps.push} t={t} />
           </div>
@@ -275,10 +318,40 @@ export function CardSyncDialog() {
   );
 }
 
-function SummaryRow({ label }: { label: string }) {
+// Distinct issuer fund names, in plan order, for the request summary rows.
+function issuerNames(items: Array<{ issuerFundName: string }>): string {
+  return [...new Set(items.map((i) => i.issuerFundName))].join(", ");
+}
+
+// Distinct request states, in plan order, labelled like the requests panel
+// ("pending", "rejected", …) for the awaiting-issuer row.
+function requestStatuses(
+  items: CardSyncPlanWire["awaitingIssuer"],
+  tRoot: ReturnType<typeof useTranslations>,
+): string {
+  return [...new Set(items.map((i) => i.status))]
+    .map((s) =>
+      tRoot(`fund.cards.enrollmentRequests.status.${s}` as never).toLowerCase(),
+    )
+    .join(", ");
+}
+
+// `muted` marks a row that reports a state the run won't act on (nothing to
+// confirm), as opposed to a piece of work the confirm button will do.
+function SummaryRow({ label, muted = false }: { label: string; muted?: boolean }) {
   return (
-    <li className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2">
-      <span className="size-1.5 rounded-full bg-primary" />
+    <li
+      className={cn(
+        "flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2",
+        muted && "text-muted-foreground",
+      )}
+    >
+      <span
+        className={cn(
+          "size-1.5 rounded-full",
+          muted ? "bg-muted-foreground/40" : "bg-primary",
+        )}
+      />
       {label}
     </li>
   );
