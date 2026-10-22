@@ -25,13 +25,15 @@ let warnedInsecure = false;
 
 /**
  * Push the fund's top-up URL (see top-up-url.ts) to its CitizenPay treasury:
- * the contribution link for PAY_AND_GO and FIXED_PERIOD. No-op for a fund
- * that isn't connected to CP yet.
+ * the cotisation link for FIXED_PERIOD. No-op for a fund that isn't connected
+ * to CP yet.
  *
- * DISABLED funds compute null, but "clear" only ever removes a link La Caisse
- * published itself: the treasury's current value is read first and anything
- * else — a CP-managed URL such as CP's own checkout — is left in place
- * (`foreign_url`, logged). If that read fails, nothing is cleared.
+ * PAY_AND_GO and DISABLED funds compute null (PAY_AND_GO because CP serves its
+ * own checkout link as the treasury's default `top_up_url`), but "clear" only
+ * ever removes a link La Caisse published itself: the treasury's current value
+ * is read first and anything else — a CP-managed URL such as CP's own
+ * checkout — is left in place (`foreign_url`, logged). If that read fails,
+ * nothing is cleared.
  *
  * Environment guard: against the live API, a URL that isn't https (a dev
  * server — `http://acme.localhost:3000/…` — pointed at a real CP) is never

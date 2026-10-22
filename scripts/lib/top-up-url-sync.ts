@@ -19,9 +19,10 @@ type Push<F> = (fund: F, url: string | null) => Promise<void>;
 type Read<F> = (fund: F) => Promise<string | null>;
 
 /**
- * What the run does for one fund. A computed link is always set; a computed
- * null (DISABLED) only clears a link La Caisse published itself
- * (isOwnTopUpUrl) — a CP-managed value such as CP's own checkout is left.
+ * What the run does for one fund. A computed link (FIXED_PERIOD) is always
+ * set; a computed null (PAY_AND_GO, whose link CP serves itself, and
+ * DISABLED) only clears a link La Caisse published itself (isOwnTopUpUrl) — a
+ * CP-managed value such as CP's own checkout is left.
  */
 type Action =
   | { kind: "set"; url: string }
@@ -32,12 +33,13 @@ type Action =
   | { kind: "read_failed"; error: unknown };
 
 /**
- * The URL this environment would build for a stock PAY_AND_GO fund. Checked
- * before touching the DB: anything but https means NODE_ENV / APP_DOMAIN
- * aren't set for production.
+ * The URL this environment would build for a stock FIXED_PERIOD fund (the
+ * only mode that still yields a La Caisse link). Checked before touching the
+ * DB: anything but https means NODE_ENV / APP_DOMAIN aren't set for
+ * production.
  */
 export function probeTopUpUrl(): string | null {
-  return topUpUrlFor({ domain: "probe.lacaisse.eu", allocationMode: "PAY_AND_GO" });
+  return topUpUrlFor({ domain: "probe.lacaisse.eu", allocationMode: "FIXED_PERIOD" });
 }
 
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));

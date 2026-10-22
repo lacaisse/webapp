@@ -20,8 +20,11 @@
 // computed URL is https (forgetting NODE_ENV/APP_DOMAIN would otherwise push
 // `http://…:3000` or `*.localhost` links to real treasuries).
 //
-// DISABLED funds compute "no link", but the run only clears a link La Caisse
-// published itself (the fund's own /pay/{serial}): it reads the treasury's
+// Only FIXED_PERIOD funds get a link (their cotisation page). PAY_AND_GO funds
+// compute "no link" — CP serves its own checkout as the treasury's default
+// `top_up_url` — and so do DISABLED funds. For those the run only clears a
+// link La Caisse published itself (the fund's own /pay/{serial}, e.g. the one
+// earlier runs published for PAY_AND_GO funds): it reads the treasury's
 // current `top_up_url` first and leaves anything else — e.g. Brussels Pay's
 // CP checkout — in place, printed as "(leave: CP-managed URL)". The dry run
 // does that read too when APP_CRED_KEY + CITIZENPAY_API_BASE_URL are set.
