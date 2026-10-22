@@ -1974,7 +1974,9 @@
           "title": "Dit fonds registreren bij Citizen Pay",
           "description": "Uw treasury en de bijbehorende token worden aangemaakt op de Citizen Pay-pagina die deze knop opent. De tokennaam en het symbool uit het tabblad Token zijn vooraf ingevuld; de eerste API-sleutel wordt op het einde uitgegeven en u komt meteen hier terug.",
           "cta": "Registreren bij Citizen Pay",
-          "manualFallback": "Of een bestaande Citizen Pay-treasury koppelen"
+          "manualFallback": "Of een bestaande Citizen Pay-treasury koppelen",
+          "resume": "Registratie hervatten",
+          "startOver": "Opnieuw beginnen"
         },
         "connect": {
           "issueKey": "API-sleutel uitgeven via Citizen Pay",
@@ -1997,7 +1999,7 @@
             "notConnected": "Stel hierboven eerst de Citizen Pay treasury-id in voordat u een sleutel uitgeeft.",
             "failed": "Verbinding met Citizen Pay is mislukt. Probeer het opnieuw.",
             "alreadyRegistered": "Dit fonds heeft al een Citizen Pay-treasury. Geef hieronder een API-sleutel uit of vernieuw ze om een nieuwe sleutel te krijgen.",
-            "registrationPending": "Een Citizen Pay-registratie die minder dan 30 minuten geleden is gestart, is nog open. Rond ze af in het Citizen Pay-tabblad of wacht tot ze verloopt voor u een nieuwe start.",
+            "registrationPending": "Een Citizen Pay-registratie die minder dan 30 minuten geleden is gestart, is nog open. Hervat ze om terug te keren naar het Citizen Pay-formulier, of begin opnieuw om ze te annuleren en een nieuwe te starten.",
             "forbidden": "Deze actie kan alleen vanaf de instellingenpagina van het fonds worden gestart."
           }
         }

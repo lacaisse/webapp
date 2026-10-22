@@ -77,6 +77,7 @@ export class ConnectError extends Error {
       | "missing_params"
       | "not_connected"
       | "registration_pending"
+      | "no_pending_registration"
       | "treasury_mismatch",
     message: string,
   ) {
@@ -122,6 +123,9 @@ export async function initiateKeyIssue(args: {
  * exists for the fund: each attempt is a registration CP may still finish,
  * and two of them landing would mean two treasuries for one fund.
  * `consumeConnect` is the second line of defence (`treasury_mismatch`).
+ * The way out of a pending attempt is `resumeTreasuryRegistration` (same
+ * state, back to CP's form) or `cancelPendingRegistration` (expire it, then
+ * start again) — not waiting 30 minutes.
  */
 export async function initiateTreasuryRegistration(args: {
   fundId: string;
@@ -129,22 +133,63 @@ export async function initiateTreasuryRegistration(args: {
   prefill: RegistrationPrefill;
 }): Promise<{ redirectUrl: string }> {
   const baseUrl = requireBaseUrl();
-  if (await hasPendingAttempt(args.fundId)) {
+  if (await findPendingAttempt(args.fundId)) {
     throw new ConnectError(
       "registration_pending",
       "A registration started less than 30 minutes ago is still open",
     );
   }
   const fundState = await issueFundState(args.fundId, args.returnHost);
+  return {
+    redirectUrl: buildRegisterUrl(baseUrl, args.returnHost, fundState, args.prefill),
+  };
+}
 
-  const cpUrl = new URL(CP_TREASURY_REGISTER_PATH, baseUrl);
-  cpUrl.searchParams.set("redirect_uri", redirectUriFor(args.returnHost, fundState));
-  for (const [key, value] of Object.entries(
-    buildRegistrationPrefill(args.prefill),
-  )) {
-    cpUrl.searchParams.set(key, value);
+/**
+ * Rebuild the CP register URL for the registration that is still pending
+ * for the fund, so the admin can get back to CP's form after pressing Back
+ * or closing the tab. Reuses the pending attempt's fund state — no new row,
+ * so finishing the resumed form consumes the same state the original would
+ * have. CP mints its own state on every GET of its register page, so the
+ * re-entry is a fresh CP form, not a continuation of CP's half-filled one.
+ *
+ * `no_pending_registration` when there is nothing to resume (consumed or
+ * expired meanwhile) — the caller falls back to a fresh registration.
+ */
+export async function resumeTreasuryRegistration(args: {
+  fundId: string;
+  returnHost: string;
+  prefill: RegistrationPrefill;
+}): Promise<{ redirectUrl: string }> {
+  const baseUrl = requireBaseUrl();
+  const pending = await findPendingAttempt(args.fundId);
+  if (!pending) {
+    throw new ConnectError(
+      "no_pending_registration",
+      "No open registration to resume for this fund",
+    );
   }
-  return { redirectUrl: cpUrl.toString() };
+  return {
+    redirectUrl: buildRegisterUrl(baseUrl, args.returnHost, pending.state, args.prefill),
+  };
+}
+
+/**
+ * Expire every pending (unconsumed, unexpired) attempt for the fund so a new
+ * registration can start right away instead of after the 30-minute TTL.
+ * Done by moving `expiresAt` to now rather than marking consumed: the row
+ * keeps telling the truth (nothing was consumed), and a CP tab that is still
+ * open on the old form fails at the callback with `state_expired`, which is
+ * exactly what we want for a registration the admin abandoned. Returns the
+ * number of attempts cancelled.
+ */
+export async function cancelPendingRegistration(fundId: string): Promise<number> {
+  const now = new Date();
+  const { count } = await prisma.citizenPayConnectAttempt.updateMany({
+    where: { fundId, consumedAt: null, expiresAt: { gt: now } },
+    data: { expiresAt: now },
+  });
+  return count;
 }
 
 export type ConsumedConnection = {
@@ -409,12 +454,31 @@ export function redirectUriFor(returnHost: string, fundState: string): string {
 // =============================================================================
 
 /** An unconsumed, unexpired attempt — a handoff CP may still complete. */
-async function hasPendingAttempt(fundId: string): Promise<boolean> {
-  const pending = await prisma.citizenPayConnectAttempt.findFirst({
+async function findPendingAttempt(
+  fundId: string,
+): Promise<{ state: string } | null> {
+  return prisma.citizenPayConnectAttempt.findFirst({
     where: { fundId, consumedAt: null, expiresAt: { gt: new Date() } },
     select: { state: true },
   });
-  return pending !== null;
+}
+
+/**
+ * CP's register URL for a given fund state. Shared by the first start and
+ * the resume so both hand CP byte-identical prefill for the same state.
+ */
+function buildRegisterUrl(
+  baseUrl: string,
+  returnHost: string,
+  fundState: string,
+  prefill: RegistrationPrefill,
+): string {
+  const cpUrl = new URL(CP_TREASURY_REGISTER_PATH, baseUrl);
+  cpUrl.searchParams.set("redirect_uri", redirectUriFor(returnHost, fundState));
+  for (const [key, value] of Object.entries(buildRegistrationPrefill(prefill))) {
+    cpUrl.searchParams.set(key, value);
+  }
+  return cpUrl.toString();
 }
 
 async function issueFundState(fundId: string, returnHost: string): Promise<string> {

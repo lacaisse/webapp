@@ -2013,7 +2013,9 @@
           "title": "Register this fund on Citizen Pay",
           "description": "Your treasury and its token are created on the Citizen Pay page this button opens. The token name and symbol from the Token tab are pre-filled; the first API key is issued at the end and you come straight back here.",
           "cta": "Register on Citizen Pay",
-          "manualFallback": "Or connect an existing Citizen Pay treasury"
+          "manualFallback": "Or connect an existing Citizen Pay treasury",
+          "resume": "Resume registration",
+          "startOver": "Start over"
         },
         "connect": {
           "issueKey": "Issue API key via Citizen Pay",
@@ -2036,7 +2038,7 @@
             "notConnected": "Set the Citizen Pay treasury ID above before issuing a key.",
             "failed": "Citizen Pay connection failed. Please try again.",
             "alreadyRegistered": "This fund already has a Citizen Pay treasury. To get a new key, issue or rotate the API key below.",
-            "registrationPending": "A Citizen Pay registration started less than 30 minutes ago is still open. Finish it in the Citizen Pay tab, or wait for it to expire before starting another.",
+            "registrationPending": "A Citizen Pay registration started less than 30 minutes ago is still open. Resume it to get back to the Citizen Pay form, or start over to cancel it and begin a new one.",
             "forbidden": "This action can only be started from the fund's own settings page."
           }
         }
