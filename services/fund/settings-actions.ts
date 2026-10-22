@@ -8,6 +8,10 @@ import { z } from "zod";
 import { requireFundRole } from "@/services/auth/dal";
 import { getCitizenPayClient } from "@/services/citizenpay/client";
 import { scheduleTreasuryTopUpUrlSync } from "@/services/citizenpay/sync-top-up-url";
+import {
+  ensureMinterRoles,
+  type EnsureMinterRolesResult,
+} from "@/services/citizenpay/token-roles";
 import { prisma } from "@/services/db/prisma";
 import { isSupportedLocale } from "@/services/i18n/config";
 
@@ -345,6 +349,20 @@ export async function updatePayoutFeeAction(
 
   revalidatePath("/settings");
   return { ok: true };
+}
+
+// --- Token minter role ----------------------------------------------------
+// The Token tab's "Grant minter role" button: ask Citizen Pay to grant the
+// fund's minter Safe MINTER_ROLE + BURNER_ROLE on the treasury's token (the
+// same call `consumeConnect` makes after a key pickup). Awaited here — the
+// admin is waiting for the outcome — and never throws; the status is
+// rendered by the button. ADMIN+, like the rest of settings.
+
+export async function grantMinterRoleAction(): Promise<EnsureMinterRolesResult> {
+  const { fund } = await requireFundRole("ADMIN");
+  const result = await ensureMinterRoles({ fundId: fund.id });
+  revalidatePath("/settings");
+  return result;
 }
 
 // --- Helpers -------------------------------------------------------------

@@ -3,7 +3,10 @@ import { CheckCircle2, Coins, HelpCircle, XCircle } from "lucide-react";
 import { getFormatter, getTranslations } from "next-intl/server";
 
 import { CopyButton } from "@/components/copy-button";
-import { checkMinterRole, type RoleStatus } from "@/services/token/permissions";
+import { checkAndRecordMinterRole } from "@/services/citizenpay/token-roles";
+import type { RoleStatus } from "@/services/token/permissions";
+
+import { GrantMinterRoleButton } from "./grant-minter-role-button";
 
 // Read-only display of the connected token. All fields are cached from
 // CitizenPay (synced by services/citizenpay/sync.ts during the connect
@@ -15,7 +18,10 @@ import { checkMinterRole, type RoleStatus } from "@/services/token/permissions";
 // services/token/minter.ts. The smart-account address column stays empty
 // until CitizenPay's bundler factory + salt convention are wired.
 // "Mint permission" reads `hasRole(MINTER_ROLE, smartAccount)` on-chain
-// via Alchemy — see services/token/permissions.ts.
+// via the CitizenPay bundler RPC — see services/token/permissions.ts. When
+// it's missing (or can't be read), "Grant minter role" asks Citizen Pay to
+// grant it (services/citizenpay/token-roles.ts); a role found on chain while
+// `Fund.tokenMintEnabledAt` is still null gets that stamp on render.
 
 // Display label for known chains. Anything not in this list shows the raw
 // chain id — fine as a fallback because the column accepts arbitrary ints.
@@ -29,11 +35,13 @@ const CHAIN_LABELS: Record<number, string> = {
 };
 
 export async function TokenInfo({
+  fundId,
   token,
   minter,
   connected,
   topUpRun,
 }: {
+  fundId: string;
   token: {
     address: string | null;
     chainId: number | null;
@@ -45,6 +53,7 @@ export async function TokenInfo({
   minter: {
     eoaAddress: string | null;
     smartAccountAddress: string | null;
+    mintEnabledAt: Date | null;
   };
   connected: boolean;
   // Last run of the terminal top-up cron (app/api/cron/topups) for this
@@ -75,10 +84,12 @@ export async function TokenInfo({
   // we'd be calling hasRole(MINTER_ROLE, 0x0) which is meaningless.
   const minterRole: RoleStatus | null =
     token.address && token.chainId != null && minter.smartAccountAddress
-      ? await checkMinterRole({
+      ? await checkAndRecordMinterRole({
+          fundId,
           tokenAddress: token.address,
           chainId: token.chainId,
           account: minter.smartAccountAddress,
+          mintEnabledAt: minter.mintEnabledAt,
         })
       : null;
 
@@ -185,6 +196,10 @@ export async function TokenInfo({
             </>
           )}
         </dl>
+
+        {minterRole && (
+          <GrantMinterRoleButton showButton={minterRole !== "has-role"} />
+        )}
       </div>
 
       <div className="space-y-3 border-t pt-6">

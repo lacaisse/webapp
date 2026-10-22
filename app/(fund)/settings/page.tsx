@@ -199,6 +199,7 @@ async function SettingsContent({
           </CardHeader>
           <CardContent className="pb-4">
             <TokenInfo
+              fundId={fund.id}
               token={{
                 address: fund.tokenAddress,
                 chainId: fund.tokenChainId,
@@ -210,6 +211,7 @@ async function SettingsContent({
               minter={{
                 eoaAddress: fund.tokenMinterEoaAddress,
                 smartAccountAddress: fund.tokenMinterSmartAccountAddress,
+                mintEnabledAt: fund.tokenMintEnabledAt,
               }}
               connected={Boolean(
                 fund.citizenPayFundId && fund.citizenPayApiKeyId,

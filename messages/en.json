@@ -1772,7 +1772,17 @@
           "permissionLabel": "Mint permission",
           "permissionGranted": "Active",
           "permissionMissing": "Missing",
-          "permissionUnknown": "Unknown"
+          "permissionUnknown": "Unknown",
+          "grant": {
+            "button": "Grant minter role",
+            "pending": "Granting…",
+            "hint": "Asks Citizen Pay to grant this smart account the mint and burn roles on the treasury's token.",
+            "granted": "Minter role granted. This fund can now mint and burn.",
+            "already": "The smart account already holds the minter role.",
+            "unsupported": "Citizen Pay can't grant the role on this token: it wasn't deployed by Citizen Pay. The token's admin has to grant MINTER_ROLE (and BURNER_ROLE if the token has one) to the smart account above.",
+            "failed": "The grant didn't go through. Try again in a few minutes.",
+            "detail": "Details: {detail}"
+          }
         },
         "topUps": {
           "title": "Terminal top-ups",

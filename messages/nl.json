@@ -1772,7 +1772,17 @@
           "permissionLabel": "Mintrecht",
           "permissionGranted": "Actief",
           "permissionMissing": "Ontbreekt",
-          "permissionUnknown": "Onbekend"
+          "permissionUnknown": "Onbekend",
+          "grant": {
+            "button": "Mintrecht toekennen",
+            "pending": "Bezig met toekennen…",
+            "hint": "Vraagt Citizen Pay om dit smart account de mint- en burnrol op de token van de treasury toe te kennen.",
+            "granted": "Mintrecht toegekend. Dit fonds kan nu minten en burnen.",
+            "already": "Het smart account heeft het mintrecht al.",
+            "unsupported": "Citizen Pay kan deze rol niet toekennen op deze token: hij is niet door Citizen Pay uitgerold. De beheerder van de token moet MINTER_ROLE (en BURNER_ROLE als de token die heeft) toekennen aan het smart account hierboven.",
+            "failed": "Het toekennen is niet gelukt. Probeer het over een paar minuten opnieuw.",
+            "detail": "Details: {detail}"
+          }
         },
         "topUps": {
           "title": "Opwaarderingen aan de terminal",

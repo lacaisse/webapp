@@ -17,12 +17,14 @@ const prisma = vi.hoisted(() => ({
 }));
 vi.mock("@/services/db/prisma", () => ({ prisma }));
 vi.mock("@/services/crypto/secret", () => ({ encryptSecret: (s: string) => `enc:${s}` }));
-vi.mock("@/services/token/smart-account", () => ({
-  deriveSmartAccountAddress: vi.fn(async () => null),
-}));
-vi.mock("./sync", () => ({ fetchTokenInfo: vi.fn(async () => null) }));
+const deriveSmartAccountAddress = vi.hoisted(() => vi.fn(async (): Promise<string | null> => null));
+vi.mock("@/services/token/smart-account", () => ({ deriveSmartAccountAddress }));
+const fetchTokenInfo = vi.hoisted(() => vi.fn(async (): Promise<unknown> => null));
+vi.mock("./sync", () => ({ fetchTokenInfo }));
 const schedule = vi.hoisted(() => vi.fn());
 vi.mock("./sync-top-up-url", () => ({ scheduleTreasuryTopUpUrlSync: schedule }));
+const scheduleRoles = vi.hoisted(() => vi.fn());
+vi.mock("./token-roles", () => ({ scheduleEnsureMinterRoles: scheduleRoles }));
 
 import {
   ConnectError,
@@ -43,6 +45,11 @@ beforeEach(() => {
   }
   prisma.$transaction.mockResolvedValue([]);
   schedule.mockReset();
+  scheduleRoles.mockReset();
+  deriveSmartAccountAddress.mockReset();
+  deriveSmartAccountAddress.mockResolvedValue(null);
+  fetchTokenInfo.mockReset();
+  fetchTokenInfo.mockResolvedValue(null);
   prisma.citizenPayConnectAttempt.create.mockImplementation(async ({ data }) => data);
 });
 
@@ -204,5 +211,73 @@ describe("consumeConnect — top-up URL", () => {
     prisma.fund.findUnique.mockResolvedValue({ citizenPayFundId: "t-other" });
     await expect(code(call())).resolves.toBe("treasury_mismatch");
     expect(schedule).not.toHaveBeenCalled();
+  });
+});
+
+// Minter-role grant: once the Safe is derived and the token is known, the
+// connect asks CP (deferred, best-effort) to grant the Safe its roles.
+describe("consumeConnect — minter roles", () => {
+  const attempt = {
+    state: "fs",
+    fundId: "f1",
+    returnHost: "demo.lacaisse.eu",
+    consumedAt: null,
+    expiresAt: new Date(T0.getTime() + 60_000),
+  };
+  const SAFE = "0x15fbD78d29AcC4dA1E9630caDE532eDBCab4BB23";
+  const TOKEN = "0x1356E5C3e7FB6a6Cf821D844ea826a75B5D39422";
+  const call = () =>
+    consumeConnect({
+      fundState: "fs",
+      cpState: "cs",
+      pickupToken: "pt",
+      callbackHost: "demo.lacaisse.eu",
+    });
+
+  beforeEach(() => {
+    prisma.citizenPayConnectAttempt.findUnique.mockResolvedValue(attempt);
+    prisma.fund.findUnique.mockResolvedValue({
+      citizenPayFundId: null,
+      tokenMinterEoaAddress: "0xeoa",
+    });
+    fetchTokenInfo.mockResolvedValue({
+      tokenAddress: TOKEN,
+      citizenPayAccountFactoryAddress: "0xfactory",
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({ api_key: "secret", api_key_id: "0xkey", treasury_id: "t-1" }),
+      ),
+    );
+  });
+
+  it("schedules the grant when the Safe and the token are known", async () => {
+    deriveSmartAccountAddress.mockResolvedValue(SAFE);
+    prisma.$transaction.mockResolvedValue([{ id: "f1", tokenAddress: TOKEN }, {}] as never);
+    await call();
+    expect(scheduleRoles).toHaveBeenCalledExactlyOnceWith("f1");
+  });
+
+  it("skips it without a derived Safe", async () => {
+    prisma.$transaction.mockResolvedValue([{ id: "f1", tokenAddress: TOKEN }, {}] as never);
+    await call();
+    expect(scheduleRoles).not.toHaveBeenCalled();
+  });
+
+  it("skips it without a token address", async () => {
+    deriveSmartAccountAddress.mockResolvedValue(SAFE);
+    prisma.$transaction.mockResolvedValue([{ id: "f1", tokenAddress: null }, {}] as never);
+    await call();
+    expect(scheduleRoles).not.toHaveBeenCalled();
+  });
+
+  it("doesn't fail the connect when scheduling throws", async () => {
+    deriveSmartAccountAddress.mockResolvedValue(SAFE);
+    prisma.$transaction.mockResolvedValue([{ id: "f1", tokenAddress: TOKEN }, {}] as never);
+    scheduleRoles.mockImplementation(() => {
+      throw new Error("boom");
+    });
+    await expect(call()).resolves.toEqual({ treasuryId: "t-1", apiKeyId: "0xkey" });
   });
 });

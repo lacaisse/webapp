@@ -526,6 +526,37 @@ export type FeeCollectionFrequencyWire = "per_payment" | "monthly";
 // Budget for the best-effort top-up URL sync (its GET + PATCH /v2/treasury).
 export const TOP_UP_URL_TIMEOUT_MS = 3_000;
 
+// Token roles of one account on the treasury's token, as
+// `GET /v2/treasury/token/roles?account=` answers them. `admin_account` is
+// the Safe CP grants from; `can_grant` is false when that Safe isn't the
+// token's admin (a token CP didn't deploy). `burner` means "may burnFrom":
+// the token's BURNER_ROLE when `separate_burner_role`, otherwise the
+// MINTER_ROLE (the default implementation gates burnFrom by it).
+export type TokenRoleWire = "minter" | "burner";
+
+export type TreasuryTokenRolesWire = {
+  account: string;
+  admin_account: string;
+  can_grant: boolean;
+  minter: boolean;
+  burner: boolean;
+  separate_burner_role: boolean;
+};
+
+// `POST /v2/treasury/token/roles` echoes the roles read back after the grant,
+// plus what it granted and the UserOps it sent — both empty when the account
+// already held everything (the route is idempotent).
+export type GrantTreasuryTokenRolesWire = TreasuryTokenRolesWire & {
+  granted: string[];
+  user_op_hashes: string[];
+};
+
+// The grant bundles a UserOp and waits for its receipt (CP bounds that at
+// 3 minutes); give it well past the default 15 s without matching CP's own
+// bound — a timeout here doesn't mean the grant failed, only that we stopped
+// waiting.
+export const TOKEN_ROLES_GRANT_TIMEOUT_MS = 120_000;
+
 export const treasury = {
   get(
     creds: CitizenPayApiCredentials,
@@ -562,6 +593,31 @@ export const treasury = {
     return request(creds, "PATCH", "/v2/treasury", {
       body: { topUpUrl },
       timeoutMs: TOP_UP_URL_TIMEOUT_MS,
+    });
+  },
+  // Read `account`'s minter/burner roles on the treasury's token, on chain.
+  getTokenRoles(
+    creds: CitizenPayApiCredentials,
+    account: string,
+    opts: { timeoutMs?: number } = {},
+  ): Promise<TreasuryTokenRolesWire> {
+    return request(creds, "GET", "/v2/treasury/token/roles", {
+      query: { account },
+      timeoutMs: opts.timeoutMs,
+    });
+  },
+  // Grant `account` the missing roles on the treasury's token, from CP's
+  // admin Safe. Idempotent. Errors: 409 CP isn't admin of this token (it was
+  // deployed by hand), 422 virtual chain / no issuing business, 429 daily
+  // cap, 502 chain failure, 404 on an api that predates the route.
+  grantTokenRoles(
+    creds: CitizenPayApiCredentials,
+    body: { account: string; roles: TokenRoleWire[] },
+    opts: { timeoutMs?: number } = {},
+  ): Promise<GrantTreasuryTokenRolesWire> {
+    return request(creds, "POST", "/v2/treasury/token/roles", {
+      body: { account: body.account, roles: body.roles },
+      timeoutMs: opts.timeoutMs ?? TOKEN_ROLES_GRANT_TIMEOUT_MS,
     });
   },
 };
