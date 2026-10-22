@@ -6,8 +6,11 @@ import { CotisationPaymentPage } from "./cotisation-page";
 import { TopUpPage } from "./top-up-page";
 
 // Public, no-auth per-card payment page (see AGENTS.md "(fund-public)"),
-// reached from the cotisation reminder email and from the card wallet's
-// "Add funds" button (the treasury top-up URL, `https://<fund>/pay/<serial>`).
+// reached from the cotisation reminder email and, for FIXED_PERIOD funds, from
+// the card wallet's "Add funds" button (the treasury top-up URL,
+// `https://<fund>/pay/<serial>`). PAY_AND_GO funds' wallet button opens
+// Citizen Pay's checkout instead (CP's default `top_up_url`); the open-banking
+// top-up below still serves anyone who lands here.
 //
 //   - PAY_AND_GO: open-banking top-up — the member picks an amount and their
 //     bank, signs the payment at the bank, and the same amount is minted to

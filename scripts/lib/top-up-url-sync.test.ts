@@ -4,11 +4,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { probeTopUpUrl, runTopUpUrlSync } from "./top-up-url-sync";
 
 const funds = [
-  { domain: "laclass.lacaisse.eu", allocationMode: "PAY_AND_GO" as const },
+  { domain: "laclass.lacaisse.eu", allocationMode: "FIXED_PERIOD" as const },
   { domain: "other.lacaisse.eu", allocationMode: "DISABLED" as const },
 ];
-type Fund = (typeof funds)[number] | { domain: string; allocationMode: "FIXED_PERIOD" | "DISABLED" };
+type Fund =
+  | (typeof funds)[number]
+  | { domain: string; allocationMode: "PAY_AND_GO" | "FIXED_PERIOD" | "DISABLED" };
 const CP_CHECKOUT = "https://checkout.citizenpay.xyz/topup";
+// What CP now serves itself for a PAY_AND_GO fund's treasury.
+const CP_TOP_UP = "https://checkout.citizenpay.xyz/top-up/payg?serial={serial}";
 // Treasury state per fund domain, as GET /v2/treasury would answer it.
 const reader = (current: Record<string, string | null>) =>
   vi.fn(async (f: Fund) => current[f.domain] ?? null);
@@ -59,6 +63,47 @@ describe("scripts/sync-top-up-urls", () => {
     const out = lines.join("\n");
     expect(out).toContain("paybrussels.lacaisse.eu [DISABLED] → (leave: CP-managed URL)");
     expect(out).not.toContain("(clear)");
+  });
+
+  it("PAY_AND_GO funds publish nothing: the dry run plans to clear our own old link, leave CP's", async () => {
+    prodEnv();
+    const ours = { domain: "payg.lacaisse.eu", allocationMode: "PAY_AND_GO" as const };
+    const cps = { domain: "cp.lacaisse.eu", allocationMode: "PAY_AND_GO" as const };
+    const lines: string[] = [];
+    const push = vi.fn();
+    await runTopUpUrlSync({
+      funds: [ours, cps],
+      apply: false,
+      push,
+      read: reader({
+        "payg.lacaisse.eu": "https://payg.lacaisse.eu/pay/{serial}",
+        "cp.lacaisse.eu": CP_TOP_UP,
+      }),
+      log: (l) => lines.push(l),
+    });
+    const out = lines.join("\n");
+    expect(out).toContain("payg.lacaisse.eu [PAY_AND_GO] → (clear)");
+    expect(out).toContain(`cp.lacaisse.eu [PAY_AND_GO] → (leave: CP-managed URL) ${CP_TOP_UP}`);
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("--apply clears a PAY_AND_GO fund's own /pay/{serial} link and leaves CP's checkout", async () => {
+    prodEnv();
+    const ours = { domain: "payg.lacaisse.eu", allocationMode: "PAY_AND_GO" as const };
+    const cps = { domain: "cp.lacaisse.eu", allocationMode: "PAY_AND_GO" as const };
+    const push = vi.fn(async () => {});
+    const code = await runTopUpUrlSync({
+      funds: [ours, cps],
+      apply: true,
+      push,
+      read: reader({
+        "payg.lacaisse.eu": "https://payg.lacaisse.eu/pay/{serial}",
+        "cp.lacaisse.eu": CP_TOP_UP,
+      }),
+      log: () => {},
+    });
+    expect(code).toBe(0);
+    expect(push.mock.calls).toEqual([[ours, null]]);
   });
 
   it("dry run without CP access says it didn't read", async () => {

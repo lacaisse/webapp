@@ -22,6 +22,8 @@ const KEY = "11".repeat(32);
 const OWN = "https://laclass.lacaisse.eu/pay/{serial}";
 // Brussels Pay's treasury points the wallet at CP's own checkout.
 const CP_CHECKOUT = "https://checkout.citizenpay.xyz/topup";
+// What CP now sets on a PAY_AND_GO fund's treasury itself.
+const CP_TOP_UP = "https://checkout.citizenpay.xyz/top-up/laclass?serial={serial}";
 const seed = (fund: { id: string }, url: string | null) =>
   getCitizenPayClient({ ...fund, citizenPayApiKeyId: null, citizenPayApiKeyEnc: null })
     .setTreasuryTopUpUrl(url);
@@ -60,11 +62,34 @@ afterEach(() => {
 });
 
 describe("syncTreasuryTopUpUrl", () => {
-  it("sets the contribution link for a PAY_AND_GO fund", async () => {
+  it("publishes nothing for a PAY_AND_GO fund (CP serves its checkout link)", async () => {
     const fund = connected("PAY_AND_GO");
-    const url = "https://laclass.lacaisse.eu/pay/{serial}";
-    await expect(syncTreasuryTopUpUrl(fund)).resolves.toEqual({ status: "synced", url });
-    expect(getMockTreasuryTopUpUrl(fund.id)).toBe(url);
+    await expect(syncTreasuryTopUpUrl(fund)).resolves.toEqual({
+      status: "skipped",
+      reason: "already_clear",
+    });
+    expect(getMockTreasuryTopUpUrl(fund.id)).toBeUndefined();
+  });
+
+  it("clears a PAY_AND_GO fund's own /pay/{serial} link so CP's checkout link takes over", async () => {
+    const fund = connected("PAY_AND_GO");
+    await seed(fund, OWN);
+    await expect(syncTreasuryTopUpUrl(fund)).resolves.toEqual({
+      status: "synced",
+      url: null,
+    });
+    expect(getMockTreasuryTopUpUrl(fund.id)).toBeNull();
+  });
+
+  it("leaves a CP-managed URL on a PAY_AND_GO fund alone", async () => {
+    const fund = connected("PAY_AND_GO");
+    await seed(fund, CP_TOP_UP);
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    await expect(syncTreasuryTopUpUrl(fund)).resolves.toEqual({
+      status: "skipped",
+      reason: "foreign_url",
+    });
+    expect(getMockTreasuryTopUpUrl(fund.id)).toBe(CP_TOP_UP);
   });
 
   it("sets the cotisation link for a FIXED_PERIOD fund, over whatever was there", async () => {
@@ -125,7 +150,7 @@ describe("syncTreasuryTopUpUrl", () => {
   it("sends PATCH /v2/treasury { topUpUrl } on the live client", async () => {
     vi.stubEnv("CITIZENPAY_API_BASE_URL", "https://cp.test");
     const fetchMock = liveTreasury(CP_CHECKOUT);
-    await syncTreasuryTopUpUrl(connected("PAY_AND_GO"));
+    await syncTreasuryTopUpUrl(connected("FIXED_PERIOD"));
     // Publishing a link doesn't read first — only a clear does.
     expect(fetchMock).toHaveBeenCalledOnce();
     const [input, init] = fetchMock.mock.calls[0] as unknown as FetchCall;
@@ -155,7 +180,7 @@ describe("syncTreasuryTopUpUrl", () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    await expect(syncTreasuryTopUpUrl(connected("PAY_AND_GO"))).resolves.toEqual({
+    await expect(syncTreasuryTopUpUrl(connected("FIXED_PERIOD"))).resolves.toEqual({
       status: "skipped",
       reason: "insecure_url",
     });
@@ -175,6 +200,18 @@ describe("syncTreasuryTopUpUrl", () => {
       ["/v2/treasury", "GET"],
       ["/v2/treasury", "PATCH"],
     ]);
+    expect(JSON.parse(String(calls[1][1].body))).toEqual({ topUpUrl: null });
+  });
+
+  it("live: clears a PAY_AND_GO fund's own link (GET then PATCH null)", async () => {
+    vi.stubEnv("CITIZENPAY_API_BASE_URL", "https://cp.test");
+    const fetchMock = liveTreasury(OWN);
+    await expect(syncTreasuryTopUpUrl(connected("PAY_AND_GO"))).resolves.toEqual({
+      status: "synced",
+      url: null,
+    });
+    const calls = fetchMock.mock.calls as unknown as FetchCall[];
+    expect(calls.map(([, i]) => i?.method)).toEqual(["GET", "PATCH"]);
     expect(JSON.parse(String(calls[1][1].body))).toEqual({ topUpUrl: null });
   });
 
@@ -215,7 +252,7 @@ describe("syncTreasuryTopUpUrl", () => {
       ),
     );
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    const pending = syncTreasuryTopUpUrl(connected("PAY_AND_GO"));
+    const pending = syncTreasuryTopUpUrl(connected("FIXED_PERIOD"));
     await vi.advanceTimersByTimeAsync(2_999);
     let settled = false;
     void pending.then(() => (settled = true));
@@ -229,7 +266,7 @@ describe("syncTreasuryTopUpUrl", () => {
 
 describe("scheduleTreasuryTopUpUrlSync", () => {
   it("defers the push to after() instead of running it in the request", async () => {
-    const fund = connected("PAY_AND_GO");
+    const fund = connected("FIXED_PERIOD");
     scheduleTreasuryTopUpUrlSync(fund);
     expect(getMockTreasuryTopUpUrl(fund.id)).toBeUndefined();
     expect(afterCallbacks).toHaveLength(1);

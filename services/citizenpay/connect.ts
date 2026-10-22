@@ -378,9 +378,10 @@ export async function consumeConnect(args: {
     }
   }
 
-  // Publish the fund's contribution link as the treasury's top-up URL so a
-  // freshly connected (or re-keyed) PAY_AND_GO fund gets the wallet's "Add
-  // funds" button right away. Uses the row the transaction returned (no
+  // Sync the treasury's top-up URL so a freshly connected (or re-keyed)
+  // FIXED_PERIOD fund gets the wallet's "Add funds" button right away (and a
+  // PAY_AND_GO fund drops any old /pay link of ours, leaving CP's checkout —
+  // see top-up-url.ts). Uses the row the transaction returned (no
   // extra read that could fail a connect that already committed) and runs
   // after the redirect is sent; never throws. Both flows (register a
   // treasury, mint a key) finish here, so both publish the link.

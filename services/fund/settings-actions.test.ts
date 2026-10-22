@@ -60,7 +60,11 @@ describe("updateGeneralSettingsAction → top-up URL", () => {
     const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(updateGeneralSettingsAction(input)).resolves.toEqual({ ok: true });
+    // FIXED_PERIOD publishes its cotisation page; PAY_AND_GO publishes nothing
+    // (CP serves its checkout link) — see services/citizenpay/top-up-url.ts.
+    await expect(
+      updateGeneralSettingsAction({ ...input, allocationMode: "FIXED_PERIOD" }),
+    ).resolves.toEqual({ ok: true });
     expect(fundUpdate).toHaveBeenCalledOnce();
     expect(fetchMock).not.toHaveBeenCalled();
     expect(afterCallbacks).toHaveLength(1);

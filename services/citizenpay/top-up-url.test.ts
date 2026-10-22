@@ -11,28 +11,23 @@ function prod() {
 }
 
 describe("topUpUrlFor", () => {
-  it("links PAY_AND_GO funds to their /pay/{serial} page", () => {
-    prod();
-    expect(
-      topUpUrlFor({ domain: "laclass.lacaisse.eu", allocationMode: "PAY_AND_GO" }),
-    ).toBe("https://laclass.lacaisse.eu/pay/{serial}");
-  });
-
-  it("keeps a custom domain verbatim", () => {
-    prod();
-    expect(
-      topUpUrlFor({ domain: "funds.acme.com", allocationMode: "PAY_AND_GO" }),
-    ).toBe("https://funds.acme.com/pay/{serial}");
-  });
-
-  it("links FIXED_PERIOD funds to the same page (their cotisation page)", () => {
+  it("links FIXED_PERIOD funds to their /pay/{serial} cotisation page", () => {
     prod();
     expect(
       topUpUrlFor({ domain: "laclass.lacaisse.eu", allocationMode: "FIXED_PERIOD" }),
     ).toBe("https://laclass.lacaisse.eu/pay/{serial}");
   });
 
-  it.each(["DISABLED"] as const)("returns null for %s", (mode) => {
+  it("keeps a custom domain verbatim", () => {
+    prod();
+    expect(
+      topUpUrlFor({ domain: "funds.acme.com", allocationMode: "FIXED_PERIOD" }),
+    ).toBe("https://funds.acme.com/pay/{serial}");
+  });
+
+  // PAY_AND_GO: CP serves its own checkout as the treasury's default
+  // top_up_url, so La Caisse publishes nothing. DISABLED: no money taken.
+  it.each(["PAY_AND_GO", "DISABLED"] as const)("returns null for %s", (mode) => {
     prod();
     expect(
       topUpUrlFor({ domain: "laclass.lacaisse.eu", allocationMode: mode }),
@@ -44,10 +39,10 @@ describe("topUpUrlFor", () => {
     vi.stubEnv("APP_DOMAIN", "localhost");
     vi.stubEnv("PORT", "3000");
     expect(
-      topUpUrlFor({ domain: "acme.lacaisse.eu", allocationMode: "PAY_AND_GO" }),
+      topUpUrlFor({ domain: "acme.lacaisse.eu", allocationMode: "FIXED_PERIOD" }),
     ).toBe("http://acme.localhost:3000/pay/{serial}");
     expect(
-      topUpUrlFor({ domain: "acme.localhost", allocationMode: "PAY_AND_GO" }),
+      topUpUrlFor({ domain: "acme.localhost", allocationMode: "FIXED_PERIOD" }),
     ).toBe("http://acme.localhost:3000/pay/{serial}");
   });
 });

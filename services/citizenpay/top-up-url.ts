@@ -5,14 +5,23 @@ import { getFundUrl } from "@/services/fund/host";
 // The CitizenPay treasury's `topUpUrl` — what the public card wallet
 // (tap.citizenpay.eu/card/<serial>?network=<slug>) opens from its "Add funds"
 // button. The literal `{serial}` placeholder is expanded by the wallet with the
-// card's serial, landing the member on the fund's contribution page
-// (app/(fund-public)/pay/[serial]).
+// card's serial.
 //
-// PAY_AND_GO funds get the open-banking top-up there; FIXED_PERIOD funds get
-// their cotisation page (IBAN + EPC QR for the monthly contribution), which is
-// what the previous wallet linked for them. DISABLED funds take no money from
-// members, so they return null — which the sync turns into "clear our own
-// link if it's there", never "clear whatever is there" (see isOwnTopUpUrl).
+//   - FIXED_PERIOD: La Caisse publishes the fund's cotisation page
+//     (app/(fund-public)/pay/[serial] — IBAN + EPC QR for the monthly
+//     contribution), which is what the previous wallet linked for them.
+//   - PAY_AND_GO: null. Citizen Pay serves the checkout link itself: its api's
+//     `GET /v2/treasuries` falls back to a default `top_up_url`
+//     (`https://checkout.citizenpay.xyz/top-up/<treasury slug>?serial={serial}`)
+//     for a treasury whose row has none, once the issuer has a top-up place
+//     (`topup_place`). So La Caisse stops publishing its own `/pay/{serial}`
+//     link for these funds and clears the one it published before, letting
+//     CP's checkout take over. (The `/pay/[serial]` open-banking page still
+//     works; the wallet just no longer links to it.)
+//   - DISABLED: null — the fund takes no money from members.
+//
+// The sync turns a null into "clear our own link if it's there", never "clear
+// whatever is there" (see isOwnTopUpUrl).
 //
 // Pure: host arithmetic via services/fund/host.ts (same scheme/port logic as
 // every other cross-host fund link — https in production, http + PORT in dev,
@@ -23,7 +32,8 @@ export function topUpUrlFor(fund: {
   domain: string;
   allocationMode: AllocationMode;
 }): string | null {
-  if (fund.allocationMode === "DISABLED") return null;
+  // PAY_AND_GO → CP's checkout (CP's default top_up_url), DISABLED → nothing.
+  if (fund.allocationMode !== "FIXED_PERIOD") return null;
   return ownTopUpUrl(fund.domain);
 }
 
@@ -34,10 +44,10 @@ function ownTopUpUrl(domain: string): string {
 /**
  * Whether `url` is a top-up link La Caisse published for this fund — its own
  * `/pay/{serial}` page, as this environment builds it or in its production
- * https form. Only such a link may be cleared when a fund turns DISABLED: a
- * treasury can carry a value CitizenPay manages itself (Brussels Pay points
- * at CP's own checkout), and a fund that takes no money through La Caisse has
- * no business removing it.
+ * https form. Only such a link may be cleared when a fund computes no link
+ * (PAY_AND_GO, DISABLED): a treasury can carry a value CitizenPay manages
+ * itself (CP's own checkout — Brussels Pay's, or the one CP now publishes for
+ * PAY_AND_GO funds), and La Caisse has no business removing it.
  */
 export function isOwnTopUpUrl(
   fund: { domain: string },
