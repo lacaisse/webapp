@@ -1319,7 +1319,7 @@ model CitizenPayConnectAttempt {
   fund       Fund      @relation(fields: [fundId], references: [id], onDelete: Cascade)
   returnHost String // exact hostname we asked CP to redirect back to
   createdAt  DateTime  @default(now())
-  expiresAt  DateTime // ~10 min after createdAt
+  expiresAt  DateTime // 30 min after createdAt (STATE_TTL_MS in services/citizenpay/connect.ts); moved to now() by "start over"
   consumedAt DateTime? // single-use; set atomically on callback
 
   @@index([fundId])

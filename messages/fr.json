@@ -2013,7 +2013,9 @@
           "title": "Enregistrer cette caisse sur Citizen Pay",
           "description": "Votre trésorerie et son jeton sont créés sur la page Citizen Pay qu'ouvre ce bouton. Le nom et le symbole du jeton (onglet Jeton) sont pré-remplis ; la première clé API est émise à la fin et vous revenez directement ici.",
           "cta": "S'enregistrer sur Citizen Pay",
-          "manualFallback": "Ou connecter une trésorerie Citizen Pay existante"
+          "manualFallback": "Ou connecter une trésorerie Citizen Pay existante",
+          "resume": "Reprendre l'enregistrement",
+          "startOver": "Recommencer"
         },
         "connect": {
           "issueKey": "Émettre la clé API via Citizen Pay",
@@ -2036,7 +2038,7 @@
             "notConnected": "Renseignez l'identifiant de trésorerie Citizen Pay ci-dessus avant d'émettre une clé.",
             "failed": "La connexion à Citizen Pay a échoué. Veuillez réessayer.",
             "alreadyRegistered": "Cette caisse a déjà une trésorerie Citizen Pay. Pour obtenir une nouvelle clé, émettez ou renouvelez la clé API ci-dessous.",
-            "registrationPending": "Un enregistrement Citizen Pay commencé il y a moins de 30 minutes est encore en cours. Terminez-le dans l'onglet Citizen Pay, ou attendez son expiration avant d'en lancer un autre.",
+            "registrationPending": "Un enregistrement Citizen Pay commencé il y a moins de 30 minutes est encore ouvert. Reprenez-le pour revenir au formulaire Citizen Pay, ou recommencez pour l'annuler et en lancer un nouveau.",
             "forbidden": "Cette action ne peut être lancée que depuis la page des paramètres de la caisse."
           }
         }

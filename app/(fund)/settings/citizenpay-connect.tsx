@@ -250,10 +250,29 @@ function ConnectFlash({ flash }: { flash: string | null }) {
     );
   }
   if (flash === "registration_pending") {
+    // Actionable, not an error: the register button navigates the same
+    // tab, so Back (or a closed tab) lands here with the attempt still
+    // open. "Resume" rebuilds CP's form URL for the pending fund state
+    // (plain <a>, same no-prefetch reasoning as the other handoff links);
+    // "Start over" POSTs so a prefetch can never expire an attempt.
     return (
-      <Alert variant="destructive">
+      <Alert variant="warning">
         <AlertDescription>
-          {t("connect.flash.registrationPending")}
+          <p>{t("connect.flash.registrationPending")}</p>
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <a
+              href="/api/citizenpay/register?resume=1"
+              className={buttonVariants({ variant: "default", size: "sm" })}
+            >
+              <ExternalLink className="size-3.5" />
+              {t("register.resume")}
+            </a>
+            <form method="post" action="/api/citizenpay/register">
+              <Button type="submit" variant="outline" size="sm">
+                {t("register.startOver")}
+              </Button>
+            </form>
+          </div>
         </AlertDescription>
       </Alert>
     );

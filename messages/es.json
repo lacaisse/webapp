@@ -1974,7 +1974,9 @@
           "title": "Registrar este fondo en Citizen Pay",
           "description": "Su tesorería y su token se crean en la página de Citizen Pay que abre este botón. El nombre y el símbolo del token (pestaña Token) se rellenan automáticamente; la primera clave API se emite al final y vuelve directamente aquí.",
           "cta": "Registrarse en Citizen Pay",
-          "manualFallback": "O conectar una tesorería de Citizen Pay existente"
+          "manualFallback": "O conectar una tesorería de Citizen Pay existente",
+          "resume": "Reanudar el registro",
+          "startOver": "Empezar de nuevo"
         },
         "connect": {
           "issueKey": "Emitir clave de API mediante Citizen Pay",
@@ -1997,7 +1999,7 @@
             "notConnected": "Define el ID de la tesorería de Citizen Pay arriba antes de emitir una clave.",
             "failed": "La conexión con Citizen Pay falló. Inténtalo de nuevo.",
             "alreadyRegistered": "Este fondo ya tiene una tesorería en Citizen Pay. Para obtener una clave nueva, emita o renueve la clave API más abajo.",
-            "registrationPending": "Un registro en Citizen Pay iniciado hace menos de 30 minutos sigue abierto. Termínelo en la pestaña de Citizen Pay o espere a que caduque antes de iniciar otro.",
+            "registrationPending": "Un registro en Citizen Pay iniciado hace menos de 30 minutos sigue abierto. Reanúdelo para volver al formulario de Citizen Pay, o empiece de nuevo para cancelarlo e iniciar otro.",
             "forbidden": "Esta acción solo puede iniciarse desde la página de configuración del fondo."
           }
         }
