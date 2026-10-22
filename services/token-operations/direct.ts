@@ -86,6 +86,30 @@ export type DirectBurnResult =
 // note instead — that note is the audit record of *why*.
 export type DirectAudit = { trigger: string };
 
+// The operator-facing text for a failed userop. A missing MINTER_ROLE gets
+// its own message naming the minter Safe and the token, because it is the one
+// failure an operator can act on (ask Citizen Pay to grant the role); every
+// other failure points at the operation log, where the full error is.
+function failureMessage(
+  t: Translate,
+  fund: DirectTokenFund,
+  e: unknown,
+): string {
+  if (e instanceof UserOpError && e.code === "missing_role") {
+    return t("tokenOps.errors.minterRoleMissing", {
+      safe: fund.tokenMinterSmartAccountAddress ?? "—",
+      token: fund.tokenAddress ?? "—",
+    });
+  }
+  return t("tokenOps.errors.submitFailed");
+}
+
+// The settlement tx hash of a userop that landed and reverted (receipt status
+// 0x0) — kept on the FAILED row so the revert can be looked up on chain.
+function revertedTxHash(e: unknown): string | undefined {
+  return e instanceof UserOpError ? e.txHash : undefined;
+}
+
 export async function mintDirect(
   ctx: DirectOpContext,
   input: { to: string; amount: string; note?: string },
@@ -138,6 +162,19 @@ export async function mintDirect(
       where: { id: op.id },
       data: { status: "CONFIRMED", txHash, confirmedAt: new Date() },
     });
+    // The receipt succeeded, so the minter Safe demonstrably holds
+    // MINTER_ROLE: record the verification so later mints skip the pre-submit
+    // role read. Bookkeeping only — never turns a confirmed mint into an error.
+    if (fund.tokenMintEnabledAt == null) {
+      await prisma.fund
+        .update({
+          where: { id: fund.id },
+          data: { tokenMintEnabledAt: new Date() },
+        })
+        .catch((err: unknown) => {
+          console.warn("[mintDirect] tokenMintEnabledAt not recorded", fund.id, err);
+        });
+    }
     const trigger = audit?.trigger ?? ANNOTATION_TRIGGERS.adminDirectMint;
     await resolveOrEnqueueAnnotation({
       fundId: fund.id,
@@ -153,12 +190,13 @@ export async function mintDirect(
   } catch (e) {
     const errorMessage =
       e instanceof UserOpError ? `${e.code}: ${e.message}` : String(e);
+    const txHash = revertedTxHash(e);
     await prisma.tokenOperation.update({
       where: { id: op.id },
-      data: { status: "FAILED", errorMessage },
+      data: { status: "FAILED", errorMessage, ...(txHash ? { txHash } : {}) },
     });
     console.error("[mintDirect] failed", op.id, e);
-    return { error: t("tokenOps.errors.submitFailed") };
+    return { error: failureMessage(t, fund, e) };
   }
 }
 
@@ -247,15 +285,17 @@ export async function burnDirect(
     const errorMessage =
       (e instanceof UserOpError ? `${e.code}: ${e.message}` : String(e)) +
       (userOpHash ? ` [userOp ${userOpHash}]` : "");
+    // A burn that landed and reverted has a tx hash too (receipt 0x0).
+    const txHash = burned?.txHash ?? revertedTxHash(e);
     await prisma.tokenOperation.update({
       where: { id: op.id },
-      data: { status: "FAILED", errorMessage },
+      data: { status: "FAILED", errorMessage, ...(txHash ? { txHash } : {}) },
     });
     console.error("[burnDirect] failed", op.id, e);
     return {
       error: t("tokenOps.errors.submitFailed"),
       broadcast: burned !== null || !failedBeforeSubmit(e),
-      ...(burned ? { txHash: burned.txHash } : {}),
+      ...(txHash ? { txHash } : {}),
       ...(userOpHash ? { userOpHash } : {}),
     };
   }

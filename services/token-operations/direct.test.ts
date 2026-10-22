@@ -9,6 +9,7 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 const prisma = vi.hoisted(() => ({
   tokenOperation: { create: vi.fn(), update: vi.fn() },
+  fund: { update: vi.fn() },
 }));
 vi.mock("@/services/db/prisma", () => ({ prisma }));
 
@@ -18,26 +19,51 @@ const userop = vi.hoisted(() => ({
   failedBeforeSubmit: vi.fn(),
   attemptedUserOpHash: vi.fn(),
 }));
-vi.mock("@/services/token/userop", () => ({
-  ...userop,
-  UserOpError: class UserOpError extends Error {},
-}));
+// Same shape as the real UserOpError: `code`, plus `txHash` for a tx that
+// landed and reverted.
+const UserOpError = vi.hoisted(
+  () =>
+    class UserOpError extends Error {
+      txHash?: string;
+      constructor(
+        public readonly code: string,
+        message: string,
+        details: { txHash?: string } = {},
+      ) {
+        super(message);
+        this.txHash = details.txHash;
+      }
+    },
+);
+vi.mock("@/services/token/userop", () => ({ ...userop, UserOpError }));
 
 const resolveOrEnqueueAnnotation = vi.hoisted(() => vi.fn());
 vi.mock("@/services/transaction-annotation/pending", () => ({
   resolveOrEnqueueAnnotation,
 }));
 vi.mock("@/services/transaction-annotation/annotate", () => ({
-  ANNOTATION_TRIGGERS: { adminDirectBurn: "ADMIN_DIRECT_BURN" },
+  ANNOTATION_TRIGGERS: {
+    adminDirectBurn: "ADMIN_DIRECT_BURN",
+    adminDirectMint: "ADMIN_DIRECT_MINT",
+  },
 }));
 
-import { burnDirect, type DirectOpContext } from "./direct";
+import { burnDirect, mintDirect, type DirectOpContext } from "./direct";
 
 const TX = `0x${"ab".repeat(32)}`;
+const SAFE = "0x5555555555555555555555555555555555555555";
 const ctx = {
-  fund: { id: "fund-1", tokenAddress: "0x3333333333333333333333333333333333333333", tokenDecimals: 6, tokenChainId: 100 },
+  fund: {
+    id: "fund-1",
+    tokenAddress: "0x3333333333333333333333333333333333333333",
+    tokenDecimals: 6,
+    tokenChainId: 100,
+    tokenMinterSmartAccountAddress: SAFE,
+    tokenMintEnabledAt: null,
+  },
   userId: "user-1",
-  t: (key: string) => key,
+  t: (key: string, values?: Record<string, string | number>) =>
+    values ? `${key} ${JSON.stringify(values)}` : key,
 } as unknown as DirectOpContext;
 const input = { from: "0x9999999999999999999999999999999999999999", amount: "12.50" };
 const audit = { trigger: "PAYOUT_BURN" };
@@ -46,7 +72,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   prisma.tokenOperation.create.mockResolvedValue({ id: "op-1" });
   prisma.tokenOperation.update.mockResolvedValue({});
+  prisma.fund.update.mockResolvedValue({});
   userop.burnFromToken.mockResolvedValue({ txHash: TX, userOpHash: "0xuserop" });
+  userop.mintToken.mockResolvedValue({ txHash: TX, userOpHash: "0xuserop" });
   userop.failedBeforeSubmit.mockReturnValue(false);
   userop.attemptedUserOpHash.mockReturnValue(null);
 });
@@ -114,6 +142,67 @@ describe("burnDirect — broadcast", () => {
       ok: true,
       txHash: TX,
       userOpHash: "0xuserop",
+    });
+  });
+});
+
+describe("mintDirect — settlement", () => {
+  const mintInput = { to: "0x9999999999999999999999999999999999999999", amount: "1.00" };
+  const mintAudit = { trigger: "ORDER_SETTLEMENT_MINT" };
+
+  it("records FAILED with the tx hash when the tx landed and reverted", async () => {
+    userop.mintToken.mockRejectedValueOnce(
+      new UserOpError("tx_failed", "UserOp 0xaa tx reverted on chain (receipt status 0x0)", {
+        txHash: TX,
+      }),
+    );
+    expect(await mintDirect(ctx, mintInput, mintAudit)).toEqual({
+      error: "tokenOps.errors.submitFailed",
+    });
+    expect(prisma.tokenOperation.update).toHaveBeenLastCalledWith({
+      where: { id: "op-1" },
+      data: {
+        status: "FAILED",
+        errorMessage: "tx_failed: UserOp 0xaa tx reverted on chain (receipt status 0x0)",
+        txHash: TX,
+      },
+    });
+    expect(resolveOrEnqueueAnnotation).not.toHaveBeenCalled();
+    expect(prisma.fund.update).not.toHaveBeenCalled();
+  });
+
+  it("names the minter Safe and MINTER_ROLE when the role is missing", async () => {
+    userop.mintToken.mockRejectedValueOnce(
+      new UserOpError("missing_role", `Smart account ${SAFE} is missing MINTER_ROLE`),
+    );
+    expect(await mintDirect(ctx, mintInput, mintAudit)).toEqual({
+      error: `tokenOps.errors.minterRoleMissing ${JSON.stringify({
+        safe: SAFE,
+        token: "0x3333333333333333333333333333333333333333",
+      })}`,
+    });
+    expect(prisma.tokenOperation.update).toHaveBeenLastCalledWith({
+      where: { id: "op-1" },
+      data: {
+        status: "FAILED",
+        errorMessage: `missing_role: Smart account ${SAFE} is missing MINTER_ROLE`,
+      },
+    });
+  });
+
+  it("confirms and records the role verification on a successful receipt", async () => {
+    expect(await mintDirect(ctx, mintInput, mintAudit)).toEqual({
+      ok: true,
+      txHash: TX,
+      userOpHash: "0xuserop",
+    });
+    expect(prisma.tokenOperation.update).toHaveBeenCalledWith({
+      where: { id: "op-1" },
+      data: { status: "CONFIRMED", txHash: TX, confirmedAt: expect.any(Date) },
+    });
+    expect(prisma.fund.update).toHaveBeenCalledWith({
+      where: { id: "fund-1" },
+      data: { tokenMintEnabledAt: expect.any(Date) },
     });
   });
 });

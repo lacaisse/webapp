@@ -16,6 +16,7 @@ import {
   burnFromToken,
   failedBeforeSubmit,
   getTxReceiptWithLogs,
+  mintToken,
   UserOpError,
 } from "./userop";
 
@@ -33,6 +34,9 @@ const fund = {
   citizenPayAccountFactoryAddress: "0x7777777777777777777777777777777777777777",
   citizenPayPaymasterAddress: "0x8888888888888888888888888888888888888888",
   citizenPayPaymasterType: "cw-safe",
+  // Role verified: the mint path skips its pre-submit hasRole read (the
+  // faked eth_call answers a zero word, which would read as "missing").
+  tokenMintEnabledAt: new Date("2026-01-01T00:00:00Z"),
 };
 
 const args = {
@@ -69,6 +73,10 @@ beforeEach(() => {
     eth_sendUserOperation: () => ({ result: `0x${"aa".repeat(32)}` }),
     pm_getUserOpTxHash: () => ({
       result: { user_op_hash: "0xaa", tx_hash: `0x${"bb".repeat(32)}`, status: "success" },
+    }),
+    // The bundler's `success` is re-checked against the real receipt.
+    eth_getTransactionReceipt: () => ({
+      result: { transactionHash: `0x${"bb".repeat(32)}`, status: "0x1", logs: [] },
     }),
   };
   vi.stubGlobal(
@@ -158,6 +166,70 @@ describe("burnFromToken — failedBeforeSubmit", () => {
     expect(failedBeforeSubmit(new Error("x"))).toBe(false);
     expect(failedBeforeSubmit("boom")).toBe(false);
     expect(failedBeforeSubmit(null)).toBe(false);
+  });
+});
+
+// The bundler reports `success` for any bundle that has a receipt — including
+// one whose inner call reverted (the Demo fund's "Must have minter role to
+// mint" mint, 2026-10-21). The settlement must be read from the receipt.
+describe("mintToken — receipt status", () => {
+  const mintArgs = {
+    fund,
+    to: "0x9999999999999999999999999999999999999999" as const,
+    amount: BigInt(100),
+  };
+  const TX = `0x${"bb".repeat(32)}`;
+
+  function sentUserOps(): number {
+    const calls = vi.mocked(fetch).mock.calls as unknown as [
+      unknown,
+      RequestInit?,
+    ][];
+    return calls.filter(([, init]) =>
+      String(init?.body ?? "").includes('"eth_sendUserOperation"'),
+    ).length;
+  }
+
+  it("confirms on a receipt with status 0x1", async () => {
+    await expect(mintToken(mintArgs)).resolves.toEqual({
+      txHash: TX,
+      userOpHash: `0x${"aa".repeat(32)}`,
+    });
+  });
+
+  it("fails with tx_failed (keeping the tx hash) when the receipt says 0x0", async () => {
+    replies.eth_getTransactionReceipt = () => ({
+      result: { transactionHash: TX, status: "0x0", logs: [] },
+    });
+    const e = await mintToken(mintArgs).catch((err: unknown) => err);
+    expect(e).toBeInstanceOf(UserOpError);
+    expect((e as UserOpError).code).toBe("tx_failed");
+    expect((e as UserOpError).message).toMatch(/reverted on chain/);
+    expect((e as UserOpError).txHash).toBe(TX);
+    // It did reach the chain: not before-submit, and the attempt is known.
+    expect(failedBeforeSubmit(e)).toBe(false);
+    expect(attemptedUserOpHash(e)).toMatch(/^0x[0-9a-f]{64}$/);
+  });
+
+  it("refuses before submit when MINTER_ROLE was never verified and is missing", async () => {
+    // eth_call answers a zero word → hasRole(MINTER_ROLE, safe) is false.
+    const e = await mintToken({
+      ...mintArgs,
+      fund: { ...fund, tokenMintEnabledAt: null },
+    }).catch((err: unknown) => err);
+    expect(e).toBeInstanceOf(UserOpError);
+    expect((e as UserOpError).code).toBe("missing_role");
+    expect((e as UserOpError).message).toContain(fund.tokenMinterSmartAccountAddress);
+    expect(failedBeforeSubmit(e)).toBe(true);
+    expect(sentUserOps()).toBe(0);
+  });
+
+  it("submits when MINTER_ROLE was never verified but is held", async () => {
+    replies.eth_call = () => ({ result: `0x${"00".repeat(31)}01` });
+    await expect(
+      mintToken({ ...mintArgs, fund: { ...fund, tokenMintEnabledAt: null } }),
+    ).resolves.toMatchObject({ txHash: TX });
+    expect(sentUserOps()).toBe(1);
   });
 });
 

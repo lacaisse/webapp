@@ -24,6 +24,7 @@ import {
 } from "viem/chains";
 
 import { decryptSecret } from "@/services/crypto/secret";
+import { checkMinterRole } from "@/services/token/permissions";
 
 // ERC-4337 UserOperation builder + submitter for CitizenPay's Safe-account
 // bundler. Used by mint/burn flows to push gasless transactions through
@@ -241,9 +242,18 @@ export type FundMinterContext = {
   citizenPayAccountFactoryAddress: string | null;
   citizenPayPaymasterAddress: string | null;
   citizenPayPaymasterType: string | null;
+  // When we last verified `hasRole(MINTER_ROLE, smartAccount)` on chain. Null
+  // (or absent, for callers that don't load the column) means "never": the
+  // mint path then checks the role itself before submitting anything.
+  tokenMintEnabledAt?: Date | null;
 };
 
 export class UserOpError extends Error {
+  // The settlement tx hash, when the failure is a tx that DID land on chain
+  // (receipt status 0x0). Callers store it on the FAILED row so the revert
+  // can be looked up; absent for everything that never reached a block.
+  public readonly txHash?: Hex;
+
   constructor(
     public readonly code:
       | "config"
@@ -255,9 +265,11 @@ export class UserOpError extends Error {
       | "tx_failed"
       | "missing_role",
     message: string,
+    details: { txHash?: Hex } = {},
   ) {
     super(message);
     this.name = "UserOpError";
+    if (details.txHash) this.txHash = details.txHash;
   }
 }
 
@@ -678,6 +690,13 @@ type UserOpStatus = {
  * We poll the bundler instead of `eth_getTransactionReceipt` because the
  * tx hash isn't known until the bundler broadcasts; passing the userop
  * hash to a normal chain RPC just spins until that RPC's own timeout.
+ *
+ * The bundler's `success` is NOT taken at its word: its status reflects
+ * "a receipt exists", and a bundle whose inner call reverted (e.g. the Safe
+ * lacks MINTER_ROLE — "Must have minter role to mint") still has a receipt,
+ * with status 0x0. So once the bundler names the tx we read the real receipt
+ * from the node and fail on 0x0 (`tx_failed`, carrying the tx hash), inside
+ * the same time budget.
  */
 async function awaitUserOpSuccess(args: {
   chainId: number;
@@ -699,6 +718,12 @@ async function awaitUserOpSuccess(args: {
           `UserOp ${args.userOpHash} reported success without a tx hash`,
         );
       }
+      await assertTxSucceeded({
+        chainId: args.chainId,
+        userOpHash: args.userOpHash,
+        txHash: status.tx_hash,
+        deadline,
+      });
       return status.tx_hash;
     }
     if (status.status === "reverted" || status.status === "timeout") {
@@ -717,6 +742,45 @@ async function awaitUserOpSuccess(args: {
 }
 
 type EthReceipt = { status?: string; blockNumber?: string } | null;
+
+/**
+ * Read the receipt of the tx the bundler reported as settled and throw
+ * `tx_failed` (with the tx hash) when its status is 0x0. The node can lag
+ * the bundler by a moment, so an unknown hash / unreachable node is retried
+ * until `deadline`; a tx we cannot verify by then is also a failure — a
+ * mint is only CONFIRMED on a receipt we have seen succeed.
+ */
+async function assertTxSucceeded(args: {
+  chainId: number;
+  userOpHash: Hex;
+  txHash: Hex;
+  deadline: number;
+}): Promise<void> {
+  for (;;) {
+    const receipt = await getBundlerTxReceipt({
+      chainId: args.chainId,
+      txHash: args.txHash,
+    });
+    if (receipt) {
+      if (receipt.status === "reverted") {
+        throw new UserOpError(
+          "tx_failed",
+          `UserOp ${args.userOpHash} tx ${args.txHash} reverted on chain (receipt status 0x0)`,
+          { txHash: args.txHash },
+        );
+      }
+      return;
+    }
+    if (Date.now() >= args.deadline) {
+      throw new UserOpError(
+        "tx_failed",
+        `UserOp ${args.userOpHash} tx ${args.txHash}: no receipt within ${USEROP_POLL_TIMEOUT_MS}ms`,
+        { txHash: args.txHash },
+      );
+    }
+    await new Promise((r) => setTimeout(r, USEROP_POLL_INTERVAL_MS));
+  }
+}
 
 /**
  * Fetch a plain on-chain receipt via the bundler URL (which is a full
@@ -1020,8 +1084,19 @@ async function mintUserOp(
   args: MintArgs,
   awaitConfirmation: boolean,
 ): Promise<{ txHash: Hex | null; userOpHash: Hex }> {
-  const ctx = loadFundContext(args.fund);
-  const callData = safeMintCallData(ctx.token, args.to, args.amount);
+  let ctx: FundContext;
+  let callData: Hex;
+  try {
+    ctx = loadFundContext(args.fund);
+    callData = safeMintCallData(ctx.token, args.to, args.amount);
+    // A fund whose MINTER_ROLE was never verified on chain does not get to
+    // submit: the bundle would land and revert ("Must have minter role to
+    // mint"), and the sponsor would pay for nothing. Nothing has been sent
+    // at this point, so the refusal is tagged failed-before-submit.
+    if (!args.fund.tokenMintEnabledAt) await requireMinterRole(ctx);
+  } catch (e) {
+    throw markFailedBeforeSubmit(e);
+  }
   try {
     return await runUserOp(ctx, callData, {
       userOpData: args.userOpData,
@@ -1163,8 +1238,38 @@ export const TRANSFER_TOPIC =
   "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef" as const;
 
 // =============================================================================
-// Role checks (post-failure diagnostics)
+// Role checks
 // =============================================================================
+
+/**
+ * Pre-submit gate: `hasRole(MINTER_ROLE, sender)` through the shared
+ * read-only check in services/token/permissions.ts. Only a definite
+ * "missing-role" refuses; an RPC failure ("unknown") lets the mint go ahead
+ * — the receipt check after settlement still catches a revert.
+ */
+async function requireMinterRole(ctx: FundContext): Promise<void> {
+  const status = await checkMinterRole({
+    tokenAddress: ctx.token,
+    chainId: ctx.fund.tokenChainId,
+    account: ctx.sender,
+  });
+  if (status === "missing-role") {
+    throw new UserOpError(
+      "missing_role",
+      `Smart account ${ctx.sender} is missing MINTER_ROLE on ${ctx.token}`,
+    );
+  }
+  if (status === "unknown") {
+    console.warn("[userop] minter role check inconclusive, submitting anyway", {
+      fund: ctx.fund.id,
+      sender: ctx.sender,
+      token: ctx.token,
+    });
+  }
+}
+
+// Post-failure diagnostics: turn a bundler refusal into a role error when the
+// account lacks the role the call needs.
 
 async function assertMinterRole(ctx: FundContext): Promise<void> {
   const role = (await ctx.client.readContract({
