@@ -239,7 +239,7 @@ model OauthConsent {
 }
 
 model Fund {
-  id     String @id @default(cuid())
+  id       String  @id @default(cuid())
   domain   String  @unique // full hostname: "acme.lacaisse.eu" or "funds.acme.com"
   name     String
   fullName String? // full / legal name, e.g. "Caisse Locale d'Alimentation Solidaire de Schaerbeek" for "La CLASS"; falls back to `name`
@@ -344,7 +344,7 @@ model Fund {
   // CP treasury slug, cached from `GET /v2/treasury` (the `network` segment of
   // a card's public tap URL: https://tap.citizenpay.xyz/card/<serial>?network=<slug>).
   // Refreshed whenever the API key is (re)issued — see services/citizenpay/sync.ts.
-  citizenPayTreasurySlug String?
+  citizenPayTreasurySlug    String?
 
   // 4337 stack identity. Cached from CP's `GET /v2/treasury` response —
   // CP picks the entrypoint / factory / paymaster per treasury and we
@@ -417,19 +417,19 @@ model Fund {
   // a join table) so the proxy lookup stays a single row read.
   embedAllowedDomains String[] @default([])
 
-  staff              FundMember[] // staff with admin access (OWNER/ADMIN/VIEWER)
-  invites            FundInvite[] // pending staff invitations
-  members            Member[] // demand-side recipients of allocations
-  cards              Card[] // cards in the fund (may be member-bound or imported)
-  tiers              AllocationTier[] // contribution/allocation tiers
-  merchants          Merchant[] // shops in the fund's network
-  onboardingFields   OnboardingField[] // per-fund extras on the signup forms
-  onboardingSteps    OnboardingStep[] // optional multi-step grouping of those extras
-  bankTransactions   BankTransaction[] // bank-sync mirror (incoming + outgoing)
-  tokenOperations    TokenOperation[] // mint/burn/transfer audit log
-  allocationPeriods  AllocationPeriod[] // FIXED_PERIOD scheduling windows
-  linkedBankAccounts LinkedBankAccount[] // learned IBAN → member mappings
-  referrals          Referral[] // referral programme records (5.3.4)
+  staff                    FundMember[] // staff with admin access (OWNER/ADMIN/VIEWER)
+  invites                  FundInvite[] // pending staff invitations
+  members                  Member[] // demand-side recipients of allocations
+  cards                    Card[] // cards in the fund (may be member-bound or imported)
+  tiers                    AllocationTier[] // contribution/allocation tiers
+  merchants                Merchant[] // shops in the fund's network
+  onboardingFields         OnboardingField[] // per-fund extras on the signup forms
+  onboardingSteps          OnboardingStep[] // optional multi-step grouping of those extras
+  bankTransactions         BankTransaction[] // bank-sync mirror (incoming + outgoing)
+  tokenOperations          TokenOperation[] // mint/burn/transfer audit log
+  allocationPeriods        AllocationPeriod[] // FIXED_PERIOD scheduling windows
+  linkedBankAccounts       LinkedBankAccount[] // learned IBAN → member mappings
+  referrals                Referral[] // referral programme records (5.3.4)
   emails                   Email[] // transactional email outbox/log
   emailTemplates           EmailTemplate[] // per-fund library of custom email templates
   emailTemplateAssignments EmailTemplateAssignment[] // which library template (if any) is active per email type
@@ -441,6 +441,11 @@ model Fund {
   txAnnotations             TransactionAnnotation[] // per-tx labels for on-chain history
   pendingAnnotations        PendingAnnotation[] // userOp hashes awaiting tx-hash resolution
   cardTopUps                CardTopUp[] // open-banking card top-ups (PAY_AND_GO /pay/<serial>)
+
+  // Cross-fund card enrollment: requests other funds filed against cards this
+  // fund issued (in), and requests this fund filed against other funds' cards (out).
+  cardEnrollmentRequestsIn  CardEnrollmentRequest[] @relation("CardEnrollmentRequestsIn")
+  cardEnrollmentRequestsOut CardEnrollmentRequest[] @relation("CardEnrollmentRequestsOut")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -742,6 +747,10 @@ model Member {
   // Open-banking card top-ups (PAY_AND_GO /pay/<serial>).
   cardTopUps CardTopUp[]
 
+  // Cross-fund enrollment requests that will bind the enrolled card to this
+  // member on accept (add-card flow).
+  cardEnrollmentRequests CardEnrollmentRequest[] @relation("CardEnrollmentRequestMember")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -791,8 +800,13 @@ model Card {
   // is the on-chain wallet address, populated when CitizenPay registers
   // the card; nullable until then so admin can create the local row before
   // the CP roundtrip completes.
-  serialNumber String  @unique
-  account      String? @unique
+  //
+  // Both are unique PER FUND, not globally: a physical card issued by one
+  // fund can be enrolled by other funds (CardEnrollmentRequest), each with
+  // its own row for the same serial — and the on-chain account can be the
+  // same across funds too. Always scope serial/account lookups by fundId.
+  serialNumber String
+  account      String?
 
   // Per-fund sequential card number (1…N). Encoded in the Belgian structured
   // communication members put on their bank transfers (base of the OGM =
@@ -843,14 +857,69 @@ model Card {
   // Open-banking top-ups the member started for this card (/pay/<serial>).
   topUps CardTopUp[]
 
+  // Requests from other funds to enroll this (issuer) card.
+  enrollmentRequests  CardEnrollmentRequest[] @relation("IssuerCardRequests")
+  // Set on a card created by accepting an enrollment request.
+  enrolledFromRequest CardEnrollmentRequest?  @relation("EnrolledCard")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([fundId, number])
+  @@unique([fundId, serialNumber])
+  @@unique([fundId, account])
+  @@index([serialNumber])
   @@index([memberId])
   @@index([formerMemberId])
   @@index([fundId])
   @@index([status])
+}
+
+// A fund asking to enroll a card another fund issued. The requester files it
+// against the issuer's Card row; the issuer fund accepts or rejects. On accept
+// the requester fund enrolls the serial at CitizenPay with its own API key
+// (POST /v2/treasury/cards on an already-issued serial is a silent
+// enrollment) and gets its own local Card row (`enrolledCard`). One request
+// per (issuer card, requester fund); a rejected/cancelled one is revived.
+enum CardEnrollmentRequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+}
+
+model CardEnrollmentRequest {
+  id String @id @default(cuid())
+
+  // The issuer's Card row (its fundId is the issuer fund, denormalised below
+  // for the inbox query).
+  cardId          String
+  card            Card   @relation("IssuerCardRequests", fields: [cardId], references: [id], onDelete: Cascade)
+  issuerFundId    String
+  issuerFund      Fund   @relation("CardEnrollmentRequestsIn", fields: [issuerFundId], references: [id], onDelete: Cascade)
+  requesterFundId String
+  requesterFund   Fund   @relation("CardEnrollmentRequestsOut", fields: [requesterFundId], references: [id], onDelete: Cascade)
+
+  requestedById   String  @db.Uuid // audit, no FK (like FundInvite.acceptedById)
+  requestedNumber Int? // per-fund card number wanted in the requester fund (CSV import)
+  memberId        String? // requester-fund Member to bind on accept (add-card flow)
+  member          Member? @relation("CardEnrollmentRequestMember", fields: [memberId], references: [id], onDelete: SetNull)
+  holderName      String?
+
+  status      CardEnrollmentRequestStatus @default(PENDING)
+  decidedById String?                     @db.Uuid
+  decidedAt   DateTime?
+
+  // The Card row created in the requester fund on accept.
+  enrolledCardId String? @unique
+  enrolledCard   Card?   @relation("EnrolledCard", fields: [enrolledCardId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([cardId, requesterFundId])
+  @@index([issuerFundId, status])
+  @@index([requesterFundId, status])
 }
 
 enum CardStatus {
@@ -1568,8 +1637,8 @@ model CardTopUp {
   // Mint bookkeeping. `mintTxHash` / `mintUserOpHash` are written as soon as
   // the userop is submitted (or its hash is known after a failure), so the
   // sweep can finish a claimed row even if the TokenOperation update failed.
-  mintTxHash     String?
-  mintUserOpHash String?
+  mintTxHash        String?
+  mintUserOpHash    String?
   // Pre-submit failures release the claim with a backoff: the next attempt
   // waits until `nextMintAttemptAt`, and after MAX_MINT_ATTEMPTS it stops.
   mintAttempts      Int       @default(0)

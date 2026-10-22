@@ -13,6 +13,7 @@ import { getCitizenPayClient } from "@/services/citizenpay/client";
 import { Prisma } from "@/services/db/generated/client";
 import type { CardStatus } from "@/services/db/generated/enums";
 import { prisma } from "@/services/db/prisma";
+import { findForeignCards, requestCardEnrollment } from "@/services/card/enrollment-requests";
 import { nextCardNumber } from "@/services/card/numbering";
 import { normalizeSerial } from "@/services/card/serial";
 import { parseCsv } from "@/services/csv/parse";
@@ -433,7 +434,10 @@ export async function importOneCardAction(input: {
   // Already-exists is fine — concurrent sync runs, or a manual addCard
   // that landed between preview and execute. Treat as success.
   const existing = await prisma.card.findFirst({
-    where: { serialNumber: { equals: input.serialNumber, mode: "insensitive" } },
+    where: {
+      fundId: fund.id,
+      serialNumber: { equals: input.serialNumber, mode: "insensitive" },
+    },
     select: { id: true },
   });
   if (existing) return { ok: true };
@@ -756,6 +760,7 @@ export type ImportCardNumbersResult =
       provisioned: number;
       displaced: number;
       skipped: string[];
+      requested: Array<{ serial: string; fundName: string }>;
     };
 
 // Bulk serial→number mapping from a CSV with headers. The admin picks which
@@ -767,13 +772,18 @@ export type ImportCardNumbersResult =
 // frees any number currently held elsewhere (those cards become unnumbered —
 // reported as `displaced`). Serials that can't be provisioned (fund not
 // connected to CP, or CP rejected them) are reported as `skipped`.
+//
+// Serials issued by ANOTHER fund are neither provisioned nor created here: the
+// current fund files a CardEnrollmentRequest against the issuer's card (with
+// the row's number as the requested number) and the serial is reported in
+// `requested`. The issuer fund accepts it later.
 export async function importCardNumbersAction(input: {
   csv: string;
   serialColumn: string;
   numberColumn: string;
 }): Promise<ImportCardNumbersResult> {
   const t = await getTranslations();
-  const { fund } = await requireFundRole("OPERATOR");
+  const { user, fund } = await requireFundRole("OPERATOR");
 
   const { headers, rows: csvRows } = parseCsv(input.csv);
   const si = headers.indexOf(input.serialColumn);
@@ -821,11 +831,40 @@ export async function importCardNumbersAction(input: {
   // Serials with no local card: provision them at CitizenPay (one bulk call),
   // hydrate each account, and create the local row. Numbers are assigned below
   // in the displacement loop along with the existing cards.
-  const missing = rows
+  let missing = rows
     .filter((r) => !idBySerial.has(r.serial))
     .map((r) => r.serial);
   let provisioned = 0;
   const skipped: string[] = [];
+
+  // Serials issued by another fund: file an enrollment request with the issuer
+  // instead of provisioning a duplicate. One failed request only skips its
+  // serial — the rest of the import goes on.
+  const requested: Array<{ serial: string; fundName: string }> = [];
+  if (missing.length > 0) {
+    const foreign = await findForeignCards(fund.id, missing);
+    if (foreign.size > 0) {
+      const numberBySerial = new Map(rows.map((r) => [r.serial, r.number]));
+      for (const serial of missing) {
+        const card = foreign.get(serial);
+        if (!card) continue;
+        try {
+          await requestCardEnrollment({
+            requesterFund: { id: fund.id, name: fund.name, domain: fund.domain },
+            requestedById: user.id,
+            card,
+            requestedNumber: numberBySerial.get(serial) ?? null,
+          });
+          requested.push({ serial, fundName: card.fund.name });
+        } catch (e) {
+          console.error("[card.numberImport] request failed", serial, e);
+          skipped.push(serial);
+        }
+      }
+      missing = missing.filter((s) => !foreign.has(s));
+    }
+  }
+
   if (missing.length > 0) {
     if (!fund.citizenPayFundId) {
       skipped.push(...missing); // not connected to CP — can't provision
@@ -850,8 +889,9 @@ export async function importCardNumbersAction(input: {
             idBySerial.set(serial, created.id);
             provisioned++;
           } catch (e) {
-            // Raced with another create — re-find within THIS fund only. A
-            // serial owned by another fund (global @unique) is left untouched.
+            // Raced with another create — re-find within THIS fund. A serial
+            // owned by another fund never gets here: it was routed into an
+            // enrollment request above.
             const existing = await prisma.card.findFirst({
               where: { fundId: fund.id, serialNumber: serial },
               select: { id: true },
@@ -874,6 +914,11 @@ export async function importCardNumbersAction(input: {
 
   const toApply = rows.filter((r) => idBySerial.has(r.serial));
   if (toApply.length === 0) {
+    if (requested.length > 0) {
+      // Nothing to number locally, but requests went out — not an error.
+      revalidatePath("/cards");
+      return { ok: true, applied: 0, provisioned: 0, displaced: 0, skipped, requested };
+    }
     return { error: t("cards.admin.numberImport.errors.noMatches" as never) };
   }
 
@@ -917,7 +962,14 @@ export async function importCardNumbersAction(input: {
   ]);
 
   revalidatePath("/cards");
-  return { ok: true, applied: toApply.length, provisioned, displaced, skipped };
+  return {
+    ok: true,
+    applied: toApply.length,
+    provisioned,
+    displaced,
+    skipped,
+    requested,
+  };
 }
 
 // =============================================================================

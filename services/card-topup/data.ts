@@ -28,8 +28,8 @@ export async function loadTopUpCard(
   fundId: string,
   serial: string,
 ): Promise<TopUpCard | null> {
-  const card = await prisma.card.findUnique({
-    where: { serialNumber: serial },
+  const card = await prisma.card.findFirst({
+    where: { fundId, serialNumber: { equals: serial, mode: "insensitive" } },
     select: {
       id: true,
       fundId: true,
@@ -40,7 +40,7 @@ export async function loadTopUpCard(
       member: { select: { firstName: true, lastName: true } },
     },
   });
-  if (!card || card.fundId !== fundId) return null;
+  if (!card) return null;
   return {
     id: card.id,
     serialNumber: card.serialNumber,

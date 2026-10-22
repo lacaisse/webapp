@@ -1241,9 +1241,12 @@ export function getCitizenPayClient(fund: FundCredentials): CitizenPayClient {
   }
 
   const apiKey = decryptSecret(fund.citizenPayApiKeyEnc);
-  return new LiveCitizenPayClient({
-    baseUrl,
-    apiKeyId: fund.citizenPayApiKeyId,
-    apiKey,
-  });
+  return new LiveCitizenPayClient(
+    {
+      baseUrl,
+      apiKeyId: fund.citizenPayApiKeyId,
+      apiKey,
+    },
+    fund.id,
+  );
 }

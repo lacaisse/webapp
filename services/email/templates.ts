@@ -119,11 +119,15 @@ export async function buildShopList(
   return { html, text };
 }
 
-// The card serial for a recipient wallet address (TokenOperation.account).
-async function resolveCardSerial(account: string | null): Promise<string> {
+// The card serial for a recipient wallet address (TokenOperation.account),
+// within the fund (Card.account is unique per fund, not globally).
+async function resolveCardSerial(
+  fundId: string,
+  account: string | null,
+): Promise<string> {
   if (!account) return "";
-  const card = await prisma.card.findUnique({
-    where: { account },
+  const card = await prisma.card.findFirst({
+    where: { fundId, account },
     select: { serialNumber: true },
   });
   return card?.serialNumber ?? "";
@@ -439,7 +443,7 @@ export async function resolveAllocationTemplate(args: {
   });
   const scan = `${content.subject}\n${content.bodyText}\n${content.bodyHtml ?? ""}`;
   const cardSerial = scan.includes("{cardSerial}")
-    ? await resolveCardSerial(args.account)
+    ? await resolveCardSerial(args.fundId, args.account)
     : "";
   const shop = scan.includes("{shopList}")
     ? await buildShopList(args.fundId)

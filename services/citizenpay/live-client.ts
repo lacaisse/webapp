@@ -328,7 +328,14 @@ const FEE_FREQUENCY_WIRE: Record<
 };
 
 export class LiveCitizenPayClient implements CitizenPayClient {
-  constructor(private readonly creds: CitizenPayApiCredentials) {}
+  // `fundId` scopes the Prisma lookups this client does on its own (submitMint's
+  // account → serial resolution): Card.account is unique per fund, not
+  // globally. Optional so the HTTP-level tests can build a bare client;
+  // getCitizenPayClient always passes it.
+  constructor(
+    private readonly creds: CitizenPayApiCredentials,
+    private readonly fundId?: string,
+  ) {}
 
   async registerCard(input: RegisterCardInput): Promise<RegisteredCard> {
     // Two-step: create the card, then read its balance to pick up the
@@ -383,9 +390,14 @@ export class LiveCitizenPayClient implements CitizenPayClient {
 
   async submitMint(input: SubmitMintInput): Promise<SubmittedOperation> {
     // The OpenAPI top-up endpoint identifies the card by serial, but our
-    // internal call sites carry the on-chain account. Resolve via Prisma.
-    const card = await prisma.card.findUnique({
-      where: { account: input.toAccount },
+    // internal call sites carry the on-chain account. Resolve via Prisma,
+    // scoped to this client's fund (the same account can belong to rows in
+    // several funds when a card is enrolled cross-fund — same serial anyway).
+    const card = await prisma.card.findFirst({
+      where: {
+        ...(this.fundId ? { fundId: this.fundId } : {}),
+        account: input.toAccount,
+      },
       select: { serialNumber: true },
     });
     if (!card) {
