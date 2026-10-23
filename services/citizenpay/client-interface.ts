@@ -53,6 +53,7 @@ import type {
   TopUpOrderReport,
   TopUpOrderState,
   TopUpSignUrlInput,
+  TreasuryStats,
 } from "./types";
 
 export interface CitizenPayClient {
@@ -299,6 +300,17 @@ export interface CitizenPayClient {
     from?: string;
     to?: string;
   }): Promise<PayoutDraft[]>;
+
+  /**
+   * Aggregated merchant sales for the treasury: grand total, per-month series
+   * and per-place breakdown. Unlike the drafts, it covers every
+   * payout-eligible order whether or not it's already settled in a payout.
+   * Optional half-open `[from, to)` window on the order's creation time;
+   * omitted means all time. Months are UTC ("YYYY-MM", ascending), places by
+   * total desc. Money is EUR decimal strings, signed so refunds subtract.
+   * Computed live, read-only. Drives the statistics page.
+   */
+  getStats(query?: { from?: string; to?: string }): Promise<TreasuryStats>;
 
   /**
    * Live count/total for one place over a required `[from, to)` range —

@@ -95,3 +95,43 @@ describe("mock client burn claim", () => {
     expect((await c.getPayoutStatus(id)).burnClaim).toBeNull();
   });
 });
+
+describe("mock getStats", () => {
+  const sum = (xs: string[]) => xs.reduce((a, x) => a + Math.round(Number(x) * 100), 0);
+
+  it("covers six months ending now, with totals that add up", async () => {
+    const s = await getCitizenPayClient(fund).getStats();
+    expect(s.months.map((m) => m.month)).toEqual([
+      "2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10",
+    ]);
+    expect(s.places.map((p) => p.placeId)).toEqual(["mock-place-1", "mock-place-2", "mock-place-3"]);
+    for (const k of ["total", "fees", "payoutFees", "net"] as const) {
+      expect(sum(s.months.map((m) => m[k]))).toBe(sum([s.orders[k]]));
+      expect(sum(s.places.map((p) => p[k]))).toBe(sum([s.orders[k]]));
+    }
+    expect(s.orders.refundCount).toBe(1);
+  });
+
+  it("keeps the months that overlap [from, to)", async () => {
+    const s = await getCitizenPayClient(fund).getStats({
+      from: "2026-08-01T00:00:00Z",
+      to: "2026-10-01T00:00:00Z",
+    });
+    expect(s.months.map((m) => m.month)).toEqual(["2026-08", "2026-09"]);
+    expect(sum(s.places.map((p) => p.total))).toBe(sum([s.orders.total]));
+    expect(sum(s.months.map((m) => m.total))).toBe(sum([s.orders.total]));
+  });
+
+  it("keeps a month a window only partly covers", async () => {
+    // Inside one month, and a local-midnight window from UTC−5 (starts at
+    // 05:00Z on the 1st): both still show that month.
+    for (const query of [
+      { from: "2026-09-10T00:00:00Z", to: "2026-09-20T00:00:00Z" },
+      { from: "2026-09-01T05:00:00Z", to: "2026-10-01T05:00:00Z" },
+    ]) {
+      const s = await getCitizenPayClient(fund).getStats(query);
+      expect(s.months[0].month).toBe("2026-09");
+      expect(sum(s.months.map((m) => m.total))).toBe(sum([s.orders.total]));
+    }
+  });
+});

@@ -134,3 +134,49 @@ describe("cards.setHolderName (PUT …/profile)", () => {
     ).rejects.toMatchObject({ status: 404 });
   });
 });
+
+describe("getStats (GET /v2/treasury/stats)", () => {
+  const bucket = { count: 3, refundCount: 1, total: 12345, fees: 100, payoutFees: 45, net: 12200 };
+
+  it("passes the window and maps cents to decimals", async () => {
+    reply = {
+      status: 200,
+      body: {
+        from: "2026-01-01T00:00:00Z",
+        to: null,
+        orders: bucket,
+        months: [{ ...bucket, month: "2026-09" }],
+        places: [{ ...bucket, placeId: "p1", placeName: "Bakery", placeImage: "", businessId: "b1" }],
+      },
+    };
+    const s = await new LiveCitizenPayClient(creds).getStats({ from: "2026-01-01T00:00:00Z" });
+    expect(calls[0].url.pathname).toBe("/v2/treasury/stats");
+    expect(Object.fromEntries(calls[0].url.searchParams)).toEqual({ from: "2026-01-01T00:00:00Z" });
+    const money = { count: 3, refundCount: 1, total: "123.45", fees: "1.00", payoutFees: "0.45", net: "122.00" };
+    expect(s).toEqual({
+      from: "2026-01-01T00:00:00Z",
+      to: null,
+      orders: money,
+      months: [{ ...money, month: "2026-09" }],
+      places: [{ ...money, placeId: "p1", placeName: "Bakery", placeImage: null, businessId: "b1" }],
+    });
+  });
+
+  it("reads null arrays and a missing businessId as empty", async () => {
+    reply = {
+      status: 200,
+      body: { from: null, to: null, orders: { ...bucket, total: -500, net: -645 }, months: null, places: null },
+    };
+    const s = await new LiveCitizenPayClient(creds).getStats();
+    expect(s.months).toEqual([]);
+    expect(s.places).toEqual([]);
+    expect(s.orders.total).toBe("-5.00");
+
+    reply = {
+      status: 200,
+      body: { from: null, to: null, orders: bucket, months: [], places: [{ ...bucket, placeId: "p1", placeName: "X" }] },
+    };
+    const t = await new LiveCitizenPayClient(creds).getStats();
+    expect(t.places[0]).toMatchObject({ placeImage: null, businessId: null });
+  });
+});

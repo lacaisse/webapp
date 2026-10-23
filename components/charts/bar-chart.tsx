@@ -176,8 +176,22 @@ export function BarChart({
     }
   }
 
-  // Skip x labels when bands get too narrow for them.
-  const xEvery = Math.max(1, Math.ceil(34 / band));
+  // Skip x labels when bands get too narrow for them: label every nth
+  // group, counted back from the last so the latest is always labelled. The
+  // room a label needs follows the longest one (~6px a character at 11px),
+  // never less than the 34px short month names ("Oct", "sept.") get, so
+  // longer labels (e.g. "Oct 25" on a multi-year axis) thin out sooner.
+  const longestLabel = Math.max(0, ...data.map((d) => d.label.length));
+  const labelW = Math.max(34, longestLabel * 6 + 4);
+  const xEvery = Math.max(1, Math.ceil(labelW / band));
+  // A centred label that would run past the right edge (narrow last band)
+  // is end-anchored on the edge instead of being clipped.
+  const xLabel = (g: number) => {
+    const cx = MARGIN.left + g * band + band / 2;
+    return cx + labelW / 2 > width
+      ? { x: width, anchor: "end" as const }
+      : { x: cx, anchor: "middle" as const };
+  };
 
   const bars = data.flatMap((d, g) => {
     const gx = MARGIN.left + g * band + (band - groupW) / 2;
@@ -263,20 +277,22 @@ export function BarChart({
           ))}
 
           {/* x labels */}
-          {data.map((d, g) =>
-            g % xEvery === (data.length - 1) % xEvery ? (
+          {data.map((d, g) => {
+            if (g % xEvery !== (data.length - 1) % xEvery) return null;
+            const { x, anchor } = xLabel(g);
+            return (
               <text
                 key={g}
-                x={MARGIN.left + g * band + band / 2}
+                x={x}
                 y={height - 6}
-                textAnchor="middle"
+                textAnchor={anchor}
                 fontSize={11}
                 fill="var(--muted-foreground)"
               >
                 {d.label}
               </text>
-            ) : null,
-          )}
+            );
+          })}
 
           {/* Bars */}
           {bars.map((b) => {

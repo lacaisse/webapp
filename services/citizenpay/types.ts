@@ -347,6 +347,32 @@ export type PayoutDraftPreview = PayoutDraft & {
   to: string; // ISO 8601
 };
 
+// One aggregate of treasury sales (GET /v2/treasury/stats). Money is signed:
+// refund / correction rows subtract from `total`, and so does a topup row,
+// which is in neither count. `net = total − fees − payoutFees`.
+export type OrderStatsBucket = {
+  count: number; // sales: paid / refunded rows only (not topups)
+  refundCount: number; // refund / correction rows
+  total: string; // EUR decimal string, signed (refunds subtract)
+  fees: string; // processor fees withheld at source
+  payoutFees: string; // platform cut
+  net: string; // total − fees − payoutFees
+};
+export type MonthStats = OrderStatsBucket & { month: string }; // "YYYY-MM" (UTC)
+export type PlaceStats = OrderStatsBucket & {
+  placeId: string;
+  placeName: string;
+  placeImage: string | null;
+  businessId: string | null;
+};
+export type TreasuryStats = {
+  from: string | null; // echoed window, null = unbounded
+  to: string | null;
+  orders: OrderStatsBucket;
+  months: MonthStats[]; // ascending
+  places: PlaceStats[]; // by total desc
+};
+
 // Result of creating a pending payout (POST /v2/treasury/payouts).
 export type CreatedPayout = {
   payoutId: string;
