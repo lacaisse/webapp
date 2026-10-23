@@ -5,14 +5,18 @@ import {
   formatCents,
   mergeMonthly,
   monthKey,
-  payoutsInWindow,
   summariseContributions,
-  summarisePayouts,
+  summariseTransfers,
   toCents,
+  windowMonths,
 } from "./aggregate";
 
-// Local-time dates throughout, matching monthKey's local clock.
-const at = (y: number, m: number, d: number, h = 12) => new Date(y, m - 1, d, h);
+// Row timestamps are UTC (monthKey's clock); window edges are local
+// midnights, as app/(fund)/statistics/range.ts builds them. Both are built
+// explicitly so the tests pass in any TZ.
+const utc = (y: number, m: number, d: number, h = 12) =>
+  new Date(Date.UTC(y, m - 1, d, h));
+const local = (y: number, m: number, d: number) => new Date(y, m - 1, d);
 
 describe("cents math", () => {
   it("rounds decimal strings, numbers and Decimal-likes to integer cents", () => {
@@ -33,85 +37,90 @@ describe("cents math", () => {
   it("does not drift where float addition would", () => {
     const rows = Array.from({ length: 3 }, () => ({
       amount: "0.10",
-      occurredAt: at(2026, 1, 1),
-      memberId: "m",
+      occurredAt: utc(2026, 1, 1),
     }));
     // 0.1 + 0.1 + 0.1 === 0.30000000000000004 in floats.
-    expect(summariseContributions(rows).total).toBe("0.30");
+    expect(summariseTransfers(rows).total).toBe("0.30");
   });
 });
 
 describe("monthKey", () => {
-  it("is the local YYYY-MM", () => {
-    expect(monthKey(at(2026, 1, 31, 23))).toBe("2026-01");
-    expect(monthKey(at(2026, 12, 1, 0))).toBe("2026-12");
+  it("is the UTC YYYY-MM", () => {
+    expect(monthKey(utc(2026, 1, 31, 23))).toBe("2026-01");
+    expect(monthKey(utc(2026, 12, 1, 0))).toBe("2026-12");
+    // 23:30 on 30 Sep UTC is 1 Oct in Brussels, but September in UTC.
+    expect(monthKey(new Date("2026-09-30T23:30:00Z"))).toBe("2026-09");
+  });
+});
+
+describe("summariseTransfers", () => {
+  it("totals, counts rows and buckets by UTC month", () => {
+    expect(
+      summariseTransfers([
+        { amount: "120.00", occurredAt: utc(2026, 3, 2) },
+        { amount: "80.10", occurredAt: utc(2026, 1, 10) },
+        { amount: "19.90", occurredAt: utc(2026, 1, 20) },
+      ]),
+    ).toEqual({
+      total: "220.00",
+      count: 3,
+      months: [
+        { month: "2026-01", total: "100.00" },
+        { month: "2026-03", total: "120.00" },
+      ],
+    });
+  });
+
+  it("is all zeros with no rows", () => {
+    expect(summariseTransfers([])).toEqual({ total: "0.00", count: 0, months: [] });
   });
 });
 
 describe("summariseContributions", () => {
-  it("totals, counts deposits and distinct members, buckets by month", () => {
+  it("counts every deposit, matched or not, and how many are unmatched", () => {
     const stats = summariseContributions([
-      { amount: "20.00", occurredAt: at(2026, 3, 2), memberId: "a" },
-      { amount: "15.50", occurredAt: at(2026, 1, 10), memberId: "b" },
-      { amount: "4.50", occurredAt: at(2026, 1, 20), memberId: "a" },
+      { amount: "20.00", occurredAt: utc(2026, 3, 2), memberId: "a" },
+      { amount: "15.50", occurredAt: utc(2026, 1, 10), memberId: null },
+      { amount: "4.50", occurredAt: utc(2026, 1, 20), memberId: "a" },
     ]);
     expect(stats).toEqual({
       total: "40.00",
-      depositCount: 3,
-      memberCount: 2,
+      count: 3,
+      unmatchedCount: 1,
       months: [
         { month: "2026-01", total: "20.00" },
         { month: "2026-03", total: "20.00" },
       ],
     });
   });
-
-  it("is all zeros with no rows", () => {
-    expect(summariseContributions([])).toEqual({
-      total: "0.00",
-      depositCount: 0,
-      memberCount: 0,
-      months: [],
-    });
-  });
 });
 
-describe("payouts", () => {
-  const payouts = [
-    { id: "1", createdAt: at(2026, 2, 28).toISOString(), net: "100.10" },
-    { id: "2", createdAt: at(2026, 3, 1, 0).toISOString(), net: "50.05" },
-    { id: "3", createdAt: at(2026, 4, 1, 0).toISOString(), net: "9.99" },
-    { id: "4", createdAt: "garbage", net: "1.00" },
-  ];
-
-  it("keeps payouts created in the half-open window", () => {
-    const kept = payoutsInWindow(payouts, at(2026, 3, 1, 0), at(2026, 4, 1, 0));
-    expect(kept.map((p) => p.id)).toEqual(["2"]);
+describe("windowMonths", () => {
+  it("is the first and last month of a half-open window", () => {
+    expect(
+      windowMonths({ from: local(2026, 1, 1), to: local(2027, 1, 1) }),
+    ).toEqual({ first: "2026-01", last: "2026-12" });
+    expect(
+      windowMonths({ from: local(2026, 3, 5), to: local(2026, 3, 6) }),
+    ).toEqual({ first: "2026-03", last: "2026-03" });
   });
 
-  it("an unbounded window keeps every readable payout", () => {
-    expect(payoutsInWindow(payouts, null, null).map((p) => p.id)).toEqual([
-      "1",
-      "2",
-      "3",
-    ]);
-  });
-
-  it("sums net in cents and buckets by created month", () => {
-    expect(summarisePayouts(payouts)).toEqual({
-      total: "160.14",
-      count: 3,
-      months: [
-        { month: "2026-02", total: "100.10" },
-        { month: "2026-03", total: "50.05" },
-        { month: "2026-04", total: "9.99" },
-      ],
+  it("is null on an unbounded side", () => {
+    expect(windowMonths({ from: null, to: local(2026, 4, 1) })).toEqual({
+      first: null,
+      last: "2026-03",
+    });
+    expect(windowMonths({ from: null, to: null })).toEqual({
+      first: null,
+      last: null,
     });
   });
 });
 
 describe("mergeMonthly", () => {
-  it("unions both series ascending and zero-fills missing values and gaps", () => {
+  const ALL = { from: null, to: null };
+
+  it("all time: unions both series over the data's extent, zero-filled", () => {
     expect(
       mergeMonthly(
         [
@@ -119,6 +128,7 @@ describe("mergeMonthly", () => {
           { month: "2025-12", total: "10.00" },
         ],
         [{ month: "2026-01", total: "5.00" }],
+        ALL,
       ),
     ).toEqual([
       { month: "2025-12", contributions: "10.00", spent: "0.00" },
@@ -128,7 +138,60 @@ describe("mergeMonthly", () => {
     ]);
   });
 
-  it("is empty when neither series has months", () => {
-    expect(mergeMonthly([], [])).toEqual([]);
+  it("all time with no data is empty", () => {
+    expect(mergeMonthly([], [], ALL)).toEqual([]);
+  });
+
+  it("a bounded window spans exactly its months, even without data", () => {
+    const year = { from: local(2026, 1, 1), to: local(2027, 1, 1) };
+    const out = mergeMonthly([{ month: "2026-03", total: "1.00" }], [], year);
+    expect(out.map((p) => p.month)).toEqual([
+      "2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06",
+      "2026-07", "2026-08", "2026-09", "2026-10", "2026-11", "2026-12",
+    ]);
+    expect(mergeMonthly([], [], year)).toHaveLength(12);
+  });
+
+  it("folds UTC buckets outside the window into the nearest edge month", () => {
+    // "This month" = October: a 00:30 local sale on 1 Oct that CP files
+    // under September (UTC), and a late 31 Oct deposit filed under November.
+    const october = { from: local(2026, 10, 1), to: local(2026, 11, 1) };
+    const out = mergeMonthly(
+      [
+        { month: "2026-10", total: "10.00" },
+        { month: "2026-11", total: "0.10" },
+      ],
+      [
+        { month: "2026-09", total: "2.50" },
+        { month: "2026-10", total: "7.00" },
+      ],
+      october,
+    );
+    expect(out).toEqual([
+      { month: "2026-10", contributions: "10.10", spent: "9.50" },
+    ]);
+  });
+
+  it("a half-open window spans from its bounded edge to the data", () => {
+    const sinceMarch = { from: local(2026, 3, 1), to: null };
+    expect(
+      mergeMonthly([{ month: "2026-05", total: "1.00" }], [], sinceMarch).map(
+        (p) => p.month,
+      ),
+    ).toEqual(["2026-03", "2026-04", "2026-05"]);
+
+    const untilMarch = { from: null, to: local(2026, 4, 1) };
+    expect(
+      mergeMonthly([{ month: "2026-01", total: "1.00" }], [], untilMarch).map(
+        (p) => p.month,
+      ),
+    ).toEqual(["2026-01", "2026-02", "2026-03"]);
+  });
+
+  it("keeps signed totals (refunds can make a month negative)", () => {
+    const march = { from: local(2026, 3, 1), to: local(2026, 4, 1) };
+    expect(
+      mergeMonthly([], [{ month: "2026-03", total: "-4.50" }], march),
+    ).toEqual([{ month: "2026-03", contributions: "0.00", spent: "-4.50" }]);
   });
 });

@@ -559,10 +559,11 @@ export const TOKEN_ROLES_GRANT_TIMEOUT_MS = 120_000;
 
 // Aggregated merchant sales for the treasury (`GET /v2/treasury/stats`):
 // every payout-eligible order, settled into a payout or not, bucketed by
-// creation time. Integer cents, signed — refund / correction rows subtract.
-// `net = total − fees − payoutFees`.
+// creation time. Integer cents, signed — refund / correction rows subtract,
+// and so does a topup row, which lowers `total` without being counted in
+// either count. `net = total − fees − payoutFees`.
 export type OrderStatsBucketWire = {
-  count: number; // sales (paid / refunded / topup rows)
+  count: number; // sales: paid / refunded rows only (not topups)
   refundCount: number; // refund / correction rows
   total: number; // cents
   fees: number; // cents — withheld at source
@@ -574,9 +575,10 @@ export type TreasuryStatsWire = {
   from: string | null; // RFC3339, echoes the query (null = unbounded)
   to: string | null;
   orders: OrderStatsBucketWire;
-  // Ascending by `month` ("YYYY-MM", UTC). Null on an empty treasury.
+  // Ascending by `month` ("YYYY-MM", UTC). Always an array (empty on an
+  // empty treasury); typed nullable only so the client stays defensive.
   months: (OrderStatsBucketWire & { month: string })[] | null;
-  // By total desc. `placeImage` may be ""; null on an empty treasury.
+  // By total desc. `placeImage` may be "". Always an array, as `months`.
   places:
     | (OrderStatsBucketWire & {
         placeId: string;

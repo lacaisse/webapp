@@ -1,28 +1,25 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Pure aggregation helpers for the Statistics page: cents math, local-month
-// bucketing, payout window filtering and the merged monthly series. No I/O,
-// so the loaders in ./data.ts stay thin and this file carries the tests.
+// Pure aggregation helpers for the Statistics page: cents math, UTC-month
+// bucketing of bank rows and the merged monthly series. No I/O, so the
+// loaders in ./data.ts stay thin and this file carries the tests.
 //
 // Money is summed in integer cents and only turned back into a 2-dp decimal
 // string at the end. Adding floats (0.1 + 0.2 …) drifts by a cent over a few
 // hundred deposits, and these totals end up next to bank statements.
 
-import type { Payout } from "@/services/citizenpay/types";
-
 export type MonthTotal = { month: string; total: string }; // "YYYY-MM"
 
-export type ContributionStats = {
-  total: string;
-  depositCount: number;
-  memberCount: number;
-  months: MonthTotal[];
-};
-
-export type PayoutTotals = {
+// A set of bank rows (one direction) over the window.
+export type TransferTotals = {
   total: string;
   count: number;
   months: MonthTotal[];
 };
+
+// Contributions as the dashboard defines them: every INCOMING bank row,
+// matched to a member or not. `unmatchedCount` is the part still waiting for
+// a member, the same split the dashboard's contributions hint shows.
+export type ContributionStats = TransferTotals & { unmatchedCount: number };
 
 export type MonthlyPoint = {
   month: string; // "YYYY-MM"
@@ -30,9 +27,11 @@ export type MonthlyPoint = {
   spent: string;
 };
 
+type Amount = string | number | { toString(): string };
+
 // A Prisma Decimal, a decimal string or a number → integer cents. Decimal is
 // read through `toString()` so nothing depends on its `valueOf` shape.
-export function toCents(value: string | number | { toString(): string }): number {
+export function toCents(value: Amount): number {
   const n = Number(typeof value === "number" ? value : value.toString());
   return Number.isFinite(n) ? Math.round(n * 100) : 0;
 }
@@ -44,11 +43,11 @@ export function formatCents(cents: number): string {
   return `${sign}${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, "0")}`;
 }
 
-// `YYYY-MM` in the server's local time — the same clock
-// app/(fund)/statistics/range.ts resolves its windows on, so a deposit at
-// 00:30 on the 1st lands in the month the "This month" preset covers.
+// `YYYY-MM` in UTC — the same months as the dashboard's money series
+// (app/(fund)/dashboard/data.ts) and as CitizenPay's per-month sales, so the
+// two chart series bucket every row on one clock.
 export function monthKey(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
 function bucketByMonth(items: { at: Date; cents: number }[]): MonthTotal[] {
@@ -62,64 +61,33 @@ function bucketByMonth(items: { at: Date; cents: number }[]): MonthTotal[] {
     .map(([month, cents]) => ({ month, total: formatCents(cents) }));
 }
 
-// Matched member deposits → total, deposit count, distinct members and the
-// per-month totals (only months that have rows).
-export function summariseContributions(
-  rows: {
-    amount: string | number | { toString(): string };
-    occurredAt: Date;
-    memberId: string | null;
-  }[],
-): ContributionStats {
+// Bank rows → total, row count and per-UTC-month totals (only months that
+// have rows). Callers query one direction over the window first.
+export function summariseTransfers(
+  rows: { amount: Amount; occurredAt: Date }[],
+): TransferTotals {
   let cents = 0;
-  const members = new Set<string>();
   const items: { at: Date; cents: number }[] = [];
   for (const row of rows) {
     const c = toCents(row.amount);
     cents += c;
-    if (row.memberId) members.add(row.memberId);
     items.push({ at: row.occurredAt, cents: c });
   }
   return {
     total: formatCents(cents),
-    depositCount: rows.length,
-    memberCount: members.size,
+    count: rows.length,
     months: bucketByMonth(items),
   };
 }
 
-// Completed payouts whose `createdAt` falls in the half-open `[from, to)`
-// window (null = unbounded). A payout with an unreadable timestamp is left
-// out rather than guessed into a month.
-export function payoutsInWindow<P extends Pick<Payout, "createdAt">>(
-  payouts: P[],
-  from: Date | null,
-  to: Date | null,
-): P[] {
-  return payouts.filter((p) => {
-    const at = new Date(p.createdAt).getTime();
-    if (Number.isNaN(at)) return false;
-    if (from && at < from.getTime()) return false;
-    if (to && at >= to.getTime()) return false;
-    return true;
-  });
-}
-
-// Sum of `net` (what the merchant actually receives) with per-month totals
-// keyed on `createdAt`. Callers filter to the window first.
-export function summarisePayouts(
-  payouts: Pick<Payout, "createdAt" | "net">[],
-): PayoutTotals {
-  let cents = 0;
-  const items: { at: Date; cents: number }[] = [];
-  for (const p of payouts) {
-    const at = new Date(p.createdAt);
-    if (Number.isNaN(at.getTime())) continue;
-    const c = toCents(p.net);
-    cents += c;
-    items.push({ at, cents: c });
-  }
-  return { total: formatCents(cents), count: items.length, months: bucketByMonth(items) };
+// INCOMING bank rows → the transfer totals plus how many have no member yet.
+export function summariseContributions(
+  rows: { amount: Amount; occurredAt: Date; memberId: string | null }[],
+): ContributionStats {
+  return {
+    ...summariseTransfers(rows),
+    unmatchedCount: rows.filter((r) => !r.memberId).length,
+  };
 }
 
 function nextMonth(key: string): string {
@@ -127,38 +95,86 @@ function nextMonth(key: string): string {
   return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
 }
 
+// The calendar month a window edge falls in, on the clock the window was
+// built on: app/(fund)/statistics/range.ts resolves presets and custom days
+// to the server's LOCAL midnights. Reading those edges in UTC would add a
+// stray month on any server not on UTC (local 1 Oct 00:00 is 30 Sep 22:00Z in
+// Brussels), so the edges keep the window's clock and the UTC buckets that
+// straddle them are folded in (see mergeMonthly). In production the server
+// runs on UTC and the two clocks are the same.
+function localMonthKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+// The first and last month a half-open `[from, to)` window covers, null on an
+// unbounded side.
+export function windowMonths(window: {
+  from: Date | null;
+  to: Date | null;
+}): { first: string | null; last: string | null } {
+  return {
+    first: window.from ? localMonthKey(window.from) : null,
+    last: window.to ? localMonthKey(new Date(window.to.getTime() - 1)) : null,
+  };
+}
+
 // Hard stop for the gap fill below: a malformed month key must not spin the
 // loop, and no fund has 100 years of history.
 const MAX_MONTHS = 1200;
 
+const MONTH_RE = /^\d{4}-\d{2}$/;
+
 // The chart's series: contributions and merchant sales on one ascending month
-// axis. Covers every month from the first to the last one either series has,
-// with the months in between zero-filled — a time axis that skipped an idle
-// month would draw March right after January and hide the gap.
+// axis, zero-filled — a time axis that skipped an idle month would draw March
+// right after January and hide the gap.
 //
-// Contributions are bucketed on the server's local clock and CitizenPay's
-// months on UTC; the two only disagree for orders in the first hours of a
-// month, which is noise at this resolution.
+// A bounded window spans exactly its own months, first to last, even where
+// they have no data. Any bucket outside that span is folded into the nearest
+// edge month rather than dropped or drawn: it is a row that is inside the
+// window but lands in the neighbouring month on UTC (e.g. a 00:30 local sale
+// on the 1st, which CitizenPay files under the previous UTC month), so
+// folding keeps the chart adding up to the KPI tiles. An unbounded side
+// ("all time") spans the data's own extent.
 export function mergeMonthly(
   contributions: MonthTotal[],
   spent: MonthTotal[],
+  window: { from: Date | null; to: Date | null },
 ): MonthlyPoint[] {
-  const c = new Map(contributions.map((m) => [m.month, m.total]));
-  const s = new Map(spent.map((m) => [m.month, m.total]));
-  const keys = [...new Set([...c.keys(), ...s.keys()])]
-    .filter((k) => /^\d{4}-\d{2}$/.test(k))
-    .sort();
-  if (keys.length === 0) return [];
+  const valid = (ms: MonthTotal[]) => ms.filter((m) => MONTH_RE.test(m.month));
+  const c = valid(contributions);
+  const s = valid(spent);
+  const keys = [...c, ...s].map((m) => m.month).sort();
 
-  const last = keys[keys.length - 1];
+  const { first, last } = windowMonths(window);
+  let start = first ?? keys[0];
+  let end = last ?? keys[keys.length - 1];
+  // An unbounded side with no data to take its extent from: nothing to draw.
+  if (start === undefined || end === undefined) return [];
+  // One bounded side, data all beyond it: the span is just that edge month.
+  if (!first && start > end) start = end;
+  if (!last && end < start) end = start;
+  if (start > end) return [];
+
+  const clamp = (k: string) => (k < start ? start : k > end ? end : k);
+  const sums = (ms: MonthTotal[]) => {
+    const out = new Map<string, number>();
+    for (const m of ms) {
+      const k = clamp(m.month);
+      out.set(k, (out.get(k) ?? 0) + toCents(m.total));
+    }
+    return out;
+  };
+  const cSums = sums(c);
+  const sSums = sums(s);
+
   const out: MonthlyPoint[] = [];
-  for (let k = keys[0]; out.length < MAX_MONTHS; k = nextMonth(k)) {
+  for (let k = start; out.length < MAX_MONTHS; k = nextMonth(k)) {
     out.push({
       month: k,
-      contributions: c.get(k) ?? "0.00",
-      spent: s.get(k) ?? "0.00",
+      contributions: formatCents(cSums.get(k) ?? 0),
+      spent: formatCents(sSums.get(k) ?? 0),
     });
-    if (k >= last) break;
+    if (k >= end) break;
   }
   return out;
 }

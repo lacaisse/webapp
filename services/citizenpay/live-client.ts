@@ -824,7 +824,8 @@ export class LiveCitizenPayClient implements CitizenPayClient {
     query: { from?: string; to?: string } = {},
   ): Promise<TreasuryStats> {
     const w = await apiTreasury.stats(this.creds, query);
-    // An empty treasury comes back with null arrays (Go nil slices).
+    // CP always sends arrays (empty on an empty treasury); `?? []` only
+    // guards against a regression to Go nil slices.
     return {
       from: w.from ?? null,
       to: w.to ?? null,

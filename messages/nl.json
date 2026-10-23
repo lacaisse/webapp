@@ -478,13 +478,13 @@
       },
       "kpi": {
         "contributed": "Bijgedragen door leden",
-        "contributedHint": "{deposits, plural, one {# storting} other {# stortingen}} · {members, plural, one {# lid} other {# leden}}",
+        "contributedHint": "{deposits, plural, one {# storting} other {# stortingen}} · {unmatched} niet gekoppeld",
         "spent": "Uitgegeven bij handelaars",
         "spentHint": "{net} netto voor handelaars na kosten",
         "transactions": "Transacties",
         "transactionsHint": "{n, plural, =0 {Geen terugbetalingen} one {# terugbetaling} other {# terugbetalingen}}",
         "paidOut": "Uitbetaald aan handelaars",
-        "paidOutHint": "{n, plural, =0 {Geen uitbetalingen} one {# uitbetaling} other {# uitbetalingen}}"
+        "paidOutHint": "{n, plural, =0 {Nog geen overschrijvingen} one {# overschrijving} other {# overschrijvingen}}"
       },
       "chart": {
         "title": "Per maand",

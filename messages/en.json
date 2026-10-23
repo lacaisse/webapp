@@ -478,13 +478,13 @@
       },
       "kpi": {
         "contributed": "Contributed by members",
-        "contributedHint": "{deposits, plural, one {# deposit} other {# deposits}} · {members, plural, one {# member} other {# members}}",
+        "contributedHint": "{deposits, plural, one {# deposit} other {# deposits}} · {unmatched} unmatched",
         "spent": "Spent at merchants",
         "spentHint": "{net} net to merchants after fees",
         "transactions": "Transactions",
         "transactionsHint": "{n, plural, =0 {No refunds} one {# refund} other {# refunds}}",
         "paidOut": "Paid out to merchants",
-        "paidOutHint": "{n, plural, =0 {No payouts} one {# payout} other {# payouts}}"
+        "paidOutHint": "{n, plural, =0 {No bank transfers yet} one {# bank transfer} other {# bank transfers}}"
       },
       "chart": {
         "title": "Month by month",

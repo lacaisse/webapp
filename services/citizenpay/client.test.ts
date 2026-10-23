@@ -112,7 +112,7 @@ describe("mock getStats", () => {
     expect(s.orders.refundCount).toBe(1);
   });
 
-  it("keeps only months whose first day is in [from, to)", async () => {
+  it("keeps the months that overlap [from, to)", async () => {
     const s = await getCitizenPayClient(fund).getStats({
       from: "2026-08-01T00:00:00Z",
       to: "2026-10-01T00:00:00Z",
@@ -120,5 +120,18 @@ describe("mock getStats", () => {
     expect(s.months.map((m) => m.month)).toEqual(["2026-08", "2026-09"]);
     expect(sum(s.places.map((p) => p.total))).toBe(sum([s.orders.total]));
     expect(sum(s.months.map((m) => m.total))).toBe(sum([s.orders.total]));
+  });
+
+  it("keeps a month a window only partly covers", async () => {
+    // Inside one month, and a local-midnight window from UTC−5 (starts at
+    // 05:00Z on the 1st): both still show that month.
+    for (const query of [
+      { from: "2026-09-10T00:00:00Z", to: "2026-09-20T00:00:00Z" },
+      { from: "2026-09-01T05:00:00Z", to: "2026-10-01T05:00:00Z" },
+    ]) {
+      const s = await getCitizenPayClient(fund).getStats(query);
+      expect(s.months[0].month).toBe("2026-09");
+      expect(sum(s.months.map((m) => m.total))).toBe(sum([s.orders.total]));
+    }
   });
 });

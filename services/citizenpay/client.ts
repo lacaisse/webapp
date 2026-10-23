@@ -1357,13 +1357,16 @@ function mockTreasuryStats(
   const from = query.from ? new Date(query.from).getTime() : -Infinity;
   const to = query.to ? new Date(query.to).getTime() : Infinity;
   const n = MOCK_STATS_MONTHS.length;
-  // Keep a month when its first day (UTC) falls in [from, to).
+  // Keep a month when it overlaps [from, to) at all, so a window inside one
+  // month — or a local-midnight window from a TZ west of UTC, which starts a
+  // few hours after the 1st — still shows that month. The fixture has no
+  // per-day detail, so an overlapping month counts in full.
   const months = MOCK_STATS_MONTHS.map((cents, i) => {
-    const start = new Date(
-      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (n - 1 - i), 1),
-    );
-    return { start, cents };
-  }).filter(({ start }) => start.getTime() >= from && start.getTime() < to);
+    const offset = now.getUTCMonth() - (n - 1 - i);
+    const start = new Date(Date.UTC(now.getUTCFullYear(), offset, 1));
+    const end = new Date(Date.UTC(now.getUTCFullYear(), offset + 1, 1));
+    return { start, end, cents };
+  }).filter(({ start, end }) => start.getTime() < to && end.getTime() > from);
 
   const placeCents = MOCK_STATS_PLACES.map(() => emptyCents());
   let orders = emptyCents();

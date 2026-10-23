@@ -478,13 +478,13 @@
       },
       "kpi": {
         "contributed": "Cotisé par les membres",
-        "contributedHint": "{deposits, plural, one {# virement} other {# virements}} · {members, plural, one {# membre} other {# membres}}",
+        "contributedHint": "{deposits, plural, one {# virement} other {# virements}} · {unmatched} non attribués",
         "spent": "Dépensé dans les commerces",
         "spentHint": "{net} net pour les commerces après frais",
         "transactions": "Transactions",
         "transactionsHint": "{n, plural, =0 {Aucun remboursement} one {# remboursement} other {# remboursements}}",
         "paidOut": "Versé aux commerces",
-        "paidOutHint": "{n, plural, =0 {Aucun versement} one {# versement} other {# versements}}"
+        "paidOutHint": "{n, plural, =0 {Aucun virement pour l'instant} one {# virement bancaire} other {# virements bancaires}}"
       },
       "chart": {
         "title": "Mois par mois",

@@ -7,11 +7,10 @@ import type { TreasuryStats } from "@/services/citizenpay/types";
 import { prisma } from "@/services/db/prisma";
 
 import {
-  payoutsInWindow,
   summariseContributions,
-  summarisePayouts,
+  summariseTransfers,
   type ContributionStats,
-  type PayoutTotals,
+  type TransferTotals,
 } from "./aggregate";
 
 // Loaders for the fund Statistics page. Each is wrapped in React's `cache()`
@@ -24,7 +23,6 @@ import {
 // Windows are half-open `[from, to)`; a null end is unbounded.
 
 export type MerchantStatsData = { stats: TreasuryStats | null; error: boolean };
-export type PayoutStatsData = PayoutTotals & { error: boolean };
 export type LocalMerchant = { id: string; name: string; citizenPayPlaceId: string };
 
 function client(
@@ -45,34 +43,60 @@ function toDate(iso: string | null): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-// What members put in: the fund's matched incoming bank deposits. Unmatched
-// deposits (no member yet) are left out — until someone attributes them they
-// aren't a member's contribution, and the bank page is where they get fixed.
+function occurredIn(fromIso: string | null, toIso: string | null) {
+  const from = toDate(fromIso);
+  const to = toDate(toIso);
+  return from || to
+    ? {
+        occurredAt: {
+          ...(from ? { gte: from } : {}),
+          ...(to ? { lt: to } : {}),
+        },
+      }
+    : {};
+}
+
+// What came in: every INCOMING bank row in the window, matched to a member or
+// not — the same definition as the dashboard's contributions
+// (app/(fund)/dashboard/data.ts::getMonthMoneyKpis / getMoneySeries), so the
+// two pages agree on any month they both show. The unmatched count travels
+// with it, as on the dashboard, so the gap is visible rather than hidden.
 export const getContributionStats = cache(
   async (
     fundId: string,
     fromIso: string | null,
     toIso: string | null,
   ): Promise<ContributionStats> => {
-    const from = toDate(fromIso);
-    const to = toDate(toIso);
     const rows = await prisma.bankTransaction.findMany({
       where: {
         fundId,
         direction: "INCOMING",
-        memberId: { not: null },
-        ...(from || to
-          ? {
-              occurredAt: {
-                ...(from ? { gte: from } : {}),
-                ...(to ? { lt: to } : {}),
-              },
-            }
-          : {}),
+        ...occurredIn(fromIso, toIso),
       },
       select: { amount: true, occurredAt: true, memberId: true },
     });
     return summariseContributions(rows);
+  },
+);
+
+// What went out to merchants: every OUTGOING bank row in the window — the
+// dashboard's "paid out" (getMonthMoneyKpis / getMerchantPayouts), i.e. the
+// bank transfers that actually left the fund's account.
+export const getPaidOutStats = cache(
+  async (
+    fundId: string,
+    fromIso: string | null,
+    toIso: string | null,
+  ): Promise<TransferTotals> => {
+    const rows = await prisma.bankTransaction.findMany({
+      where: {
+        fundId,
+        direction: "OUTGOING",
+        ...occurredIn(fromIso, toIso),
+      },
+      select: { amount: true, occurredAt: true },
+    });
+    return summariseTransfers(rows);
   },
 );
 
@@ -99,38 +123,6 @@ export const getMerchantStats = cache(
     } catch (e) {
       console.warn("[statistics] getStats failed", e);
       return { stats: null, error: true };
-    }
-  },
-);
-
-// What merchants were paid out. Only completed payouts count: a payout is
-// "paid out" once it was created AND its settlement ran, so pending ones
-// (bank signature outstanding, burn not done) stay out of the figure. It is
-// placed in time by `createdAt` — the moment the admin committed to paying
-// it — because the list rows carry no settlement timestamp (`updatedAt` moves
-// on any later edit, e.g. a fee sweep). The amount is `net`, what the
-// merchant actually receives after fees and deductions.
-//
-// CitizenPay has no date filter on this list, so the window is applied here.
-export const getPayoutStats = cache(
-  async (
-    fundId: string,
-    citizenPayApiKeyId: string | null,
-    citizenPayApiKeyEnc: string | null,
-    fromIso: string | null,
-    toIso: string | null,
-  ): Promise<PayoutStatsData> => {
-    try {
-      const payouts = await client(
-        fundId,
-        citizenPayApiKeyId,
-        citizenPayApiKeyEnc,
-      ).listCompletedPayouts();
-      const kept = payoutsInWindow(payouts, toDate(fromIso), toDate(toIso));
-      return { ...summarisePayouts(kept), error: false };
-    } catch (e) {
-      console.warn("[statistics] listCompletedPayouts failed", e);
-      return { total: "0.00", count: 0, months: [], error: true };
     }
   },
 );

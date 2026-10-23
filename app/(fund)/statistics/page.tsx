@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { Suspense } from "react";
 import Link from "next/link";
-import { getFormatter, getTranslations } from "next-intl/server";
+import { getFormatter, getLocale, getTranslations } from "next-intl/server";
 
+import type { ValueFormat } from "@/components/charts/bar-chart";
 import {
   Card,
   CardContent,
@@ -25,7 +26,7 @@ import {
   getContributionStats,
   getLocalMerchantsForPlaces,
   getMerchantStats,
-  getPayoutStats,
+  getPaidOutStats,
 } from "@/services/statistics/data";
 
 import { DateRangeFilter } from "./date-range-filter";
@@ -41,12 +42,18 @@ import {
 // merchants, how many sales that was, and what merchants were paid out, over
 // a URL-driven date range (default: all time). Fund-wide money → ADMIN-only.
 //
-// Contributions are the fund's own matched bank deposits; sales and payouts
-// come from CitizenPay, so those sections degrade to "—" and a notice when
-// CP is down instead of reading as zero.
+// Contributions and payouts are the fund's own bank rows with the dashboard's
+// definitions (every INCOMING row in, every OUTGOING row out), so the two
+// pages agree on any month they both show. Sales come from CitizenPay, so
+// those sections degrade to "—" and a notice when CP is down instead of
+// reading as zero.
 //
 // URL state: ?range=all|thisMonth|lastMonth|thisYear|lastYear|custom, plus
 // ?from / ?to (YYYY-MM-DD, `to` inclusive) for custom.
+
+// Same series colours as the dashboard's money chart.
+const SERIES_1 = "var(--chart-1)";
+const SERIES_2 = "var(--chart-4)";
 
 // Long tail beyond this is summarised in one line: the board reads the top
 // of the list, and a fund with hundreds of places shouldn't render them all.
@@ -145,8 +152,8 @@ async function ContributionTile({ w }: { w: Window }) {
       label={t("kpi.contributed")}
       value={eur(c.total)}
       hint={t("kpi.contributedHint", {
-        deposits: c.depositCount,
-        members: c.memberCount,
+        deposits: c.count,
+        unmatched: c.unmatchedCount,
       })}
     />
   );
@@ -191,12 +198,12 @@ async function SalesTiles({ w }: { w: Window }) {
 
 async function PayoutTile({ w }: { w: Window }) {
   const { t, eur } = await getFormatters();
-  const p = await getPayoutStats(w.fundId, w.keyId, w.keyEnc, w.fromIso, w.toIso);
+  const p = await getPaidOutStats(w.fundId, w.fromIso, w.toIso);
   return (
     <KpiTile
       label={t("kpi.paidOut")}
-      value={p.error ? "—" : eur(p.total)}
-      hint={p.error ? t("errors.citizenpay") : t("kpi.paidOutHint", { n: p.count })}
+      value={eur(p.total)}
+      hint={t("kpi.paidOutHint", { n: p.count })}
     />
   );
 }
@@ -228,15 +235,48 @@ function KpiTile({
 // ---------------------------------------------------------------------------
 
 async function MonthlyCard({ w }: { w: Window }) {
-  const { t } = await getFormatters();
-  const [contributions, merchant] = await Promise.all([
+  const { t, eur } = await getFormatters();
+  const [format, locale, contributions, merchant] = await Promise.all([
+    getFormatter(),
+    getLocale(),
     getContributionStats(w.fundId, w.fromIso, w.toIso),
     getMerchantStats(w.fundId, w.keyId, w.keyEnc, w.fromIso, w.toIso),
   ]);
   const months = mergeMonthly(
     contributions.months,
     (merchant.stats?.months ?? []).map((m) => ({ month: m.month, total: m.total })),
+    {
+      from: w.fromIso ? new Date(w.fromIso) : null,
+      to: w.toIso ? new Date(w.toIso) : null,
+    },
   );
+
+  // Built like the dashboard's chartData: labels pre-formatted here, on UTC
+  // month starts. An axis that crosses a year boundary (all time, a custom
+  // range) carries the year on its short labels too.
+  const spansYears =
+    months.length > 0 &&
+    months[0].month.slice(0, 4) !== months[months.length - 1].month.slice(0, 4);
+  const points = months.map((m) => {
+    const [y, mo] = m.month.split("-").map(Number);
+    const d = new Date(Date.UTC(y, mo - 1, 1));
+    return {
+      label: format.dateTime(d, {
+        month: "short",
+        ...(spansYears ? { year: "2-digit" as const } : {}),
+        timeZone: "UTC",
+      }),
+      fullLabel: format.dateTime(d, {
+        month: "long",
+        year: "numeric",
+        timeZone: "UTC",
+      }),
+      values: [Number(m.contributions) || 0, Number(m.spent) || 0],
+      contributions: eur(m.contributions),
+      spent: eur(m.spent),
+    };
+  });
+  const eurFormat: ValueFormat = { style: "currency", currency: "EUR", locale };
 
   return (
     <Card>
@@ -246,15 +286,27 @@ async function MonthlyCard({ w }: { w: Window }) {
       </CardHeader>
       <CardContent className="space-y-2 pb-4">
         <MonthlyChart
-          months={months}
+          data={points.map((p) => ({
+            label: p.label,
+            fullLabel: p.fullLabel,
+            values: p.values,
+          }))}
+          series={[
+            { name: t("chart.contributionsSeries"), color: SERIES_1 },
+            { name: t("chart.spentSeries"), color: SERIES_2 },
+          ]}
+          valueFormat={eurFormat}
+          ariaLabel={t("chart.aria")}
+          emptyLabel={t("chart.empty")}
+          rows={points.map((p) => ({
+            month: p.fullLabel,
+            contributions: p.contributions,
+            spent: p.spent,
+          }))}
           labels={{
-            contributions: t("chart.contributionsSeries"),
-            spent: t("chart.spentSeries"),
             month: t("chart.month"),
             showTable: t("chart.showTable"),
             showChart: t("chart.showChart"),
-            empty: t("chart.empty"),
-            aria: t("chart.aria"),
           }}
         />
         {merchant.error && (

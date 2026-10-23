@@ -55,9 +55,10 @@ function parseDay(value: string | undefined): Date | null {
 // unbounded on both.
 //
 // Computed in the server's LOCAL time, not UTC, for the same reason as the
-// bank filter: "this month" means the viewer's calendar month, and the
-// month buckets on this page use the same clock (see
-// services/statistics/aggregate.ts::monthKey).
+// bank filter: "this month" means the viewer's calendar month. The chart's
+// month span is read on the same clock (services/statistics/aggregate.ts::
+// windowMonths); its buckets are UTC, like CitizenPay's and the dashboard's,
+// and fold into that span.
 export function resolveRangeWindow(
   range: RangePreset,
   from: string | undefined,
@@ -79,8 +80,11 @@ export function resolveRangeWindow(
     case "lastYear":
       return { from: dayStart(y - 1, 0, 1), to: dayStart(y, 0, 1) };
     case "custom": {
-      const start = parseDay(from);
-      const end = parseDay(to);
+      let start = parseDay(from);
+      let end = parseDay(to);
+      // Days typed the wrong way round mean the same period, not an empty
+      // one: swap them.
+      if (start && end && start > end) [start, end] = [end, start];
       // `to` is an inclusive day → advance to the next midnight (exclusive).
       return {
         from: start,

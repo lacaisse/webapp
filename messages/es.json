@@ -478,13 +478,13 @@
       },
       "kpi": {
         "contributed": "Aportado por los miembros",
-        "contributedHint": "{deposits, plural, one {# transferencia} other {# transferencias}} · {members, plural, one {# miembro} other {# miembros}}",
+        "contributedHint": "{deposits, plural, one {# transferencia} other {# transferencias}} · {unmatched} sin asignar",
         "spent": "Gastado en comercios",
         "spentHint": "{net} netos para los comercios tras comisiones",
         "transactions": "Transacciones",
         "transactionsHint": "{n, plural, =0 {Sin reembolsos} one {# reembolso} other {# reembolsos}}",
         "paidOut": "Pagado a comercios",
-        "paidOutHint": "{n, plural, =0 {Sin pagos} one {# pago} other {# pagos}}"
+        "paidOutHint": "{n, plural, =0 {Aún no hay transferencias} one {# transferencia bancaria} other {# transferencias bancarias}}"
       },
       "chart": {
         "title": "Mes a mes",

@@ -77,6 +77,13 @@ describe("resolveRangeWindow", () => {
     });
   });
 
+  it("custom swaps days given the wrong way round", () => {
+    expect(resolveRangeWindow("custom", "2026-03-31", "2026-03-05", NOW)).toEqual({
+      from: local(2026, 3, 5),
+      to: local(2026, 4, 1),
+    });
+  });
+
   it("custom with a missing end is open on that side", () => {
     expect(resolveRangeWindow("custom", "2026-03-05", undefined, NOW)).toEqual({
       from: local(2026, 3, 5),
