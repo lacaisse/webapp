@@ -45,6 +45,7 @@ import type {
   ListPlacesResult,
   OpenPlaceOrder,
   OperationStatusResult,
+  OrderStatsBucket,
   PaymentRequestState,
   Payout,
   PayoutBurnClaim,
@@ -69,6 +70,7 @@ import type {
   TopUpOrderReport,
   TopUpOrderState,
   TopUpSignUrlInput,
+  TreasuryStats,
 } from "./types";
 
 // Re-export the interface so existing imports `from "@/services/citizenpay/client"`
@@ -428,6 +430,13 @@ class MockCitizenPayClient implements CitizenPayClient {
         payoutFees: "2.10",
       }),
     ];
+  }
+
+  async getStats(
+    query: { from?: string; to?: string } = {},
+  ): Promise<TreasuryStats> {
+    this.log("getStats", query);
+    return mockTreasuryStats(query, new Date());
   }
 
   async previewPayoutDraft(args: {
@@ -1261,6 +1270,130 @@ function recomputed(
     fees,
     payoutFees,
     net: payoutNet({ total, fees, payoutFees }),
+  };
+}
+
+// ---- Statistics fixture --------------------------------------------------
+// Six months of sales ending at the current UTC month, one refund in the
+// middle. Each month is split across the same places as the drafts fixture
+// (plus a third) at a fixed share, so the statistics page can join them to
+// local merchants. Everything is integer cents until the very end and every
+// total is summed from the buckets below it — never hand-typed — so the
+// months, the places and the grand total always agree.
+
+type CentsBucket = {
+  count: number;
+  refundCount: number;
+  total: number;
+  fees: number;
+  payoutFees: number;
+};
+
+// Oldest first; the last row is the current month.
+const MOCK_STATS_MONTHS: CentsBucket[] = [
+  { count: 38, refundCount: 0, total: 41_250, fees: 620, payoutFees: 1_030 },
+  { count: 44, refundCount: 0, total: 47_800, fees: 710, payoutFees: 1_195 },
+  { count: 51, refundCount: 0, total: 55_340, fees: 830, payoutFees: 1_385 },
+  // One refunded sale (−24.50) nets out of this month's total.
+  { count: 47, refundCount: 1, total: 49_660, fees: 745, payoutFees: 1_240 },
+  { count: 56, refundCount: 0, total: 61_120, fees: 915, payoutFees: 1_530 },
+  { count: 19, refundCount: 0, total: 20_480, fees: 305, payoutFees: 510 },
+];
+
+const MOCK_STATS_PLACES: {
+  placeId: string;
+  placeName: string;
+  businessId: string;
+  share: number; // percent of every month; shares sum to 100
+}[] = [
+  { placeId: "mock-place-1", placeName: "Mock Grocer", businessId: "mock-business-1", share: 50 },
+  { placeId: "mock-place-2", placeName: "Mock Bakery", businessId: "mock-business-2", share: 30 },
+  { placeId: "mock-place-3", placeName: "Mock Café", businessId: "mock-business-3", share: 20 },
+];
+
+const CENTS_FIELDS = ["count", "refundCount", "total", "fees", "payoutFees"] as const;
+
+function emptyCents(): CentsBucket {
+  return { count: 0, refundCount: 0, total: 0, fees: 0, payoutFees: 0 };
+}
+
+function addCents(a: CentsBucket, b: CentsBucket): CentsBucket {
+  const out = emptyCents();
+  for (const k of CENTS_FIELDS) out[k] = a[k] + b[k];
+  return out;
+}
+
+// Split one month across the places: each place takes its rounded-down
+// share, the last place takes the remainder so the parts add back exactly.
+function splitCents(month: CentsBucket): CentsBucket[] {
+  const parts = MOCK_STATS_PLACES.map(() => emptyCents());
+  for (const k of CENTS_FIELDS) {
+    let left = month[k];
+    MOCK_STATS_PLACES.forEach((p, i) => {
+      const last = i === MOCK_STATS_PLACES.length - 1;
+      const v = last ? left : Math.floor((month[k] * p.share) / 100);
+      parts[i][k] = v;
+      left -= v;
+    });
+  }
+  return parts;
+}
+
+function statsBucket(c: CentsBucket): OrderStatsBucket {
+  return {
+    count: c.count,
+    refundCount: c.refundCount,
+    total: fromCents(c.total),
+    fees: fromCents(c.fees),
+    payoutFees: fromCents(c.payoutFees),
+    net: fromCents(c.total - c.fees - c.payoutFees),
+  };
+}
+
+function mockTreasuryStats(
+  query: { from?: string; to?: string },
+  now: Date,
+): TreasuryStats {
+  const from = query.from ? new Date(query.from).getTime() : -Infinity;
+  const to = query.to ? new Date(query.to).getTime() : Infinity;
+  const n = MOCK_STATS_MONTHS.length;
+  // Keep a month when its first day (UTC) falls in [from, to).
+  const months = MOCK_STATS_MONTHS.map((cents, i) => {
+    const start = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (n - 1 - i), 1),
+    );
+    return { start, cents };
+  }).filter(({ start }) => start.getTime() >= from && start.getTime() < to);
+
+  const placeCents = MOCK_STATS_PLACES.map(() => emptyCents());
+  let orders = emptyCents();
+  for (const { cents } of months) {
+    orders = addCents(orders, cents);
+    splitCents(cents).forEach((part, i) => {
+      placeCents[i] = addCents(placeCents[i], part);
+    });
+  }
+
+  return {
+    from: query.from ?? null,
+    to: query.to ?? null,
+    orders: statsBucket(orders),
+    months: months.map(({ start, cents }) => ({
+      ...statsBucket(cents),
+      month: start.toISOString().slice(0, 7),
+    })),
+    // Like the api: places with no orders in the window are absent, the rest
+    // by total desc.
+    places: MOCK_STATS_PLACES.map((p, i) => ({ p, cents: placeCents[i] }))
+      .filter(({ cents }) => cents.count + cents.refundCount > 0)
+      .sort((a, b) => b.cents.total - a.cents.total)
+      .map(({ p, cents }) => ({
+        ...statsBucket(cents),
+        placeId: p.placeId,
+        placeName: p.placeName,
+        placeImage: null,
+        businessId: p.businessId,
+      })),
   };
 }
 

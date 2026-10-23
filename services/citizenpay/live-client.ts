@@ -36,6 +36,7 @@ import {
   type FeeCollectionFrequencyWire,
   type OpenOrderWire,
   type TopUpOrderWire,
+  type OrderStatsBucketWire,
 } from "./api";
 import type { CitizenPayClient } from "./client-interface";
 import type {
@@ -70,6 +71,7 @@ import type {
   ListPlacesResult,
   OpenPlaceOrder,
   OperationStatusResult,
+  OrderStatsBucket,
   PaymentRequestState,
   Payout,
   PayoutBurnClaim,
@@ -93,6 +95,7 @@ import type {
   TopUpOrderReport,
   TopUpOrderState,
   TopUpSignUrlInput,
+  TreasuryStats,
 } from "./types";
 
 // Adapts the OpenAPI-shaped low-level api.ts to the high-level interface the
@@ -244,6 +247,17 @@ function draftFromWire(w: PayoutDraftWire): PayoutDraft {
     placeName: w.placeName,
     placeImage: w.placeImage || null,
     orderCount: w.orderCount,
+    total: centsToDecimal(w.total),
+    fees: centsToDecimal(w.fees),
+    payoutFees: centsToDecimal(w.payoutFees),
+    net: centsToDecimal(w.net),
+  };
+}
+
+function statsBucketFromWire(w: OrderStatsBucketWire): OrderStatsBucket {
+  return {
+    count: w.count ?? 0,
+    refundCount: w.refundCount ?? 0,
     total: centsToDecimal(w.total),
     fees: centsToDecimal(w.fees),
     payoutFees: centsToDecimal(w.payoutFees),
@@ -804,6 +818,29 @@ export class LiveCitizenPayClient implements CitizenPayClient {
   ): Promise<PayoutDraft[]> {
     const { drafts } = await apiPayouts.listDrafts(this.creds, query);
     return (drafts ?? []).map(draftFromWire);
+  }
+
+  async getStats(
+    query: { from?: string; to?: string } = {},
+  ): Promise<TreasuryStats> {
+    const w = await apiTreasury.stats(this.creds, query);
+    // An empty treasury comes back with null arrays (Go nil slices).
+    return {
+      from: w.from ?? null,
+      to: w.to ?? null,
+      orders: statsBucketFromWire(w.orders),
+      months: (w.months ?? []).map((m) => ({
+        ...statsBucketFromWire(m),
+        month: m.month,
+      })),
+      places: (w.places ?? []).map((p) => ({
+        ...statsBucketFromWire(p),
+        placeId: p.placeId,
+        placeName: p.placeName,
+        placeImage: p.placeImage || null,
+        businessId: p.businessId || null,
+      })),
+    };
   }
 
   async previewPayoutDraft(args: {

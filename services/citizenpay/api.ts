@@ -557,6 +557,36 @@ export type GrantTreasuryTokenRolesWire = TreasuryTokenRolesWire & {
 // waiting.
 export const TOKEN_ROLES_GRANT_TIMEOUT_MS = 120_000;
 
+// Aggregated merchant sales for the treasury (`GET /v2/treasury/stats`):
+// every payout-eligible order, settled into a payout or not, bucketed by
+// creation time. Integer cents, signed — refund / correction rows subtract.
+// `net = total − fees − payoutFees`.
+export type OrderStatsBucketWire = {
+  count: number; // sales (paid / refunded / topup rows)
+  refundCount: number; // refund / correction rows
+  total: number; // cents
+  fees: number; // cents — withheld at source
+  payoutFees: number; // cents — platform cut
+  net: number; // cents
+};
+
+export type TreasuryStatsWire = {
+  from: string | null; // RFC3339, echoes the query (null = unbounded)
+  to: string | null;
+  orders: OrderStatsBucketWire;
+  // Ascending by `month` ("YYYY-MM", UTC). Null on an empty treasury.
+  months: (OrderStatsBucketWire & { month: string })[] | null;
+  // By total desc. `placeImage` may be ""; null on an empty treasury.
+  places:
+    | (OrderStatsBucketWire & {
+        placeId: string;
+        placeName: string;
+        placeImage?: string | null;
+        businessId?: string | null;
+      })[]
+    | null;
+};
+
 export const treasury = {
   get(
     creds: CitizenPayApiCredentials,
@@ -579,6 +609,15 @@ export const treasury = {
     return request(creds, "PATCH", "/v2/treasury", {
       body: { feePercentageBps, feeCollectionFrequency },
     });
+  },
+  // Sales statistics over an optional half-open `[from, to)` window (RFC3339,
+  // on the order's creation time): grand total, per-month series and
+  // per-place breakdown. Read-only, computed on every call.
+  stats(
+    creds: CitizenPayApiCredentials,
+    query: { from?: string; to?: string } = {},
+  ): Promise<TreasuryStatsWire> {
+    return request(creds, "GET", "/v2/treasury/stats", { query });
   },
   // Set (or clear, with null) the treasury's top-up URL — the link behind the
   // public card wallet's "Add funds" button (tap.citizenpay.eu). The literal
