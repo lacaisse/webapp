@@ -128,6 +128,7 @@
   "fund": {
     "nav": {
       "dashboard": "Tableau de bord",
+      "statistics": "Statistiques",
       "members": "Membres",
       "cards": "Cartes",
       "allocations": "Allocations",
@@ -460,6 +461,57 @@
         "connected": "Compte CitizenPay {account} · dernière synchronisation {lastSync}",
         "never": "jamais",
         "notConnected": "Non connecté à CitizenPay."
+      }
+    },
+    "statistics": {
+      "title": "Statistiques",
+      "description": "Cotisations des membres, dépenses dans les commerces et versements aux commerces de la caisse, sur la période de votre choix.",
+      "range": {
+        "all": "Depuis le début",
+        "thisMonth": "Ce mois-ci",
+        "lastMonth": "Le mois dernier",
+        "thisYear": "Cette année",
+        "lastYear": "L'année dernière",
+        "custom": "Personnalisé",
+        "from": "Du",
+        "to": "Au"
+      },
+      "kpi": {
+        "contributed": "Cotisé par les membres",
+        "contributedHint": "{deposits, plural, one {# virement} other {# virements}} · {members, plural, one {# membre} other {# membres}}",
+        "spent": "Dépensé dans les commerces",
+        "spentHint": "{net} net pour les commerces après frais",
+        "transactions": "Transactions",
+        "transactionsHint": "{n, plural, =0 {Aucun remboursement} one {# remboursement} other {# remboursements}}",
+        "paidOut": "Versé aux commerces",
+        "paidOutHint": "{n, plural, =0 {Aucun versement} one {# versement} other {# versements}}"
+      },
+      "chart": {
+        "title": "Mois par mois",
+        "description": "Cotisations des membres et dépenses dans les commerces, par mois.",
+        "contributionsSeries": "Cotisé par les membres",
+        "spentSeries": "Dépensé dans les commerces",
+        "month": "Mois",
+        "showTable": "Voir le tableau",
+        "showChart": "Voir le graphique",
+        "empty": "Aucune activité sur cette période.",
+        "aria": "Cotisations des membres et dépenses dans les commerces par mois"
+      },
+      "merchants": {
+        "title": "Par commerce",
+        "description": "Dépenses dans chaque commerce sur cette période, des plus importantes aux plus faibles.",
+        "columns": {
+          "name": "Commerce",
+          "transactions": "Transactions",
+          "refunds": "Remboursements",
+          "amount": "Montant",
+          "net": "Net"
+        },
+        "empty": "Aucune vente sur cette période.",
+        "more": "{n, plural, one {et # autre commerce} other {et # autres commerces}}"
+      },
+      "errors": {
+        "citizenpay": "CitizenPay est indisponible pour le moment."
       }
     },
     "members": {

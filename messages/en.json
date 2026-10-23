@@ -128,6 +128,7 @@
   "fund": {
     "nav": {
       "dashboard": "Dashboard",
+      "statistics": "Statistics",
       "members": "Members",
       "cards": "Cards",
       "allocations": "Allocations",
@@ -460,6 +461,57 @@
         "connected": "CitizenPay account {account} · last sync {lastSync}",
         "never": "never",
         "notConnected": "Not connected to CitizenPay."
+      }
+    },
+    "statistics": {
+      "title": "Statistics",
+      "description": "Your fund's member contributions, spending at merchants and payouts to merchants, for any period.",
+      "range": {
+        "all": "All time",
+        "thisMonth": "This month",
+        "lastMonth": "Last month",
+        "thisYear": "This year",
+        "lastYear": "Last year",
+        "custom": "Custom",
+        "from": "From",
+        "to": "To"
+      },
+      "kpi": {
+        "contributed": "Contributed by members",
+        "contributedHint": "{deposits, plural, one {# deposit} other {# deposits}} · {members, plural, one {# member} other {# members}}",
+        "spent": "Spent at merchants",
+        "spentHint": "{net} net to merchants after fees",
+        "transactions": "Transactions",
+        "transactionsHint": "{n, plural, =0 {No refunds} one {# refund} other {# refunds}}",
+        "paidOut": "Paid out to merchants",
+        "paidOutHint": "{n, plural, =0 {No payouts} one {# payout} other {# payouts}}"
+      },
+      "chart": {
+        "title": "Month by month",
+        "description": "Member contributions and spending at merchants, per month.",
+        "contributionsSeries": "Contributed by members",
+        "spentSeries": "Spent at merchants",
+        "month": "Month",
+        "showTable": "Show table",
+        "showChart": "Show chart",
+        "empty": "No activity in this period.",
+        "aria": "Monthly member contributions and spending at merchants"
+      },
+      "merchants": {
+        "title": "By merchant",
+        "description": "Spending at each merchant in this period, largest first.",
+        "columns": {
+          "name": "Merchant",
+          "transactions": "Transactions",
+          "refunds": "Refunds",
+          "amount": "Amount",
+          "net": "Net"
+        },
+        "empty": "No sales in this period.",
+        "more": "{n, plural, one {and # more merchant} other {and # more merchants}}"
+      },
+      "errors": {
+        "citizenpay": "CitizenPay is unavailable right now."
       }
     },
     "members": {

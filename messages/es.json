@@ -128,6 +128,7 @@
   "fund": {
     "nav": {
       "dashboard": "Panel",
+      "statistics": "Estadísticas",
       "members": "Miembros",
       "cards": "Tarjetas",
       "allocations": "Asignaciones",
@@ -460,6 +461,57 @@
         "connected": "Cuenta de CitizenPay {account} · última sincronización {lastSync}",
         "never": "nunca",
         "notConnected": "Sin conexión con CitizenPay."
+      }
+    },
+    "statistics": {
+      "title": "Estadísticas",
+      "description": "Aportaciones de los miembros, gasto en comercios y pagos a comercios de tu fondo, para el periodo que elijas.",
+      "range": {
+        "all": "Desde el inicio",
+        "thisMonth": "Este mes",
+        "lastMonth": "El mes pasado",
+        "thisYear": "Este año",
+        "lastYear": "El año pasado",
+        "custom": "Personalizado",
+        "from": "Desde",
+        "to": "Hasta"
+      },
+      "kpi": {
+        "contributed": "Aportado por los miembros",
+        "contributedHint": "{deposits, plural, one {# transferencia} other {# transferencias}} · {members, plural, one {# miembro} other {# miembros}}",
+        "spent": "Gastado en comercios",
+        "spentHint": "{net} netos para los comercios tras comisiones",
+        "transactions": "Transacciones",
+        "transactionsHint": "{n, plural, =0 {Sin reembolsos} one {# reembolso} other {# reembolsos}}",
+        "paidOut": "Pagado a comercios",
+        "paidOutHint": "{n, plural, =0 {Sin pagos} one {# pago} other {# pagos}}"
+      },
+      "chart": {
+        "title": "Mes a mes",
+        "description": "Aportaciones de los miembros y gasto en comercios, por mes.",
+        "contributionsSeries": "Aportado por los miembros",
+        "spentSeries": "Gastado en comercios",
+        "month": "Mes",
+        "showTable": "Ver tabla",
+        "showChart": "Ver gráfico",
+        "empty": "No hay actividad en este periodo.",
+        "aria": "Aportaciones de los miembros y gasto en comercios por mes"
+      },
+      "merchants": {
+        "title": "Por comercio",
+        "description": "Gasto en cada comercio durante este periodo, de mayor a menor.",
+        "columns": {
+          "name": "Comercio",
+          "transactions": "Transacciones",
+          "refunds": "Reembolsos",
+          "amount": "Importe",
+          "net": "Neto"
+        },
+        "empty": "No hay ventas en este periodo.",
+        "more": "{n, plural, one {y # comercio más} other {y # comercios más}}"
+      },
+      "errors": {
+        "citizenpay": "CitizenPay no está disponible en este momento."
       }
     },
     "members": {

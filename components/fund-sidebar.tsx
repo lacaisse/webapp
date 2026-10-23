@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
   ArrowUpRight,
+  ChartColumn,
   Coins,
   CreditCard,
   EyeOff,
@@ -55,6 +56,7 @@ export function FundSidebar({
 
   const allItems: Item[] = [
     { href: "/dashboard", label: t("dashboard"), icon: LayoutDashboard, minRole: "ADMIN" },
+    { href: "/statistics", label: t("statistics"), icon: ChartColumn, minRole: "ADMIN" },
     { href: "/members", label: t("members"), icon: Users, minRole: "OPERATOR" },
     { href: "/cards", label: t("cards"), icon: CreditCard, minRole: "OPERATOR" },
     { href: "/allocations", label: t("allocations"), icon: Wallet, minRole: "ADMIN" },

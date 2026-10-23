@@ -128,6 +128,7 @@
   "fund": {
     "nav": {
       "dashboard": "Dashboard",
+      "statistics": "Statistieken",
       "members": "Leden",
       "cards": "Kaarten",
       "allocations": "Allocaties",
@@ -460,6 +461,57 @@
         "connected": "CitizenPay-account {account} · laatste synchronisatie {lastSync}",
         "never": "nooit",
         "notConnected": "Niet verbonden met CitizenPay."
+      }
+    },
+    "statistics": {
+      "title": "Statistieken",
+      "description": "Bijdragen van leden, uitgaven bij handelaars en uitbetalingen aan handelaars van uw fonds, voor elke periode.",
+      "range": {
+        "all": "Sinds het begin",
+        "thisMonth": "Deze maand",
+        "lastMonth": "Vorige maand",
+        "thisYear": "Dit jaar",
+        "lastYear": "Vorig jaar",
+        "custom": "Aangepast",
+        "from": "Van",
+        "to": "Tot"
+      },
+      "kpi": {
+        "contributed": "Bijgedragen door leden",
+        "contributedHint": "{deposits, plural, one {# storting} other {# stortingen}} · {members, plural, one {# lid} other {# leden}}",
+        "spent": "Uitgegeven bij handelaars",
+        "spentHint": "{net} netto voor handelaars na kosten",
+        "transactions": "Transacties",
+        "transactionsHint": "{n, plural, =0 {Geen terugbetalingen} one {# terugbetaling} other {# terugbetalingen}}",
+        "paidOut": "Uitbetaald aan handelaars",
+        "paidOutHint": "{n, plural, =0 {Geen uitbetalingen} one {# uitbetaling} other {# uitbetalingen}}"
+      },
+      "chart": {
+        "title": "Per maand",
+        "description": "Bijdragen van leden en uitgaven bij handelaars, per maand.",
+        "contributionsSeries": "Bijgedragen door leden",
+        "spentSeries": "Uitgegeven bij handelaars",
+        "month": "Maand",
+        "showTable": "Toon tabel",
+        "showChart": "Toon grafiek",
+        "empty": "Geen activiteit in deze periode.",
+        "aria": "Bijdragen van leden en uitgaven bij handelaars per maand"
+      },
+      "merchants": {
+        "title": "Per handelaar",
+        "description": "Uitgaven bij elke handelaar in deze periode, van hoog naar laag.",
+        "columns": {
+          "name": "Handelaar",
+          "transactions": "Transacties",
+          "refunds": "Terugbetalingen",
+          "amount": "Bedrag",
+          "net": "Netto"
+        },
+        "empty": "Geen verkopen in deze periode.",
+        "more": "{n, plural, one {en nog # handelaar} other {en nog # handelaars}}"
+      },
+      "errors": {
+        "citizenpay": "CitizenPay is momenteel niet beschikbaar."
       }
     },
     "members": {
