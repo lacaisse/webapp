@@ -32,6 +32,7 @@ import {
   type PayoutOrderWire,
   type RecomputedPayoutWire,
   type BankTransactionWire,
+  type CardAllowanceWire,
   type CardChargeResultWire,
   type FeeCollectionFrequencyWire,
   type OpenOrderWire,
@@ -55,6 +56,8 @@ import type {
   CardOperationResult,
   CardStatus,
   CitizenPayBank,
+  CardAllowance,
+  CardSourceInfo,
   CitizenPayCard,
   CitizenPayCardDetail,
   CitizenPayInvite,
@@ -345,6 +348,26 @@ function cardFromWire(w: {
     createdAt: w.created_at,
     lastActivity: w.last_activity ?? null,
   };
+}
+
+// `allowance` on GET /v2/treasury/cards/{serial}: null when no cap is set,
+// missing entirely on CP deploys that predate it. A malformed one (no usable
+// `resets_at`, non-numeric amounts) reads as null rather than throwing — the
+// card page shows the cap without the usage line.
+export function cardAllowanceFromWire(
+  w: CardAllowanceWire | null | undefined,
+): CardAllowance | null {
+  if (!w) return null;
+  const resetsAt = new Date(w.resets_at);
+  if (
+    Number.isNaN(resetsAt.getTime()) ||
+    !Number.isFinite(w.limit) ||
+    !Number.isFinite(w.spent) ||
+    !Number.isFinite(w.remaining)
+  ) {
+    return null;
+  }
+  return { limit: w.limit, spent: w.spent, remaining: w.remaining, resetsAt };
 }
 
 function inviteFromWire(w: InviteWire): CitizenPayInvite {
@@ -727,14 +750,34 @@ export class LiveCitizenPayClient implements CitizenPayClient {
     await apiCards.setHolderName(this.creds, serialNumber, name);
   }
 
-  async getCardSource(serialNumber: string): Promise<string | null> {
+  async setCardSourceLimit(
+    serialNumber: string,
+    limitCents: number | null,
+  ): Promise<void> {
+    // `0` is CP's "clear the cap" sentinel on the PATCH.
+    await apiCards.update(this.creds, serialNumber, {
+      source_weekly_limit: limitCents ?? 0,
+    });
+  }
+
+  async getCardSourceInfo(serialNumber: string): Promise<CardSourceInfo> {
+    let res;
     try {
-      const res = await apiCards.get(this.creds, serialNumber);
-      return res.card.source_serial || null;
+      res = await apiCards.get(this.creds, serialNumber);
     } catch (e) {
-      if (e instanceof CitizenPayApiError && e.status === 404) return null;
+      if (e instanceof CitizenPayApiError && e.status === 404) {
+        return { sourceSerial: null, weeklyLimit: null, allowance: null };
+      }
       throw e;
     }
+    const limit = res.card.source_weekly_limit;
+    return {
+      // CP omits the field (or sends "") when no source is set.
+      sourceSerial: res.card.source_serial || null,
+      // 0 is the "no cap" sentinel on the write side; read it the same way.
+      weeklyLimit: typeof limit === "number" && limit > 0 ? limit : null,
+      allowance: cardAllowanceFromWire(res.allowance),
+    };
   }
 
   async getCitizenPayCard(

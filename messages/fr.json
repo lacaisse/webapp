@@ -736,7 +736,19 @@
           "unresolved": "Actuel : {serial}",
           "clear": "Retirer la source",
           "open": "Ouvrir la liste",
-          "hint": "Si le solde de cette carte est insuffisant lors d'un paiement, le montant manquant est prélevé sur sa source (une autre carte ou un compte source)."
+          "hint": "Si le solde de cette carte est insuffisant lors d'un paiement, le montant manquant est prélevé sur sa source (une autre carte ou un compte source).",
+          "weeklyLimit": {
+            "label": "Plafond hebdomadaire",
+            "placeholder": "Pas de plafond",
+            "hint": "Montant maximum que cette carte peut prélever sur sa source chaque semaine (du lundi au dimanche). Laissez vide pour ne pas fixer de plafond.",
+            "noSource": "Choisissez d'abord une source : le plafond limite ce que la carte y prélève.",
+            "usage": "{spent} sur {limit} utilisés cette semaine · remise à zéro {resetsAt}",
+            "errors": {
+              "invalid": "Saisissez un montant en euros, par ex. 10 ou 10,50.",
+              "negative": "Le plafond ne peut pas être négatif.",
+              "tooLarge": "Le plafond ne peut pas dépasser {max}."
+            }
+          }
         },
         "onboardingLetter": {
           "rowLabel": "Courrier d'accueil",
@@ -2988,7 +3000,9 @@
           "notFound": "Carte introuvable.",
           "sourceNotFound": "Carte source introuvable.",
           "self": "Une carte ne peut pas être sa propre source.",
-          "failed": "Impossible de mettre à jour la carte source. Réessayez dans un instant."
+          "failed": "Impossible de mettre à jour la carte source. Réessayez dans un instant.",
+          "limitInvalid": "Plafond hebdomadaire invalide.",
+          "limitFailed": "Impossible de mettre à jour le plafond hebdomadaire. Réessayez dans un instant."
         }
       },
       "unassign": {

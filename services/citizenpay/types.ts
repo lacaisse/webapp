@@ -186,6 +186,24 @@ export type CitizenPayCardDetail = CitizenPayCard & {
   account: string | null;
 };
 
+// This week's usage of a card's weekly source cap (cents). The week runs
+// Monday–Sunday Europe/Brussels; `resetsAt` is the next Monday 00:00 there.
+export type CardAllowance = {
+  limit: number;
+  spent: number;
+  remaining: number;
+  resetsAt: Date;
+};
+
+// What a card pulls from when it's short, read live from CitizenPay for the
+// card detail page. `weeklyLimit` is the cap in cents (null = no cap);
+// `allowance` is null when no cap is set or the CP deploy predates it.
+export type CardSourceInfo = {
+  sourceSerial: string | null;
+  weeklyLimit: number | null;
+  allowance: CardAllowance | null;
+};
+
 export type ListCardsInput = {
   /** 1-indexed page, default 1. */
   page?: number;

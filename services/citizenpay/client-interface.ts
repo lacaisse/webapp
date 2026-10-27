@@ -17,6 +17,7 @@ import type {
   CardOperationInput,
   CardOperationResult,
   CitizenPayBank,
+  CardSourceInfo,
   CitizenPayCardDetail,
   CitizenPayInvite,
   CitizenPayProfile,
@@ -257,11 +258,22 @@ export interface CitizenPayClient {
   setCardHolderName(serialNumber: string, name: string | null): Promise<void>;
 
   /**
-   * Read a card's configured source serial (null when none / card unknown).
-   * Narrow read for the card detail page — unlike `getCitizenPayCard` it
-   * doesn't trigger the balance side-call.
+   * Set (or clear, with null or 0) the weekly cap in cents on what the card
+   * may pull from its source. The week runs Monday–Sunday Europe/Brussels.
+   * The cap only matters while a source is set.
    */
-  getCardSource(serialNumber: string): Promise<string | null>;
+  setCardSourceLimit(
+    serialNumber: string,
+    limitCents: number | null,
+  ): Promise<void>;
+
+  /**
+   * Read a card's source serial, weekly source cap and this week's usage of
+   * it (all null when none / card unknown). Narrow read for the card detail
+   * page — unlike `getCitizenPayCard` it doesn't trigger the balance
+   * side-call.
+   */
+  getCardSourceInfo(serialNumber: string): Promise<CardSourceInfo>;
 
   /**
    * Delete a card on CitizenPay by serial — used to clean up CP orphans

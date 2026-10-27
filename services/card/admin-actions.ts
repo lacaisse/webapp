@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { parseUnits } from "viem";
 import { z } from "zod";
 
+import { isValidWeeklyLimitCents } from "@/lib/weekly-limit";
 import { requireFundRole } from "@/services/auth/dal";
 import { holderDisplayName } from "@/services/card/holder-name";
 import { scheduleCardHolderNamePublish } from "@/services/card/publish-holder-name";
@@ -840,6 +841,44 @@ export async function setCardSourceAction(input: {
     where: { id: card.id },
     data: { sourceSerial },
   });
+
+  revalidatePath("/cards");
+  revalidatePath(`/cards/${card.id}`);
+  return { ok: true };
+}
+
+export type SetCardSourceLimitResult = { ok: true } | { error: string };
+
+// Set (or clear, with null or 0) the weekly cap in cents on what this card may
+// pull from its source (Monday–Sunday Europe/Brussels). Lives on CitizenPay
+// only — no local mirror; the card page reads it (and this week's usage) back
+// live.
+export async function setCardSourceLimitAction(input: {
+  cardId: string;
+  limitCents: number | null;
+}): Promise<SetCardSourceLimitResult> {
+  const t = await getTranslations();
+  const { fund } = await requireFundRole("OPERATOR");
+
+  if (!isValidWeeklyLimitCents(input.limitCents)) {
+    return { error: t("cards.admin.source.errors.limitInvalid" as never) };
+  }
+
+  const card = await prisma.card.findFirst({
+    where: { id: input.cardId, fundId: fund.id },
+    select: { id: true, serialNumber: true },
+  });
+  if (!card) return { error: t("cards.admin.source.errors.notFound" as never) };
+
+  try {
+    await getCitizenPayClient(fund).setCardSourceLimit(
+      card.serialNumber,
+      input.limitCents || null,
+    );
+  } catch (e) {
+    console.error("[citizenpay] setCardSourceLimit failed", e);
+    return { error: t("cards.admin.source.errors.limitFailed" as never) };
+  }
 
   revalidatePath("/cards");
   revalidatePath(`/cards/${card.id}`);
