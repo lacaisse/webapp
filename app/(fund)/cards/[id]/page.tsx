@@ -20,6 +20,7 @@ import { maskValue } from "@/lib/privacy";
 import { getBalances } from "@/services/alchemy/balances";
 import { formatTokenAmount, shortAddress } from "@/services/alchemy/format";
 import { getCitizenPayClient } from "@/services/citizenpay/client";
+import type { CardSourceInfo } from "@/services/citizenpay/types";
 import { resolveTreasurySlug } from "@/services/citizenpay/treasury-slug";
 import {
   type CardStatus as CardStatusEnum,
@@ -34,6 +35,7 @@ import { TableSkeleton } from "../../token/skeleton";
 import { CardNumberEdit } from "./card-number-edit";
 import { CardSourcePicker, type SourceOption } from "./source-picker";
 import { CardTransfersTable } from "./transfers-table";
+import { CardWeeklyLimitInput } from "./weekly-limit";
 import { NotifyCardButton } from "./notify-card-button";
 import { ChargeCardDialog } from "./charge-card-dialog";
 import { TransferDialog } from "./transfer-dialog";
@@ -329,23 +331,28 @@ export default async function CardDetailPage({
                 )}
               </DtDd>
               {fund.citizenPayFundId && (
-                <DtDd label={t("info.source")}>
-                  <Suspense
-                    fallback={
-                      <span className="inline-block h-7 w-40 animate-pulse rounded bg-muted" />
-                    }
-                  >
-                    <CardSourceRow
-                      fund={{
-                        id: fund.id,
-                        citizenPayApiKeyId: fund.citizenPayApiKeyId,
-                        citizenPayApiKeyEnc: fund.citizenPayApiKeyEnc,
-                      }}
-                      cardId={card.id}
-                      serialNumber={card.serialNumber}
-                    />
-                  </Suspense>
-                </DtDd>
+                <Suspense
+                  fallback={
+                    <>
+                      <DtDd label={t("info.source")}>
+                        <span className="inline-block h-7 w-40 animate-pulse rounded bg-muted" />
+                      </DtDd>
+                      <DtDd label={t("source.weeklyLimit.label")}>
+                        <span className="inline-block h-7 w-24 animate-pulse rounded bg-muted" />
+                      </DtDd>
+                    </>
+                  }
+                >
+                  <CardSourceRows
+                    fund={{
+                      id: fund.id,
+                      citizenPayApiKeyId: fund.citizenPayApiKeyId,
+                      citizenPayApiKeyEnc: fund.citizenPayApiKeyEnc,
+                    }}
+                    cardId={card.id}
+                    serialNumber={card.serialNumber}
+                  />
+                </Suspense>
               )}
               <DtDd label={t("info.issued")}>
                 {card.issuedAt
@@ -470,11 +477,13 @@ async function BalanceDisplay({
   );
 }
 
-// What the card pulls from at charge time when its own balance falls short.
-// Source can be another fund card or a SOURCE token account — both referenced on
-// CitizenPay by serial. The relationship lives on CP (read live here, set via
-// the inline picker); candidates come from the local mirror.
-async function CardSourceRow({
+// What the card pulls from at charge time when its own balance falls short,
+// and the weekly cap on those pulls. Source can be another fund card or a
+// SOURCE token account — both referenced on CitizenPay by serial. Source, cap
+// and this week's usage live on CP (read live here, set via the inline picker
+// and limit input); source candidates come from the local mirror. Renders the
+// "Source card" and "Weekly limit" rows of the info list.
+async function CardSourceRows({
   fund,
   cardId,
   serialNumber,
@@ -487,13 +496,26 @@ async function CardSourceRow({
   cardId: string;
   serialNumber: string;
 }) {
-  let sourceSerial: string | null = null;
+  const t = await getTranslations("fund.cards.detail");
+  const format = await getFormatter();
+
+  let info: CardSourceInfo;
   try {
-    sourceSerial = await getCitizenPayClient(fund).getCardSource(serialNumber);
+    info = await getCitizenPayClient(fund).getCardSourceInfo(serialNumber);
   } catch (e) {
-    console.warn("[cards.detail] getCardSource failed", e);
-    return <span className="text-muted-foreground">—</span>;
+    console.warn("[cards.detail] getCardSourceInfo failed", e);
+    return (
+      <>
+        <DtDd label={t("info.source")}>
+          <span className="text-muted-foreground">—</span>
+        </DtDd>
+        <DtDd label={t("source.weeklyLimit.label")}>
+          <span className="text-muted-foreground">—</span>
+        </DtDd>
+      </>
+    );
   }
+  const { sourceSerial, weeklyLimit, allowance } = info;
 
   const [cards, accounts] = await Promise.all([
     prisma.card.findMany({
@@ -542,13 +564,54 @@ async function CardSourceRow({
     ? (options.find((o) => o.serial === sourceSerial) ?? null)
     : null;
 
+  // Fund money, not personal data — amounts stay visible in privacy mode.
+  const eur = (cents: number) =>
+    format.number(cents / 100, { style: "currency", currency: "EUR" });
+
   return (
-    <CardSourcePicker
-      cardId={cardId}
-      currentRefId={current ? `${current.type}:${current.id}` : null}
-      unresolvedSourceSerial={sourceSerial && !current ? sourceSerial : null}
-      options={options}
-    />
+    <>
+      <DtDd label={t("info.source")}>
+        <CardSourcePicker
+          cardId={cardId}
+          currentRefId={current ? `${current.type}:${current.id}` : null}
+          unresolvedSourceSerial={sourceSerial && !current ? sourceSerial : null}
+          options={options}
+        />
+      </DtDd>
+      <DtDd label={t("source.weeklyLimit.label")}>
+        <div className="space-y-1">
+          <CardWeeklyLimitInput
+            // Remount on a server-side change so the input shows CP's value.
+            key={`${weeklyLimit ?? "none"}:${sourceSerial ?? "none"}`}
+            cardId={cardId}
+            limitCents={weeklyLimit}
+            hasSource={sourceSerial !== null}
+          />
+          {allowance && (
+            <p
+              className={
+                allowance.remaining <= 0
+                  ? "text-xs text-destructive"
+                  : "text-xs text-muted-foreground"
+              }
+            >
+              {t("source.weeklyLimit.usage", {
+                spent: eur(allowance.spent),
+                limit: eur(allowance.limit),
+                // The week resets Monday 00:00 in Brussels; format it there so
+                // a UTC server doesn't print "Sunday".
+                resetsAt: format.dateTime(allowance.resetsAt, {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "short",
+                  timeZone: "Europe/Brussels",
+                }),
+              })}
+            </p>
+          )}
+        </div>
+      </DtDd>
+    </>
   );
 }
 

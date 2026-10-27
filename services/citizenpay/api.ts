@@ -45,6 +45,9 @@ export type CardWire = {
   // Serial of the card this card pulls from when its own balance can't cover
   // a charge ("source card"). Omitted when no source is set.
   source_serial?: string | null;
+  // Weekly cap (cents, Monday–Sunday Europe/Brussels) on what this card may
+  // pull from its source. Null/omitted when no cap is set.
+  source_weekly_limit?: number | null;
   last_activity?: string | null;
   limits?: Record<string, unknown> | null;
   notes?: string | null;
@@ -55,6 +58,15 @@ export type CardWire = {
 // CP returns `cards: null` (not `[]`) when the treasury has no cards, and
 // can omit `pagination` entirely on empty responses. The optional/nullable
 // shape here forces callers to normalise — see live-client.ts.
+// This week's usage of a card's source cap, on `GET /v2/treasury/cards/{serial}`.
+// Amounts in cents; `resets_at` is RFC3339 (next Monday 00:00 Europe/Brussels).
+export type CardAllowanceWire = {
+  limit: number;
+  spent: number;
+  remaining: number;
+  resets_at: string;
+};
+
 export type PaginatedCards = {
   cards: CardWire[] | null;
   pagination?: { page: number; limit: number; total: number; totalPages: number };
@@ -751,25 +763,33 @@ export const cards = {
       body: { serials },
     });
   },
+  // `allowance` is non-null only when a weekly source cap is set, and is
+  // missing entirely on older CP deploys — callers read missing as null.
   get(
     creds: CitizenPayApiCredentials,
     serial: string,
-  ): Promise<{ card: CardWire }> {
+  ): Promise<{ card: CardWire; allowance?: CardAllowanceWire | null }> {
     return request(creds, "GET", `/v2/treasury/cards/${encodeURIComponent(serial)}`);
   },
   delete(creds: CitizenPayApiCredentials, serial: string): Promise<void> {
     return request(creds, "DELETE", `/v2/treasury/cards/${encodeURIComponent(serial)}`);
   },
-  // PATCH accepts `status` and/or `source_serial` (empty string clears the
-  // source) — either field alone or both in one call.
+  // PATCH accepts `status`, `source_serial` (empty string clears the source)
+  // and/or `source_weekly_limit` (cents, `0` clears the cap) — any subset in
+  // one call; an omitted field is left unchanged.
   update(
     creds: CitizenPayApiCredentials,
     serial: string,
     body: {
       status?: "active" | "inactive" | "blocked";
       source_serial?: string;
+      source_weekly_limit?: number;
     },
-  ): Promise<{ status?: string; source_serial?: string }> {
+  ): Promise<{
+    status?: string;
+    source_serial?: string;
+    source_weekly_limit?: number | null;
+  }> {
     return request(creds, "PATCH", `/v2/treasury/cards/${encodeURIComponent(serial)}`, {
       body,
     });

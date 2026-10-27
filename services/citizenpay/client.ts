@@ -30,6 +30,7 @@ import type {
   CardOperationInput,
   CardOperationResult,
   CitizenPayBank,
+  CardSourceInfo,
   CitizenPayCardDetail,
   CitizenPayInvite,
   CitizenPayProfile,
@@ -380,9 +381,34 @@ class MockCitizenPayClient implements CitizenPayClient {
     this.log("setCardHolderName", { serialNumber, reset: name === null });
   }
 
-  async getCardSource(serialNumber: string): Promise<string | null> {
-    this.log("getCardSource", { serialNumber });
-    return mockCardSources.get(serialNumber) ?? null;
+  async setCardSourceLimit(
+    serialNumber: string,
+    limitCents: number | null,
+  ): Promise<void> {
+    this.log("setCardSourceLimit", { serialNumber, limitCents });
+    if (!limitCents) mockCardSourceLimits.delete(serialNumber);
+    else mockCardSourceLimits.set(serialNumber, limitCents);
+  }
+
+  async getCardSourceInfo(serialNumber: string): Promise<CardSourceInfo> {
+    this.log("getCardSourceInfo", { serialNumber });
+    const limit = mockCardSourceLimits.get(serialNumber) ?? null;
+    // A fixed €7 "spent this week" (capped at the limit) so the usage line
+    // has something to show on the local bench.
+    const spent = limit === null ? 0 : Math.min(limit, 700);
+    return {
+      sourceSerial: mockCardSources.get(serialNumber) ?? null,
+      weeklyLimit: limit,
+      allowance:
+        limit === null
+          ? null
+          : {
+              limit,
+              spent,
+              remaining: limit - spent,
+              resetsAt: nextBrusselsMonday(new Date()),
+            },
+    };
   }
 
   async deleteCard(serialNumber: string): Promise<void> {
@@ -1235,6 +1261,36 @@ function mockBurnClaim(payoutId: string): PayoutBurnClaim | null {
 // round-trips set/fetch in dev. Module-level: the factory hands out a fresh
 // MockCitizenPayClient per call.
 const mockCardSources = new Map<string, string>();
+// Card → weekly source cap (cents), same lifetime as mockCardSources.
+const mockCardSourceLimits = new Map<string, number>();
+
+// Next Monday 00:00 Europe/Brussels — where CP's weekly source cap resets.
+function nextBrusselsMonday(now: Date): Date {
+  const fmt = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Brussels",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    weekday: "short",
+    hour: "numeric",
+    hourCycle: "h23",
+  });
+  const part = (d: Date, type: Intl.DateTimeFormatPartTypes) =>
+    fmt.formatToParts(d).find((p) => p.type === type)?.value ?? "";
+  const dow = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].indexOf(
+    part(now, "weekday"),
+  );
+  const midnightUtc = Date.UTC(
+    Number(part(now, "year")),
+    Number(part(now, "month")) - 1,
+    Number(part(now, "day")) + (7 - dow),
+  );
+  // Brussels is UTC+1 (CET) or UTC+2 (CEST): pick the offset that lands on 00h.
+  const cet = new Date(midnightUtc - 3_600_000);
+  return part(cet, "hour") === "0" || part(cet, "hour") === "00"
+    ? cet
+    : new Date(midnightUtc - 7_200_000);
+}
 
 // Every mock money fixture derives `net` from its parts rather than carrying a
 // fourth hand-typed number, so dev mode can't drift from

@@ -180,3 +180,78 @@ describe("getStats (GET /v2/treasury/stats)", () => {
     expect(t.places[0]).toMatchObject({ placeImage: null, businessId: null });
   });
 });
+
+describe("LiveCitizenPayClient card source info / weekly limit", () => {
+  const client = new LiveCitizenPayClient(creds);
+  const card = { serial: "S1", status: "active", created_at: "", updated_at: "" };
+
+  it("reads source, cap and allowance", async () => {
+    reply = {
+      status: 200,
+      body: {
+        card: { ...card, source_serial: "SRC", source_weekly_limit: 1000 },
+        allowance: { limit: 1000, spent: 700, remaining: 300, resets_at: "2026-11-02T23:00:00Z" },
+      },
+    };
+    expect(await client.getCardSourceInfo("S/1")).toEqual({
+      sourceSerial: "SRC",
+      weeklyLimit: 1000,
+      allowance: {
+        limit: 1000,
+        spent: 700,
+        remaining: 300,
+        resetsAt: new Date("2026-11-02T23:00:00Z"),
+      },
+    });
+    expect(calls[0].method).toBe("GET");
+    expect(calls[0].url.pathname).toBe("/v2/treasury/cards/S%2F1");
+  });
+
+  it("reads a missing allowance (older CP deploy) and missing fields as null", async () => {
+    reply = { status: 200, body: { card: { ...card, source_serial: "SRC", source_weekly_limit: 1000 } } };
+    expect(await client.getCardSourceInfo("S1")).toEqual({
+      sourceSerial: "SRC",
+      weeklyLimit: 1000,
+      allowance: null,
+    });
+    reply = { status: 200, body: { card: { ...card, source_serial: "", source_weekly_limit: 0 }, allowance: null } };
+    expect(await client.getCardSourceInfo("S1")).toEqual({
+      sourceSerial: null,
+      weeklyLimit: null,
+      allowance: null,
+    });
+  });
+
+  it("reads a malformed allowance as null", async () => {
+    reply = {
+      status: 200,
+      body: { card, allowance: { limit: 1000, spent: 0, remaining: 1000, resets_at: "soon" } },
+    };
+    expect((await client.getCardSourceInfo("S1")).allowance).toBeNull();
+  });
+
+  it("maps a 404 to all nulls", async () => {
+    reply = { status: 404, body: { error: "card not found" } };
+    expect(await client.getCardSourceInfo("S1")).toEqual({
+      sourceSerial: null,
+      weeklyLimit: null,
+      allowance: null,
+    });
+  });
+
+  it("rethrows other errors", async () => {
+    reply = { status: 500, body: { error: "boom" } };
+    await expect(client.getCardSourceInfo("S1")).rejects.toMatchObject({ status: 500 });
+  });
+
+  it.each([
+    [1000, 1000],
+    [null, 0],
+  ])("setCardSourceLimit(%j) PATCHes source_weekly_limit=%d only", async (limit, wire) => {
+    reply = { status: 200, body: { source_weekly_limit: wire } };
+    await client.setCardSourceLimit("S1", limit);
+    expect(calls[0].method).toBe("PATCH");
+    expect(calls[0].url.pathname).toBe("/v2/treasury/cards/S1");
+    expect(calls[0].body).toEqual({ source_weekly_limit: wire });
+  });
+});

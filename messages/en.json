@@ -736,7 +736,19 @@
           "unresolved": "Current: {serial}",
           "clear": "Clear source",
           "open": "Open list",
-          "hint": "When this card can't cover a charge, the missing amount is pulled from its source (another card or a source account)."
+          "hint": "When this card can't cover a charge, the missing amount is pulled from its source (another card or a source account).",
+          "weeklyLimit": {
+            "label": "Weekly limit",
+            "placeholder": "No limit",
+            "hint": "The most this card can pull from its source each week (Monday to Sunday). Leave blank for no limit.",
+            "noSource": "Set a source first: the limit caps what the card pulls from it.",
+            "usage": "{spent} of {limit} used this week · resets {resetsAt}",
+            "errors": {
+              "invalid": "Enter an amount in euros, e.g. 10 or 10.50.",
+              "negative": "The limit can't be negative.",
+              "tooLarge": "The limit can't be more than {max}."
+            }
+          }
         },
         "onboardingLetter": {
           "rowLabel": "Onboarding letter",
@@ -2988,7 +3000,9 @@
           "notFound": "Card not found.",
           "sourceNotFound": "Source card not found.",
           "self": "A card can't be its own source.",
-          "failed": "Couldn't update the source card. Try again shortly."
+          "failed": "Couldn't update the source card. Try again shortly.",
+          "limitInvalid": "Invalid weekly limit.",
+          "limitFailed": "Couldn't update the weekly limit. Try again shortly."
         }
       },
       "unassign": {
