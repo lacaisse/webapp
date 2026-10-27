@@ -79,7 +79,8 @@ export function CardWeeklyLimitInput({
           aria-invalid={error ? true : undefined}
           placeholder={t("placeholder")}
           value={text}
-          disabled={pending || !hasSource}
+          // A cap left on CP after the source was cleared must stay clearable.
+          disabled={pending || (!hasSource && saved === null)}
           onChange={(e) => {
             setText(e.target.value);
             if (error) setError(null);

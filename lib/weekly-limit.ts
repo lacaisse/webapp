@@ -14,16 +14,17 @@ export type EuroInputResult =
 
 /**
  * Parse what an operator typed into the weekly limit field into cents.
- * Accepts "10", "10,5", "10.50", "€ 10" or "10 €"; blank → null (no limit).
- * Rejects thousands separators, more than two decimals, negatives and
- * anything above MAX_WEEKLY_LIMIT_CENTS. "0" parses to 0 (which CP reads as
+ * Accepts "10", "10,5", "10.50", ".5", "€ 10" or "10 €"; blank → null (no
+ * limit). Rejects a lone "€", thousands separators (also "1 000"), more than
+ * two decimals, negatives and anything above MAX_WEEKLY_LIMIT_CENTS. "0" parses to 0 (which CP reads as
  * "no limit" too).
  */
 export function parseEuroInput(raw: string): EuroInputResult {
-  const s = raw.replace(/[\s €]/g, "");
-  if (s === "") return { ok: true, cents: null };
-  const m = /^(-?)(\d+)(?:[.,](\d{0,2}))?$/.exec(s);
-  if (!m) return { ok: false, error: "invalid" };
+  // Only a truly blank field clears the cap; a stray "€" must not.
+  if (raw.trim() === "") return { ok: true, cents: null };
+  const s = raw.trim().replace(/^€\s*|\s*€$/g, "");
+  const m = /^(-?)(\d*)(?:[.,](\d{0,2}))?$/.exec(s);
+  if (!m || (m[2] === "" && !m[3])) return { ok: false, error: "invalid" };
   const [, sign, whole, frac = ""] = m;
   const cents = Number(whole) * 100 + Number(frac.padEnd(2, "0"));
   if (sign && cents > 0) return { ok: false, error: "negative" };

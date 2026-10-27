@@ -25,11 +25,11 @@ describe("parseEuroInput", () => {
     expect(parseEuroInput(raw)).toEqual({ ok: true, cents });
   });
 
-  it.each([[""], ["   "], ["€"]])("reads %j as no limit", (raw) => {
+  it.each([[""], ["   "]])("reads %j as no limit", (raw) => {
     expect(parseEuroInput(raw)).toEqual({ ok: true, cents: null });
   });
 
-  it.each([["abc"], ["10,505"], ["1.000,00"], ["10e2"], [",5"], ["10-"], ["--1"]])(
+  it.each([["abc"], ["10,505"], ["1.000,00"], ["10e2"], ["10-"], ["--1"]])(
     "rejects %j as invalid",
     (raw) => {
       expect(parseEuroInput(raw)).toEqual({ ok: false, error: "invalid" });
@@ -73,4 +73,14 @@ describe("isValidWeeklyLimitCents", () => {
       expect(isValidWeeklyLimitCents(v)).toBe(false);
     },
   );
+});
+
+describe("parseEuroInput edge cases from review", () => {
+  it("rejects a lone € and inner thousands spaces, accepts .5", () => {
+    expect(parseEuroInput("€")).toEqual({ ok: false, error: "invalid" });
+    expect(parseEuroInput("1 000")).toEqual({ ok: false, error: "invalid" });
+    expect(parseEuroInput(".5")).toEqual({ ok: true, cents: 50 });
+    expect(parseEuroInput("10,")).toEqual({ ok: true, cents: 1000 });
+    expect(parseEuroInput("   ")).toEqual({ ok: true, cents: null });
+  });
 });
