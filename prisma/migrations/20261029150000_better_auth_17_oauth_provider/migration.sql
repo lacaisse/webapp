@@ -85,6 +85,21 @@ CREATE INDEX "OauthClient_userId_idx" ON "OauthClient"("userId");
 
 ALTER TABLE "OauthClient" ADD CONSTRAINT "OauthClient_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
+-- 1.6 wrote `metadata` as free text (JSON.stringify of whatever the client
+-- sent). A row that doesn't parse must not abort the cut-over: keep it as a
+-- JSON string instead. Temp function, gone with the migration's session.
+CREATE FUNCTION pg_temp.ba17_text_to_jsonb(value TEXT) RETURNS JSONB
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF value IS NULL OR btrim(value) = '' THEN
+        RETURN NULL;
+    END IF;
+    RETURN value::jsonb;
+EXCEPTION WHEN others THEN
+    RETURN to_jsonb(value);
+END
+$$;
+
 -- Carry the 1.6 registrations over. What 1.6 didn't record is filled with
 -- the values its registration endpoint answered to clients:
 --   - secret: '' meant a public client (token_endpoint_auth_method "none"),
@@ -111,7 +126,7 @@ SELECT
     a."updatedAt",
     a."name",
     a."icon",
-    CASE WHEN a."metadata" IS NULL OR a."metadata" = '' THEN NULL ELSE a."metadata"::jsonb END,
+    pg_temp.ba17_text_to_jsonb(a."metadata"),
     ARRAY(SELECT btrim(u) FROM unnest(string_to_array(a."redirectUrls", ',')) AS u WHERE btrim(u) <> ''),
     CASE WHEN a."clientSecret" IS NULL OR a."clientSecret" = '' THEN 'none' ELSE 'client_secret_basic' END,
     CASE
@@ -151,12 +166,23 @@ CREATE TABLE "OauthResource" (
 
 CREATE UNIQUE INDEX "OauthResource_identifier_key" ON "OauthResource"("identifier");
 
--- Every existing fund host, in its production form. The apex resource is
--- seeded by the plugin at boot (from config), and a fund created later gets
--- its row on first discovery (services/mcp/auth.ts::ensureMcpResource) —
--- this backfill only spares the first client of each existing fund that
--- round-trip. Dev databases (hosts under *.localhost) go through the same
--- lazy path and ignore these rows.
+-- The production apex plus every existing fund host, in their production
+-- form. The plugin seeds the configured apex resource at boot (insert-only)
+-- and a fund gets its row at creation (services/fund/actions.ts) or on first
+-- discovery (services/mcp/auth.ts::ensureMcpResource); this backfill makes
+-- the rows exist whatever the boot order — dynamic client registration
+-- refuses every client while the apex row is missing. Dev databases (hosts
+-- under *.localhost) go through the lazy path and ignore these rows.
+INSERT INTO "OauthResource" ("identifier", "name", "allowedScopes", "createdAt", "updatedAt")
+VALUES (
+    'https://lacaisse.eu/api/mcp',
+    'La Caisse',
+    ARRAY['openid', 'profile', 'email', 'offline_access'],
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP
+)
+ON CONFLICT ("identifier") DO NOTHING;
+
 INSERT INTO "OauthResource" ("identifier", "name", "allowedScopes", "createdAt", "updatedAt")
 SELECT
     'https://' || f."domain" || '/api/mcp',

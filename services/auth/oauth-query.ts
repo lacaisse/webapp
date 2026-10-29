@@ -30,6 +30,37 @@ export function signedOAuthQueryFromSearch(
 }
 
 /**
+ * The next hop if a resumed `auth.api.*` call's result carries one: either
+ * the plain `{ redirect: true, url }` object, or (what `auth.api.oauth2Consent`
+ * hands back when its nested authorize dispatch builds the reply itself) a
+ * `Response` — a 3xx with `location`, or a JSON body with the same object.
+ */
+export async function oauthRedirectFrom(
+  result: unknown,
+): Promise<string | null> {
+  let value: unknown = result;
+  if (result instanceof Response) {
+    const location = result.headers.get("location");
+    if (location) return location;
+    value = await result
+      .clone()
+      .json()
+      .catch(() => null);
+  }
+  if (
+    value &&
+    typeof value === "object" &&
+    "redirect" in value &&
+    value.redirect === true &&
+    "url" in value &&
+    typeof value.url === "string"
+  ) {
+    return value.url;
+  }
+  return null;
+}
+
+/**
  * Where to send the browser to resume an authorize after a sign-in that did
  * NOT carry `oauth_query` (the passkey ceremony — its request body is owned by
  * the passkey plugin). Re-entering /oauth2/authorize with the original

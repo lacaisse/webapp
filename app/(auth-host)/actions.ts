@@ -6,8 +6,8 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { auth } from "@/services/auth/better-auth";
+import { oauthRedirectFrom } from "@/services/auth/oauth-query";
 import {
-  oauthRedirectFrom,
   oauthRedirectFromError,
   oauthResumeCallContext,
 } from "@/services/auth/oauth-resume";
@@ -77,16 +77,28 @@ export async function loginAction(
         ? await oauthResumeCallContext("/sign-in/email")
         : { headers: await headers() }),
     });
-    const next = await oauthRedirectFrom(signedIn);
-    if (next) return { ok: true, redirectTo: next };
+    // Only mid-OAuth: a plain sign-in response carries `redirect`/`url`
+    // fields of its own (callbackURL) that must never bypass the exchange.
+    if (oauthQuery) {
+      const next = await oauthRedirectFrom(signedIn);
+      if (next) return { ok: true, redirectTo: next };
+    }
     result = signedIn as typeof result;
   } catch (e) {
     // Better Auth surfaces auth failures as APIError. Treat them all as
     // "invalid credentials" to avoid leaking which field was wrong — except
-    // the MCP OAuth resume redirect, which rides in as APIError("FOUND").
+    // the MCP OAuth resume redirect, which rides in as APIError("FOUND"),
+    // and a stale signed query (10 min), which is the agent's fault, not
+    // the password's.
     if (isAPIError(e)) {
       const next = oauthRedirectFromError(e);
       if (next) return { ok: true, redirectTo: next };
+      if (
+        oauthQuery &&
+        (e.body as { error?: string } | undefined)?.error === "invalid_signature"
+      ) {
+        return { error: (await getTranslations("auth.consent"))("invalid") };
+      }
       return { error: t("invalidCredentials") };
     }
     throw e;

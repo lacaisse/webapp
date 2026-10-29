@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, expect, it } from "vitest";
-import { authorizeResumeUrl, signedOAuthQueryFromSearch } from "./oauth-query";
+import {
+  authorizeResumeUrl,
+  oauthRedirectFrom,
+  signedOAuthQueryFromSearch,
+} from "./oauth-query";
 
 const signed =
   "client_id=abc&redirect_uri=http%3A%2F%2Flocalhost%3A6274%2Fcallback&response_type=code&scope=openid+offline_access&prompt=login+consent&exp=1700000000&ba_iat=1699999000&ba_param=ba_param&ba_param=client_id&sig=xyz";
@@ -15,6 +19,32 @@ describe("signedOAuthQueryFromSearch", () => {
     expect(signedOAuthQueryFromSearch("?return_to=https%3A%2F%2Fx")).toBeNull();
     expect(signedOAuthQueryFromSearch("")).toBeNull();
     expect(signedOAuthQueryFromSearch(null)).toBeNull();
+  });
+});
+
+describe("oauthRedirectFrom", () => {
+  it("reads the plain { redirect, url } object", async () => {
+    expect(await oauthRedirectFrom({ redirect: true, url: "/consent?x=1" })).toBe(
+      "/consent?x=1",
+    );
+    expect(await oauthRedirectFrom({ redirect: false, url: "/x" })).toBeNull();
+    expect(await oauthRedirectFrom({ token: "t", user: {} })).toBeNull();
+  });
+
+  it("reads a 3xx Response's location", async () => {
+    const res = new Response(null, {
+      status: 302,
+      headers: { location: "http://localhost:9876/callback?code=c" },
+    });
+    expect(await oauthRedirectFrom(res)).toBe(
+      "http://localhost:9876/callback?code=c",
+    );
+  });
+
+  it("reads a JSON Response carrying the object", async () => {
+    const res = Response.json({ redirect: true, url: "/consent?y=2" });
+    expect(await oauthRedirectFrom(res)).toBe("/consent?y=2");
+    expect(await oauthRedirectFrom(new Response("not json"))).toBeNull();
   });
 });
 

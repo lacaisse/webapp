@@ -4,6 +4,7 @@
 import { getLocale, getTranslations } from "next-intl/server";
 import { requireUser } from "@/services/auth/dal";
 import { prisma } from "@/services/db/prisma";
+import { registerFundMcpResource } from "@/services/mcp/auth";
 import { isSupportedLocale } from "@/services/i18n/config";
 import { generateFundMinter } from "@/services/token/minter";
 import { FUND_APEX } from "./host";
@@ -75,6 +76,8 @@ export async function createFundAction(
         },
       },
     });
+    // The new host is an MCP OAuth resource from day one (best-effort).
+    await registerFundMcpResource(fund);
     return { ok: true, redirectTo: getFundUrl(fund.domain) };
   } catch (e) {
     if (

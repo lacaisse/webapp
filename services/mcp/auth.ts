@@ -10,15 +10,11 @@ import {
   verifyAccessTokenRequest,
 } from "better-auth/oauth2";
 
+import { headers } from "next/headers";
+
 import { auth } from "@/services/auth/better-auth";
 import { prisma } from "@/services/db/prisma";
-import {
-  getApexUrl,
-  getCurrentFund,
-  getCurrentFundDomain,
-  getFundUrl,
-} from "@/services/fund/server";
-import { getHostType } from "@/services/host/server";
+import { getApexUrl, getCurrentFund, getFundUrl } from "@/services/fund/server";
 
 import { MCP_SCOPES, mcpResourceForOrigin } from "./resource";
 
@@ -38,49 +34,90 @@ import { MCP_SCOPES, mcpResourceForOrigin } from "./resource";
 //
 // Every resource must exist as an OauthResource row before the authorization
 // server will put it in a token's audience (`invalid_target` otherwise).
-// The apex is seeded from config at boot; fund hosts get their row the first
-// time a client fetches their protected-resource metadata — which every MCP
-// client does before its first authorize — see ensureMcpResource below.
+// The apex is seeded from config at boot; a fund's row is created with the
+// fund (services/fund/actions.ts → registerFundMcpResource), the backfill
+// migration covers older funds, and the protected-resource metadata route
+// re-creates it on the way as a fallback (ensureMcpResource).
 
 export type AccessTokenClaims = Awaited<
   ReturnType<typeof verifyAccessTokenRequest>
 >;
 
 /**
- * The resource identifier for the current request's host, or null on the
- * auth host (which serves the authorization server, not an MCP server).
+ * The resource identifier for the current request's host, or null where
+ * there is no MCP server: the auth host (it serves the authorization
+ * server), a host the proxy could not classify, and the reserved infra
+ * subdomains (`www.`, `api.`, …) that proxy.ts folds into "apex" — the
+ * resource must be the exact origin the agent connected to, and a token
+ * minted for the apex must not be accepted elsewhere. Reads the proxy's
+ * raw classification rather than getHostType(), whose unknown-host
+ * fallback is "apex".
  */
 export async function currentMcpResource(): Promise<string | null> {
-  const hostType = await getHostType();
-  if (hostType === "auth") return null;
-  const fundDomain = await getCurrentFundDomain();
-  const origin =
-    hostType === "fund" && fundDomain ? getFundUrl(fundDomain) : getApexUrl("");
-  return mcpResourceForOrigin(origin);
+  const h = await headers();
+  const hostType = h.get("x-host-type");
+  if (hostType === "fund") {
+    const fundDomain = h.get("x-fund-domain");
+    return fundDomain ? mcpResourceForOrigin(getFundUrl(fundDomain)) : null;
+  }
+  if (hostType !== "apex") return null;
+  // An equality check against the configured apex, not host parsing: the
+  // reserved subdomains carry the same x-host-type and nothing else tells
+  // them apart.
+  const requestHost = (h.get("host") ?? "").split(":")[0];
+  if (requestHost !== (process.env.APP_DOMAIN ?? "localhost")) return null;
+  return mcpResourceForOrigin(getApexUrl(""));
 }
 
 /**
- * Idempotently register `resource` with the authorization server. Rows are
- * never updated afterwards (same `insertOnly` semantics as the plugin's own
- * config seeding) so an admin edit in the DB sticks.
+ * Register a fund's MCP resource the moment the fund (and so its host)
+ * exists, so the first authorize that names it never sees `invalid_target`.
+ * Best-effort: a failure here must not fail fund creation — the discovery
+ * route repairs it on the agent's first visit.
+ */
+export async function registerFundMcpResource(fund: {
+  domain: string;
+  name: string;
+}): Promise<void> {
+  try {
+    await ensureMcpResource(mcpResourceForOrigin(getFundUrl(fund.domain)), fund.name);
+  } catch (e) {
+    console.error("registerFundMcpResource failed:", e);
+  }
+}
+
+/**
+ * Idempotently register `resource` with the authorization server. Read
+ * first — the public discovery route calls this on every hit — and create
+ * only when missing; rows are never updated afterwards (same `insertOnly`
+ * semantics as the plugin's own config seeding) so an admin edit sticks.
  */
 export async function ensureMcpResource(
   resource: string,
   name: string,
 ): Promise<void> {
-  const now = new Date();
-  await prisma.oauthResource.upsert({
+  const existing = await prisma.oauthResource.findUnique({
     where: { identifier: resource },
-    create: {
-      identifier: resource,
-      name,
-      allowedScopes: MCP_SCOPES,
-      createdAt: now,
-      updatedAt: now,
-    },
-    update: {},
     select: { id: true },
   });
+  if (existing) return;
+  const now = new Date();
+  try {
+    await prisma.oauthResource.create({
+      data: {
+        identifier: resource,
+        name,
+        allowedScopes: MCP_SCOPES,
+        createdAt: now,
+        updatedAt: now,
+      },
+      select: { id: true },
+    });
+  } catch (e) {
+    // P2002: a concurrent request created it between the read and the
+    // insert — that's the row we wanted.
+    if ((e as { code?: string }).code !== "P2002") throw e;
+  }
 }
 
 const CORS_HEADERS = {
@@ -187,21 +224,16 @@ function challengeResponse(error: unknown, resource: string): Response {
   });
   // Not an auth failure (e.g. the JWKS fetch blew up) — let the route 500.
   if (!challenge) throw error;
-  const headers = new Headers(challenge.headers);
-  headers.set("Content-Type", "application/json");
-  return new Response(
-    JSON.stringify({
-      jsonrpc: "2.0",
-      error: { code: -32000, message: challenge.message },
-      id: null,
-    }),
-    { status: challenge.statusCode, headers },
-  );
+  return jsonRpcError(challenge.statusCode, challenge.message, challenge.headers);
 }
 
-function jsonRpcError(status: number, message: string): Response {
+function jsonRpcError(
+  status: number,
+  message: string,
+  extraHeaders?: HeadersInit,
+): Response {
   return Response.json(
     { jsonrpc: "2.0", error: { code: -32000, message }, id: null },
-    { status },
+    { status, headers: extraHeaders },
   );
 }

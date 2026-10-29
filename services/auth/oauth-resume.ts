@@ -14,8 +14,8 @@ import { auth } from "./better-auth";
 //     request looks like, or when we ask for JSON;
 //   - a thrown `APIError("FOUND")` with a `location` header when it thinks
 //     it's a browser navigation.
-// `oauthRedirectFrom` / `oauthRedirectFromError` extract the next hop from
-// either. The actions hand that URL back to the form as `redirectTo` and
+// `oauthRedirectFrom` (in ./oauth-query.ts, pure) / `oauthRedirectFromError`
+// extract the next hop from either. The actions hand that URL back to the form as `redirectTo` and
 // the browser navigates to it itself (`window.location.assign`) rather than
 // through `redirect()`: a server-action redirect is a soft client-side
 // navigation, and under Cache Components the dynamic /consent page cannot
@@ -56,35 +56,6 @@ export async function oauthResumeCallContext(
     headers: h,
   });
   return { headers: h, request };
-}
-
-/**
- * The next hop if `result` carries one: either the plain
- * `{ redirect: true, url }` object, or (what `auth.api.oauth2Consent` hands
- * back when its nested authorize dispatch builds the reply itself) a
- * `Response` — a 3xx with `location`, or a JSON body with the same object.
- */
-export async function oauthRedirectFrom(result: unknown): Promise<string | null> {
-  let value: unknown = result;
-  if (result instanceof Response) {
-    const location = result.headers.get("location");
-    if (location) return location;
-    value = await result
-      .clone()
-      .json()
-      .catch(() => null);
-  }
-  if (
-    value &&
-    typeof value === "object" &&
-    "redirect" in value &&
-    value.redirect === true &&
-    "url" in value &&
-    typeof value.url === "string"
-  ) {
-    return value.url;
-  }
-  return null;
 }
 
 /**
