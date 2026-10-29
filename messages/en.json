@@ -149,6 +149,7 @@
       "ACCOUNT_MINT": "Mint",
       "ACCOUNT_BURN": "Burn",
       "ACCOUNT_TRANSFER": "Transfer",
+      "SAFE_TRANSFER": "Safe transfer",
       "system": "System",
       "by": "by {name}",
       "triggers": {
@@ -160,6 +161,7 @@
         "ACCOUNT_MINT": "Account mint",
         "ACCOUNT_BURN": "Account burn",
         "ACCOUNT_TRANSFER": "Account transfer",
+        "SAFE_TRANSFER": "Safe (multisig) transfer",
         "ORDER_SETTLEMENT_MINT": "Order settlement (mint)",
         "ORDER_SETTLEMENT_BURN": "Order settlement (burn)",
         "PAYOUT_BURN": "Payout burn",
@@ -184,7 +186,7 @@
     },
     "accounts": {
       "title": "Accounts",
-      "description": "Named accounts derived from the fund's key. See each one's balance and token transaction history.",
+      "description": "Accounts that hold the fund's tokens. Each one is controlled either by the fund's key or by several signatures (a Safe). See each one's balance and transaction history.",
       "notConnected": "Connect this fund to Citizen Pay first to create accounts.",
       "balancesError": "Couldn't load on-chain balances. Try again shortly.",
       "empty": "No accounts yet. Create one to get started.",
@@ -194,8 +196,12 @@
       "table": {
         "name": "Name",
         "address": "Address",
-        "serial": "Serial",
+        "security": "Security",
         "balance": "Balance"
+      },
+      "security": {
+        "fundKey": "Fund key",
+        "safe": "{threshold} {m, plural, one {signature} other {signatures}}"
       },
       "detail": {
         "back": "All accounts",
@@ -206,6 +212,11 @@
         "trigger": "New account",
         "title": "Create account",
         "description": "A new on-chain account derived from the fund's key.",
+        "securityLabel": "Security",
+        "securityFundKey": "Fund key",
+        "securityFundKeyHint": "Controlled by the fund's key, like the main account. Quick for day-to-day use.",
+        "securitySafe": "Several signatures (Safe)",
+        "securitySafeHint": "Money only moves when enough owners sign, e.g. 2 of 3. For reserves and larger sums.",
         "name": "Name",
         "namePlaceholder": "e.g. Reserve, Fees, Events",
         "sourceLabel": "Card-source account",
@@ -275,6 +286,213 @@
         "transferFailed": "On-chain transfer failed. Try again shortly.",
         "cannotTransferSource": "Card-source accounts can't transfer out.",
         "transfersFailed": "Couldn't load transactions. Try again shortly."
+      }
+    },
+    "safes": {
+      "relayerMissing": "The La Caisse relayer isn't configured, so Safes can't be created or executed yet. Ask the platform team to set it up.",
+      "balancesError": "Couldn't load on-chain balances. Try again shortly.",
+      "openInSafeWallet": "Open in Safe'{Wallet}'",
+      "you": "You",
+      "retryDeploy": "Retry deployment",
+      "thresholdOf": "{n} of {m}",
+      "thresholdLabel": "Required signatures",
+      "thresholdRequired": "{n} of {m} signatures required",
+      "thresholdDecrease": "Fewer signatures",
+      "thresholdIncrease": "More signatures",
+      "table": {
+        "pendingCount": "{count} pending"
+      },
+      "status": {
+        "DEPLOYING": "Deploying…",
+        "ACTIVE": "Active",
+        "FAILED": "Deployment failed"
+      },
+      "detail": {
+        "back": "All accounts",
+        "balance": "Balance",
+        "threshold": "Signatures required",
+        "thresholdChip": "{threshold} to sign",
+        "thresholdHint": "Every transaction needs {threshold, plural, one {# owner's signature} other {# owners' signatures}}.",
+        "deploying": "The Safe is being deployed on chain. This usually takes a few seconds.",
+        "deployFailed": "Deployment failed",
+        "pendingTitle": "Waiting for signatures",
+        "pendingEmpty": "Nothing to sign right now."
+      },
+      "owners": {
+        "title": "Owners",
+        "description": "{threshold} signatures required for every transaction.",
+        "kind": {
+          "MEMBER": "Team",
+          "EXTERNAL": "External"
+        },
+        "externalHint": "Signs in Safe'{Wallet}'.",
+        "formerMember": "No longer a team member — consider removing or replacing this owner."
+      },
+      "create": {
+        "description": "Choose who owns the Safe and how many of them must sign each transaction.",
+        "name": "Name",
+        "namePlaceholder": "e.g. Reserve, Board",
+        "teamOwners": "Owners from the team",
+        "teamOwnersHint": "Team members sign inside La Caisse with one click — no wallet needed.",
+        "noMembers": "No admin in this fund can own a Safe yet.",
+        "externalOwners": "External owners",
+        "externalOwnersHint": "Any wallet address (a hardware wallet, a partner…). External owners sign in Safe'{Wallet}', at app.safe.global.",
+        "externalAddress": "External owner {index} address",
+        "externalLabel": "External owner {index} name",
+        "externalLabelPlaceholder": "Name",
+        "addExternal": "Add an external owner",
+        "removeExternal": "Remove this owner",
+        "deployHint": "The Safe is deployed on Gnosis by La Caisse; it costs the fund nothing.",
+        "confirm": "Create Safe"
+      },
+      "rename": {
+        "trigger": "Rename",
+        "title": "Rename Safe",
+        "name": "Name"
+      },
+      "archive": {
+        "trigger": "Archive",
+        "title": "Archive this Safe?",
+        "description": "It disappears from La Caisse. The Safe, its owners and its funds stay on chain and remain usable in Safe'{Wallet}'.",
+        "blocked": "{count, plural, one {# transaction is} other {# transactions are}} still open. Execute or reject them before archiving.",
+        "confirm": "Archive"
+      },
+      "transfer": {
+        "trigger": "Propose transfer",
+        "title": "Propose a transfer",
+        "description": "The transfer is sent as soon as {threshold, plural, one {# owner has} other {# owners have}} signed.",
+        "recipient": "Recipient",
+        "pickRecipient": "Pick an account or card…",
+        "groupAccounts": "Fund accounts",
+        "groupCards": "Team cards",
+        "recipientIs": "Recipient: {label}",
+        "amount": "Amount",
+        "note": "Note (optional)",
+        "notePlaceholder": "What is it for?",
+        "confirm": "Propose",
+        "cardLabel": "{name}'s card"
+      },
+      "proposal": {
+        "executed": "Signed and executed.",
+        "proposed": "Proposed. It runs once {threshold, plural, one {# owner has} other {# owners have}} signed."
+      },
+      "ownerChange": {
+        "needsSignatures": "This change is itself a Safe transaction: it takes effect once {threshold, plural, one {# current owner has} other {# current owners have}} signed.",
+        "addTrigger": "Add owner",
+        "addTitle": "Add an owner",
+        "addDescription": "Add a team member or an external address to the owners.",
+        "modeMember": "Team member",
+        "modeExternal": "External address",
+        "member": "Team member",
+        "pickMember": "Pick a team member…",
+        "memberHint": "They will sign inside La Caisse.",
+        "address": "Address",
+        "label": "Name",
+        "labelPlaceholder": "e.g. Treasurer's Ledger",
+        "externalHint": "External owners sign in Safe'{Wallet}'.",
+        "addConfirm": "Propose",
+        "removeTrigger": "Remove",
+        "removeTitle": "Remove {owner}?",
+        "removeDescription": "{address} will no longer be able to sign for this Safe.",
+        "thresholdMustDrop": "Only {remaining, plural, one {# owner remains} other {# owners remain}}, so the threshold drops to {threshold}.",
+        "removeSelf": "That's you: you won't be able to sign for this Safe anymore.",
+        "removeConfirm": "Propose removal",
+        "thresholdTrigger": "Change threshold",
+        "thresholdTitle": "Change the threshold",
+        "thresholdDescription": "How many owners must sign each transaction.",
+        "thresholdConfirm": "Propose"
+      },
+      "tx": {
+        "kinds": {
+          "TOKEN_TRANSFER": "Transfer",
+          "ADD_OWNER": "Add owner",
+          "REMOVE_OWNER": "Remove owner",
+          "SWAP_OWNER": "Replace owner",
+          "CHANGE_THRESHOLD": "Change threshold",
+          "REJECTION": "Rejection",
+          "UNKNOWN": "Transaction"
+        },
+        "summary": {
+          "transfer": "Send {amount} to {recipient}",
+          "addOwner": "Add owner {owner}, {threshold, plural, one {# signature} other {# signatures}} required",
+          "removeOwner": "Remove owner {owner}, {threshold, plural, one {# signature} other {# signatures}} required",
+          "swapOwner": "Replace owner {oldOwner} with {newOwner}",
+          "changeThreshold": "Change threshold to {threshold, plural, one {# signature} other {# signatures}}",
+          "rejection": "Reject transaction #{nonce}"
+        },
+        "status": {
+          "PENDING": "Pending",
+          "EXECUTING": "Executing",
+          "EXECUTED": "Executed",
+          "FAILED": "Failed",
+          "SUPERSEDED": "Replaced"
+        },
+        "source": {
+          "LACAISSE": "in La Caisse",
+          "SAFE_WALLET": "in Safe'{Wallet}'"
+        },
+        "nonce": "#{nonce}",
+        "proposedBy": "Proposed by {name}",
+        "proposedExternally": "Proposed in Safe'{Wallet}'",
+        "rejectionProposed": "Rejection proposed",
+        "nextInLine": "Next in line",
+        "waitsFor": "Waits for #{nonce}",
+        "signatures": "{count} of {total} signatures",
+        "notSigned": "Not signed yet",
+        "signedAt": "Signed {date}",
+        "youName": "{name} (you)",
+        "youSigned": "You signed this transaction.",
+        "waitingExternal": "Waiting for {names} to sign in Safe'{Wallet}'.",
+        "sign": "Sign",
+        "reject": "Reject",
+        "rejectTitle": "Reject transaction #{nonce}?",
+        "rejectDescription": "This proposes an empty transaction with the same number (#{nonce}). Once {threshold, plural, one {# owner signs} other {# owners sign}} it, it runs instead and the original can never be executed.",
+        "rejectConfirm": "Propose rejection",
+        "retry": "Retry",
+        "executing": "Executing…",
+        "refresh": "Refresh",
+        "refreshHint": "Fetch owners, threshold and Safe'{Wallet}' signatures from the chain",
+        "executedBy": {
+          "relayer": "Executed by La Caisse",
+          "external": "Executed externally"
+        },
+        "signedBy": "Signed by {names}"
+      },
+      "history": {
+        "title": "History",
+        "empty": "No executed transaction yet."
+      },
+      "relayer": {
+        "lowGas": "Relayer low on gas",
+        "lowGasBody": "The La Caisse relayer has {balance} xDAI left to pay for executions. Top it up soon:",
+        "status": "Relayer balance: {balance} xDAI. Send xDAI to this address to pay for deployments and executions:"
+      },
+      "errors": {
+        "config": "The fund token is not configured yet. Connect Citizen Pay first.",
+        "unsupported_chain": "This network is not supported for Safes.",
+        "relayer_not_configured": "The transaction relayer is not configured. Contact support.",
+        "relayer_failed": "The transaction could not be sent. Try again in a moment.",
+        "tx_reverted": "The transaction was rejected on chain.",
+        "tx_service": "Safe'{Wallet}' could not be reached.",
+        "not_owner": "You are not an owner of this Safe.",
+        "already_signed": "You have already signed this transaction.",
+        "threshold": "Not enough signatures yet.",
+        "nonce": "This transaction's slot has already been used by another transaction.",
+        "invalid_signature": "A signature is invalid.",
+        "not_found": "Safe or transaction not found.",
+        "invalid_state": "This action is not possible in the current state.",
+        "unknown": "Something went wrong. Try again.",
+        "nameRequired": "Enter a name.",
+        "nameTooLong": "The name is too long (60 characters max).",
+        "addressInvalid": "Enter a valid address (0x…).",
+        "amountInvalid": "Enter a positive amount with at most 2 decimals.",
+        "thresholdInvalid": "The threshold must be at least 1.",
+        "labelTooLong": "The label is too long (60 characters max).",
+        "ownersRequired": "Add at least one owner.",
+        "thresholdTooHigh": "The threshold cannot exceed the number of owners.",
+        "noteTooLong": "The note is too long (200 characters max).",
+        "ownerRequired": "Pick a member or enter an address.",
+        "duplicateOwner": "The same address is listed twice."
       }
     },
     "team": {

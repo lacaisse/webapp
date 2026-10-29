@@ -25,6 +25,7 @@ export const ANNOTATION_KINDS = {
   accountMint: "ACCOUNT_MINT",
   accountBurn: "ACCOUNT_BURN",
   accountTransfer: "ACCOUNT_TRANSFER",
+  safeTransfer: "SAFE_TRANSFER", // token transfer executed from a fund Safe (multisig)
   custom: "CUSTOM", // manual, operator-written annotation
 } as const;
 
@@ -54,6 +55,7 @@ export const ANNOTATION_TRIGGERS = {
   periodClose: "PERIOD_CLOSE", // cron: batch mint at period cutoff
   manualAttribution: "MANUAL_ATTRIBUTION", // admin attributed an unmatched deposit
   allocationRun: "ALLOCATION_RUN", // admin ran a period allocation (single or bulk)
+  safeTransfer: "SAFE_TRANSFER", // multisig transfer from a fund Safe (actor = proposer)
 } as const;
 
 // Best-effort upsert — never throws, so it can't fail the action that produced
