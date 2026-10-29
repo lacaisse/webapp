@@ -381,6 +381,17 @@ function ownerLabel(safe: LoadedSafe, address: string): string | null {
   return o.label;
 }
 
+// Whether La Caisse publishes proposals / signatures to the public Safe
+// Transaction Service. The tx-service is only needed when someone signs
+// outside La Caisse (an EXTERNAL owner in Safe{Wallet}). For a team-only Safe
+// it buys nothing and costs a lot: publishing partial signature sets lets
+// anyone collect a full set and execute the tx themselves, bypassing La
+// Caisse's own gates (sync, nonce ordering, bookkeeping). Same rule as
+// `serviceOn` in sync.ts. `owners` are the current (removedAt null) rows.
+function shouldMirror(chainId: number, owners: { kind: string }[]): boolean {
+  return isTxServiceEnabled(chainId) && owners.some((o) => o.kind === "EXTERNAL");
+}
+
 async function nextNonce(safe: { id: string; chainId: number; address: string }): Promise<number> {
   const state = await readSafeState({ chainId: safe.chainId, safeAddress: safe.address as Address });
   const agg = await prisma.fundSafeTransaction.aggregate({
@@ -451,7 +462,8 @@ async function propose(a: {
     throw e;
   }
 
-  if (isTxServiceEnabled(safe.chainId)) {
+  const mirror = shouldMirror(safe.chainId, safe.owners);
+  if (mirror) {
     try {
       await proposeTransaction({
         chainId: safe.chainId,
@@ -581,6 +593,7 @@ export async function proposeTokenTransfer(a: {
       recipientLabel: input.recipientLabel?.trim() || null,
       token: tok.token,
       ...(tok.symbol ? { symbol: tok.symbol } : {}),
+      contract: tok.contract,
     },
     note: input.note,
   });
@@ -638,6 +651,7 @@ export async function proposeOwnerChange(a: {
         owner: owner.address,
         ownerLabel: owner.label,
         threshold: change.threshold,
+        previousThreshold: state.threshold,
       };
       break;
     }
@@ -650,7 +664,13 @@ export async function proposeOwnerChange(a: {
       }
       kind = "REMOVE_OWNER";
       data = removeOwnerData(chainOwners, owner, BigInt(change.threshold));
-      summary = { kind, owner, ownerLabel: ownerLabel(safe, owner), threshold: change.threshold };
+      summary = {
+        kind,
+        owner,
+        ownerLabel: ownerLabel(safe, owner),
+        threshold: change.threshold,
+        previousThreshold: state.threshold,
+      };
       break;
     }
     case "SWAP_OWNER": {
@@ -678,7 +698,7 @@ export async function proposeOwnerChange(a: {
       }
       kind = "CHANGE_THRESHOLD";
       data = changeThresholdData(BigInt(change.threshold));
-      summary = { kind, threshold: change.threshold };
+      summary = { kind, threshold: change.threshold, previousThreshold: state.threshold };
       break;
     }
   }
@@ -790,7 +810,8 @@ export async function signTransaction(a: {
     throw e;
   }
 
-  if (isTxServiceEnabled(tx.safe.chainId)) {
+  const mirror = shouldMirror(tx.safe.chainId, tx.safe.owners);
+  if (mirror) {
     try {
       await confirmTransaction({
         chainId: tx.safe.chainId,
