@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { REAUTH_REQUIRED } from "@/services/auth/step-up-types";
 import type { SafeTransfersPage } from "./transfers";
 
 // Result types of the Safe server actions (services/safe/admin-actions.ts).
@@ -7,12 +8,10 @@ import type { SafeTransfersPage } from "./transfers";
 
 // `reauth_required`: the action wants a fresh re-authentication first
 // (services/auth/step-up.ts); the dialogs open the re-auth dialog and retry.
-export const REAUTH_REQUIRED = "reauth_required";
+// The vocabulary itself lives in services/auth/step-up-types.ts, shared with
+// the other step-up consumers (the /token mint/burn actions).
+export { REAUTH_REQUIRED, isReauthRequired } from "@/services/auth/step-up-types";
 export type ActionError = { error: string; code?: typeof REAUTH_REQUIRED };
-
-export function isReauthRequired(res: { code?: string } | { ok: true }): boolean {
-  return "code" in res && res.code === REAUTH_REQUIRED;
-}
 
 export type SafeActionResult = { error: string } | { ok: true };
 export type CreateSafeActionResult = { error: string } | { ok: true; safeId: string };

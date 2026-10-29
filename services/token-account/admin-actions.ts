@@ -14,10 +14,7 @@ import {
   UserOpError,
   type FundMinterContext,
 } from "@/services/token/userop";
-import {
-  manualBurnDirectAction,
-  manualMintDirectAction,
-} from "@/services/token-operations/admin-actions";
+import { burnDirect, mintDirect } from "@/services/token-operations/direct";
 import { ANNOTATION_TRIGGERS } from "@/services/transaction-annotation/annotate";
 import { resolveOrEnqueueAnnotation } from "@/services/transaction-annotation/pending";
 
@@ -207,13 +204,15 @@ export async function archiveTokenAccountAction(input: {
 }
 
 // Move tokens IN: mint the amount to the account. Reuses the minter mint path
-// (records a TokenOperation, submits the paymaster-sponsored UserOp).
+// (records a TokenOperation, submits the paymaster-sponsored UserOp) through
+// the fund-parameterized core, not the /token server action — that one is the
+// operator door and asks for a step-up (review S4) and a note.
 export async function accountMintInAction(input: {
   id: string;
   amount: string;
 }): Promise<MoveTokensResult> {
   const t = await getTranslations();
-  const { fund } = await requireFundRole("ADMIN");
+  const { fund, user } = await requireFundRole("ADMIN");
 
   const parsed = MoveTokensSchema.safeParse(input);
   if (!parsed.success) {
@@ -226,11 +225,9 @@ export async function accountMintInAction(input: {
   });
   if (!account) return { error: t("fund.accounts.errors.notFound" as never) };
 
-  const mint = await manualMintDirectAction(
-    {
-      to: account.address,
-      amount: parsed.data.amount,
-    },
+  const mint = await mintDirect(
+    { fund, userId: user.id, t: (key, values) => t(key as never, values as never) },
+    { to: account.address, amount: parsed.data.amount },
     { trigger: ANNOTATION_TRIGGERS.accountMint },
   );
   if ("error" in mint) return { error: mint.error };
@@ -248,7 +245,7 @@ export async function accountBurnOutAction(input: {
   amount: string;
 }): Promise<MoveTokensResult> {
   const t = await getTranslations();
-  const { fund } = await requireFundRole("ADMIN");
+  const { fund, user } = await requireFundRole("ADMIN");
 
   const parsed = MoveTokensSchema.safeParse(input);
   if (!parsed.success) {
@@ -261,11 +258,9 @@ export async function accountBurnOutAction(input: {
   });
   if (!account) return { error: t("fund.accounts.errors.notFound" as never) };
 
-  const burn = await manualBurnDirectAction(
-    {
-      from: account.address,
-      amount: parsed.data.amount,
-    },
+  const burn = await burnDirect(
+    { fund, userId: user.id, t: (key, values) => t(key as never, values as never) },
+    { from: account.address, amount: parsed.data.amount },
     { trigger: ANNOTATION_TRIGGERS.accountBurn },
   );
   if ("error" in burn) return { error: burn.error };

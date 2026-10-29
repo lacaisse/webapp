@@ -19,9 +19,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { signIn } from "@/services/auth/client";
 import { reauthWithPasswordAction } from "@/services/auth/step-up-actions";
-import { isReauthRequired } from "@/services/safe/action-types";
+import { isReauthRequired, type ReauthRequiredError } from "@/services/auth/step-up-types";
 
-// Step-up re-authentication (review S4). The Safe actions answer
+// Step-up re-authentication (review S4). The sensitive server actions (Safe
+// proposals and signatures, the manual mint/burn on /token) answer
 // `reauth_required` when the user has not re-authenticated in the last 10
 // minutes; `useStepUp` keeps the submit the action refused, opens this
 // dialog, and runs it again once the user confirmed — by password (a server
@@ -40,7 +41,7 @@ export function ReauthDialog({
   onCancel: () => void;
   onVerified: () => void;
 }) {
-  const t = useTranslations("fund.safes.reauth");
+  const t = useTranslations("auth.reauth");
   const tCommon = useTranslations("common");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -104,9 +105,9 @@ export function ReauthDialog({
 
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="safe-reauth-password">{t("password")}</Label>
+              <Label htmlFor="reauth-password">{t("password")}</Label>
               <Input
-                id="safe-reauth-password"
+                id="reauth-password"
                 type="password"
                 autoComplete="current-password"
                 autoFocus
@@ -168,7 +169,7 @@ export function ReauthDialog({
 }
 
 /**
- * Step-up glue for a dialog or card that calls a Safe action. Wrap the
+ * Step-up glue for a dialog or card that calls a step-up gated action. Wrap the
  * action's result check with `stepUp.check(res, retry)`: when the action
  * asked for re-authentication it opens the dialog and, once confirmed,
  * calls `retry` (the same submit again); it returns true so the caller
@@ -178,7 +179,7 @@ export function useStepUp(hasPasskey: boolean) {
   const [retry, setRetry] = useState<(() => void) | null>(null);
 
   const check = useCallback(
-    (res: { code?: string } | { ok: true }, again: () => void): boolean => {
+    (res: object, again: () => void): res is ReauthRequiredError => {
       if (!isReauthRequired(res)) return false;
       setRetry(() => again);
       return true;

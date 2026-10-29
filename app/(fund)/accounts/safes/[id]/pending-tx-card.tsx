@@ -38,7 +38,7 @@ import {
 
 import type { SafeTxView } from "../data";
 import { sameAddress, shortAddress, summaryLine } from "../format";
-import { useStepUp } from "../reauth-dialog";
+import { useStepUp } from "@/components/reauth-dialog";
 import type { OwnerRow } from "./owners-card";
 import { TxDetails } from "./tx-details";
 import { TxKindIcon } from "./tx-kind-icon";

@@ -23,7 +23,7 @@ import { proposeTransferAction } from "@/services/safe/admin-actions";
 import { ProposeTransferSchema, type TransferToken } from "@/services/safe/schemas";
 
 import { sameAddress, shortAddress } from "../format";
-import { useStepUp } from "../reauth-dialog";
+import { useStepUp } from "@/components/reauth-dialog";
 import { ProposalResult } from "./proposal-result";
 
 type RecipientOption = {
