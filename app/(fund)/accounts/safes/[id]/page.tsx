@@ -1,12 +1,21 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { Suspense } from "react";
-import { AlertTriangle, ArrowLeft, ExternalLink, Fuel, Info, Loader2 } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  ExternalLink,
+  Fuel,
+  Info,
+  Loader2,
+  Send,
+} from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, resolveActiveTab } from "@/components/ui/tabs";
 import { requireFundRole } from "@/services/auth/dal";
@@ -21,11 +30,12 @@ import type { SafeTransfersFund } from "@/services/safe/transfers";
 import {
   enabledExtraTokens,
   type BalanceDisplaySettings,
+  type ExtraToken,
 } from "@/services/token/extra-tokens";
 
 import { getAccountOptions } from "../../data";
 import { ExtraBalanceLines, extraLinesFor } from "../../extra-balance-lines";
-import { getExtraBalances } from "../../extra-balances";
+import { getExtraBalances, type ExtraBalances } from "../../extra-balances";
 import { TransfersTableSkeleton } from "../../skeleton";
 import {
   getCurrentSignerAddress,
@@ -47,7 +57,7 @@ import { PendingTxCard } from "./pending-tx-card";
 import { SafeManage } from "./safe-manage";
 import { SafeTransfersTable } from "./safe-transfers-table";
 import { SyncButton } from "./sync-button";
-import { ProposeTransferDialog } from "./transfer-dialog";
+import { ProposeTransferDialog, type TransferTokenOption } from "./transfer-dialog";
 
 // Server actions invoked from this route broadcast a Safe transaction and wait
 // for its receipt (relayer.ts, up to 90 s); give them room on Vercel.
@@ -115,6 +125,20 @@ async function SafeDetailView({
     tokenChainId: fund.tokenChainId,
     tokenDecimals: fund.tokenDecimals,
   };
+  const display: BalanceDisplaySettings = {
+    tokenChainId: fund.tokenChainId,
+    showNativeBalance: fund.showNativeBalance,
+    showEureBalance: fund.showEureBalance,
+  };
+  // xDAI / EURe the fund opted into; only for a Safe on the fund's chain.
+  const sameChain = safe.chainId === fund.tokenChainId;
+  const extraTokens = sameChain ? enabledExtraTokens(display) : [];
+  // One Alchemy round-trip for the balance card and the transfer dialog's
+  // token picker; both await it inside their own <Suspense>.
+  const balances: Promise<SafeBalances> = Promise.all([
+    getSafeBalance(safe.chainId, safe.address, token),
+    getExtraBalances(display, sameChain ? [safe.address] : []),
+  ]).then(([main, extra]) => ({ main, extra }));
   const active = safe.status === "ACTIVE";
   // Before deployment the address column holds a `pending:` placeholder.
   const deployed = isDeployedAddress(safe.address);
@@ -247,15 +271,11 @@ async function SafeDetailView({
           <div className="mt-1 text-lg font-medium tabular-nums">
             <Suspense fallback={<Skeleton className="h-6 w-24" />}>
               <SafeBalance
-                chainId={safe.chainId}
                 address={safe.address}
-                token={token}
+                balances={balances}
                 symbol={fund.tokenSymbol}
-                display={{
-                  tokenChainId: fund.tokenChainId,
-                  showNativeBalance: fund.showNativeBalance,
-                  showEureBalance: fund.showEureBalance,
-                }}
+                extraTokens={extraTokens}
+                sameChain={sameChain}
               />
             </Suspense>
           </div>
@@ -271,15 +291,27 @@ async function SafeDetailView({
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
           {active && fund.tokenAddress && (
-            <ProposeTransferDialog
-              safeId={safe.id}
-              chainId={safe.chainId}
-              threshold={safe.threshold}
-              options={recipients.filter(
-                (r) => r.address.toLowerCase() !== safe.address.toLowerCase(),
-              )}
-              symbol={fund.tokenSymbol}
-            />
+            <Suspense
+              fallback={
+                <Button size="sm" disabled>
+                  <Send className="size-4" />
+                  {t("transfer.trigger")}
+                </Button>
+              }
+            >
+              <ProposeTransferSlot
+                safeId={safe.id}
+                chainId={safe.chainId}
+                threshold={safe.threshold}
+                options={recipients.filter(
+                  (r) => r.address.toLowerCase() !== safe.address.toLowerCase(),
+                )}
+                address={safe.address}
+                balances={balances}
+                fundSymbol={fund.tokenSymbol}
+                extraTokens={extraTokens}
+              />
+            </Suspense>
           )}
         </div>
       </div>
@@ -447,38 +479,32 @@ async function SafeTransfersSection({
   );
 }
 
+type SafeBalances = {
+  main: { balance: string | null; error: boolean };
+  extra: ExtraBalances;
+};
+
 // The token balance is an Alchemy round-trip — stream it on its own so the
 // signatures (the important part) paint first.
 async function SafeBalance({
-  chainId,
   address,
-  token,
+  balances,
   symbol,
-  display,
+  extraTokens,
+  sameChain,
 }: {
-  chainId: number;
   address: string;
-  token: {
-    tokenAddress: string | null;
-    tokenChainId: number | null;
-    tokenDecimals: number | null;
-  };
+  balances: Promise<SafeBalances>;
   symbol: string | null;
-  display: BalanceDisplaySettings;
+  extraTokens: ExtraToken[];
+  sameChain: boolean;
 }) {
   const t = await getTranslations("fund.safes");
-  // xDAI / EURe lines the fund opted into; only for a Safe on the fund's chain.
-  const sameChain = chainId === display.tokenChainId;
-  const [{ balance, error }, extra] = await Promise.all([
-    getSafeBalance(chainId, address, token),
-    getExtraBalances(display, sameChain ? [address] : []),
-  ]);
-  const lines = extraLinesFor(
-    address,
-    enabledExtraTokens(display),
+  const {
+    main: { balance, error },
     extra,
-    sameChain,
-  );
+  } = await balances;
+  const lines = extraLinesFor(address, extraTokens, extra, sameChain);
   return (
     <>
       {balance == null ? (
@@ -491,4 +517,36 @@ async function SafeBalance({
       <ExtraBalanceLines lines={lines} className="mt-1 font-normal" />
     </>
   );
+}
+
+// "Propose transfer" waits for the balances so its token picker can show
+// what each one holds ("EURe · 0.75"): the fund token first, then each extra
+// token the fund enabled.
+async function ProposeTransferSlot({
+  address,
+  balances,
+  fundSymbol,
+  extraTokens,
+  ...dialog
+}: {
+  safeId: string;
+  chainId: number;
+  threshold: number;
+  options: { address: string; label: string; kind: "ACCOUNT" | "CARD" }[];
+  address: string;
+  balances: Promise<SafeBalances>;
+  fundSymbol: string | null;
+  extraTokens: ExtraToken[];
+}) {
+  const { main, extra } = await balances;
+  const held = extra.byAddress.get(address.toLowerCase());
+  const tokens: TransferTokenOption[] = [
+    { key: "fund", symbol: fundSymbol, balance: main.balance },
+    ...extraTokens.map((tok) => ({
+      key: tok.key,
+      symbol: tok.symbol,
+      balance: held?.find((b) => b.key === tok.key)?.amount ?? null,
+    })),
+  ];
+  return <ProposeTransferDialog {...dialog} tokens={tokens} />;
 }

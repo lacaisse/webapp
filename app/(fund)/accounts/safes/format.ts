@@ -75,7 +75,8 @@ function who(
  * One human line for a Safe transaction, from its stored summary — never from
  * calldata. `names` maps lowercased address → display name as a fallback for
  * summaries recorded without a label. Falls back to the generic kind label
- * when the summary is missing (`kind` from the row).
+ * when the summary is missing (`kind` from the row). `tokenSymbol` is the
+ * fund token's symbol, used for transfers whose summary has no `symbol`.
  */
 export function summaryLine(
   summary: SafeTxSummary | null,
@@ -86,11 +87,16 @@ export function summaryLine(
   const { names } = opts;
   if (!summary) return t(`tx.kinds.${opts.kind ?? "UNKNOWN"}`);
   switch (summary.kind) {
-    case "TOKEN_TRANSFER":
+    case "TOKEN_TRANSFER": {
+      // The symbol frozen on the summary (xDAI / EURe / fund token); rows
+      // written before multi-token transfers carry none and moved the fund
+      // token, so the caller's fund symbol applies.
+      const symbol = summary.symbol?.trim() || tokenSymbol;
       return t("tx.summary.transfer", {
-        amount: tokenSymbol ? `${summary.amount} ${tokenSymbol}` : summary.amount,
+        amount: symbol ? `${summary.amount} ${symbol}` : summary.amount,
         recipient: who(summary.recipient, summary.recipientLabel, names),
       });
+    }
     case "ADD_OWNER":
       return t("tx.summary.addOwner", {
         owner: who(summary.owner, summary.ownerLabel, names),

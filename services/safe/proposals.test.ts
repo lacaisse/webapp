@@ -64,7 +64,16 @@ const B = getAddress("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
 const C = getAddress("0xcccccccccccccccccccccccccccccccccccccccc");
 const D = getAddress("0xdddddddddddddddddddddddddddddddddddddddd");
 const EXEC_HASH = `0x${"e1".repeat(32)}` as const;
-const FUND = { id: "fund-1", tokenChainId: 100, tokenAddress: TOKEN, tokenDecimals: 6 };
+const EURE = getAddress("0x420CA0f9B9b604cE0fd9C18EF134C705e5Fa3430"); // extra-tokens.ts, chain 100
+const FUND = {
+  id: "fund-1",
+  tokenChainId: 100,
+  tokenAddress: TOKEN,
+  tokenDecimals: 6,
+  tokenSymbol: "CAISSE",
+  showNativeBalance: true,
+  showEureBalance: true,
+};
 
 // 65-byte signature, distinct per key.
 const sigFor = (enc: string) => `0x${enc.slice(-2).repeat(65)}` as `0x${string}`;
@@ -169,6 +178,8 @@ describe("proposeTokenTransfer", () => {
       amount: "12.5",
       recipient: RECIPIENT,
       recipientLabel: "Bakery",
+      token: "fund",
+      symbol: "CAISSE",
     });
     expect(db.tokenOperation).toHaveLength(1);
     expect(db.tokenOperation[0]).toMatchObject({
@@ -183,6 +194,127 @@ describe("proposeTokenTransfer", () => {
     expect(annotate.annotateTransaction).toHaveBeenCalledWith(
       expect.objectContaining({ fundId: FUND.id, txHash: EXEC_HASH, trigger: "SAFE_TRANSFER", triggeredByUserId: "u-a" }),
     );
+  });
+
+  it("refuses more than 2 decimals on the fund token (TokenOperation is Decimal(12,2))", async () => {
+    seed({ threshold: 1, owners: [OWNERS_3[0]] });
+    await expect(transfer("u-a", "1.234")).rejects.toMatchObject({ code: "invalid_state" });
+    expect(db.fundSafeTransaction).toHaveLength(0);
+  });
+
+  it("records a pre-multi-token summary (no `token`) as a fund-token transfer", async () => {
+    seed({ threshold: 2, owners: OWNERS_3 });
+    const proposed = await transfer("u-a", "3");
+    const row = db.fundSafeTransaction[0];
+    // Simulate a row written before the change.
+    row.summary = { kind: "TOKEN_TRANSFER", amount: "3", recipient: RECIPIENT, recipientLabel: null };
+
+    await signTransaction({ fundId: FUND.id, transactionId: proposed.transactionId, userId: "u-b" });
+
+    expect(row.status).toBe("EXECUTED");
+    expect(db.tokenOperation).toHaveLength(1);
+    expect(db.tokenOperation[0]).toMatchObject({ amount: "3", account: RECIPIENT });
+  });
+
+  it("native (xDAI): a plain value transfer to the recipient, annotated but no TokenOperation", async () => {
+    seed({ threshold: 1, owners: [OWNERS_3[0]] });
+
+    const res = await proposeTokenTransfer({
+      fund: FUND,
+      safeId,
+      userId: "u-a",
+      input: { safeId, recipient: RECIPIENT, amount: "0.123456789", token: "native", note: "gas" },
+    });
+
+    expect(res).toMatchObject({ executed: true, txHash: EXEC_HASH });
+    const tx = db.fundSafeTransaction[0];
+    expect(tx).toMatchObject({
+      status: "EXECUTED",
+      kind: "TOKEN_TRANSFER",
+      to: RECIPIENT,
+      value: "123456789000000000",
+      data: "0x",
+      operation: 0,
+    });
+    const sent = relayer.execSafeTransaction.mock.calls[0][0].tx;
+    expect(sent).toMatchObject({ to: RECIPIENT, value: BigInt("123456789000000000"), data: "0x", operation: 0 });
+    expect(tx.summary).toEqual({
+      kind: "TOKEN_TRANSFER",
+      amount: "0.123456789",
+      recipient: RECIPIENT,
+      recipientLabel: null,
+      token: "native",
+      symbol: "xDAI",
+    });
+    expect(db.tokenOperation).toHaveLength(0);
+    expect(tx.tokenOperationId).toBeNull();
+    expect(annotate.annotateTransaction).toHaveBeenCalledTimes(1);
+    expect(annotate.annotateTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({ fundId: FUND.id, txHash: EXEC_HASH, kind: "SAFE_TRANSFER", note: "gas" }),
+    );
+  });
+
+  it("EURe: an ERC-20 transfer on the EURe contract in 18-decimal units", async () => {
+    seed({ threshold: 2, owners: OWNERS_3 });
+
+    await proposeTokenTransfer({
+      fund: FUND,
+      safeId,
+      userId: "u-a",
+      input: { safeId, recipient: RECIPIENT, amount: "0.75", token: "eure" },
+    });
+
+    const tx = db.fundSafeTransaction[0];
+    expect(tx).toMatchObject({ status: "PENDING", to: EURE, value: "0" });
+    // transfer(address,uint256): selector + padded recipient + padded amount.
+    const units = BigInt("750000000000000000");
+    expect(tx.data).toBe(
+      `0xa9059cbb${RECIPIENT.slice(2).toLowerCase().padStart(64, "0")}${units.toString(16).padStart(64, "0")}`,
+    );
+    expect(tx.summary).toMatchObject({ token: "eure", symbol: "EURe", amount: "0.75" });
+
+    await signTransaction({ fundId: FUND.id, transactionId: tx.id as string, userId: "u-b" });
+    expect(tx.status).toBe("EXECUTED");
+    expect(db.tokenOperation).toHaveLength(0);
+    expect(annotate.annotateTransaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses an extra token the fund has not enabled", async () => {
+    seed({ threshold: 1, owners: [OWNERS_3[0]] });
+    for (const [token, fund] of [
+      ["native", { ...FUND, showNativeBalance: false }],
+      ["eure", { ...FUND, showEureBalance: false }],
+      ["eure", { ...FUND, tokenChainId: 1 }], // no registry entry for the chain
+    ] as const) {
+      await expect(
+        proposeTokenTransfer({
+          fund,
+          safeId,
+          userId: "u-a",
+          input: { safeId, recipient: RECIPIENT, amount: "1", token },
+        }),
+      ).rejects.toMatchObject({ code: "invalid_state", message: "Token not enabled" });
+    }
+    expect(db.fundSafeTransaction).toHaveLength(0);
+  });
+
+  it("allows up to 18 decimals on an extra token", async () => {
+    seed({ threshold: 2, owners: OWNERS_3 });
+    await proposeTokenTransfer({
+      fund: FUND,
+      safeId,
+      userId: "u-a",
+      input: { safeId, recipient: RECIPIENT, amount: "0.000000000000000001", token: "native" },
+    });
+    expect(db.fundSafeTransaction[0].value).toBe("1");
+    await expect(
+      proposeTokenTransfer({
+        fund: FUND,
+        safeId,
+        userId: "u-a",
+        input: { safeId, recipient: RECIPIENT, amount: "0.0000000000000000001", token: "native" },
+      }),
+    ).rejects.toMatchObject({ code: "invalid_state" });
   });
 
   it("2-of-3: stays PENDING after the proposal, executes on the second signature", async () => {

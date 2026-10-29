@@ -58,14 +58,24 @@ export const SafeTxIdSchema = z.object({
   transactionId: z.string().min(1),
 });
 
+// Which of the Safe's balances a transfer moves: the fund token, or one of the
+// extra tokens the fund shows (services/token/extra-tokens.ts — xDAI is
+// "native", a plain value transfer). Decimal caps are enforced server-side
+// per token (2 for the fund token: TokenOperation.amount is Decimal(12,2)).
+export const TRANSFER_TOKENS = ["fund", "native", "eure"] as const;
+export type TransferToken = (typeof TRANSFER_TOKENS)[number];
+
 export const ProposeTransferSchema = z.object({
   safeId: z.string().min(1),
   recipient: ADDRESS,
   amount: DECIMAL_AMOUNT,
+  token: z.enum(TRANSFER_TOKENS).default("fund"),
   recipientLabel: z.string().trim().max(80).optional(),
   note: z.string().trim().max(200, "fund.safes.errors.noteTooLong").optional(),
 });
-export type ProposeTransferInput = z.infer<typeof ProposeTransferSchema>;
+// Input (token optional, defaults to "fund") — what callers pass; the core
+// reads `token ?? "fund"`.
+export type ProposeTransferInput = z.input<typeof ProposeTransferSchema>;
 
 // Owner / threshold changes. A new owner is either a fund member (we create
 // or reuse their FundSigner) or an external address with a label.
