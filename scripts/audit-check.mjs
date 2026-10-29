@@ -41,6 +41,37 @@ const ALLOWLIST = {
       "Stack exhaustion on deeply nested brace patterns. NOT fixable today: the advisory lists no patched version (GitHub: patched_versions null) and 3.0.3 is the newest braces on npm, so every consumer of micromatch carries it; npm's only 'fix' is a breaking downgrade to eslint-config-next 14 / shadcn 1. Both reach braces only from dev tooling run by hand on repo-authored globs (the Next lint plugin, the shadcn CLI) — never the app at runtime, never attacker-supplied patterns. Re-check for a braces release past 3.0.3 and drop this entry the day one ships.",
     reviewBy: "2026-12-01",
   },
+
+  // 2026-10-29: three better-auth advisories published after main's last
+  // green audit, all fixed only in the 1.7 line (first patched 1.7.0-rc.3 /
+  // 1.7.7; no 1.6.x backport). We are pinned to ~1.6.33 on purpose: 1.7
+  // removes the `mcp` plugin from core in favour of @better-auth/mcp + a
+  // required jwt() plugin, with a schema migration of the OAuth tables and
+  // a reworked login-resume flow (see commit 620ddc5 and the MCP section in
+  // AGENTS.md). That migration is its own task; until it lands, each entry
+  // below is accepted because the vulnerable code path needs an opt-in
+  // plugin or provider this app does not register. Our Better Auth surface
+  // is exactly: email+password, @better-auth/passkey, the core `mcp` plugin
+  // (services/auth/better-auth.ts). Drop all three the day the migration
+  // ships on better-auth >= 1.7.7.
+  "GHSA-965c-763c-88jm": {
+    pkg: "better-auth (direct, 1.6.33)",
+    reason:
+      "OAuth sign-in state accepted as a Magic Link token. Per the advisory, exploitable only when the magicLink() plugin is enabled AND at least one built-in social or genericOAuth provider is configured (the two flows share verification storage). Neither is registered here: no magicLink plugin, no socialProviders, no genericOAuth — sign-in is email+password and passkey only, so there is no OAuth state to mint and no Magic Link endpoint to redeem it at. Fixed in 1.7.7; re-triage when the @better-auth/mcp migration lands.",
+    reviewBy: "2026-12-15",
+  },
+  "GHSA-r4xp-prcw-77qf": {
+    pkg: "better-auth (direct, 1.6.33)",
+    reason:
+      "OAuth Proxy plugin trusts any profile it can decrypt and lets an attacker sign in as another user. Requires the oAuthProxy() plugin (plus cookie-backed OAuth state and a social provider). The plugin is not registered here and we have no social sign-in, so the /oauth-proxy-callback path does not exist in this deployment. Fixed in 1.7.7; re-triage when the @better-auth/mcp migration lands.",
+    reviewBy: "2026-12-15",
+  },
+  "GHSA-q84f-53jg-9ppm": {
+    pkg: "better-auth (direct, 1.6.33)",
+    reason:
+      "Device-login approval page cannot show which client/scopes are asking. Requires the opt-in deviceAuthorization() plugin (RFC 8628 /device/code flow). Not registered here — the MCP agents use the authorization-code grant of the core mcp plugin, never the device grant — so no /device/* routes are mounted. Fixed in 1.7.0-rc.3; re-triage when the @better-auth/mcp migration lands.",
+    reviewBy: "2026-12-15",
+  },
 };
 
 function runAudit() {
