@@ -120,7 +120,7 @@ async function SafeDetailView({ params }: { params: Promise<{ id: string }> }) {
     <div className="space-y-6">
       <div>
         <Link
-          href="/safes"
+          href="/accounts"
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="size-4" />

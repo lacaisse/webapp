@@ -20,7 +20,7 @@ import {
 } from "@/services/safe/relayer";
 import type { SafeTxSummary } from "@/services/safe/types";
 
-import { getAccountOptions } from "../accounts/data";
+import { getAccountOptions } from "../data";
 import { isDeployedAddress, parseSummary, shortAddress } from "./format";
 
 // Loaders for the Safes views. cache()-wrapped so repeat reads in one render

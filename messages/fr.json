@@ -134,7 +134,6 @@
       "allocations": "Allocations",
       "token": "Jeton",
       "accounts": "Comptes",
-      "safes": "Safes",
       "merchants": "Commerces",
       "payments": "Paiements",
       "bank": "Banque",
@@ -187,7 +186,7 @@
     },
     "accounts": {
       "title": "Comptes",
-      "description": "Comptes nommés dérivés de la clé de la caisse. Consultez le solde et l'historique des transactions de chacun.",
+      "description": "Les comptes qui détiennent les jetons de la caisse. Chacun est contrôlé soit par la clé de la caisse, soit par plusieurs signatures (un Safe). Consultez le solde et l'historique des transactions de chacun.",
       "notConnected": "Connectez d'abord cette caisse à Citizen Pay pour créer des comptes.",
       "balancesError": "Impossible de charger les soldes on-chain. Réessayez bientôt.",
       "empty": "Aucun compte pour le moment. Créez-en un pour commencer.",
@@ -197,8 +196,12 @@
       "table": {
         "name": "Nom",
         "address": "Adresse",
-        "serial": "Série",
+        "security": "Sécurité",
         "balance": "Solde"
+      },
+      "security": {
+        "fundKey": "Clé de la caisse",
+        "safe": "{threshold} {m, plural, one {signature} other {signatures}}"
       },
       "detail": {
         "back": "Tous les comptes",
@@ -209,6 +212,11 @@
         "trigger": "Nouveau compte",
         "title": "Créer un compte",
         "description": "Un nouveau compte on-chain dérivé de la clé de la caisse.",
+        "securityLabel": "Sécurité",
+        "securityFundKey": "Clé de la caisse",
+        "securityFundKeyHint": "Géré par la clé de la caisse, comme le compte principal. Pratique au quotidien.",
+        "securitySafe": "Plusieurs signatures (Safe)",
+        "securitySafeHint": "L'argent ne bouge que si assez de signataires signent, par ex. 2 sur 3. Pour les réserves et les montants importants.",
         "name": "Nom",
         "namePlaceholder": "ex. Réserve, Frais, Événements",
         "sourceLabel": "Compte source de carte",
@@ -281,9 +289,6 @@
       }
     },
     "safes": {
-      "title": "Safes (multisignature)",
-      "description": "Des comptes partagés qui exigent plusieurs signatures pour déplacer le jeton de la caisse. L'équipe signe ici en un clic ; les signataires externes signent dans Safe'{Wallet}'.",
-      "notConnected": "Connectez d'abord cette caisse à Citizen Pay : un Safe détient le jeton de la caisse.",
       "relayerMissing": "Le relayeur de La Caisse n'est pas configuré : impossible de créer ou d'exécuter des Safes pour l'instant. Demandez à l'équipe de la plateforme de le mettre en place.",
       "balancesError": "Impossible de charger les soldes on-chain. Réessayez dans un instant.",
       "openInSafeWallet": "Ouvrir dans Safe'{Wallet}'",
@@ -294,17 +299,7 @@
       "thresholdRequired": "{n} sur {m} {n, plural, one {signature requise} other {signatures requises}}",
       "thresholdDecrease": "Moins de signatures",
       "thresholdIncrease": "Plus de signatures",
-      "empty": {
-        "title": "Aucun Safe pour l'instant",
-        "body": "Un Safe est un coffre on-chain qui ne bouge que si assez de signataires sont d'accord — par exemple 2 trésoriers sur 3. Idéal pour les réserves ou toute somme qu'une seule personne ne devrait pas contrôler."
-      },
       "table": {
-        "name": "Nom",
-        "address": "Adresse",
-        "owners": "Signataires",
-        "threshold": "Signatures",
-        "balance": "Solde",
-        "pending": "En attente",
         "pendingCount": "{count} en attente"
       },
       "status": {
@@ -313,7 +308,7 @@
         "FAILED": "Échec du déploiement"
       },
       "detail": {
-        "back": "Tous les Safes",
+        "back": "Tous les comptes",
         "balance": "Solde",
         "threshold": "Signatures requises",
         "thresholdChip": "{threshold} pour signer",
@@ -334,8 +329,6 @@
         "formerMember": "Ne fait plus partie de l'équipe — pensez à retirer ou remplacer ce signataire."
       },
       "create": {
-        "trigger": "Nouveau Safe",
-        "title": "Créer un Safe",
         "description": "Choisissez qui détient le Safe et combien de signataires doivent approuver chaque transaction.",
         "name": "Nom",
         "namePlaceholder": "ex. Réserve, Bureau",

@@ -134,7 +134,6 @@
       "allocations": "Allocaties",
       "token": "Token",
       "accounts": "Rekeningen",
-      "safes": "Safes",
       "merchants": "Handelaars",
       "payments": "Betalingen",
       "bank": "Bank",
@@ -187,7 +186,7 @@
     },
     "accounts": {
       "title": "Rekeningen",
-      "description": "Benoemde rekeningen afgeleid van de sleutel van het fonds. Bekijk per rekening het saldo en de transactiegeschiedenis.",
+      "description": "De rekeningen die de tokens van het fonds bevatten. Elke rekening wordt beheerd met de sleutel van het fonds of met meerdere handtekeningen (een Safe). Bekijk per rekening het saldo en de transactiegeschiedenis.",
       "notConnected": "Verbind dit fonds eerst met Citizen Pay om rekeningen aan te maken.",
       "balancesError": "Kon de on-chain saldi niet laden. Probeer het zo opnieuw.",
       "empty": "Nog geen rekeningen. Maak er een aan om te beginnen.",
@@ -197,8 +196,12 @@
       "table": {
         "name": "Naam",
         "address": "Adres",
-        "serial": "Serie",
+        "security": "Beveiliging",
         "balance": "Saldo"
+      },
+      "security": {
+        "fundKey": "Sleutel van het fonds",
+        "safe": "{threshold} {m, plural, one {handtekening} other {handtekeningen}}"
       },
       "detail": {
         "back": "Alle rekeningen",
@@ -209,6 +212,11 @@
         "trigger": "Nieuwe rekening",
         "title": "Rekening aanmaken",
         "description": "Een nieuwe on-chain rekening afgeleid van de sleutel van het fonds.",
+        "securityLabel": "Beveiliging",
+        "securityFundKey": "Sleutel van het fonds",
+        "securityFundKeyHint": "Beheerd met de sleutel van het fonds, zoals de hoofdrekening. Handig voor dagelijks gebruik.",
+        "securitySafe": "Meerdere handtekeningen (Safe)",
+        "securitySafeHint": "Geld beweegt pas als genoeg ondertekenaars tekenen, bv. 2 van 3. Voor reserves en grotere bedragen.",
         "name": "Naam",
         "namePlaceholder": "bijv. Reserve, Kosten, Evenementen",
         "sourceLabel": "Bronrekening voor kaarten",
@@ -281,9 +289,6 @@
       }
     },
     "safes": {
-      "title": "Safes (multisig)",
-      "description": "Gedeelde rekeningen die meerdere handtekeningen nodig hebben om het fondstoken te verplaatsen. Teamleden tekenen hier met één klik; externe ondertekenaars tekenen in Safe'{Wallet}'.",
-      "notConnected": "Koppel dit fonds eerst aan Citizen Pay: een Safe bewaart het fondstoken.",
       "relayerMissing": "De relayer van La Caisse is niet ingesteld, dus Safes kunnen nog niet worden aangemaakt of uitgevoerd. Vraag het platformteam om hem in te stellen.",
       "balancesError": "Kon de on-chain saldi niet laden. Probeer het zo opnieuw.",
       "openInSafeWallet": "Openen in Safe'{Wallet}'",
@@ -294,17 +299,7 @@
       "thresholdRequired": "{n} van {m} {m, plural, one {handtekening} other {handtekeningen}} vereist",
       "thresholdDecrease": "Minder handtekeningen",
       "thresholdIncrease": "Meer handtekeningen",
-      "empty": {
-        "title": "Nog geen Safe",
-        "body": "Een Safe is een on-chain rekening die alleen geld verplaatst als genoeg ondertekenaars akkoord gaan — bijvoorbeeld 2 van 3 penningmeesters. Gebruik er een voor reserves of elk bedrag dat niet één persoon alleen mag beheren."
-      },
       "table": {
-        "name": "Naam",
-        "address": "Adres",
-        "owners": "Ondertekenaars",
-        "threshold": "Handtekeningen",
-        "balance": "Saldo",
-        "pending": "Openstaand",
         "pendingCount": "{count} openstaand"
       },
       "status": {
@@ -313,7 +308,7 @@
         "FAILED": "Uitrol mislukt"
       },
       "detail": {
-        "back": "Alle Safes",
+        "back": "Alle rekeningen",
         "balance": "Saldo",
         "threshold": "Vereiste handtekeningen",
         "thresholdChip": "{threshold} om te tekenen",
@@ -334,8 +329,6 @@
         "formerMember": "Geen teamlid meer — overweeg deze ondertekenaar te verwijderen of te vervangen."
       },
       "create": {
-        "trigger": "Nieuwe Safe",
-        "title": "Een Safe aanmaken",
         "description": "Kies wie eigenaar is van de Safe en hoeveel van hen elke transactie moeten ondertekenen.",
         "name": "Naam",
         "namePlaceholder": "bv. Reserve, Bestuur",

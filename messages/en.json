@@ -134,7 +134,6 @@
       "allocations": "Allocations",
       "token": "Token",
       "accounts": "Accounts",
-      "safes": "Safes",
       "merchants": "Merchants",
       "payments": "Payments",
       "bank": "Bank",
@@ -187,7 +186,7 @@
     },
     "accounts": {
       "title": "Accounts",
-      "description": "Named accounts derived from the fund's key. See each one's balance and token transaction history.",
+      "description": "Accounts that hold the fund's tokens. Each one is controlled either by the fund's key or by several signatures (a Safe). See each one's balance and transaction history.",
       "notConnected": "Connect this fund to Citizen Pay first to create accounts.",
       "balancesError": "Couldn't load on-chain balances. Try again shortly.",
       "empty": "No accounts yet. Create one to get started.",
@@ -197,8 +196,12 @@
       "table": {
         "name": "Name",
         "address": "Address",
-        "serial": "Serial",
+        "security": "Security",
         "balance": "Balance"
+      },
+      "security": {
+        "fundKey": "Fund key",
+        "safe": "{threshold} {m, plural, one {signature} other {signatures}}"
       },
       "detail": {
         "back": "All accounts",
@@ -209,6 +212,11 @@
         "trigger": "New account",
         "title": "Create account",
         "description": "A new on-chain account derived from the fund's key.",
+        "securityLabel": "Security",
+        "securityFundKey": "Fund key",
+        "securityFundKeyHint": "Controlled by the fund's key, like the main account. Quick for day-to-day use.",
+        "securitySafe": "Several signatures (Safe)",
+        "securitySafeHint": "Money only moves when enough owners sign, e.g. 2 of 3. For reserves and larger sums.",
         "name": "Name",
         "namePlaceholder": "e.g. Reserve, Fees, Events",
         "sourceLabel": "Card-source account",
@@ -281,9 +289,6 @@
       }
     },
     "safes": {
-      "title": "Safes (multisig)",
-      "description": "Shared accounts that need several signatures to move the fund token. Team members sign here in one click; external owners sign in Safe'{Wallet}'.",
-      "notConnected": "Connect this fund to Citizen Pay first: a Safe holds the fund token.",
       "relayerMissing": "The La Caisse relayer isn't configured, so Safes can't be created or executed yet. Ask the platform team to set it up.",
       "balancesError": "Couldn't load on-chain balances. Try again shortly.",
       "openInSafeWallet": "Open in Safe'{Wallet}'",
@@ -294,17 +299,7 @@
       "thresholdRequired": "{n} of {m} signatures required",
       "thresholdDecrease": "Fewer signatures",
       "thresholdIncrease": "More signatures",
-      "empty": {
-        "title": "No Safe yet",
-        "body": "A Safe is an on-chain account that only moves money when enough owners agree — for example 2 of 3 treasurers. Use one for reserves or any sum no single person should control alone."
-      },
       "table": {
-        "name": "Name",
-        "address": "Address",
-        "owners": "Owners",
-        "threshold": "Signatures",
-        "balance": "Balance",
-        "pending": "Pending",
         "pendingCount": "{count} pending"
       },
       "status": {
@@ -313,7 +308,7 @@
         "FAILED": "Deployment failed"
       },
       "detail": {
-        "back": "All Safes",
+        "back": "All accounts",
         "balance": "Balance",
         "threshold": "Signatures required",
         "thresholdChip": "{threshold} to sign",
@@ -334,8 +329,6 @@
         "formerMember": "No longer a team member — consider removing or replacing this owner."
       },
       "create": {
-        "trigger": "New Safe",
-        "title": "Create a Safe",
         "description": "Choose who owns the Safe and how many of them must sign each transaction.",
         "name": "Name",
         "namePlaceholder": "e.g. Reserve, Board",

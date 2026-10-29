@@ -25,7 +25,7 @@
 //   tx-service.ts    — Safe Transaction Service HTTP client (no SDK).
 //   proposals.ts     — propose / confirm / execute flows over DB + chain + TS.
 //   sync.ts          — reconcile DB with chain + tx-service (cron + on view).
-//   admin-actions.ts — "use server" actions behind app/(fund)/safes.
+//   admin-actions.ts — "use server" actions behind app/(fund)/accounts/safes.
 //   schemas.ts       — Zod schemas shared by forms and actions.
 //   types.ts         — shared types + SafeError.
 

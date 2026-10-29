@@ -134,7 +134,6 @@
       "allocations": "Asignaciones",
       "token": "Token",
       "accounts": "Cuentas",
-      "safes": "Safes",
       "merchants": "Comercios",
       "payments": "Pagos",
       "bank": "Banco",
@@ -187,7 +186,7 @@
     },
     "accounts": {
       "title": "Cuentas",
-      "description": "Cuentas con nombre derivadas de la clave del fondo. Consulta el saldo y el historial de transacciones de tokens de cada una.",
+      "description": "Las cuentas que guardan los tokens del fondo. Cada una se controla con la clave del fondo o con varias firmas (un Safe). Consulta el saldo y el historial de transacciones de cada una.",
       "notConnected": "Conecta primero este fondo a Citizen Pay para crear cuentas.",
       "balancesError": "No se pudieron cargar los saldos en cadena. Vuelve a intentarlo en breve.",
       "empty": "Aún no hay cuentas. Crea una para empezar.",
@@ -197,8 +196,12 @@
       "table": {
         "name": "Nombre",
         "address": "Dirección",
-        "serial": "N.º de serie",
+        "security": "Seguridad",
         "balance": "Saldo"
+      },
+      "security": {
+        "fundKey": "Clave del fondo",
+        "safe": "{threshold} {m, plural, one {firma} other {firmas}}"
       },
       "detail": {
         "back": "Todas las cuentas",
@@ -209,6 +212,11 @@
         "trigger": "Nueva cuenta",
         "title": "Crear cuenta",
         "description": "Una nueva cuenta en cadena derivada de la clave del fondo.",
+        "securityLabel": "Seguridad",
+        "securityFundKey": "Clave del fondo",
+        "securityFundKeyHint": "Controlada por la clave del fondo, como la cuenta principal. Práctica para el día a día.",
+        "securitySafe": "Varias firmas (Safe)",
+        "securitySafeHint": "El dinero solo se mueve cuando firman suficientes firmantes, p. ej. 2 de 3. Para reservas y sumas importantes.",
         "name": "Nombre",
         "namePlaceholder": "p. ej. Reserva, Comisiones, Eventos",
         "sourceLabel": "Cuenta fuente de tarjetas",
@@ -281,9 +289,6 @@
       }
     },
     "safes": {
-      "title": "Safes (multifirma)",
-      "description": "Cuentas compartidas que necesitan varias firmas para mover el token del fondo. El equipo firma aquí con un clic; los firmantes externos firman en Safe'{Wallet}'.",
-      "notConnected": "Primero conecta este fondo a Citizen Pay: un Safe guarda el token del fondo.",
       "relayerMissing": "El relayer de La Caisse no está configurado, así que aún no se pueden crear ni ejecutar Safes. Pide al equipo de la plataforma que lo configure.",
       "balancesError": "No se pudieron cargar los saldos on-chain. Inténtalo de nuevo en un momento.",
       "openInSafeWallet": "Abrir en Safe'{Wallet}'",
@@ -294,17 +299,7 @@
       "thresholdRequired": "{n, plural, one {Se necesita # de {m} firmas} other {Se necesitan # de {m} firmas}}",
       "thresholdDecrease": "Menos firmas",
       "thresholdIncrease": "Más firmas",
-      "empty": {
-        "title": "Aún no hay ningún Safe",
-        "body": "Un Safe es una cuenta on-chain que solo mueve dinero cuando suficientes firmantes están de acuerdo — por ejemplo 2 de 3 tesoreros. Úsalo para reservas o cualquier suma que una sola persona no debería controlar."
-      },
       "table": {
-        "name": "Nombre",
-        "address": "Dirección",
-        "owners": "Firmantes",
-        "threshold": "Firmas",
-        "balance": "Saldo",
-        "pending": "Pendientes",
         "pendingCount": "{count} {count, plural, one {pendiente} other {pendientes}}"
       },
       "status": {
@@ -313,7 +308,7 @@
         "FAILED": "Despliegue fallido"
       },
       "detail": {
-        "back": "Todos los Safes",
+        "back": "Todas las cuentas",
         "balance": "Saldo",
         "threshold": "Firmas necesarias",
         "thresholdChip": "{threshold} para firmar",
@@ -334,8 +329,6 @@
         "formerMember": "Ya no forma parte del equipo — considera quitar o sustituir a este firmante."
       },
       "create": {
-        "trigger": "Nuevo Safe",
-        "title": "Crear un Safe",
         "description": "Elige quién es propietario del Safe y cuántos deben firmar cada transacción.",
         "name": "Nombre",
         "namePlaceholder": "p. ej. Reserva, Junta",

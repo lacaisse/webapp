@@ -59,8 +59,8 @@ function errorFor(t: T, e: unknown, context: string): string {
 }
 
 function revalidateSafe(safeId?: string) {
-  revalidatePath("/safes");
-  if (safeId) revalidatePath(`/safes/${safeId}`);
+  revalidatePath("/accounts");
+  if (safeId) revalidatePath(`/accounts/safes/${safeId}`);
   refresh();
 }
 
@@ -131,8 +131,8 @@ export async function archiveSafeAction(input: { safeId: string }): Promise<Safe
     await archiveSafe({ fundId: fund.id, safeId: parsed.data.safeId });
     // No refresh(): the client navigates away from the archived detail page
     // (refreshing it would 404); the list is revalidated.
-    revalidatePath("/safes");
-    revalidatePath(`/safes/${parsed.data.safeId}`);
+    revalidatePath("/accounts");
+    revalidatePath(`/accounts/safes/${parsed.data.safeId}`);
     return { ok: true };
   } catch (e) {
     return { error: errorFor(t, e, "archive") };

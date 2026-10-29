@@ -161,7 +161,7 @@ function ArchiveDialog({
       }
       setOpen(false);
       // The detail row is archived now (404 on re-render) — back to the list.
-      router.push("/safes");
+      router.push("/accounts");
     });
   };
 
