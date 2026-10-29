@@ -47,6 +47,7 @@ import { OwnerAvatar } from "../owner-avatar";
 import { useStepUp } from "../reauth-dialog";
 import { SafeAddress } from "../safe-address";
 import { ThresholdStepper } from "../threshold-stepper";
+import { CustodyNote } from "../safe-create-form";
 import { ProposalResult } from "./proposal-result";
 
 export type OwnerRow = {
@@ -433,6 +434,12 @@ function AddOwnerDialog({
             onChange={setNewThreshold}
             disabled={flow.pending}
           />
+          <CustodyNote
+            threshold={clampThreshold(newThreshold, total)}
+            memberOwners={
+              owners.filter((o) => o.kind === "MEMBER").length + (mode === "member" ? 1 : 0)
+            }
+          />
         </ChangeDialogBody>
         <ChangeDialogFooter
           flow={flow}
@@ -513,6 +520,12 @@ function RemoveOwnerDialog({
             onChange={setNewThreshold}
             disabled={flow.pending}
           />
+          <CustodyNote
+            threshold={clampThreshold(newThreshold, remaining)}
+            memberOwners={
+              owners.filter((o) => o.kind === "MEMBER" && !sameAddress(o.address, owner.address)).length
+            }
+          />
         </ChangeDialogBody>
         <ChangeDialogFooter
           flow={flow}
@@ -570,6 +583,10 @@ function ChangeThresholdDialog({ safeId, chainId, threshold, owners, hasPasskey 
             total={owners.length}
             onChange={setNewThreshold}
             disabled={flow.pending}
+          />
+          <CustodyNote
+            threshold={value}
+            memberOwners={owners.filter((o) => o.kind === "MEMBER").length}
           />
         </ChangeDialogBody>
         <ChangeDialogFooter

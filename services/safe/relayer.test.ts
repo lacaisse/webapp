@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
     getBalance: vi.fn(),
     getBlockNumber: vi.fn(),
     request: vi.fn(),
+    getStorageAt: vi.fn(),
   },
   walletClient: {
     account: { address: "0x0000000000000000000000000000000000000abc" },
@@ -40,9 +41,13 @@ vi.mock("viem", async (importOriginal) => {
 });
 
 import { SAFE_ABI } from "@/services/safe/abi";
+import { SAFE_CONTRACTS_BY_CHAIN } from "@/services/safe/config";
 import {
   EXECUTION_SCAN_CHUNK_BLOCKS,
+  EXEC_GAS_CAP,
   deploySafe,
+  describeSafeConfigDrift,
+  readSafeConfig,
   errorTxHash,
   execSafeTransaction,
   findSafeExecution,
@@ -349,5 +354,85 @@ describe("findSafeExecution", () => {
     const young = ranges();
     expect(young).toHaveLength(2);
     expect(young[1].from).toBe(BigInt(0));
+  });
+});
+
+describe("execSafeTransaction gas cap and broadcast hook", () => {
+  const tx = buildSafeTx({ to: TEST_ADDR as Address, nonce: BigInt(0) });
+  const args = { chainId: 100, safeAddress: TEST_ADDR as Address, tx, signatures: "0x" as Hex };
+
+  beforeEach(() => {
+    vi.stubEnv("SAFE_RELAYER_PRIVATE_KEY", TEST_KEY);
+    vi.stubEnv("ALCHEMY_API_KEY", "k");
+    mocks.publicClient.simulateContract.mockResolvedValue({ result: true });
+  });
+
+  it("refuses to attach more gas than the cap", async () => {
+    mocks.publicClient.estimateContractGas.mockResolvedValue(EXEC_GAS_CAP);
+    await expect(execSafeTransaction(args)).rejects.toMatchObject({
+      code: "invalid_state",
+      message: expect.stringContaining("above the relayer's cap"),
+    });
+    expect(mocks.walletClient.writeContract).not.toHaveBeenCalled();
+  });
+
+  it("reports the hash as soon as it is broadcast, before the receipt", async () => {
+    const hash = `0x${"ab".repeat(32)}` as Hex;
+    mocks.publicClient.estimateContractGas.mockResolvedValue(BigInt(100_000));
+    mocks.walletClient.writeContract.mockResolvedValue(hash);
+    const order: string[] = [];
+    mocks.publicClient.waitForTransactionReceipt.mockImplementation(async () => {
+      order.push("receipt");
+      return { status: "success", logs: [] };
+    });
+    const onBroadcast = vi.fn(async () => {
+      order.push("broadcast");
+    });
+    await expect(execSafeTransaction({ ...args, onBroadcast })).resolves.toEqual({ txHash: hash });
+    expect(onBroadcast).toHaveBeenCalledWith(hash);
+    expect(order).toEqual(["broadcast", "receipt"]);
+    expect(mocks.walletClient.writeContract.mock.calls[0][0].gas).toBe(BigInt(120_000));
+  });
+});
+
+describe("readSafeConfig / describeSafeConfigDrift", () => {
+  const canonical = SAFE_CONTRACTS_BY_CHAIN[100]!;
+  const word = (addr: string) => `0x${"0".repeat(24)}${addr.slice(2).toLowerCase()}` as Hex;
+
+  it("reads singleton, guard, fallback handler and modules", async () => {
+    vi.stubEnv("ALCHEMY_API_KEY", "k");
+    mocks.publicClient.getStorageAt.mockImplementation(async ({ slot }: { slot: string }) => {
+      if (slot === "0x0") return word(canonical.singleton);
+      if (slot.startsWith("0x4a20")) return `0x${"0".repeat(64)}` as Hex;
+      return word(canonical.fallbackHandler);
+    });
+    mocks.publicClient.readContract.mockResolvedValue([[], "0x0000000000000000000000000000000000000001"]);
+    const config = await readSafeConfig({ chainId: 100, safeAddress: TEST_ADDR as Address });
+    expect(config).toEqual({
+      singleton: canonical.singleton,
+      guard: "0x0000000000000000000000000000000000000000",
+      fallbackHandler: canonical.fallbackHandler,
+      modules: [],
+    });
+    expect(describeSafeConfigDrift(100, config)).toBeNull();
+  });
+
+  it("names every non-canonical piece", () => {
+    const drift = describeSafeConfigDrift(100, {
+      singleton: SAFE_CONTRACTS_BY_CHAIN[100]!.singleton,
+      guard: "0x1111111111111111111111111111111111111111",
+      fallbackHandler: SAFE_CONTRACTS_BY_CHAIN[100]!.fallbackHandler,
+      modules: ["0x2222222222222222222222222222222222222222"],
+    });
+    expect(drift).toContain("guard 0x1111111111111111111111111111111111111111");
+    expect(drift).toContain("module(s) 0x2222222222222222222222222222222222222222");
+    expect(
+      describeSafeConfigDrift(100, {
+        singleton: "0x3333333333333333333333333333333333333333",
+        guard: "0x0000000000000000000000000000000000000000",
+        fallbackHandler: SAFE_CONTRACTS_BY_CHAIN[100]!.fallbackHandler,
+        modules: [],
+      }),
+    ).toMatch(/^singleton 0x3333/);
   });
 });

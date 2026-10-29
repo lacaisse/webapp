@@ -25,11 +25,12 @@ import { CreateAccountDialog } from "./create-account-dialog";
 import { getTokenAccounts } from "./data";
 import { ExtraBalanceLines, extraLinesFor } from "./extra-balance-lines";
 import { getExtraBalances } from "./extra-balances";
-import { getEligibleMembers, getRelayerStatus, getSafes } from "./safes/data";
+import { getArchivedSafes, getEligibleMembers, getRelayerStatus, getSafes } from "./safes/data";
 import { formatNative, isDeployedAddress, thresholdLabel } from "./safes/format";
 import { RetryDeployButton } from "./safes/retry-deploy-button";
 import { SafeAddress } from "./safes/safe-address";
 import { SafeStatusBadge } from "./safes/status-badge";
+import { UnarchiveButton } from "./safes/unarchive-button";
 import { AccountsTableSkeleton } from "./skeleton";
 
 // Safe actions invoked from this route (create, retry deployment) broadcast a
@@ -131,8 +132,12 @@ async function AccountsTable() {
     tokenChainId: fund.tokenChainId,
     tokenDecimals: fund.tokenDecimals,
   };
-  const [{ accounts, balancesError }, { safes, balancesError: safesBalancesError }] =
-    await Promise.all([getTokenAccounts(fund.id, token), getSafes(fund.id, token)]);
+  const [{ accounts, balancesError }, { safes, balancesError: safesBalancesError }, archived] =
+    await Promise.all([
+      getTokenAccounts(fund.id, token),
+      getSafes(fund.id, token),
+      getArchivedSafes(fund.id),
+    ]);
 
   // xDAI / EURe / custom-token lines the fund opted into (Settings → Token):
   // one read for every row. Safes on another chain can't hold them.
@@ -265,6 +270,30 @@ async function AccountsTable() {
             ))}
           </TableBody>
         </Table>
+      )}
+
+      {archived.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="font-heading text-lg font-medium">{tSafes("archived.title")}</h2>
+          <p className="text-sm text-muted-foreground">{tSafes("archived.description")}</p>
+          <ul className="divide-y divide-border rounded-md border border-border">
+            {archived.map((s) => (
+              <li key={s.id} className="flex flex-wrap items-center gap-3 px-3 py-2">
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium">{s.name}</div>
+                  {isDeployedAddress(s.address) && (
+                    <SafeAddress
+                      address={s.address}
+                      href={safeWalletUrl(fund.tokenChainId, s.address)}
+                      linkLabel={tSafes("openInSafeWallet")}
+                    />
+                  )}
+                </div>
+                <UnarchiveButton safeId={s.id} />
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </>
   );

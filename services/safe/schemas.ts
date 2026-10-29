@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { isAddress } from "viem";
 import { z } from "zod";
 
 import type { ExtraTokenKey } from "@/services/token/extra-tokens";
@@ -33,10 +34,14 @@ const NAME = z
       .max(60, "fund.safes.errors.nameTooLong"),
   );
 
+// Strict EIP-55: an all-lowercase (or all-uppercase) address is accepted as
+// is, a mixed-case one must carry a correct checksum — a pasted address with
+// one wrong character is refused instead of silently "corrected" (review S17).
 export const ADDRESS = z
   .string()
   .trim()
-  .regex(/^0x[a-fA-F0-9]{40}$/, "fund.safes.errors.addressInvalid");
+  .regex(/^0x[a-fA-F0-9]{40}$/, "fund.safes.errors.addressInvalid")
+  .refine((v: string): boolean => isAddress(v, { strict: true }), "fund.safes.errors.addressChecksum");
 
 const DECIMAL_AMOUNT = z
   .string()

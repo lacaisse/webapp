@@ -221,3 +221,13 @@ export function initials(name: string): string {
   const second = parts.length > 1 ? (parts[parts.length - 1]![0] ?? "") : "";
   return (first + second).toUpperCase();
 }
+
+/**
+ * Whether La Caisse alone holds enough owner keys to meet the threshold
+ * (review S3): true when `threshold <= memberOwners`. Every MEMBER owner's
+ * key sits with the server, so such a Safe is not an independent multisig
+ * against the server; the dialogs say so.
+ */
+export function serverCanSignAlone(threshold: number, memberOwners: number): boolean {
+  return memberOwners > 0 && threshold <= memberOwners;
+}

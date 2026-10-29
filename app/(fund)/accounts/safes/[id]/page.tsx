@@ -91,7 +91,7 @@ async function SafeDetailView({
   params: Promise<{ id: string }>;
   searchParams: SearchParams;
 }) {
-  const { user, fund } = await requireFundRole("ADMIN");
+  const { user, fund, membership } = await requireFundRole("ADMIN");
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const activeTab = resolveActiveTab(sp.tab, TABS);
   const [t, tAccounts] = await Promise.all([
@@ -269,6 +269,15 @@ async function SafeDetailView({
           </AlertDescription>
         </Alert>
       )}
+      {safe.configWarning && (
+        <Alert variant="destructive">
+          <AlertTriangle className="size-4" />
+          <AlertTitle>{t("detail.configWarningTitle")}</AlertTitle>
+          <AlertDescription className="break-words">
+            {t("detail.configWarningBody", { drift: safe.configWarning })}
+          </AlertDescription>
+        </Alert>
+      )}
       {safe.status === "ACTIVE" && safe.errorMessage && (
         <Alert variant="warning">
           <AlertTriangle className="size-4" />
@@ -369,6 +378,9 @@ async function SafeDetailView({
                 canAct={active}
                 rejectionProposed={tx.kind !== "REJECTION" && rejectedNonces.has(tx.nonce)}
                 hasPasskey={hasPasskey}
+                currentUserId={user.id}
+                isFundOwner={membership.role === "OWNER"}
+                configBlocked={Boolean(safe.configWarning)}
               />
             ))}
           </div>

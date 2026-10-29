@@ -337,7 +337,9 @@
         "deployFailed": "Deployment failed",
         "syncProblem": "The last sync hit a problem, so this page may lag behind the chain until a refresh succeeds.",
         "pendingTitle": "Waiting for signatures",
-        "pendingEmpty": "Nothing to sign right now."
+        "pendingEmpty": "Nothing to sign right now.",
+        "configWarningTitle": "Non-standard configuration",
+        "configWarningBody": "This is no longer a standard Safe 1.4.1: {drift}. A module can execute without signatures and a guard can block or filter transactions. La Caisse executes nothing until this is fixed in Safe'{Wallet}'."
       },
       "tabs": {
         "transactions": "Transactions",
@@ -378,9 +380,10 @@
       "archive": {
         "trigger": "Archive",
         "title": "Archive this Safe?",
-        "description": "It disappears from La Caisse. The Safe, its owners and its funds stay on chain and remain usable in Safe'{Wallet}'.",
+        "description": "The Safe disappears from La Caisse; it stays on chain. Team members can no longer sign from La Caisse — only external owners can still act in Safe'{Wallet}'. You can restore it later.",
         "blocked": "{count, plural, one {# transaction is} other {# transactions are}} still open. Execute or reject them before archiving.",
-        "confirm": "Archive"
+        "confirm": "Archive",
+        "stewardOnly": "Only an owner of this Safe or a fund owner can archive or rename it."
       },
       "transfer": {
         "trigger": "Propose transfer",
@@ -499,7 +502,14 @@
           "relayer": "Executed by La Caisse",
           "external": "Executed externally"
         },
-        "signedBy": "Signed by {names}"
+        "signedBy": "Signed by {names}",
+        "withdraw": "Withdraw",
+        "withdrawTitle": "Withdraw proposal #{nonce}?",
+        "withdrawDescription": "The proposal is deleted and its number becomes free again. Nothing was executed.",
+        "withdrawMirrored": "This Safe has external owners: the proposal stays visible in Safe'{Wallet}', where it can still be signed. To block it for good, propose a rejection instead.",
+        "withdrawConfirm": "Withdraw proposal",
+        "formerMember": "No longer a team member",
+        "configBlocked": "Execution paused: the Safe's configuration is not standard."
       },
       "history": {
         "title": "History",
@@ -537,7 +547,10 @@
         "noteTooLong": "The note is too long (200 characters max).",
         "ownerRequired": "Pick a member or enter an address.",
         "duplicateOwner": "The same address is listed twice.",
-        "reauth_required": "Confirm it's you to continue."
+        "reauth_required": "Confirm it's you to continue.",
+        "addressChecksum": "The address has a wrong capital letter (checksum). Check it, or paste it in lowercase.",
+        "queue_full": "Too many open transactions on this Safe. Have the open proposals signed, rejected or withdrawn first.",
+        "holds_value": "This Safe still holds funds that only team members can move. Empty it before archiving."
       },
       "reauth": {
         "title": "Confirm it's you",
@@ -548,6 +561,16 @@
         "passkeyButton": "Confirm with a passkey",
         "passkeyWaiting": "Waiting for passkey…",
         "passkeyFailed": "The passkey could not be verified."
+      },
+      "archived": {
+        "title": "Archived Safes",
+        "description": "Hidden from La Caisse but still on chain. Restore one to get its owners and transactions back.",
+        "restore": "Restore",
+        "restoring": "Restoring…"
+      },
+      "custody": {
+        "shared": "With {threshold} signature{threshold, plural, one {} other {s}} for {members} team key{members, plural, one {} other {s}}, La Caisse alone holds enough keys to sign: this is not a real multisig against the server. Add an external owner (hardware wallet) and raise the threshold above the number of team keys for anything valuable.",
+        "independent": "The threshold exceeds the number of team keys: at least one external owner must sign every transaction."
       }
     },
     "team": {
@@ -2196,7 +2219,9 @@
             "addressInvalid": "Enter a valid contract address (0x followed by 40 hex characters).",
             "readFailed": "Couldn't read the contract right now. Try again in a few minutes.",
             "tooMany": "You can add at most {max} custom tokens.",
-            "notFound": "This token is no longer in the list."
+            "notFound": "This token is no longer in the list.",
+            "addressChecksum": "The address has a wrong capital letter (checksum). Check it, or paste it in lowercase.",
+            "symbolCollides": "The symbol \"{symbol}\" is already the fund token's or a built-in token's; it would be confusing."
           }
         }
       },
@@ -2742,7 +2767,8 @@
       "inviteInvalid": "This invitation is invalid or has already been used.",
       "inviteExpired": "This invitation has expired. Ask an administrator to send a new one.",
       "emailMismatch": "This invitation was sent to a different email address.",
-      "unverifiedPreexisting": "This account existed before the invitation and its email address was never confirmed. Reset your password from the sign-in page to confirm it, then accept the invitation again."
+      "unverifiedPreexisting": "This account existed before the invitation and its email address was never confirmed. Reset your password from the sign-in page to confirm it, then accept the invitation again.",
+      "memberIsSigner": "This person signs for {safes}, and without them the signature threshold could no longer be reached. Remove them from the Safe's owners first."
     }
   },
   "joinTeam": {

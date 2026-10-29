@@ -6,7 +6,8 @@ import { getAddress } from "viem";
 import { prisma } from "@/services/db/prisma";
 
 import { isOwnerChangeKind, recordExecuted, tryExecute } from "./proposals";
-import { findSafeExecution, readSafeState } from "./relayer";
+import { redactRpcKey } from "./redact";
+import { describeSafeConfigDrift, findSafeExecution, readSafeConfig, readSafeState } from "./relayer";
 import { lc, recoverSafeTxSigner, safeTxFromRow, sameAddress } from "./safe-tx";
 import {
   confirmTransaction,
@@ -24,12 +25,16 @@ import { isSafeError, type Address, type Hex, type SafeTxSummary } from "./types
 // safe is loaded by (id, fundId) and every transaction through it.
 
 const MIN_SYNC_INTERVAL_MS = 30 * 1000;
+// A Safe has at most a handful of owners; a hostile or buggy tx-service answer
+// with thousands of confirmations must not burn CPU on signature recovery
+// (review S20).
+const MAX_CONFIRMATIONS_PER_TX = 50;
 const STALE_EXECUTING_MS = 10 * 60 * 1000;
 const IDLE_RESYNC_MS = 60 * 60 * 1000;
 
 function messageOf(e: unknown): string {
-  if (isSafeError(e)) return `${e.code}: ${e.message}`;
-  return e instanceof Error ? e.message : String(e);
+  if (isSafeError(e)) return redactRpcKey(`${e.code}: ${e.message}`);
+  return redactRpcKey(e instanceof Error ? e.message : String(e));
 }
 
 type SyncResult = { synced: boolean; executed: number; errors: number };
@@ -42,7 +47,15 @@ export async function syncSafe(a: {
   const idle: SyncResult = { synced: false, executed: 0, errors: 0 };
   const safe = await prisma.fundSafe.findFirst({
     where: { id: a.safeId, fundId: a.fundId },
-    select: { id: true, fundId: true, chainId: true, address: true, status: true, lastSyncedAt: true },
+    select: {
+      id: true,
+      fundId: true,
+      chainId: true,
+      address: true,
+      status: true,
+      lastSyncedAt: true,
+      configWarning: true,
+    },
   });
   if (!safe || safe.status !== "ACTIVE") return idle;
   if (
@@ -69,6 +82,25 @@ export async function syncSafe(a: {
 
   // (1) owners + threshold
   await refreshOwners({ fundId: a.fundId, safeId: safe.id, owners: state.owners, threshold: state.threshold });
+
+  // (1b) wiring: modules / guard / singleton / fallback handler (review S6).
+  // Anything non-canonical is recorded on the Safe and stops the relayer
+  // (tryExecute refuses while configWarning is set); a read failure leaves
+  // the previous verdict in place and is reported like any sync problem.
+  let configWarning: string | null | undefined;
+  try {
+    const config = await readSafeConfig({ chainId: safe.chainId, safeAddress });
+    configWarning = describeSafeConfigDrift(safe.chainId, config);
+    if (configWarning !== safe.configWarning) {
+      if (configWarning) console.warn("[safe-sync] configuration drift", safe.id, configWarning);
+      await prisma.fundSafe.updateMany({
+        where: { id: safe.id, fundId: a.fundId },
+        data: { configWarning },
+      });
+    }
+  } catch (e) {
+    console.warn("[safe-sync] config read failed", safe.id, messageOf(e));
+  }
   const owners = await prisma.fundSafeOwner.findMany({
     where: { safeId: safe.id, removedAt: null, safe: { fundId: a.fundId } },
     select: { address: true },
@@ -90,6 +122,7 @@ export async function syncSafe(a: {
   // What went wrong this pass, kept on the Safe (step 5) so the page can say
   // the sync is lagging instead of silently showing stale rows.
   const problems: string[] = [];
+  if (configWarning === undefined) problems.push("configuration check failed");
 
   const txs = await prisma.fundSafeTransaction.findMany({
     where: {
@@ -156,6 +189,16 @@ export async function syncSafe(a: {
         }
         continue;
       }
+      // Not this transaction. SUPERSEDED either way, but say whether we know
+      // what took the slot: a sibling row we recorded as executed, or a
+      // transaction La Caisse never saw (older than the execution lookback,
+      // or run entirely in Safe{Wallet}) — review S12.
+      const sibling = seen
+        ? null
+        : await prisma.fundSafeTransaction.findFirst({
+            where: { safeId: safe.id, safe: { fundId: a.fundId }, nonce: tx.nonce, status: "EXECUTED" },
+            select: { id: true },
+          });
       await prisma.fundSafeTransaction.updateMany({
         where: { id: tx.id, safe: { fundId: a.fundId }, status: { in: ["PENDING", "EXECUTING", "FAILED"] } },
         data: seen
@@ -165,7 +208,12 @@ export async function syncSafe(a: {
               txHash: seen.txHash,
               errorMessage: "tx_reverted: executed on chain but the call failed",
             }
-          : { status: "SUPERSEDED" },
+          : {
+              status: "SUPERSEDED",
+              errorMessage: sibling
+                ? null
+                : "nonce consumed by a transaction La Caisse did not record",
+            },
       });
       continue;
     }
@@ -217,7 +265,7 @@ export async function syncSafe(a: {
       } else {
         // (2a) import Safe{Wallet} confirmations we don't have yet.
         const have = new Set(tx.signatures.map((s) => lc(s.ownerAddress)));
-        for (const c of remote.confirmations ?? []) {
+        for (const c of (remote.confirmations ?? []).slice(0, MAX_CONFIRMATIONS_PER_TX)) {
           // Contract signatures / approved hashes carry no recoverable ECDSA sig.
           if (!c.signature) continue;
           const signature = c.signature;

@@ -320,7 +320,9 @@
         "deploying": "El Safe se está desplegando on-chain. Suele tardar unos segundos.",
         "deployFailed": "Despliegue fallido",
         "pendingTitle": "Esperando firmas",
-        "pendingEmpty": "Nada que firmar por ahora."
+        "pendingEmpty": "Nada que firmar por ahora.",
+        "configWarningTitle": "Configuración no estándar",
+        "configWarningBody": "Este ya no es un Safe 1.4.1 estándar: {drift}. Un módulo puede ejecutar sin firmas y un guard puede bloquear o filtrar transacciones. La Caisse no ejecuta nada hasta que se corrija en Safe'{Wallet}'."
       },
       "tabs": {
         "transactions": "Transacciones",
@@ -361,9 +363,10 @@
       "archive": {
         "trigger": "Archivar",
         "title": "¿Archivar este Safe?",
-        "description": "Desaparece de La Caisse. El Safe, sus firmantes y sus fondos siguen on-chain y se pueden usar en Safe'{Wallet}'.",
+        "description": "El Safe desaparece de La Caisse; sigue en la cadena. Los miembros del equipo ya no podrán firmar desde La Caisse; solo los firmantes externos podrán actuar en Safe'{Wallet}'. Podrá restaurarlo más tarde.",
         "blocked": "{count, plural, one {Aún hay # transacción abierta} other {Aún hay # transacciones abiertas}}. Ejecútalas o recházalas antes de archivar.",
-        "confirm": "Archivar"
+        "confirm": "Archivar",
+        "stewardOnly": "Solo un firmante de este Safe o un propietario del fondo puede archivarlo o renombrarlo."
       },
       "transfer": {
         "trigger": "Proponer transferencia",
@@ -482,7 +485,14 @@
           "relayer": "Ejecutada por La Caisse",
           "external": "Ejecutada fuera de La Caisse"
         },
-        "signedBy": "Firmada por {names}"
+        "signedBy": "Firmada por {names}",
+        "withdraw": "Retirar",
+        "withdrawTitle": "¿Retirar la propuesta n.º {nonce}?",
+        "withdrawDescription": "La propuesta se elimina y su número vuelve a quedar libre. No se ejecutó nada.",
+        "withdrawMirrored": "Este Safe tiene firmantes externos: la propuesta sigue visible en Safe'{Wallet}', donde todavía puede firmarse. Para bloquearla definitivamente, proponga un rechazo.",
+        "withdrawConfirm": "Retirar la propuesta",
+        "formerMember": "Ya no es miembro del equipo",
+        "configBlocked": "Ejecución en pausa: la configuración del Safe no es estándar."
       },
       "history": {
         "title": "Historial",
@@ -520,7 +530,10 @@
         "noteTooLong": "La nota es demasiado larga (máx. 200 caracteres).",
         "ownerRequired": "Elige un miembro o introduce una dirección.",
         "duplicateOwner": "La misma dirección aparece dos veces.",
-        "reauth_required": "Confirme su identidad para continuar."
+        "reauth_required": "Confirme su identidad para continuar.",
+        "addressChecksum": "La dirección tiene una mayúscula incorrecta (suma de verificación). Compruébela o péguela en minúsculas.",
+        "queue_full": "Demasiadas transacciones abiertas en este Safe. Haga firmar, rechazar o retirar las propuestas abiertas primero.",
+        "holds_value": "Este Safe aún contiene fondos que solo los miembros del equipo pueden mover. Vacíelo antes de archivarlo."
       },
       "reauth": {
         "title": "Confirme su identidad",
@@ -531,6 +544,16 @@
         "passkeyButton": "Confirmar con una passkey",
         "passkeyWaiting": "Esperando la passkey…",
         "passkeyFailed": "No se pudo verificar la passkey."
+      },
+      "archived": {
+        "title": "Safes archivados",
+        "description": "Ocultos en La Caisse pero todavía en la cadena. Restaure uno para recuperar sus firmantes y transacciones.",
+        "restore": "Restaurar",
+        "restoring": "Restaurando…"
+      },
+      "custody": {
+        "shared": "Con {threshold} firma{threshold, plural, one {} other {s}} para {members} clave{members, plural, one {} other {s}} del equipo, La Caisse guarda por sí sola suficientes claves para firmar: no es un verdadero multifirma frente al servidor. Añada un firmante externo (cartera física) y suba el umbral por encima del número de claves del equipo para importes relevantes.",
+        "independent": "El umbral supera el número de claves del equipo: al menos un firmante externo debe firmar cada transacción."
       }
     },
     "team": {
@@ -2140,7 +2163,9 @@
             "addressInvalid": "Introduce una dirección de contrato válida (0x seguido de 40 caracteres hexadecimales).",
             "readFailed": "No se pudo leer el contrato ahora mismo. Inténtalo de nuevo en unos minutos.",
             "tooMany": "Puedes añadir como máximo {max} tokens personalizados.",
-            "notFound": "Este token ya no está en la lista."
+            "notFound": "Este token ya no está en la lista.",
+            "addressChecksum": "La dirección tiene una mayúscula incorrecta (suma de verificación). Compruébela o péguela en minúsculas.",
+            "symbolCollides": "El símbolo «{symbol}» ya es el del token del fondo o de un token integrado; sería confuso."
           }
         }
       },
@@ -2685,7 +2710,8 @@
       "inviteInvalid": "Esta invitación no es válida o ya se ha utilizado.",
       "inviteExpired": "Esta invitación ha caducado. Pide a un administrador que envíe una nueva.",
       "emailMismatch": "Esta invitación se envió a una dirección de correo electrónico diferente.",
-      "unverifiedPreexisting": "Esta cuenta existía antes de la invitación y su dirección de correo nunca se confirmó. Restablezca su contraseña desde la página de inicio de sesión para confirmarla y vuelva a aceptar la invitación."
+      "unverifiedPreexisting": "Esta cuenta existía antes de la invitación y su dirección de correo nunca se confirmó. Restablezca su contraseña desde la página de inicio de sesión para confirmarla y vuelva a aceptar la invitación.",
+      "memberIsSigner": "Esta persona firma para {safes} y, sin ella, el umbral de firmas ya no podría alcanzarse. Retírela primero de los firmantes del Safe."
     }
   },
   "joinTeam": {

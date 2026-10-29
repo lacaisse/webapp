@@ -337,7 +337,9 @@
         "deployFailed": "Échec du déploiement",
         "syncProblem": "La dernière synchronisation a rencontré un problème : cette page peut être en retard sur la chaîne jusqu'à ce qu'un rafraîchissement réussisse.",
         "pendingTitle": "En attente de signatures",
-        "pendingEmpty": "Rien à signer pour le moment."
+        "pendingEmpty": "Rien à signer pour le moment.",
+        "configWarningTitle": "Configuration non standard",
+        "configWarningBody": "Ce Safe n'est plus un Safe 1.4.1 standard : {drift}. Un module peut exécuter sans signature et un guard peut bloquer ou filtrer les transactions. La Caisse n'exécute plus rien tant que cela n'est pas corrigé dans Safe'{Wallet}'."
       },
       "tabs": {
         "transactions": "Transactions",
@@ -378,9 +380,10 @@
       "archive": {
         "trigger": "Archiver",
         "title": "Archiver ce Safe ?",
-        "description": "Il disparaît de La Caisse. Le Safe, ses signataires et ses fonds restent on-chain et utilisables dans Safe'{Wallet}'.",
+        "description": "Le Safe disparaît de La Caisse ; il reste sur la blockchain. Les membres de l'équipe ne pourront plus signer depuis La Caisse — seuls les signataires externes pourront encore agir dans Safe'{Wallet}'. Vous pourrez le restaurer plus tard.",
         "blocked": "{count, plural, one {# transaction est encore ouverte} other {# transactions sont encore ouvertes}}. Exécutez-les ou rejetez-les avant d'archiver.",
-        "confirm": "Archiver"
+        "confirm": "Archiver",
+        "stewardOnly": "Seul un signataire de ce Safe ou un propriétaire de la caisse peut l'archiver ou le renommer."
       },
       "transfer": {
         "trigger": "Proposer un transfert",
@@ -499,7 +502,14 @@
           "relayer": "Exécutée par La Caisse",
           "external": "Exécutée en dehors de La Caisse"
         },
-        "signedBy": "Signée par {names}"
+        "signedBy": "Signée par {names}",
+        "withdraw": "Retirer",
+        "withdrawTitle": "Retirer la proposition n° {nonce} ?",
+        "withdrawDescription": "La proposition est supprimée et son numéro redevient libre. Rien n'a été exécuté.",
+        "withdrawMirrored": "Ce Safe a des signataires externes : la proposition reste visible dans Safe'{Wallet}', où elle peut encore être signée. Pour l'empêcher définitivement, proposez plutôt un rejet.",
+        "withdrawConfirm": "Retirer la proposition",
+        "formerMember": "N'est plus membre de l'équipe",
+        "configBlocked": "Exécution suspendue : la configuration du Safe n'est pas standard."
       },
       "history": {
         "title": "Historique",
@@ -537,7 +547,10 @@
         "noteTooLong": "La note est trop longue (200 caractères max.).",
         "ownerRequired": "Choisissez un membre ou saisissez une adresse.",
         "duplicateOwner": "La même adresse figure deux fois.",
-        "reauth_required": "Confirmez votre identité pour continuer."
+        "reauth_required": "Confirmez votre identité pour continuer.",
+        "addressChecksum": "L'adresse contient une majuscule incorrecte (somme de contrôle). Vérifiez-la ou collez-la en minuscules.",
+        "queue_full": "Trop de transactions en attente sur ce Safe. Faites signer, rejeter ou retirer les propositions ouvertes d'abord.",
+        "holds_value": "Ce Safe détient encore des fonds que seuls les membres de l'équipe peuvent déplacer. Videz-le avant de l'archiver."
       },
       "reauth": {
         "title": "Confirmez votre identité",
@@ -548,6 +561,16 @@
         "passkeyButton": "Confirmer avec une passkey",
         "passkeyWaiting": "En attente de la passkey…",
         "passkeyFailed": "La passkey n'a pas pu être vérifiée."
+      },
+      "archived": {
+        "title": "Safes archivés",
+        "description": "Masqués de La Caisse mais toujours sur la blockchain. Restaurez-en un pour retrouver ses signataires et ses transactions.",
+        "restore": "Restaurer",
+        "restoring": "Restauration…"
+      },
+      "custody": {
+        "shared": "Avec {threshold} signature{threshold, plural, one {} other {s}} pour {members} clé{members, plural, one {} other {s}} d'équipe, La Caisse détient à elle seule de quoi signer : ce n'est pas un vrai multisig face au serveur. Ajoutez un signataire externe (portefeuille matériel) et montez le seuil au-dessus du nombre de clés d'équipe pour les montants importants.",
+        "independent": "Le seuil dépasse le nombre de clés d'équipe : au moins un signataire externe est requis pour chaque transaction."
       }
     },
     "team": {
@@ -2196,7 +2219,9 @@
             "addressInvalid": "Saisissez une adresse de contrat valide (0x suivi de 40 caractères hexadécimaux).",
             "readFailed": "Impossible de lire le contrat pour l'instant. Réessayez dans quelques minutes.",
             "tooMany": "Vous pouvez ajouter au plus {max} jetons personnalisés.",
-            "notFound": "Ce jeton n'est plus dans la liste."
+            "notFound": "Ce jeton n'est plus dans la liste.",
+            "addressChecksum": "L'adresse contient une majuscule incorrecte (somme de contrôle). Vérifiez-la ou collez-la en minuscules.",
+            "symbolCollides": "Le symbole « {symbol} » est déjà celui du jeton de la caisse ou d'un jeton intégré ; il prêterait à confusion."
           }
         }
       },
@@ -2742,7 +2767,8 @@
       "inviteInvalid": "Cette invitation est invalide ou a déjà été utilisée.",
       "inviteExpired": "Cette invitation a expiré. Demandez à un administrateur d'en envoyer une nouvelle.",
       "emailMismatch": "Cette invitation a été envoyée à une autre adresse email.",
-      "unverifiedPreexisting": "Ce compte existait avant l'invitation et son adresse email n'a jamais été confirmée. Réinitialisez votre mot de passe depuis la page de connexion pour la confirmer, puis acceptez à nouveau l'invitation."
+      "unverifiedPreexisting": "Ce compte existait avant l'invitation et son adresse email n'a jamais été confirmée. Réinitialisez votre mot de passe depuis la page de connexion pour la confirmer, puis acceptez à nouveau l'invitation.",
+      "memberIsSigner": "Cette personne est signataire de {safes} et, sans elle, le seuil de signatures ne serait plus atteignable. Retirez-la d'abord des signataires du Safe."
     }
   },
   "joinTeam": {

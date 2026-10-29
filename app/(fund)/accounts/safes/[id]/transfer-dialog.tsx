@@ -22,7 +22,7 @@ import { Label } from "@/components/ui/label";
 import { proposeTransferAction } from "@/services/safe/admin-actions";
 import { ProposeTransferSchema, type TransferToken } from "@/services/safe/schemas";
 
-import { sameAddress } from "../format";
+import { sameAddress, shortAddress } from "../format";
 import { useStepUp } from "../reauth-dialog";
 import { ProposalResult } from "./proposal-result";
 
@@ -214,7 +214,9 @@ export function ProposeTransferDialog({
                   >
                     {tokens.map((tok) => (
                       <option key={tok.key} value={tok.key}>
-                        {`${tok.symbol ?? t("token")} · ${tok.balance ?? "—"}`}
+                        {`${tok.symbol ?? t("token")} · ${tok.balance ?? "—"}${
+                          tok.key.startsWith("custom:") ? ` · ${shortAddress(tok.key.slice(7))}` : ""
+                        }`}
                       </option>
                     ))}
                   </select>

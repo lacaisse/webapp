@@ -216,6 +216,14 @@ export function createFakePrisma() {
         const nonces = db.fundSafeTransaction.filter((t) => matches(t, a.where)).map((t) => t.nonce as number);
         return { _max: { nonce: nonces.length ? Math.max(...nonces) : null } };
       },
+      // Signatures cascade (schema: onDelete Cascade).
+      deleteMany: async (a: { where: Where }) => {
+        const gone = db.fundSafeTransaction.filter((t) => matches(t, a.where));
+        const ids = new Set(gone.map((t) => t.id));
+        db.fundSafeTransaction = db.fundSafeTransaction.filter((t) => !ids.has(t.id));
+        db.fundSafeSignature = db.fundSafeSignature.filter((s) => !ids.has(s.transactionId));
+        return { count: gone.length };
+      },
       count: async (a: { where: Where }) => db.fundSafeTransaction.filter((t) => matches(t, a.where)).length,
     },
     fundSafeSignature: {
