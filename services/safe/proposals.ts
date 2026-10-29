@@ -6,6 +6,7 @@ import { formatUnits, getAddress, parseUnits } from "viem";
 import type { Prisma } from "@/services/db/generated/client";
 import type { FundSafeTxKind } from "@/services/db/generated/enums";
 import { prisma } from "@/services/db/prisma";
+import { enabledExtraTokens } from "@/services/token/extra-tokens";
 import {
   ANNOTATION_KINDS,
   ANNOTATION_TRIGGERS,
@@ -465,29 +466,77 @@ async function propose(a: {
   return { transactionId: created.id, safeTxHash: hash, executed: exec.executed, txHash: exec.txHash };
 }
 
+// What a transfer moves and how: the fund token (an ERC-20 transfer on
+// Fund.tokenAddress), or one of the extra tokens the fund shows next to it
+// (services/token/extra-tokens.ts) — an ERC-20 for EURe, a plain value
+// transfer for the chain's native coin. Refused unless the fund enabled it.
+type ResolvedTransferToken = {
+  token: "fund" | "native" | "eure";
+  symbol: string | null;
+  decimals: number;
+  maxFractionDigits: number;
+  contract: Address | null; // null = native coin
+};
+
+function resolveTransferToken(
+  fund: TransferFund,
+  token: "fund" | "native" | "eure",
+): ResolvedTransferToken {
+  if (token === "fund") {
+    if (!fund.tokenAddress || fund.tokenDecimals == null) {
+      throw new SafeError("config", "Fund token is not configured");
+    }
+    return {
+      token,
+      symbol: fund.tokenSymbol?.trim() || null,
+      decimals: fund.tokenDecimals,
+      // TokenOperation.amount is Decimal(12,2): refuse precision we can't record.
+      maxFractionDigits: Math.min(2, fund.tokenDecimals),
+      contract: getAddress(fund.tokenAddress),
+    };
+  }
+  const extra = enabledExtraTokens(fund).find((tok) => tok.key === token);
+  if (!extra) throw new SafeError("invalid_state", "Token not enabled");
+  return {
+    token,
+    symbol: extra.symbol,
+    decimals: extra.decimals,
+    maxFractionDigits: extra.decimals,
+    contract: extra.address ? getAddress(extra.address) : null,
+  };
+}
+
+type TransferFund = {
+  id: string;
+  tokenChainId: number;
+  tokenAddress: string | null;
+  tokenDecimals: number | null;
+  tokenSymbol: string | null;
+  showNativeBalance: boolean;
+  showEureBalance: boolean;
+};
+
 export async function proposeTokenTransfer(a: {
-  fund: { id: string; tokenChainId: number; tokenAddress: string | null; tokenDecimals: number | null };
+  fund: TransferFund;
   safeId: string;
   userId: string;
   input: ProposeTransferInput;
 }): Promise<ProposeResult> {
   const { fund, input } = a;
-  if (!fund.tokenAddress || fund.tokenDecimals == null) {
-    throw new SafeError("config", "Fund token is not configured");
-  }
+  const tok = resolveTransferToken(fund, input.token ?? "fund");
   const safe = await loadActiveSafe(fund.id, a.safeId);
+  // Extra tokens are registered per fund chain too, so one check covers both.
   if (safe.chainId !== fund.tokenChainId) {
     throw new SafeError("unsupported_chain", "Safe and fund token are on different chains");
   }
 
-  // TokenOperation.amount is Decimal(12,2): refuse precision we can't record.
   const fraction = input.amount.split(".")[1] ?? "";
-  if (fraction.length > Math.min(2, fund.tokenDecimals)) {
+  if (fraction.length > tok.maxFractionDigits) {
     throw new SafeError("invalid_state", "Amount has too many decimals");
   }
   let units: bigint;
   try {
-    units = parseUnits(input.amount, fund.tokenDecimals);
+    units = parseUnits(input.amount, tok.decimals);
   } catch (e) {
     throw new SafeError("invalid_state", "Invalid amount", { cause: e });
   }
@@ -499,12 +548,17 @@ export async function proposeTokenTransfer(a: {
     safe,
     userId: a.userId,
     kind: "TOKEN_TRANSFER",
-    call: { to: getAddress(fund.tokenAddress), data: erc20TransferData(recipient, units) },
+    call: tok.contract
+      ? { to: tok.contract, data: erc20TransferData(recipient, units) }
+      : // Native coin: the Safe sends `value` straight to the recipient.
+        { to: recipient, value: units, data: "0x" },
     summary: {
       kind: "TOKEN_TRANSFER",
-      amount: formatUnits(units, fund.tokenDecimals),
+      amount: formatUnits(units, tok.decimals),
       recipient,
       recipientLabel: input.recipientLabel?.trim() || null,
+      token: tok.token,
+      ...(tok.symbol ? { symbol: tok.symbol } : {}),
     },
     note: input.note,
   });
@@ -898,7 +952,8 @@ export async function retryExecution(a: {
 
 // Mark a transaction EXECUTED (by our relayer or seen executed externally),
 // supersede the other open transactions at the same nonce, and for a
-// TOKEN_TRANSFER record the TokenOperation + annotation. Idempotent: a row
+// fund-token TOKEN_TRANSFER record the TokenOperation + annotation (xDAI /
+// EURe: the annotation only). Idempotent: a row
 // that is already EXECUTED is left alone.
 export async function recordExecuted(a: {
   fundId: string;
@@ -950,26 +1005,33 @@ export async function recordExecuted(a: {
   });
 
   const summary = tx.summary as SafeTxSummary | null;
-  if (tx.kind === "TOKEN_TRANSFER" && summary?.kind === "TOKEN_TRANSFER" && !tx.tokenOperationId) {
-    try {
-      const op = await prisma.tokenOperation.create({
-        data: {
-          fundId: a.fundId,
-          type: "TRANSFER",
-          account: summary.recipient,
-          amount: summary.amount,
-          status: "CONFIRMED",
-          txHash: a.txHash,
-          confirmedAt: a.executedAt,
-        },
-        select: { id: true },
-      });
-      await prisma.fundSafeTransaction.update({
-        where: { id: tx.id },
-        data: { tokenOperationId: op.id },
-      });
-    } catch (e) {
-      console.error("[safe] TokenOperation record failed", tx.id, e);
+  if (tx.kind === "TOKEN_TRANSFER" && summary?.kind === "TOKEN_TRANSFER") {
+    // TokenOperation is the fund-token ledger: xDAI / EURe transfers out of
+    // a Safe only get the annotation. A summary without `token` predates
+    // multi-token transfers and moved the fund token.
+    const fundToken = (summary.token ?? "fund") === "fund";
+    if (fundToken && tx.tokenOperationId) return { recorded: true };
+    if (fundToken) {
+      try {
+        const op = await prisma.tokenOperation.create({
+          data: {
+            fundId: a.fundId,
+            type: "TRANSFER",
+            account: summary.recipient,
+            amount: summary.amount,
+            status: "CONFIRMED",
+            txHash: a.txHash,
+            confirmedAt: a.executedAt,
+          },
+          select: { id: true },
+        });
+        await prisma.fundSafeTransaction.update({
+          where: { id: tx.id },
+          data: { tokenOperationId: op.id },
+        });
+      } catch (e) {
+        console.error("[safe] TokenOperation record failed", tx.id, e);
+      }
     }
     // We hold the mined tx hash (not a userOp hash), so annotate directly
     // rather than via resolveOrEnqueueAnnotation. Never throws.

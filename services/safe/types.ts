@@ -34,6 +34,10 @@ export type SafeTxSummary =
       amount: string; // human decimal in token units ("12.50")
       recipient: Address;
       recipientLabel: string | null;
+      // Which balance moved. Missing on rows written before multi-token
+      // transfers: treat as "fund" (and show the fund's symbol).
+      token?: "fund" | "native" | "eure";
+      symbol?: string; // frozen at proposal time ("EURe", "xDAI", fund symbol)
     }
   | {
       kind: "ADD_OWNER";

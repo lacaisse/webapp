@@ -6,6 +6,7 @@ import { refresh, revalidatePath } from "next/cache";
 
 import { requireFundRole } from "@/services/auth/dal";
 import { prisma } from "@/services/db/prisma";
+import { enabledExtraTokens } from "@/services/token/extra-tokens";
 
 import type {
   CreateSafeActionResult,
@@ -150,9 +151,14 @@ export async function proposeTransferAction(
 
   const parsed = ProposeTransferSchema.safeParse(input);
   if (!parsed.success) return { error: t(parsed.error.issues[0].message as never) };
-  // TokenOperation.amount is Decimal(12,2).
-  if ((parsed.data.amount.split(".")[1] ?? "").length > 2) {
-    return { error: t("fund.safes.errors.amountInvalid" as never) };
+  const { token } = parsed.data;
+  if (token === "fund") {
+    // TokenOperation.amount is Decimal(12,2) (fund-token ledger only).
+    if ((parsed.data.amount.split(".")[1] ?? "").length > 2) {
+      return { error: t("fund.safes.errors.amountInvalid" as never) };
+    }
+  } else if (!enabledExtraTokens(fund).some((tok) => tok.key === token)) {
+    return { error: t("fund.safes.errors.tokenNotEnabled" as never) };
   }
 
   try {

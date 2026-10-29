@@ -20,7 +20,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { proposeTransferAction } from "@/services/safe/admin-actions";
-import { ProposeTransferSchema } from "@/services/safe/schemas";
+import { ProposeTransferSchema, type TransferToken } from "@/services/safe/schemas";
 
 import { sameAddress } from "../format";
 import { ProposalResult } from "./proposal-result";
@@ -31,24 +31,35 @@ type RecipientOption = {
   kind: "ACCOUNT" | "CARD";
 };
 
+// One balance the Safe can send: the fund token (first, the default) or an
+// extra token the fund shows (xDAI / EURe). `balance` is the human amount on
+// the Safe, null when the read failed.
+export type TransferTokenOption = {
+  key: TransferToken;
+  symbol: string | null;
+  balance: string | null;
+};
+
 const SELECT_CLASS =
   "h-8 w-full rounded-md bg-background px-2 text-sm ring-1 ring-foreground/15 outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
-// Propose sending the fund token out of the Safe. Pick one of the fund's
-// accounts / staff cards, or paste any address. The proposal then collects
-// signatures; it executes as soon as the threshold is met.
+// Propose sending one of the Safe's balances out — the fund token by default,
+// or an extra token the fund shows (xDAI / EURe; picker hidden when there is
+// none). Pick one of the fund's accounts / staff cards, or paste any address.
+// The proposal then collects signatures; it executes as soon as the
+// threshold is met.
 export function ProposeTransferDialog({
   safeId,
   chainId,
   threshold,
   options,
-  symbol,
+  tokens,
 }: {
   safeId: string;
   chainId: number;
   threshold: number;
   options: RecipientOption[];
-  symbol: string | null;
+  tokens: TransferTokenOption[];
 }) {
   const t = useTranslations("fund.safes.transfer");
   const tRoot = useTranslations();
@@ -56,6 +67,7 @@ export function ProposeTransferDialog({
   const [open, setOpen] = useState(false);
   const [to, setTo] = useState("");
   const [amount, setAmount] = useState("");
+  const [tokenKey, setTokenKey] = useState<TransferToken>(tokens[0]?.key ?? "fund");
   const [note, setNote] = useState("");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -65,6 +77,8 @@ export function ProposeTransferDialog({
   } | null>(null);
 
   const picked = options.find((o) => sameAddress(o.address, to.trim()));
+  const token = tokens.find((tok) => tok.key === tokenKey) ?? tokens[0];
+  const symbol = token?.symbol ?? null;
   const accounts = options.filter((o) => o.kind === "ACCOUNT");
   const cards = options.filter((o) => o.kind === "CARD");
 
@@ -74,6 +88,7 @@ export function ProposeTransferDialog({
     if (!next) {
       setTo("");
       setAmount("");
+      setTokenKey(tokens[0]?.key ?? "fund");
       setNote("");
       setError(null);
       if (result) router.refresh();
@@ -87,6 +102,7 @@ export function ProposeTransferDialog({
       safeId,
       recipient: to,
       amount,
+      token: token?.key ?? "fund",
       recipientLabel: picked?.label,
       note: note.trim() === "" ? undefined : note,
     });
@@ -180,6 +196,24 @@ export function ProposeTransferDialog({
                   </p>
                 )}
               </div>
+
+              {tokens.length > 1 && (
+                <div className="space-y-2">
+                  <Label htmlFor={`safe-transfer-token-${safeId}`}>{t("token")}</Label>
+                  <select
+                    id={`safe-transfer-token-${safeId}`}
+                    value={token?.key ?? "fund"}
+                    onChange={(e) => setTokenKey(e.target.value as TransferToken)}
+                    className={SELECT_CLASS}
+                  >
+                    {tokens.map((tok) => (
+                      <option key={tok.key} value={tok.key}>
+                        {`${tok.symbol ?? t("token")} · ${tok.balance ?? "—"}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor={`safe-transfer-amount-${safeId}`}>
