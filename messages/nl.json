@@ -471,7 +471,8 @@
       },
       "relayer": {
         "lowGas": "Relayer heeft bijna geen gas meer",
-        "lowGasBody": "De relayer van La Caisse heeft nog {balance} xDAI om uitvoeringen te betalen. Vul hem binnenkort aan:"
+        "lowGasBody": "De relayer van La Caisse heeft nog {balance} xDAI om uitvoeringen te betalen. Vul hem binnenkort aan:",
+        "status": "Saldo van de relayer: {balance} xDAI. Stuur xDAI naar dit adres om deployments en uitvoeringen te betalen:"
       },
       "errors": {
         "config": "Het fondstoken is nog niet ingesteld. Koppel eerst Citizen Pay.",

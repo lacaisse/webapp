@@ -471,7 +471,8 @@
       },
       "relayer": {
         "lowGas": "Relayeur bientôt à court de gas",
-        "lowGasBody": "Il reste {balance} xDAI au relayeur de La Caisse pour payer les exécutions. Rechargez-le bientôt :"
+        "lowGasBody": "Il reste {balance} xDAI au relayeur de La Caisse pour payer les exécutions. Rechargez-le bientôt :",
+        "status": "Solde du relayeur : {balance} xDAI. Envoyez des xDAI à cette adresse pour payer les déploiements et exécutions :"
       },
       "errors": {
         "config": "Le jeton de la caisse n'est pas encore configuré. Connectez d'abord Citizen Pay.",

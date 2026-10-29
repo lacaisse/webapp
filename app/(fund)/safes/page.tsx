@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { Suspense } from "react";
-import { Info, ShieldCheck } from "lucide-react";
+import { Fuel, Info, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 
@@ -17,11 +17,11 @@ import {
 } from "@/components/ui/table";
 import { requireFundRole, requireUser } from "@/services/auth/dal";
 import { requireCurrentFund } from "@/services/fund/server";
-import { safeWalletUrl } from "@/services/safe/config";
+import { explorerAddressUrl, safeWalletUrl } from "@/services/safe/config";
 
 import { CreateSafeDialog } from "./create-safe-dialog";
 import { getEligibleMembers, getRelayerStatus, getSafes } from "./data";
-import { isDeployedAddress, thresholdLabel } from "./format";
+import { formatNative, isDeployedAddress, thresholdLabel } from "./format";
 import { RetryDeployButton } from "./retry-deploy-button";
 import { SafeAddress } from "./safe-address";
 import { SafesHeaderSkeleton, SafesTableSkeleton } from "./skeleton";
@@ -90,6 +90,22 @@ async function SafesHeader() {
           <Info className="size-4" />
           <AlertDescription>{t("relayerMissing")}</AlertDescription>
         </Alert>
+      ) : relayer.address ? (
+        // Where the gas comes from: the relayer EOA and what it has left, so
+        // an operator knows which address to top up with xDAI.
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+          <Fuel className="size-4 shrink-0" />
+          <span>
+            {t("relayer.status", {
+              balance: relayer.balanceWei ? formatNative(relayer.balanceWei) : "—",
+            })}
+          </span>
+          <SafeAddress
+            address={relayer.address}
+            href={explorerAddressUrl(chainId, relayer.address)}
+            full
+          />
+        </div>
       ) : null}
     </>
   );

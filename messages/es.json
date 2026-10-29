@@ -471,7 +471,8 @@
       },
       "relayer": {
         "lowGas": "Al relayer le queda poco gas",
-        "lowGasBody": "Al relayer de La Caisse le quedan {balance} xDAI para pagar las ejecuciones. Recárgalo pronto:"
+        "lowGasBody": "Al relayer de La Caisse le quedan {balance} xDAI para pagar las ejecuciones. Recárgalo pronto:",
+        "status": "Saldo del relayer: {balance} xDAI. Envía xDAI a esta dirección para pagar los despliegues y ejecuciones:"
       },
       "errors": {
         "config": "El token del fondo aún no está configurado. Conecta primero Citizen Pay.",
