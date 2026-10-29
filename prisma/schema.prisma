@@ -70,6 +70,12 @@ model User {
   triggeredAnnotations        TransactionAnnotation[] @relation("AnnotationTriggeredBy")
   triggeredPendingAnnotations PendingAnnotation[]     @relation("PendingAnnotationTriggeredBy")
 
+  // Safe multisig: this user's per-fund signer keys and what they signed/proposed.
+  fundSigners     FundSigner[]
+  safesCreated    FundSafe[]            @relation("FundSafeCreatedBy")
+  safeTxsProposed FundSafeTransaction[] @relation("FundSafeTxProposedBy")
+  safeSignatures  FundSafeSignature[]   @relation("FundSafeSignatureUser")
+
   // MCP OAuth provider (agents operating the dashboard via /api/mcp)
   oauthApplications OauthApplication[]
   oauthAccessTokens OauthAccessToken[]
@@ -441,6 +447,8 @@ model Fund {
   txAnnotations             TransactionAnnotation[] // per-tx labels for on-chain history
   pendingAnnotations        PendingAnnotation[] // userOp hashes awaiting tx-hash resolution
   cardTopUps                CardTopUp[] // open-banking card top-ups (PAY_AND_GO /pay/<serial>)
+  safes                     FundSafe[] // multisig Safes managed from La Caisse
+  signers                   FundSigner[] // per-user Safe signer keys
 
   // Cross-fund card enrollment: requests other funds filed against cards this
   // fund issued (in), and requests this fund filed against other funds' cards (out).
@@ -587,6 +595,186 @@ model FundMember {
 
   @@unique([userId, fundId])
   @@index([fundId])
+}
+
+// ---------------------------------------------------------------------------
+// Fund Safes (multisig). A "normal" Safe 1.4.1 (SafeL2 singleton, no modules)
+// deployed through the canonical SafeProxyFactory, owned N-of-M by fund staff
+// signer keys and/or external addresses. Deliberately NOT a Citizen Pay
+// 4337 account: CP's CommunityModule accepts any single owner's signature and
+// ignores the threshold, so these Safes are executed with plain
+// `execTransaction` from a La Caisse relayer EOA (SAFE_RELAYER_PRIVATE_KEY).
+// See services/safe/*.
+// ---------------------------------------------------------------------------
+
+// One signing key per (fund, user). Generated on first use (fresh secp256k1
+// key, AES-256-GCM encrypted via APP_CRED_KEY like Fund.tokenMinterPrivateKeyEnc)
+// and reused as that user's owner address on every Safe of the fund. Kept
+// when the membership is removed: the address may still be an on-chain owner
+// and the signature history must keep pointing at a person.
+model FundSigner {
+  id            String @id @default(cuid())
+  fundId        String
+  userId        String @db.Uuid
+  address       String // EOA address (checksummed)
+  privateKeyEnc String // envelope from services/crypto/secret.ts
+
+  fund Fund @relation(fields: [fundId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  safeOwners FundSafeOwner[]
+  signatures FundSafeSignature[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([fundId, userId])
+  @@unique([fundId, address])
+}
+
+enum FundSafeStatus {
+  DEPLOYING // row created, relayer deployment in flight (or crashed mid-way)
+  ACTIVE // deployed; owners/threshold mirror the chain
+  FAILED // deployment reverted / relayer error — retryable
+}
+
+model FundSafe {
+  id      String @id @default(cuid())
+  fundId  String
+  name    String // operator-facing label
+  chainId Int    @default(100)
+
+  // CREATE2 inputs + result. `saltNonce` is a random uint256 (decimal string)
+  // passed to SafeProxyFactory.createProxyWithNonce; `address` is predicted
+  // before deployment and confirmed from the ProxyCreation event.
+  saltNonce String
+  address   String
+
+  threshold    Int // cached from chain (getThreshold), refreshed by sync
+  status       FundSafeStatus @default(DEPLOYING)
+  deployTxHash String?
+  errorMessage String? // last deployment / sync error
+
+  createdById  String?   @db.Uuid
+  createdBy    User?     @relation("FundSafeCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  lastSyncedAt DateTime?
+  archivedAt   DateTime? // soft delete — hidden from the list, kept for history
+
+  fund         Fund                  @relation(fields: [fundId], references: [id], onDelete: Cascade)
+  owners       FundSafeOwner[]
+  transactions FundSafeTransaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([fundId, address])
+  @@index([fundId])
+}
+
+enum FundSafeOwnerKind {
+  MEMBER // address is a FundSigner of this fund (signs inside La Caisse)
+  EXTERNAL // any other address (signs in Safe{Wallet})
+}
+
+// Cache of the Safe's on-chain owner set. Rows are upserted by sync from
+// getOwners(); an owner that disappears on chain gets `removedAt` set (kept
+// so past signatures still resolve to a label).
+model FundSafeOwner {
+  id       String            @id @default(cuid())
+  safeId   String
+  address  String // checksummed
+  kind     FundSafeOwnerKind
+  signerId String? // set for MEMBER owners
+  label    String? // EXTERNAL owners: operator-given name
+
+  safe   FundSafe    @relation(fields: [safeId], references: [id], onDelete: Cascade)
+  signer FundSigner? @relation(fields: [signerId], references: [id], onDelete: SetNull)
+
+  addedAt   DateTime  @default(now())
+  removedAt DateTime?
+
+  @@unique([safeId, address])
+  @@index([safeId])
+}
+
+enum FundSafeTxKind {
+  TOKEN_TRANSFER // ERC20 transfer of the fund token from the Safe
+  ADD_OWNER // addOwnerWithThreshold
+  REMOVE_OWNER // removeOwner
+  SWAP_OWNER // swapOwner
+  CHANGE_THRESHOLD // changeThreshold
+  REJECTION // empty self-call at a taken nonce (standard Safe "reject")
+}
+
+enum FundSafeTxStatus {
+  PENDING // collecting signatures
+  EXECUTING // threshold met, relayer tx in flight (guarded claim)
+  EXECUTED // mined successfully (by our relayer or externally)
+  FAILED // relayer tx reverted / errored — signatures kept, retryable
+  SUPERSEDED // another tx consumed this nonce on chain
+}
+
+model FundSafeTransaction {
+  id     String         @id @default(cuid())
+  safeId String
+  nonce  Int
+  kind   FundSafeTxKind
+
+  // SafeTx fields (gas fields are always 0 / zero address; the relayer pays).
+  to        String
+  value     String @default("0") // wei, decimal string
+  data      String @default("0x")
+  operation Int    @default(0) // 0 = Call
+
+  safeTxHash String  @unique // EIP-712 hash, also the tx-service id
+  // Human summary for the UI, by kind: { amount, recipient, recipientLabel }
+  // for transfers, { owner, label, threshold } for owner changes, etc.
+  summary    Json
+  note       String?
+
+  status       FundSafeTxStatus @default(PENDING)
+  proposedById String?          @db.Uuid
+  proposedBy   User?            @relation("FundSafeTxProposedBy", fields: [proposedById], references: [id], onDelete: SetNull)
+
+  txHash       String? // execution tx (relayer or external)
+  executedAt   DateTime?
+  executedBy   String? // "relayer" | "external"
+  errorMessage String?
+
+  // Set for executed TOKEN_TRANSFER: the TokenOperation row recorded for it.
+  tokenOperationId String? @unique
+
+  safe       FundSafe            @relation(fields: [safeId], references: [id], onDelete: Cascade)
+  signatures FundSafeSignature[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([safeId, status])
+  @@index([safeId, nonce])
+}
+
+enum FundSafeSignatureSource {
+  LACAISSE // signed in La Caisse with a FundSigner key
+  SAFE_WALLET // imported from the Safe Transaction Service (external signer)
+}
+
+// Who signed what. One row per (transaction, owner address).
+model FundSafeSignature {
+  id            String                  @id @default(cuid())
+  transactionId String
+  ownerAddress  String // checksummed
+  signature     String // 65-byte hex (EIP-712 or eth_sign-style v+4)
+  source        FundSafeSignatureSource
+  signerId      String? // FundSigner used (LACAISSE)
+  userId        String?                 @db.Uuid // user who clicked Sign (LACAISSE)
+
+  transaction FundSafeTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  signer      FundSigner?         @relation(fields: [signerId], references: [id], onDelete: SetNull)
+  user        User?               @relation("FundSafeSignatureUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  signedAt DateTime @default(now())
+
+  @@unique([transactionId, ownerAddress])
 }
 
 // A pending invitation for someone to become fund *staff* (a FundMember).
