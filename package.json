@@ -18,13 +18,15 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
-    "@better-auth/passkey": "~1.6.33",
+    "@better-auth/mcp": "~1.7.14",
+    "@better-auth/oauth-provider": "~1.7.14",
+    "@better-auth/passkey": "~1.7.14",
     "@hookform/resolvers": "^5.9.1",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
     "@react-pdf/renderer": "^4.9.0",
-    "better-auth": "~1.6.33",
+    "better-auth": "~1.7.14",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "leaflet": "^1.9.4",
@@ -62,6 +64,6 @@
     "vitest": "^4.1.10"
   },
   "overrides": {
-    "@better-auth/core": "~1.6.33"
+    "@better-auth/core": "~1.7.14"
   }
 }

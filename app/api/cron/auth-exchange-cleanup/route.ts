@@ -12,6 +12,9 @@ import { prisma } from "@/services/db/prisma";
 // Covered tables:
 //   - AuthExchange (cross-host login handoff)
 //   - CitizenPayConnectAttempt (CP treasury-connect handoff)
+//   - OauthRefreshToken / OauthAccessToken / OauthClientAssertion (the MCP
+//     OAuth provider keeps every rotated refresh token and never prunes;
+//     deleting a refresh row cascades to the access-token rows it minted)
 //
 // Vercel injects `Authorization: Bearer ${CRON_SECRET}` on cron-triggered
 // requests. We reject anything else so the endpoint isn't a free
@@ -24,14 +27,32 @@ export async function GET(request: NextRequest) {
   if (gate) return gate;
 
   const cutoff = new Date(Date.now() - GRACE_MS);
-  const [authExchange, citizenPayConnect] = await Promise.all([
+  const [
+    authExchange,
+    citizenPayConnect,
+    oauthRefreshToken,
+    oauthAccessToken,
+    oauthClientAssertion,
+  ] = await Promise.all([
     prisma.authExchange.deleteMany({ where: { expiresAt: { lt: cutoff } } }),
     prisma.citizenPayConnectAttempt.deleteMany({
+      where: { expiresAt: { lt: cutoff } },
+    }),
+    prisma.oauthRefreshToken.deleteMany({
+      where: { OR: [{ expiresAt: { lt: cutoff } }, { revoked: { lt: cutoff } }] },
+    }),
+    prisma.oauthAccessToken.deleteMany({
+      where: { OR: [{ expiresAt: { lt: cutoff } }, { revoked: { lt: cutoff } }] },
+    }),
+    prisma.oauthClientAssertion.deleteMany({
       where: { expiresAt: { lt: cutoff } },
     }),
   ]);
   return NextResponse.json({
     authExchange: authExchange.count,
     citizenPayConnect: citizenPayConnect.count,
+    oauthRefreshToken: oauthRefreshToken.count,
+    oauthAccessToken: oauthAccessToken.count,
+    oauthClientAssertion: oauthClientAssertion.count,
   });
 }

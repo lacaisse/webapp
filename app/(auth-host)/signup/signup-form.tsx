@@ -34,6 +34,8 @@ export function SignupForm({ returnTo }: { returnTo?: string }) {
       if (!result) return; // server-action redirected
       if ("error" in result) {
         form.setError("root", { message: result.error });
+      } else if (result.redirectTo) {
+        window.location.assign(result.redirectTo);
       } else if (result.message) {
         setOkMessage(result.message);
         form.reset();

@@ -1,11 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 "use server";
 
-import { APIError } from "better-auth/api";
+import { isAPIError } from "better-auth/api";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { auth } from "@/services/auth/better-auth";
+import { oauthRedirectFrom } from "@/services/auth/oauth-query";
+import {
+  oauthRedirectFromError,
+  oauthResumeCallContext,
+} from "@/services/auth/oauth-resume";
 import { buildPostAuthRedirect } from "@/services/auth/redirects";
 import { getApexUrl } from "@/services/fund/server";
 import { getAuthUrl } from "@/services/host/server";
@@ -20,19 +25,21 @@ import {
   type SignupInput,
 } from "./schemas";
 
-export type ActionResult = { error: string } | { ok: true; message?: string };
+// `redirectTo`: a URL the form must navigate to itself (full navigation) —
+// the next hop of an MCP OAuth flow, see services/auth/oauth-resume.ts.
+export type ActionResult =
+  | { error: string }
+  | { ok: true; message?: string; redirectTo?: string };
 
 // MCP OAuth resume: when a sign-in happens mid-OAuth-authorization (the MCP
-// plugin stashed the authorize query in a signed `oidc_login_prompt` cookie
-// and sent the user to /login), Better Auth's after-hook finishes the
-// authorization inside the sign-in call and surfaces the client redirect as a
-// thrown `APIError("FOUND")` with a `location` header. Forward it — treating
-// it as a failure would eat the agent's authorization code.
-function followOAuthResume(e: APIError): never | void {
-  if (e.status !== "FOUND") return;
-  const location = e.headers ? new Headers(e.headers).get("location") : null;
-  if (location) redirect(location);
-}
+// plugin sent the user to /login with a signed copy of the authorize query),
+// the login form hands that query back here as `oauthQuery`. Passed as
+// `oauth_query` in the sign-in body, the plugin verifies it and finishes the
+// authorization inside the sign-in call: the result is the next hop
+// (consent page, or the client's redirect_uri with the code) — see
+// services/auth/oauth-resume.ts for the two shapes it comes in. In that case
+// we do NOT run the cross-host handoff: the user stays on the auth host,
+// whose fresh session cookie is what the consent page needs.
 
 // After auth on this host (`auth.<APP_DOMAIN>`), we DON'T redirect the browser
 // straight to the target. Instead `buildPostAuthRedirect` mints a single-use
@@ -47,6 +54,7 @@ function followOAuthResume(e: APIError): never | void {
 export async function loginAction(
   input: LoginInput,
   returnTo?: string,
+  oauthQuery?: string,
 ): Promise<ActionResult> {
   const t = await getTranslations("auth.errors");
   const parsed = LoginSchema.safeParse(input);
@@ -56,19 +64,41 @@ export async function loginAction(
 
   let result: { user: { id: string; email: string } };
   try {
-    result = await auth.api.signInEmail({
-      body: {
-        email: parsed.data.email,
-        password: parsed.data.password,
-      },
-      headers: await headers(),
+    // `oauth_query` isn't part of signInEmail's declared body — the OAuth
+    // provider plugin reads it from the raw body in a before-hook.
+    const body = {
+      email: parsed.data.email,
+      password: parsed.data.password,
+      ...(oauthQuery ? { oauth_query: oauthQuery } : {}),
+    } as { email: string; password: string };
+    const signedIn: unknown = await auth.api.signInEmail({
+      body,
+      ...(oauthQuery
+        ? await oauthResumeCallContext("/sign-in/email")
+        : { headers: await headers() }),
     });
+    // Only mid-OAuth: a plain sign-in response carries `redirect`/`url`
+    // fields of its own (callbackURL) that must never bypass the exchange.
+    if (oauthQuery) {
+      const next = await oauthRedirectFrom(signedIn);
+      if (next) return { ok: true, redirectTo: next };
+    }
+    result = signedIn as typeof result;
   } catch (e) {
     // Better Auth surfaces auth failures as APIError. Treat them all as
     // "invalid credentials" to avoid leaking which field was wrong — except
-    // the MCP OAuth resume redirect, which rides in as APIError("FOUND").
-    if (e instanceof APIError) {
-      followOAuthResume(e);
+    // the MCP OAuth resume redirect, which rides in as APIError("FOUND"),
+    // and a stale signed query (10 min), which is the agent's fault, not
+    // the password's.
+    if (isAPIError(e)) {
+      const next = oauthRedirectFromError(e);
+      if (next) return { ok: true, redirectTo: next };
+      if (
+        oauthQuery &&
+        (e.body as { error?: string } | undefined)?.error === "invalid_signature"
+      ) {
+        return { error: (await getTranslations("auth.consent"))("invalid") };
+      }
       return { error: t("invalidCredentials") };
     }
     throw e;
@@ -117,8 +147,9 @@ export async function signupAction(
       headers: await headers(),
     });
   } catch (e) {
-    if (e instanceof APIError) {
-      followOAuthResume(e);
+    if (isAPIError(e)) {
+      const next = oauthRedirectFromError(e);
+      if (next) return { ok: true, redirectTo: next };
       // Surface the localized message Better Auth returned (e.g. "user already
       // exists"). Falls back to a generic "invalid input" if absent.
       return { error: e.body?.message ?? t("errors.invalidInput") };
@@ -146,6 +177,36 @@ export async function signupAction(
   );
 }
 
+// MCP OAuth consent (the plugin's `consentPage`, app/(auth-host)/consent).
+// `oauthQuery` is the signed query the consent page was opened with; the
+// plugin needs it back to know which authorize request is being decided.
+// Accepting stores the OauthConsent row and answers with the client's
+// redirect_uri carrying the authorization code; declining answers with the
+// redirect_uri carrying `error=access_denied`. Either way the form sends
+// the browser there (`redirectTo`).
+export async function consentAction(
+  accept: boolean,
+  oauthQuery: string,
+): Promise<ActionResult> {
+  const t = await getTranslations("auth.consent");
+  try {
+    const result: unknown = await auth.api.oauth2Consent({
+      body: { accept, oauth_query: oauthQuery },
+      ...(await oauthResumeCallContext("/oauth2/consent")),
+    });
+    const next = await oauthRedirectFrom(result);
+    if (next) return { ok: true, redirectTo: next };
+  } catch (e) {
+    if (isAPIError(e)) {
+      const next = oauthRedirectFromError(e);
+      if (next) return { ok: true, redirectTo: next };
+      return { error: t("invalid") };
+    }
+    throw e;
+  }
+  return { error: t("invalid") };
+}
+
 export async function forgotPasswordAction(
   input: ForgotPasswordInput,
 ): Promise<ActionResult> {
@@ -168,7 +229,7 @@ export async function forgotPasswordAction(
   } catch (e) {
     // Don't leak whether the email exists — return the same success message
     // regardless. Log so we can spot SMTP/Resend breakage server-side.
-    if (e instanceof APIError) {
+    if (isAPIError(e)) {
       console.error("requestPasswordReset error:", e.body);
     } else {
       throw e;
@@ -197,7 +258,7 @@ export async function resetPasswordAction(
       headers: await headers(),
     });
   } catch (e) {
-    if (e instanceof APIError) {
+    if (isAPIError(e)) {
       return { error: e.body?.message ?? t("errors.sessionExpired") };
     }
     throw e;
