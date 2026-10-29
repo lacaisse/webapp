@@ -18,6 +18,11 @@ import {
   relayerAddress,
   relayerBalance,
 } from "@/services/safe/relayer";
+import {
+  loadSafeTransfers,
+  type SafeTransfersFund,
+  type SafeTransfersPage,
+} from "@/services/safe/transfers";
 import type { SafeTxSummary } from "@/services/safe/types";
 
 import { getAccountOptions } from "../data";
@@ -450,6 +455,33 @@ export const getRecipientOptions = cache(
       }
     }
     return options;
+  },
+);
+
+// ---------------------------------------------------------------------------
+// On-chain history (Transactions tab)
+// ---------------------------------------------------------------------------
+
+// First page of the Safe's token transfers. Only a deployed Safe on the fund's
+// token chain has one; degrades to an empty page with an error flag so the
+// page renders without the history.
+export const getSafeTransfersFirstPage = cache(
+  async (
+    fundId: string,
+    fund: SafeTransfersFund,
+    chainId: number,
+    address: string,
+  ): Promise<SafeTransfersPage & { error: boolean }> => {
+    if (chainId !== fund.tokenChainId || !isDeployedAddress(address)) {
+      return { transfers: [], nextCursor: null, error: false };
+    }
+    try {
+      const page = await loadSafeTransfers(fundId, fund, address, null);
+      return { ...page, error: false };
+    } catch (e) {
+      console.warn("[safes] first transfers page failed", e);
+      return { transfers: [], nextCursor: null, error: true };
+    }
   },
 );
 

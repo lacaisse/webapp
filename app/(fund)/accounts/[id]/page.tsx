@@ -6,18 +6,17 @@ import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Skeleton } from "@/components/ui/skeleton";
 import { requireFundRole } from "@/services/auth/dal";
 import { requireCurrentFund } from "@/services/fund/server";
 import { enabledExtraTokens } from "@/services/token/extra-tokens";
 
 import { AccountManage } from "./account-manage";
 import { MoveTokensDialog } from "./move-tokens-dialog";
+import { AccountTransfersTable } from "./account-transfers-table";
 import { TransferDialog } from "./transfer-dialog";
-import { TransfersTable } from "./transfers-table";
 import { ExtraBalanceLines, extraLinesFor } from "../extra-balance-lines";
 import { getExtraBalances } from "../extra-balances";
-import { AccountDetailSkeleton } from "../skeleton";
+import { AccountDetailSkeleton, TransfersTableSkeleton } from "../skeleton";
 
 import {
   getAccountBalance,
@@ -199,7 +198,7 @@ async function TransfersSection({
           <AlertDescription>{t("transfers.loadError")}</AlertDescription>
         </Alert>
       )}
-      <TransfersTable
+      <AccountTransfersTable
         id={accountId}
         initial={first.transfers}
         initialCursor={first.nextCursor}
@@ -207,15 +206,5 @@ async function TransfersSection({
         accountNames={accountNames}
       />
     </>
-  );
-}
-
-function TransfersTableSkeleton({ rows = 5 }: { rows?: number }) {
-  return (
-    <div className="space-y-2">
-      {Array.from({ length: rows }).map((_, i) => (
-        <Skeleton key={i} className="h-10 w-full" />
-      ))}
-    </div>
   );
 }

@@ -17,22 +17,30 @@ import {
 } from "@/components/ui/table";
 import { TxAnnotationCell, TxTriggerCell } from "@/components/tx-annotation";
 import { shortAddress } from "@/services/alchemy/format";
-import { getAccountTransfersAction } from "@/services/token-account/admin-actions";
 import type { AccountTransfer } from "@/services/token-account/transfers";
 
+// What a "load more" call returns: the shape of getAccountTransfersAction and
+// getSafeTransfersAction alike.
+export type TransfersPageResult =
+  | { error: string }
+  | { ok: true; transfers: AccountTransfer[]; nextCursor: string | null };
+
+// One account's on-chain history (a named account or a Safe). The caller
+// supplies the paging call, so each page wires its own server action.
 export function TransfersTable({
-  id,
   initial,
   initialCursor,
   symbol,
   accountNames,
+  loadMore: fetchPage,
 }: {
-  id: string;
   initial: AccountTransfer[];
   initialCursor: string | null;
+  // Fallback symbol; a row's own `symbol` (mixed-asset pages) wins.
   symbol: string | null;
   // lowercased address → fund-account name, for labelling the counterparty.
   accountNames: Record<string, string>;
+  loadMore: (cursor: string) => Promise<TransfersPageResult>;
 }) {
   const t = useTranslations("fund.accounts.transfers");
   const format = useFormatter();
@@ -43,7 +51,7 @@ export function TransfersTable({
   const loadMore = () => {
     if (!cursor) return;
     startLoad(async () => {
-      const res = await getAccountTransfersAction({ id, cursor });
+      const res = await fetchPage(cursor);
       if ("error" in res) return;
       setRows((prev) => [...prev, ...res.transfers]);
       setCursor(res.nextCursor);
@@ -74,6 +82,7 @@ export function TransfersTable({
           {rows.map((tr) => {
             const counterparty = tr.direction === "out" ? tr.to : tr.from;
             const counterpartyName = accountNames[counterparty.toLowerCase()];
+            const rowSymbol = tr.symbol ?? symbol;
             const sign =
               tr.direction === "out" ? "−" : tr.direction === "in" ? "+" : "";
             return (
@@ -116,7 +125,7 @@ export function TransfersTable({
                 <TableCell className="text-right tabular-nums">
                   {sign}
                   {tr.value}
-                  {symbol ? ` ${symbol}` : ""}
+                  {rowSymbol ? ` ${rowSymbol}` : ""}
                 </TableCell>
               </TableRow>
             );
