@@ -2114,6 +2114,14 @@
           "failedLabel": "Échecs",
           "errorLabel": "Dernière erreur",
           "neverRan": "Aucune exécution pour l’instant."
+        },
+        "balances": {
+          "title": "Soldes affichés sur les comptes",
+          "description": "Les comptes peuvent détenir d'autres jetons que celui de la caisse. Choisissez les soldes supplémentaires affichés sur la page Comptes.",
+          "native": "xDAI (monnaie native)",
+          "nativeHint": "Sert à payer le gas sur Gnosis Chain ; affiché sur chaque compte et chaque Safe.",
+          "eure": "EURe (euro Monerium)",
+          "eureHint": "Stablecoin en euros sur Gnosis Chain."
         }
       },
       "onboarding": {

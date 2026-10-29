@@ -2114,6 +2114,14 @@
           "failedLabel": "Failed",
           "errorLabel": "Last error",
           "neverRan": "No run yet."
+        },
+        "balances": {
+          "title": "Balances shown on accounts",
+          "description": "Accounts can hold more than the fund token. Choose which other balances the Accounts page shows.",
+          "native": "xDAI (native coin)",
+          "nativeHint": "Gas on Gnosis Chain; shown on every account and Safe.",
+          "eure": "EURe (Monerium euro)",
+          "eureHint": "Euro stablecoin on Gnosis Chain."
         }
       },
       "onboarding": {

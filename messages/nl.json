@@ -2075,6 +2075,14 @@
           "failedLabel": "Mislukt",
           "errorLabel": "Laatste fout",
           "neverRan": "Nog geen uitvoering."
+        },
+        "balances": {
+          "title": "Saldi op de rekeningen",
+          "description": "Rekeningen kunnen meer bevatten dan de token van het fonds. Kies welke andere saldi de pagina Rekeningen toont.",
+          "native": "xDAI (native munt)",
+          "nativeHint": "Gas op Gnosis Chain; getoond bij elke rekening en elke Safe.",
+          "eure": "EURe (Monerium-euro)",
+          "eureHint": "Euro-stablecoin op Gnosis Chain."
         }
       },
       "onboarding": {

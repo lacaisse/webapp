@@ -16,7 +16,13 @@ import {
   safeWalletTxUrl,
   safeWalletUrl,
 } from "@/services/safe/config";
+import {
+  enabledExtraTokens,
+  type BalanceDisplaySettings,
+} from "@/services/token/extra-tokens";
 
+import { ExtraBalanceLines, extraLinesFor } from "../../extra-balance-lines";
+import { getExtraBalances } from "../../extra-balances";
 import {
   getCurrentSignerAddress,
   getEligibleMembers,
@@ -208,6 +214,11 @@ async function SafeDetailView({ params }: { params: Promise<{ id: string }> }) {
                 address={safe.address}
                 token={token}
                 symbol={fund.tokenSymbol}
+                display={{
+                  tokenChainId: fund.tokenChainId,
+                  showNativeBalance: fund.showNativeBalance,
+                  showEureBalance: fund.showEureBalance,
+                }}
               />
             </Suspense>
           </div>
@@ -335,6 +346,7 @@ async function SafeBalance({
   address,
   token,
   symbol,
+  display,
 }: {
   chainId: number;
   address: string;
@@ -344,15 +356,31 @@ async function SafeBalance({
     tokenDecimals: number | null;
   };
   symbol: string | null;
+  display: BalanceDisplaySettings;
 }) {
   const t = await getTranslations("fund.safes");
-  const { balance, error } = await getSafeBalance(chainId, address, token);
-  if (balance == null) {
-    return (
-      <span title={error ? t("balancesError") : undefined} className="text-muted-foreground">
-        —
-      </span>
-    );
-  }
-  return <>{`${balance}${symbol ? ` ${symbol}` : ""}`}</>;
+  // xDAI / EURe lines the fund opted into; only for a Safe on the fund's chain.
+  const sameChain = chainId === display.tokenChainId;
+  const [{ balance, error }, extra] = await Promise.all([
+    getSafeBalance(chainId, address, token),
+    getExtraBalances(display, sameChain ? [address] : []),
+  ]);
+  const lines = extraLinesFor(
+    address,
+    enabledExtraTokens(display),
+    extra,
+    sameChain,
+  );
+  return (
+    <>
+      {balance == null ? (
+        <span title={error ? t("balancesError") : undefined} className="text-muted-foreground">
+          —
+        </span>
+      ) : (
+        `${balance}${symbol ? ` ${symbol}` : ""}`
+      )}
+      <ExtraBalanceLines lines={lines} className="mt-1 font-normal" />
+    </>
+  );
 }

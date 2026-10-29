@@ -277,6 +277,12 @@ model Fund {
   tokenAddress                   String?
   tokenDecimals                  Int?
   tokenLogoUrl                   String?
+  // Extra balances the Accounts pages show next to the fund token (named
+  // accounts and Safes): the chain's native coin (xDAI on Gnosis) and
+  // Monerium's EURe. Registry per chain in services/token/extra-tokens.ts.
+  // Off by default; toggled in Settings → Token.
+  showNativeBalance              Boolean   @default(false)
+  showEureBalance                Boolean   @default(false)
   tokenMinterPrivateKeyEnc       String?
   tokenMinterEoaAddress          String?
   tokenMinterSmartAccountAddress String?

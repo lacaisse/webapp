@@ -2075,6 +2075,14 @@
           "failedLabel": "Fallos",
           "errorLabel": "Último error",
           "neverRan": "Todavía no se ha ejecutado."
+        },
+        "balances": {
+          "title": "Saldos mostrados en las cuentas",
+          "description": "Las cuentas pueden tener más que el token del fondo. Elige qué otros saldos muestra la página Cuentas.",
+          "native": "xDAI (moneda nativa)",
+          "nativeHint": "Gas en Gnosis Chain; se muestra en cada cuenta y cada Safe.",
+          "eure": "EURe (euro de Monerium)",
+          "eureHint": "Stablecoin en euros en Gnosis Chain."
         }
       },
       "onboarding": {

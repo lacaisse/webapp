@@ -238,6 +238,24 @@ export async function updateCitizenPaySettingsAction(
   return runUpdate(CitizenPaySchema, normaliseBlanks(input), "/settings");
 }
 
+// --- Balance display (Settings → Token) ---------------------------------
+// Which balances besides the fund token the Accounts pages show (xDAI, EURe —
+// registry in services/token/extra-tokens.ts).
+
+const BalanceDisplaySchema = z.object({
+  showNativeBalance: z.boolean(),
+  showEureBalance: z.boolean(),
+});
+
+export async function updateBalanceDisplayAction(
+  input: z.infer<typeof BalanceDisplaySchema>,
+): Promise<SettingsResult> {
+  const result = await runUpdate(BalanceDisplaySchema, input, "/settings");
+  // The list and both detail pages under /accounts read the flags.
+  if ("ok" in result) revalidatePath("/accounts", "layout");
+  return result;
+}
+
 // --- Referrals -----------------------------------------------------------
 
 const ReferralSchema = z.object({
