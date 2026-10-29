@@ -21,7 +21,7 @@
     "@better-auth/mcp": "~1.7.14",
     "@better-auth/oauth-provider": "~1.7.14",
     "@better-auth/passkey": "~1.7.14",
-    "@hookform/resolvers": "^5.9.1",
+    "@hookform/resolvers": "^6.0.0",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
