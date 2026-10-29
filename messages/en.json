@@ -444,6 +444,9 @@
           "removeOwner": "Remove owner {owner}, {threshold, plural, one {# signature} other {# signatures}} required",
           "swapOwner": "Replace owner {oldOwner} with {newOwner}",
           "changeThreshold": "Change threshold to {threshold, plural, one {# signature} other {# signatures}}",
+          "addOwnerThresholdChange": "Add owner {owner}, signatures required: {from} → {to}",
+          "removeOwnerThresholdChange": "Remove owner {owner}, signatures required: {from} → {to}",
+          "changeThresholdFromTo": "Change threshold from {from} to {to, plural, one {# signature} other {# signatures}}",
           "rejection": "Reject transaction #{nonce}"
         },
         "status": {
@@ -470,6 +473,20 @@
         "youSigned": "You signed this transaction.",
         "waitingExternal": "Waiting for {names} to sign in Safe'{Wallet}'.",
         "sign": "Sign",
+        "signTitle": "Sign transaction #{nonce}?",
+        "signDescription": "Check the addresses and amounts above. Your signature is final and cannot be withdrawn. The transaction runs automatically once {threshold, plural, one {# signature is} other {# signatures are}} collected.",
+        "signConfirm": "Sign",
+        "details": {
+          "recipient": "Recipient",
+          "amount": "Amount",
+          "tokenContract": "Token contract",
+          "newOwner": "New owner",
+          "removedOwner": "Removed owner",
+          "threshold": "Signatures required",
+          "unknownAddress": "Unknown address",
+          "weakens": "Weakens the Safe",
+          "viewOnExplorer": "View on explorer"
+        },
         "reject": "Reject",
         "rejectTitle": "Reject transaction #{nonce}?",
         "rejectDescription": "This proposes an empty transaction with the same number (#{nonce}). Once {threshold, plural, one {# owner signs} other {# owners sign}} it, it runs instead and the original can never be executed.",
@@ -2647,6 +2664,7 @@
       "amountInvalid": "Amount must be a positive number.",
       "amountPositive": "Amount must be greater than zero.",
       "addressInvalid": "Address must be a 0x-prefixed 40-character hex string.",
+      "fromIsSafe": "This address is one of the fund's Safes. Tokens in a Safe can only be moved by its signers' signatures.",
       "noteRequired": "Add an annotation describing this operation.",
       "noteTooLong": "Annotation is too long (max 280 characters).",
       "tokenNotConfigured": "This fund has no token configured yet — connect to Citizen Pay first.",

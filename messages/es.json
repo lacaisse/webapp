@@ -427,6 +427,9 @@
           "removeOwner": "Quitar al firmante {owner}, {threshold, plural, one {# firma necesaria} other {# firmas necesarias}}",
           "swapOwner": "Sustituir al firmante {oldOwner} por {newOwner}",
           "changeThreshold": "Cambiar el umbral a {threshold, plural, one {# firma} other {# firmas}}",
+          "addOwnerThresholdChange": "Añadir a {owner} como firmante, firmas necesarias: {from} → {to}",
+          "removeOwnerThresholdChange": "Quitar al firmante {owner}, firmas necesarias: {from} → {to}",
+          "changeThresholdFromTo": "Cambiar el umbral de {from} a {to, plural, one {# firma} other {# firmas}}",
           "rejection": "Rechazar la transacción n.º {nonce}"
         },
         "status": {
@@ -453,6 +456,20 @@
         "youSigned": "Has firmado esta transacción.",
         "waitingExternal": "Esperando a que {names} firme en Safe'{Wallet}'.",
         "sign": "Firmar",
+        "signTitle": "¿Firmar la transacción n.º {nonce}?",
+        "signDescription": "Comprueba las direcciones y los importes de arriba. Tu firma es definitiva y no se puede retirar. La transacción se ejecuta automáticamente en cuanto {threshold, plural, one {se reúna # firma} other {se reúnan # firmas}}.",
+        "signConfirm": "Firmar",
+        "details": {
+          "recipient": "Destinatario",
+          "amount": "Importe",
+          "tokenContract": "Contrato del token",
+          "newOwner": "Nuevo firmante",
+          "removedOwner": "Firmante retirado",
+          "threshold": "Firmas necesarias",
+          "unknownAddress": "Dirección desconocida",
+          "weakens": "Debilita el Safe",
+          "viewOnExplorer": "Ver en el explorador"
+        },
         "reject": "Rechazar",
         "rejectTitle": "¿Rechazar la transacción n.º {nonce}?",
         "rejectDescription": "Esto propone una transacción vacía con el mismo número (n.º {nonce}). En cuanto {threshold, plural, one {# firmante la firme} other {# firmantes la firmen}}, se ejecuta en su lugar y la original ya no podrá ejecutarse nunca.",
@@ -2591,6 +2608,7 @@
       "amountInvalid": "El importe debe ser un número positivo.",
       "amountPositive": "El importe debe ser mayor que cero.",
       "addressInvalid": "La dirección debe ser una cadena hexadecimal de 40 caracteres con prefijo 0x.",
+      "fromIsSafe": "Esta dirección es uno de los Safes del fondo. Los tokens de un Safe solo se pueden mover con las firmas de sus firmantes.",
       "noteRequired": "Añade una anotación que describa esta operación.",
       "noteTooLong": "La anotación es demasiado larga (máximo 280 caracteres).",
       "tokenNotConfigured": "Este fondo aún no tiene un token configurado — conéctese primero a Citizen Pay.",

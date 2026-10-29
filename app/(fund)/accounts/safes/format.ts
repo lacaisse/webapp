@@ -59,16 +59,76 @@ export function parseSummary(value: unknown): SafeTxSummary | null {
   return value as SafeTxSummary;
 }
 
-// Label for an address in a summary: the label frozen at proposal time, else
-// a name we know now (owners, accounts), else the short address.
+// Label for an address in a summary. The address itself is never hidden: a
+// label (frozen at proposal time, else a name we know now — owners, accounts)
+// is shown next to the short address, "Alice (0x1234…abcd)", so a co-signer
+// can't be shown a friendly name for an address they never saw.
 function who(
   address: string,
   label: string | null | undefined,
   names: Record<string, string> | undefined,
 ): string {
-  const frozen = label?.trim();
-  if (frozen) return frozen;
-  return names?.[address.toLowerCase()] ?? shortAddress(address);
+  const short = shortAddress(address);
+  const name = label?.trim() || names?.[address.toLowerCase()]?.trim();
+  return name ? `${name} (${short})` : short;
+}
+
+// `previousThreshold` / `contract` were added to the stored summary later:
+// rows written before carry neither, and a JSON column can hold anything, so
+// both are checked at runtime rather than trusted from the type.
+function previousThresholdOf(
+  summary: Extract<SafeTxSummary, { kind: "ADD_OWNER" | "REMOVE_OWNER" | "CHANGE_THRESHOLD" }>,
+): number | undefined {
+  const v: unknown = summary.previousThreshold;
+  return typeof v === "number" && Number.isFinite(v) ? v : undefined;
+}
+
+/**
+ * The ERC-20 contract a TOKEN_TRANSFER calls: an address, `null` for native
+ * xDAI, `undefined` when the summary predates the field.
+ */
+export function transferContract(summary: SafeTxSummary): string | null | undefined {
+  if (summary.kind !== "TOKEN_TRANSFER") return undefined;
+  const v: unknown = summary.contract;
+  if (v === null) return null;
+  return typeof v === "string" && v.startsWith("0x") ? v : undefined;
+}
+
+export type ThresholdChange = {
+  kind: "ADD_OWNER" | "REMOVE_OWNER" | "CHANGE_THRESHOLD";
+  from: number | undefined; // undefined on rows recorded before the field
+  to: number;
+};
+
+/** The threshold an owner / threshold change sets, with the old one if known. */
+export function thresholdChange(summary: SafeTxSummary | null): ThresholdChange | null {
+  if (!summary) return null;
+  switch (summary.kind) {
+    case "ADD_OWNER":
+    case "REMOVE_OWNER":
+    case "CHANGE_THRESHOLD":
+      return { kind: summary.kind, from: previousThresholdOf(summary), to: summary.threshold };
+    default:
+      return null;
+  }
+}
+
+/**
+ * The change lowers the bar: fewer signatures than before, or a single
+ * signature where a new or remaining owner can act alone. Removing an owner
+ * from a Safe that already needed 1 signature changes nothing.
+ */
+export function weakensSafe(change: ThresholdChange | null): boolean {
+  if (!change) return false;
+  if (change.from != null && change.to < change.from) return true;
+  return change.to <= 1 && change.kind !== "REMOVE_OWNER";
+}
+
+/** "2 → 1" when the old threshold is known and differs, else "2". */
+export function thresholdDeltaLabel(change: ThresholdChange): string {
+  return change.from != null && change.from !== change.to
+    ? `${change.from} → ${change.to}`
+    : String(change.to);
 }
 
 /**
@@ -98,22 +158,31 @@ export function summaryLine(
       });
     }
     case "ADD_OWNER":
-      return t("tx.summary.addOwner", {
-        owner: who(summary.owner, summary.ownerLabel, names),
-        threshold: summary.threshold,
-      });
-    case "REMOVE_OWNER":
-      return t("tx.summary.removeOwner", {
-        owner: who(summary.owner, summary.ownerLabel, names),
-        threshold: summary.threshold,
-      });
+    case "REMOVE_OWNER": {
+      const owner = who(summary.owner, summary.ownerLabel, names);
+      const from = previousThresholdOf(summary);
+      const base = summary.kind === "ADD_OWNER" ? "addOwner" : "removeOwner";
+      if (from != null && from !== summary.threshold) {
+        return t(`tx.summary.${base}ThresholdChange`, {
+          owner,
+          from,
+          to: summary.threshold,
+        });
+      }
+      return t(`tx.summary.${base}`, { owner, threshold: summary.threshold });
+    }
     case "SWAP_OWNER":
       return t("tx.summary.swapOwner", {
         oldOwner: who(summary.oldOwner, summary.oldOwnerLabel, names),
         newOwner: who(summary.newOwner, summary.newOwnerLabel, names),
       });
-    case "CHANGE_THRESHOLD":
+    case "CHANGE_THRESHOLD": {
+      const from = previousThresholdOf(summary);
+      if (from != null && from !== summary.threshold) {
+        return t("tx.summary.changeThresholdFromTo", { from, to: summary.threshold });
+      }
       return t("tx.summary.changeThreshold", { threshold: summary.threshold });
+    }
     case "REJECTION":
       return t("tx.summary.rejection", { nonce: summary.rejectsNonce });
   }

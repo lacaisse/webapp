@@ -5,7 +5,6 @@ import {
   Ban,
   Check,
   Circle,
-  ExternalLink,
   Loader2,
   PenLine,
   RotateCcw,
@@ -13,7 +12,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useFormatter, useNow, useTranslations } from "next-intl";
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +37,7 @@ import type { SafeTxView } from "../data";
 import { sameAddress, summaryLine } from "../format";
 import { useStepUp } from "../reauth-dialog";
 import type { OwnerRow } from "./owners-card";
+import { TxDetails } from "./tx-details";
 import { TxKindIcon } from "./tx-kind-icon";
 
 // One open Safe transaction: what it does, who proposed it, and — the point
@@ -45,6 +45,7 @@ import { TxKindIcon } from "./tx-kind-icon";
 // when and where.
 export function PendingTxCard({
   safeId,
+  chainId,
   tx,
   owners,
   threshold,
@@ -60,6 +61,7 @@ export function PendingTxCard({
   nextNonce: number | null; // lowest open nonce — the one the Safe runs next
   hasPasskey: boolean;
   safeId: string;
+  chainId: number;
   tx: SafeTxView;
   owners: OwnerRow[];
   threshold: number;
@@ -74,7 +76,6 @@ export function PendingTxCard({
   const format = useFormatter();
   const now = useNow({ updateInterval: 60_000 });
   const router = useRouter();
-  const [signing, startSign] = useTransition();
   const [retrying, startRetry] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const stepUp = useStepUp(hasPasskey);
@@ -102,21 +103,19 @@ export function PendingTxCard({
     missing.every((o) => o.kind === "EXTERNAL");
 
   const line = summaryLine(tx.summary, t, tokenSymbol, { names, kind: tx.kind });
+  const details = (
+    <TxDetails
+      summary={tx.summary}
+      chainId={chainId}
+      tokenSymbol={tokenSymbol}
+      names={names}
+      safeWalletTxHref={safeWalletTxHref}
+      t={t}
+    />
+  );
   const relative = (iso: string) => format.relativeTime(new Date(iso), now);
   const absolute = (iso: string) =>
     format.dateTime(new Date(iso), { dateStyle: "medium", timeStyle: "short" });
-
-  const onSign = () => {
-    setError(null);
-    startSign(async () => {
-      const res = await signTransactionAction({ safeId, transactionId: tx.id });
-      if (stepUp.check(res, onSign)) return;
-      // Refresh on errors too: the signature may be stored and the execution
-      // marked FAILED with its reason.
-      if ("error" in res) setError(res.error);
-      router.refresh();
-    });
-  };
 
   const onRetry = () => {
     setError(null);
@@ -135,7 +134,7 @@ export function PendingTxCard({
           <TxKindIcon kind={tx.kind} />
           <div className="min-w-0 flex-1 space-y-0.5">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-medium">{line}</span>
+              <span className="font-medium break-words">{line}</span>
               <span className="font-mono text-xs text-muted-foreground">
                 {t("tx.nonce", { nonce: tx.nonce })}
               </span>
@@ -171,6 +170,8 @@ export function PendingTxCard({
             )}
           </div>
         </div>
+
+        {details}
 
         <div className="space-y-2">
           <div className="text-xs font-medium text-muted-foreground">
@@ -225,17 +226,6 @@ export function PendingTxCard({
                   { type: "disjunction" },
                 ),
               })}
-              {safeWalletTxHref && (
-                <a
-                  href={safeWalletTxHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-0.5 font-medium text-foreground underline underline-offset-3"
-                >
-                  {t("openInSafeWallet")}
-                  <ExternalLink className="size-3" />
-                </a>
-              )}
             </p>
           )}
         </div>
@@ -259,10 +249,15 @@ export function PendingTxCard({
             </span>
           )}
           {canSign && (
-            <Button type="button" size="sm" onClick={onSign} disabled={signing}>
-              {signing ? <Loader2 className="animate-spin" /> : <PenLine />}
-              {t("tx.sign")}
-            </Button>
+            <SignDialog
+              safeId={safeId}
+              tx={tx}
+              threshold={threshold}
+              line={line}
+              details={details}
+              onError={setError}
+              hasPasskey={hasPasskey}
+            />
           )}
           {canAct && tx.status === "FAILED" && (
             <Button
@@ -294,6 +289,94 @@ export function PendingTxCard({
         {stepUp.dialog}
       </CardContent>
     </Card>
+  );
+}
+
+// Signing is final (a signature can't be withdrawn, only outvoted by a
+// rejection), so it goes through a confirmation that repeats exactly what is
+// being signed: full addresses, amount, token contract, threshold change.
+function SignDialog({
+  safeId,
+  tx,
+  threshold,
+  line,
+  details,
+  onError,
+  hasPasskey,
+}: {
+  safeId: string;
+  tx: SafeTxView;
+  threshold: number;
+  line: string;
+  details: ReactNode;
+  hasPasskey: boolean;
+  // Errors are shown on the card, not in the dialog: after the refresh the
+  // user may no longer be able to sign (signature stored, execution failed),
+  // which unmounts the dialog and would take its error with it.
+  onError: (message: string) => void;
+}) {
+  const t = useTranslations("fund.safes.tx");
+  const tRoot = useTranslations();
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const stepUp = useStepUp(hasPasskey);
+
+  const onConfirm = () => {
+    startTransition(async () => {
+      const res = await signTransactionAction({ safeId, transactionId: tx.id });
+      // Not fresh enough: confirm identity, then sign again.
+      if (stepUp.check(res, onConfirm)) return;
+      if ("error" in res) onError(res.error);
+      // Refresh on errors too: the signature may be stored and the execution
+      // marked FAILED with its reason.
+      router.refresh();
+      setOpen(false);
+    });
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(n) => {
+        if (pending || stepUp.pending) return;
+        setOpen(n);
+      }}
+    >
+      <DialogTrigger
+        render={
+          <Button type="button" size="sm">
+            <PenLine />
+            {t("sign")}
+          </Button>
+        }
+      />
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{t("signTitle", { nonce: tx.nonce })}</DialogTitle>
+          <DialogDescription className="break-words">{line}</DialogDescription>
+        </DialogHeader>
+        {details}
+        <p className="text-sm text-muted-foreground">
+          {t("signDescription", { threshold })}
+        </p>
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => setOpen(false)}
+            disabled={pending}
+          >
+            {tRoot("common.cancel")}
+          </Button>
+          <Button type="button" onClick={onConfirm} disabled={pending}>
+            {pending ? <Loader2 className="size-4 animate-spin" /> : <PenLine className="size-4" />}
+            {t("signConfirm")}
+          </Button>
+        </DialogFooter>
+        {stepUp.dialog}
+      </DialogContent>
+    </Dialog>
   );
 }
 

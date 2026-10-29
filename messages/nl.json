@@ -427,6 +427,9 @@
           "removeOwner": "Ondertekenaar {owner} verwijderen, {threshold, plural, one {# handtekening} other {# handtekeningen}} vereist",
           "swapOwner": "Ondertekenaar {oldOwner} vervangen door {newOwner}",
           "changeThreshold": "Drempel wijzigen naar {threshold, plural, one {# handtekening} other {# handtekeningen}}",
+          "addOwnerThresholdChange": "{owner} toevoegen als ondertekenaar, vereiste handtekeningen: {from} → {to}",
+          "removeOwnerThresholdChange": "Ondertekenaar {owner} verwijderen, vereiste handtekeningen: {from} → {to}",
+          "changeThresholdFromTo": "Drempel wijzigen van {from} naar {to, plural, one {# handtekening} other {# handtekeningen}}",
           "rejection": "Transactie nr. {nonce} afwijzen"
         },
         "status": {
@@ -453,6 +456,20 @@
         "youSigned": "Je hebt deze transactie getekend.",
         "waitingExternal": "Wacht tot {names} tekent in Safe'{Wallet}'.",
         "sign": "Tekenen",
+        "signTitle": "Transactie nr. {nonce} tekenen?",
+        "signDescription": "Controleer de adressen en bedragen hierboven. Je handtekening is definitief en kan niet worden ingetrokken. De transactie wordt automatisch uitgevoerd zodra {threshold, plural, one {# handtekening is verzameld} other {# handtekeningen zijn verzameld}}.",
+        "signConfirm": "Tekenen",
+        "details": {
+          "recipient": "Ontvanger",
+          "amount": "Bedrag",
+          "tokenContract": "Tokencontract",
+          "newOwner": "Nieuwe ondertekenaar",
+          "removedOwner": "Verwijderde ondertekenaar",
+          "threshold": "Vereiste handtekeningen",
+          "unknownAddress": "Onbekend adres",
+          "weakens": "Verzwakt de Safe",
+          "viewOnExplorer": "Bekijken in de explorer"
+        },
         "reject": "Afwijzen",
         "rejectTitle": "Transactie nr. {nonce} afwijzen?",
         "rejectDescription": "Dit stelt een lege transactie met hetzelfde nummer (nr. {nonce}) voor. Zodra {threshold, plural, one {# ondertekenaar ze heeft getekend} other {# ondertekenaars ze hebben getekend}}, wordt ze in de plaats uitgevoerd en kan de oorspronkelijke nooit meer worden uitgevoerd.",
@@ -2591,6 +2608,7 @@
       "amountInvalid": "Bedrag moet een positief getal zijn.",
       "amountPositive": "Bedrag moet groter zijn dan nul.",
       "addressInvalid": "Adres moet een hex-string van 40 tekens zijn met 0x-prefix.",
+      "fromIsSafe": "Dit adres is een van de Safes van het fonds. Tokens in een Safe kunnen alleen met de handtekeningen van zijn ondertekenaars worden verplaatst.",
       "noteRequired": "Voeg een annotatie toe die deze bewerking beschrijft.",
       "noteTooLong": "Annotatie is te lang (max. 280 tekens).",
       "tokenNotConfigured": "Dit fonds heeft nog geen token geconfigureerd — verbind eerst met Citizen Pay.",

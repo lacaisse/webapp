@@ -7,11 +7,31 @@ import type { ExtraTokenKey } from "@/services/token/extra-tokens";
 // actions in services/safe/admin-actions.ts (re-validation). Messages are
 // i18n keys under `fund.safes.errors.*`, resolved by the caller.
 
+// Unicode format characters (category Cf): bidi overrides / isolates
+// (U+202A–U+202E, U+2066–U+2069), zero-width space / joiners (U+200B–U+200D),
+// soft hyphen, BOM… They are invisible, so a proposer could use them to make a
+// label or note read differently from what it says (e.g. reversing an address
+// fragment with U+202E). Stripped, then trimmed, before any length check.
+const INVISIBLE = /\p{Cf}/gu;
+
+export function stripInvisible(s: string): string {
+  return s.replace(INVISIBLE, "").trim();
+}
+
+// Free text typed by a proposer: invisible characters stripped and trimmed,
+// THEN length-checked (so the cap applies to what is actually shown).
+const cleanText = (max: number, message?: string) =>
+  z.string().transform(stripInvisible).pipe(z.string().max(max, message));
+
 const NAME = z
   .string()
-  .trim()
-  .min(1, "fund.safes.errors.nameRequired")
-  .max(60, "fund.safes.errors.nameTooLong");
+  .transform(stripInvisible)
+  .pipe(
+    z
+      .string()
+      .min(1, "fund.safes.errors.nameRequired")
+      .max(60, "fund.safes.errors.nameTooLong"),
+  );
 
 export const ADDRESS = z
   .string()
@@ -31,7 +51,7 @@ const THRESHOLD = z
 
 export const ExternalOwnerSchema = z.object({
   address: ADDRESS,
-  label: z.string().trim().max(60, "fund.safes.errors.labelTooLong"),
+  label: cleanText(60, "fund.safes.errors.labelTooLong"),
 });
 
 export const CreateSafeSchema = z
@@ -81,8 +101,8 @@ export const ProposeTransferSchema = z.object({
   recipient: ADDRESS,
   amount: DECIMAL_AMOUNT,
   token: TRANSFER_TOKEN.default("fund"),
-  recipientLabel: z.string().trim().max(80).optional(),
-  note: z.string().trim().max(200, "fund.safes.errors.noteTooLong").optional(),
+  recipientLabel: cleanText(80).optional(),
+  note: cleanText(200, "fund.safes.errors.noteTooLong").optional(),
 });
 // Input (token optional, defaults to "fund") — what callers pass; the core
 // reads `token ?? "fund"`.
@@ -95,7 +115,7 @@ export type ProposeTransferInput = Omit<z.input<typeof ProposeTransferSchema>, "
 const NewOwnerFields = {
   memberUserId: z.string().min(1).optional(),
   address: ADDRESS.optional(),
-  label: z.string().trim().max(60, "fund.safes.errors.labelTooLong").optional(),
+  label: cleanText(60, "fund.safes.errors.labelTooLong").optional(),
 };
 const hasOneNewOwner = (v: { memberUserId?: string; address?: string }) =>
   Boolean(v.memberUserId) !== Boolean(v.address);
@@ -115,6 +135,6 @@ export type OwnerChangeInput = z.infer<typeof OwnerChangeSchema>;
 export const ProposeOwnerChangeSchema = z.object({
   safeId: z.string().min(1),
   change: OwnerChangeSchema,
-  note: z.string().trim().max(200, "fund.safes.errors.noteTooLong").optional(),
+  note: cleanText(200, "fund.safes.errors.noteTooLong").optional(),
 });
 export type ProposeOwnerChangeInput = z.infer<typeof ProposeOwnerChangeSchema>;

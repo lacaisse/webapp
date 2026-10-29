@@ -10,6 +10,7 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 const prisma = vi.hoisted(() => ({
   tokenOperation: { create: vi.fn(), update: vi.fn() },
   fund: { update: vi.fn() },
+  fundSafe: { findFirst: vi.fn() },
 }));
 vi.mock("@/services/db/prisma", () => ({ prisma }));
 
@@ -73,6 +74,7 @@ beforeEach(() => {
   prisma.tokenOperation.create.mockResolvedValue({ id: "op-1" });
   prisma.tokenOperation.update.mockResolvedValue({});
   prisma.fund.update.mockResolvedValue({});
+  prisma.fundSafe.findFirst.mockResolvedValue(null);
   userop.burnFromToken.mockResolvedValue({ txHash: TX, userOpHash: "0xuserop" });
   userop.mintToken.mockResolvedValue({ txHash: TX, userOpHash: "0xuserop" });
   userop.failedBeforeSubmit.mockReturnValue(false);
@@ -143,6 +145,26 @@ describe("burnDirect — broadcast", () => {
       txHash: TX,
       userOpHash: "0xuserop",
     });
+  });
+  it("burnDirect refuses a from address that is a fund Safe", async () => {
+    prisma.fundSafe.findFirst.mockResolvedValueOnce({ id: "safe-1" });
+    const from = "0xAbCdEf0123456789aBcDeF0123456789AbCdEf01";
+    expect(
+      await burnDirect(ctx, { from, amount: "12.50", note: "drain" }),
+    ).toEqual({
+      error: "tokenOps.errors.fromIsSafe",
+      field: "from",
+      broadcast: false,
+    });
+    expect(prisma.fundSafe.findFirst).toHaveBeenCalledWith({
+      where: {
+        fundId: "fund-1",
+        address: { equals: from, mode: "insensitive" },
+      },
+      select: { id: true },
+    });
+    expect(prisma.tokenOperation.create).not.toHaveBeenCalled();
+    expect(userop.burnFromToken).not.toHaveBeenCalled();
   });
 });
 

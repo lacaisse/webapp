@@ -444,6 +444,9 @@
           "removeOwner": "Retirer le signataire {owner}, {threshold, plural, one {# signature requise} other {# signatures requises}}",
           "swapOwner": "Remplacer le signataire {oldOwner} par {newOwner}",
           "changeThreshold": "Passer le seuil à {threshold, plural, one {# signature} other {# signatures}}",
+          "addOwnerThresholdChange": "Ajouter {owner} comme signataire, signatures requises : {from} → {to}",
+          "removeOwnerThresholdChange": "Retirer le signataire {owner}, signatures requises : {from} → {to}",
+          "changeThresholdFromTo": "Passer le seuil de {from} à {to, plural, one {# signature} other {# signatures}}",
           "rejection": "Rejeter la transaction n° {nonce}"
         },
         "status": {
@@ -470,6 +473,20 @@
         "youSigned": "Vous avez signé cette transaction.",
         "waitingExternal": "En attente de la signature de {names} dans Safe'{Wallet}'.",
         "sign": "Signer",
+        "signTitle": "Signer la transaction n° {nonce} ?",
+        "signDescription": "Vérifiez les adresses et les montants ci-dessus. Votre signature est définitive : elle ne peut pas être retirée. La transaction s'exécute automatiquement dès que {threshold, plural, one {# signature est réunie} other {# signatures sont réunies}}.",
+        "signConfirm": "Signer",
+        "details": {
+          "recipient": "Destinataire",
+          "amount": "Montant",
+          "tokenContract": "Contrat du jeton",
+          "newOwner": "Nouveau signataire",
+          "removedOwner": "Signataire retiré",
+          "threshold": "Signatures requises",
+          "unknownAddress": "Adresse inconnue",
+          "weakens": "Affaiblit le Safe",
+          "viewOnExplorer": "Voir dans l'explorateur"
+        },
         "reject": "Rejeter",
         "rejectTitle": "Rejeter la transaction n° {nonce} ?",
         "rejectDescription": "Cela propose une transaction vide portant le même numéro (n° {nonce}). Dès que {threshold, plural, one {# signataire l'a signée} other {# signataires l'ont signée}}, elle s'exécute à la place et l'originale ne pourra plus jamais l'être.",
@@ -2647,6 +2664,7 @@
       "amountInvalid": "Le montant doit être un nombre positif.",
       "amountPositive": "Le montant doit être supérieur à zéro.",
       "addressInvalid": "L'adresse doit être une chaîne hexadécimale de 40 caractères préfixée par 0x.",
+      "fromIsSafe": "Cette adresse est l'un des Safes de la caisse. Les jetons d'un Safe ne bougent qu'avec les signatures de ses signataires.",
       "noteRequired": "Ajoutez une annotation décrivant cette opération.",
       "noteTooLong": "L'annotation est trop longue (280 caractères max).",
       "tokenNotConfigured": "Cette caisse n'a pas encore de jeton configuré — connectez-vous d'abord à Citizen Pay.",
