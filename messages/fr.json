@@ -45,6 +45,22 @@
       "waitlistPrompt": "Vous n'avez pas encore de compte ?",
       "joinWaitlist": "Rejoindre la liste d'attente"
     },
+    "consent": {
+      "title": "Autoriser l'accès",
+      "description": "{client} souhaite agir sur vos caisses via La Caisse en votre nom, en tant que {email}.",
+      "unknownClient": "Une application",
+      "scopesTitle": "Cela lui permettra de :",
+      "scopes": {
+        "openid": "Confirmer votre identité",
+        "profile": "Voir votre nom",
+        "email": "Voir votre adresse email",
+        "offline_access": "Rester connectée pendant un jour sans redemander"
+      },
+      "accept": "Autoriser",
+      "deny": "Annuler",
+      "invalid": "Cette demande d'autorisation est invalide ou a expiré. Retournez dans l'application et recommencez.",
+      "hint": "L'accès expire automatiquement après 24 heures. L'application ne peut agir que sur les caisses dont vous êtes déjà membre, avec votre rôle."
+    },
     "forgotPassword": {
       "title": "Réinitialiser votre mot de passe",
       "description": "Nous vous enverrons un lien par email pour en définir un nouveau.",

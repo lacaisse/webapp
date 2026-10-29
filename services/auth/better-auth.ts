@@ -3,11 +3,13 @@ import "server-only";
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
-import { mcp } from "better-auth/plugins";
+import { jwt } from "better-auth/plugins";
+import { mcp } from "@better-auth/mcp";
 import { passkey } from "@better-auth/passkey";
 import { getTranslations } from "next-intl/server";
 import { prisma } from "@/services/db/prisma";
 import { sendEmail } from "@/services/email/resend";
+import { MCP_SCOPES, mcpResourceForOrigin } from "@/services/mcp/resource";
 
 // Better Auth replaces Supabase Auth as the identity layer. Postgres stays —
 // Supabase is only the host; queries still go through Prisma. Each host gets
@@ -42,9 +44,21 @@ const PORT_SUFFIX = isProd ? "" : `:${process.env.PORT ?? 3000}`;
 const APEX_ORIGIN = `${APP_SCHEME}://${APP_DOMAIN}${PORT_SUFFIX}`;
 const WILDCARD_ORIGIN = `${APP_SCHEME}://*.${APP_DOMAIN}${PORT_SUFFIX}`;
 
+// The MCP server as an OAuth protected resource. The plugin wants ONE
+// canonical resource: that's the apex's `/api/mcp`, seeded into OauthResource
+// at boot. Fund hosts (`https://<fund-domain>/api/mcp`) are resources too —
+// registered on first discovery by services/mcp/auth.ts, which is also where
+// tokens are verified per host. `enforcePerClientResources` is therefore off:
+// any registered client may target any enabled resource row.
+const MCP_RESOURCE = mcpResourceForOrigin(APEX_ORIGIN);
+
 export const auth = betterAuth({
   baseURL: AUTH_HOST,
   database: prismaAdapter(prisma, { provider: "postgresql" }),
+
+  // The jwt plugin's bare `/token` endpoint would mint session-backed JWTs
+  // outside OAuth; the provider's `/oauth2/token` is the only token door.
+  disabledPaths: ["/token"],
 
   // Merged with the default (baseURL) list. A function so paid custom domains —
   // which aren't subdomains of APP_DOMAIN and so escape the wildcard — can be
@@ -100,29 +114,38 @@ export const auth = betterAuth({
   },
 
   plugins: [
+    // Signs the OAuth access tokens (and serves /api/auth/jwks, which the
+    // MCP route verifies against). Required by @better-auth/mcp. The header
+    // option stops it from also stamping a JWT on every session response.
+    jwt({ disableSettingJwtHeader: true }),
+
     // OAuth 2.1 authorization server for MCP clients (agents operating the
-    // dashboard through /api/mcp). Clients self-register via dynamic client
-    // registration, the user authorizes on THIS host (loginPage is the auth
-    // host's own /login — the plugin stashes the OAuth query in a signed
-    // cookie and resumes the flow right after sign-in), and the issued
-    // bearer tokens land in OauthAccessToken. Deliberately short-lived:
-    // access tokens last an hour and refresh tokens a day, so an agent's
-    // authorization decays quickly unless the user re-approves.
-    //
-    // NOTE for the login/signup server actions: the post-login resume is a
-    // thrown `APIError("FOUND")` redirect — actions must forward it (see
-    // followOAuthResume in app/(auth-host)/actions.ts), not swallow it as a
-    // credential error.
+    // dashboard through /api/mcp) — @better-auth/mcp on top of the OAuth
+    // provider plugin. Clients self-register via dynamic client registration
+    // (the open, unauthenticated kind: MCP clients have no credentials
+    // before they register), PKCE is mandatory for them, and the user
+    // authorizes on THIS host: the plugin sends the browser to /login with
+    // a signed copy of the authorize query, the login action hands it back
+    // as `oauth_query` (see app/(auth-host)/actions.ts), then /consent asks
+    // for the grant. Tokens are deliberately short-lived: access tokens last
+    // an hour and refresh tokens a day, so an agent's authorization decays
+    // quickly unless the user re-approves.
     mcp({
       loginPage: "/login",
-      oidcConfig: {
-        loginPage: "/login", // OIDCOptions requires it too; same page
-        accessTokenExpiresIn: 60 * 60, // 1 h — the "short session"
-        refreshTokenExpiresIn: 60 * 60 * 24, // 1 day, then re-authorize
-        codeExpiresIn: 600,
-        requirePKCE: true,
-        allowDynamicClientRegistration: true,
-      },
+      consentPage: "/consent",
+      resource: MCP_RESOURCE,
+      // Prisma can't store a resource without allowedScopes (null list).
+      resources: [{ identifier: MCP_RESOURCE, allowedScopes: MCP_SCOPES }],
+      scopes: MCP_SCOPES,
+      enforcePerClientResources: false,
+      accessTokenExpiresIn: 60 * 60, // 1 h — the "short session"
+      refreshTokenExpiresIn: 60 * 60 * 24, // 1 day, then re-authorize
+      codeExpiresIn: 600,
+      allowDynamicClientRegistration: true,
+      allowUnauthenticatedClientRegistration: true,
+      // Cursor / older Claude Code omit application_type; their loopback
+      // redirect URIs make them native clients, not web ones.
+      clientRegistrationDefaultApplicationType: "infer",
     }),
     passkey({
       rpName: "La Caisse",

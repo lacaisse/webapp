@@ -13,10 +13,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { signIn } from "@/services/auth/client";
+import { authorizeResumeUrl } from "@/services/auth/oauth-query";
 import { loginAction } from "../actions";
 import { LoginSchema, type LoginInput } from "../schemas";
 
-export function LoginForm() {
+// `oauthQuery`: set when an MCP client's authorize request sent the user
+// here (the signed query, verified by the page). Password sign-in passes it
+// to the action, which resumes the OAuth flow server-side; passkey sign-in
+// re-enters the authorize endpoint with it once the session cookie is set.
+export function LoginForm({ oauthQuery }: { oauthQuery?: string }) {
   const t = useTranslations("auth.login");
   const tCommon = useTranslations("common");
   // Schemas emit translation keys as error messages — use this raw `t` so we
@@ -40,9 +45,13 @@ export function LoginForm() {
 
   const onPasswordSubmit = (data: LoginInput) =>
     startPwTransition(async () => {
-      const result = await loginAction(data, returnTo);
+      const result = await loginAction(data, returnTo, oauthQuery);
       if (result && "error" in result) {
         form.setError("root", { message: result.error });
+      } else if (result?.redirectTo) {
+        // Mid-OAuth: the next hop (consent page, or the agent's redirect_uri).
+        // Full navigation, not the client router — see oauth-resume.ts.
+        window.location.assign(result.redirectTo);
       }
     });
 
@@ -59,7 +68,9 @@ export function LoginForm() {
         return;
       }
       // Hard-nav so the destination host loads with the freshly-set cookie.
-      window.location.href = returnTo ?? "/";
+      window.location.href = oauthQuery
+        ? authorizeResumeUrl(oauthQuery)
+        : (returnTo ?? "/");
     });
   };
 

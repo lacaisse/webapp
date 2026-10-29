@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getCurrentUser } from "@/services/auth/dal";
+import { readSignedOAuthQuery } from "@/services/auth/oauth-resume";
 import { buildPostAuthRedirect } from "@/services/auth/redirects";
 import { getApexUrl } from "@/services/fund/server";
 import { LoginForm } from "./login-form";
@@ -22,9 +23,16 @@ export default async function LoginPage({
 }) {
   const { return_to } = await searchParams;
 
+  // Mid-MCP-OAuth: the provider plugin sent the browser here with a signed
+  // copy of the authorize query. The form hands it back to loginAction so
+  // the plugin can resume (services/auth/oauth-query.ts). A signed-in user
+  // only lands here with it on `prompt=login`, which wants a fresh sign-in —
+  // so no short-circuit in that case.
+  const oauthQuery = await readSignedOAuthQuery();
+
   // Already signed in on the auth host — skip the form and bounce the user
   // through the exchange flow so the target host gets its own session cookie.
-  const user = await getCurrentUser();
+  const user = oauthQuery ? null : await getCurrentUser();
   if (user) {
     redirect(
       await buildPostAuthRedirect({
@@ -44,7 +52,7 @@ export default async function LoginPage({
         <CardDescription>{t("description")}</CardDescription>
       </CardHeader>
       <CardContent>
-        <LoginForm />
+        <LoginForm oauthQuery={oauthQuery ?? undefined} />
       </CardContent>
       <CardFooter className="text-sm text-muted-foreground">
         {return_to ? (

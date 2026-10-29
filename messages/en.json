@@ -45,6 +45,22 @@
       "waitlistPrompt": "Don't have an account yet?",
       "joinWaitlist": "Join the waitlist"
     },
+    "consent": {
+      "title": "Authorize access",
+      "description": "{client} wants to operate your funds through La Caisse on your behalf, as {email}.",
+      "unknownClient": "An application",
+      "scopesTitle": "This will allow it to:",
+      "scopes": {
+        "openid": "Confirm who you are",
+        "profile": "See your name",
+        "email": "See your email address",
+        "offline_access": "Stay connected for one day without asking again"
+      },
+      "accept": "Authorize",
+      "deny": "Cancel",
+      "invalid": "This authorization request is invalid or has expired. Go back to the application and start again.",
+      "hint": "Access expires automatically after 24 hours. The application can only act on funds you are already a member of, with your role."
+    },
     "forgotPassword": {
       "title": "Reset your password",
       "description": "We'll email you a link to set a new one.",

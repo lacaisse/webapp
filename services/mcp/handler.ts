@@ -12,7 +12,8 @@ import { registerTools } from "./tools";
 // One MCP server instance per request (stateless Streamable HTTP): no session
 // ids, plain JSON responses, nothing held in memory between calls — exactly
 // what a serverless deployment wants. Auth happened before we get here
-// (withMcpAuth in app/api/mcp/route.ts); the token's userId scopes every tool.
+// (requireMcpAuthForHost in app/api/mcp/route.ts); the token's user (its
+// `sub` claim) scopes every tool.
 //
 // The endpoint is mounted on every host and servers are normally registered at
 // a fund URL (`https://<fund-domain>/api/mcp`), so proxy.ts has already

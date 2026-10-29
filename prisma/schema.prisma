@@ -71,9 +71,10 @@ model User {
   triggeredPendingAnnotations PendingAnnotation[]     @relation("PendingAnnotationTriggeredBy")
 
   // MCP OAuth provider (agents operating the dashboard via /api/mcp)
-  oauthApplications OauthApplication[]
-  oauthAccessTokens OauthAccessToken[]
-  oauthConsents     OauthConsent[]
+  oauthClients       OauthClient[]
+  oauthRefreshTokens OauthRefreshToken[]
+  oauthAccessTokens  OauthAccessToken[]
+  oauthConsents      OauthConsent[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -97,6 +98,11 @@ model Session {
   userAgent String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // MCP OAuth tokens minted during this session (nulled when the session
+  // row goes — the plugin re-checks the live session on introspection).
+  oauthRefreshTokens OauthRefreshToken[]
+  oauthAccessTokens  OauthAccessToken[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -170,72 +176,206 @@ model Passkey {
 }
 
 // =============================================================================
-// MCP OAuth provider tables (Better Auth `mcp` plugin)
+// MCP OAuth provider tables (@better-auth/mcp on @better-auth/oauth-provider,
+// plus the core jwt() plugin's key store)
 // =============================================================================
 // The app acts as an OAuth 2.1 authorization server for MCP clients (agents
-// operating the dashboard via /api/mcp). Shapes are dictated by the plugin —
-// same "don't rename fields" rule as the core Better Auth tables above.
-// Clients self-register (dynamic client registration), users authorize on the
-// auth host, and short-lived bearer tokens land in OauthAccessToken.
+// operating the dashboard via /api/mcp). Shapes are dictated by the plugins —
+// same "don't rename fields" rule as the core Better Auth tables above, and
+// better-auth >= 1.7.3 validates every column against the Prisma datamodel at
+// startup (a mismatch rejects auth requests). Regenerate with the better-auth
+// CLI (`npx @better-auth/cli generate`) when bumping the plugins.
+//
+// Clients self-register (dynamic client registration) into OauthClient, users
+// authorize on the auth host (login + consent pages), access tokens are JWTs
+// signed with the Jwks key and audience-bound to an OauthResource (one row per
+// MCP host: the apex seeded from config, each fund host on first discovery —
+// see services/mcp/auth.ts), refresh tokens are opaque rows in
+// OauthRefreshToken. Scalar lists are Postgres text[] (the adapter writes
+// arrays natively on Postgres).
 
-model OauthApplication {
-  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name         String
-  icon         String?
-  metadata     String?
-  clientId     String  @unique
-  clientSecret String?
-  redirectUrls String // comma-separated redirect URIs, exact-match checked
-  type         String // "web" | "native" — set by the registration endpoint
-  disabled     Boolean @default(false)
-  userId       String? @db.Uuid // registering user, when known
+// jwt() plugin: signing key pairs (private key encrypted with the app secret).
+model Jwks {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  publicKey  String
+  privateKey String
+  createdAt  DateTime
+  expiresAt  DateTime?
+  alg        String?
+  crv        String?
+}
 
-  user         User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  accessTokens OauthAccessToken[]
-  consents     OauthConsent[]
+model OauthClient {
+  id                               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId                         String    @unique
+  clientSecret                     String? // sha256/base64url hash (storeClientSecret: "hashed"); null for public clients
+  clientDiscoveryId                String?
+  disabled                         Boolean?  @default(false)
+  skipConsent                      Boolean?
+  enableEndSession                 Boolean?
+  subjectType                      String?
+  scopes                           String[]
+  clientCredentialsScopes          String[]  @default([])
+  userId                           String?   @db.Uuid // registering user, when known
+  createdAt                        DateTime?
+  updatedAt                        DateTime?
+  name                             String?
+  uri                              String?
+  icon                             String?
+  contacts                         String[]
+  tos                              String?
+  policy                           String?
+  softwareId                       String?
+  softwareVersion                  String?
+  softwareStatement                String?
+  redirectUris                     String[]
+  postLogoutRedirectUris           String[]
+  backchannelLogoutUri             String?
+  backchannelLogoutSessionRequired Boolean?
+  tokenEndpointAuthMethod          String? // "none" | "client_secret_basic" | "client_secret_post" | "private_key_jwt"
+  applicationType                  String? // "web" | "native"
+  jwks                             String?
+  jwksUri                          String?
+  grantTypes                       String[]
+  responseTypes                    String[]
+  requirePKCE                      Boolean?
+  dpopBoundAccessTokens            Boolean?  @default(false)
+  referenceId                      String?
+  metadata                         Json?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  user            User?                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientResources OauthClientResource[]
+  refreshTokens   OauthRefreshToken[]
+  accessTokens    OauthAccessToken[]
+  consents        OauthConsent[]
 
   @@index([userId])
 }
 
-model OauthAccessToken {
-  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  accessToken           String   @unique
-  refreshToken          String   @unique
-  accessTokenExpiresAt  DateTime
-  refreshTokenExpiresAt DateTime
-  clientId              String
-  userId                String?  @db.Uuid
-  scopes                String // space-separated OAuth scopes
+// A protected resource (RFC 8707 identifier = the JWT `aud`). One row per MCP
+// host URL: `https://<host>/api/mcp`.
+model OauthResource {
+  id                            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  identifier                    String    @unique
+  name                          String
+  accessTokenTtl                Int?
+  refreshTokenTtl               Int?
+  signingAlgorithm              String?
+  signingKeyId                  String?
+  allowedScopes                 String[]
+  customClaims                  Json?
+  dpopBoundAccessTokensRequired Boolean?  @default(false)
+  disabled                      Boolean?  @default(false)
+  createdAt                     DateTime?
+  updatedAt                     DateTime?
+  policyVersion                 Int?      @default(1)
+  metadata                      Json?
 
-  client OauthApplication @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
-  user   User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientResources OauthClientResource[]
+}
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+// Client ↔ resource links. Only authoritative with `enforcePerClientResources`
+// (off here: any client may target any enabled resource, since fund hosts
+// are created at runtime).
+model OauthClientResource {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId   String
+  resourceId String // OauthResource.identifier
+  metadata   Json?
+  createdAt  DateTime?
+
+  client   OauthClient   @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
+  resource OauthResource @relation(fields: [resourceId], references: [identifier], onDelete: Cascade)
+
+  @@unique([clientId, resourceId])
+  @@index([clientId])
+  @@index([resourceId])
+}
+
+model OauthRefreshToken {
+  id                      String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  token                   String    @unique // hashed
+  clientId                String
+  sessionId               String?   @db.Uuid
+  userId                  String    @db.Uuid
+  referenceId             String?
+  authorizationCodeId     String?
+  resources               String[]
+  requestedUserInfoClaims String[]
+  expiresAt               DateTime?
+  createdAt               DateTime?
+  revoked                 DateTime?
+  rotatedAt               DateTime?
+  rotationReplayResponse  String?
+  rotationReplayExpiresAt DateTime?
+  authTime                DateTime?
+  confirmation            Json?
+  scopes                  String[]
+
+  client       OauthClient        @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
+  session      Session?           @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessTokens OauthAccessToken[]
 
   @@index([clientId])
+  @@index([sessionId])
   @@index([userId])
-  @@index([accessTokenExpiresAt])
+  @@index([authorizationCodeId])
+}
+
+// Access tokens are JWTs (not stored); a row only exists for opaque tokens
+// issued without a resource audience, plus revocation bookkeeping.
+model OauthAccessToken {
+  id                      String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  token                   String?   @unique // hashed
+  clientId                String
+  sessionId               String?   @db.Uuid
+  userId                  String?   @db.Uuid
+  referenceId             String?
+  authorizationCodeId     String?
+  resources               String[]
+  requestedUserInfoClaims String[]
+  refreshId               String?   @db.Uuid
+  expiresAt               DateTime?
+  createdAt               DateTime?
+  revoked                 DateTime?
+  confirmation            Json?
+  scopes                  String[]
+
+  client       OauthClient        @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
+  session      Session?           @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  user         User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshToken OauthRefreshToken? @relation(fields: [refreshId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([sessionId])
+  @@index([userId])
+  @@index([authorizationCodeId])
+  @@index([refreshId])
 }
 
 model OauthConsent {
-  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  clientId     String
-  userId       String  @db.Uuid
-  scopes       String
-  consentGiven Boolean
+  id                      String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clientId                String
+  userId                  String?   @db.Uuid
+  referenceId             String?
+  resources               String[]
+  requestedUserInfoClaims String[]
+  scopes                  String[]
+  createdAt               DateTime?
+  updatedAt               DateTime?
 
-  client OauthApplication @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
-  user   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  client OauthClient @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
+  user   User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([clientId])
   @@index([userId])
+}
+
+// Single-use `private_key_jwt` assertion ids (row id = digest of the jti).
+model OauthClientAssertion {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  expiresAt DateTime
 }
 
 model Fund {
