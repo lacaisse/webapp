@@ -162,6 +162,25 @@ describe("auth header", () => {
     await getMultisigTransaction({ chainId: 100, safeTxHash: HASH });
     expect(headersOf(calls[0]).authorization).toBe("Bearer test-key");
   });
+
+  it("sends a Referer from the apex domain with the key (domain-restricted keys)", async () => {
+    vi.stubEnv("SAFE_API_KEY", "test-key");
+    vi.stubEnv("APP_DOMAIN", "lacaisse.eu");
+    stubFetch(() => new Response("", { status: 404 }));
+    await getMultisigTransaction({ chainId: 100, safeTxHash: HASH });
+    expect(headersOf(calls[0]).referer).toBe("https://lacaisse.eu/");
+  });
+
+  it("sends no Referer without a key, nor on localhost", async () => {
+    vi.stubEnv("APP_DOMAIN", "lacaisse.eu");
+    stubFetch(() => new Response("", { status: 404 }));
+    await getMultisigTransaction({ chainId: 100, safeTxHash: HASH });
+    expect(headersOf(calls[0]).referer).toBeUndefined();
+    vi.stubEnv("SAFE_API_KEY", "test-key");
+    vi.stubEnv("APP_DOMAIN", "localhost");
+    await getMultisigTransaction({ chainId: 100, safeTxHash: HASH });
+    expect(headersOf(calls[calls.length - 1]).referer).toBeUndefined();
+  });
 });
 
 describe("getMultisigTransaction", () => {
