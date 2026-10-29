@@ -331,6 +331,7 @@
         "thresholdHint": "Every transaction needs {threshold, plural, one {# owner's signature} other {# owners' signatures}}.",
         "deploying": "The Safe is being deployed on chain. This usually takes a few seconds.",
         "deployFailed": "Deployment failed",
+        "syncProblem": "The last sync hit a problem, so this page may lag behind the chain until a refresh succeeds.",
         "pendingTitle": "Waiting for signatures",
         "pendingEmpty": "Nothing to sign right now."
       },

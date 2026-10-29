@@ -276,6 +276,29 @@ describe("syncSafe", () => {
     expect(relayer.readSafeState).not.toHaveBeenCalled();
   });
 
+  it("keeps a PENDING tx and notes the problem on the safe when the execution lookup fails", async () => {
+    const tx = addTx();
+    chain([A, X], 2, 1);
+    relayer.findSafeExecution.mockRejectedValue(new Error("eth_getLogs: block range too wide"));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const res = await syncSafe({ fundId: FUND_ID, safeId: SAFE_ID, force: true });
+
+    expect(res).toMatchObject({ synced: true, executed: 0, errors: 1 });
+    expect(tx.status).toBe("PENDING");
+    expect(db.fundSafe[0].errorMessage).toBe(
+      `sync: execution lookup failed (${tx.id}): eth_getLogs: block range too wide`,
+    );
+    expect(db.fundSafe[0].lastSyncedAt).toBeInstanceOf(Date);
+
+    // The next clean pass clears the note.
+    relayer.findSafeExecution.mockResolvedValue({ txHash: EXT_HASH, success: true, blockNumber: BigInt(1) });
+    await syncSafe({ fundId: FUND_ID, safeId: SAFE_ID, force: true });
+    expect(tx.status).toBe("EXECUTED");
+    expect(db.fundSafe[0].errorMessage).toBeNull();
+    warn.mockRestore();
+  });
+
   it("stores the error on the safe when the chain read fails", async () => {
     relayer.readSafeState.mockRejectedValue(new Error("rpc down"));
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});

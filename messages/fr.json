@@ -331,6 +331,7 @@
         "thresholdHint": "Chaque transaction exige {threshold, plural, one {# signature} other {# signatures}}.",
         "deploying": "Le Safe est en cours de déploiement on-chain. Cela prend généralement quelques secondes.",
         "deployFailed": "Échec du déploiement",
+        "syncProblem": "La dernière synchronisation a rencontré un problème : cette page peut être en retard sur la chaîne jusqu'à ce qu'un rafraîchissement réussisse.",
         "pendingTitle": "En attente de signatures",
         "pendingEmpty": "Rien à signer pour le moment."
       },

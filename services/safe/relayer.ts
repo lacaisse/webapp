@@ -6,9 +6,12 @@ import {
   ContractFunctionRevertedError,
   createPublicClient,
   createWalletClient,
+  encodeEventTopics,
   getAddress,
+  hexToBigInt,
   http,
   parseEventLogs,
+  toHex,
   type Chain,
   type PublicClient,
   type TransactionReceipt,
@@ -176,16 +179,20 @@ export async function readSafeState(a: {
 
 // How far back findSafeExecution scans for the Safe's execution events.
 // Gnosis mines ~17k blocks a day; the cron reconciles every 2 minutes, so a
-// week covers any realistic gap. Kept bounded for the RPC provider's
-// eth_getLogs limits.
+// week covers any realistic gap. Alchemy caps an eth_getLogs call at 10 000
+// blocks (-32600 "You can make eth_getLogs requests with up to a 10000 block
+// range"), so the window is walked in chunks of that size, newest first: the
+// execution we are looking for is almost always in the latest chunk.
 const EXECUTION_LOOKBACK_BLOCKS = BigInt(120_000);
+export const EXECUTION_SCAN_CHUNK_BLOCKS = BigInt(10_000);
 
 /**
  * Chain-only answer to "did this SafeTx execute?": the Safe emits
  * ExecutionSuccess / ExecutionFailure with the safeTxHash as indexed topic.
  * Independent of the Transaction Service, so a lost receipt or bookkeeping
  * failure can be reconciled from the chain alone. Null when no event is
- * found in the lookback window.
+ * found in the lookback window. One eth_getLogs call per chunk carries both
+ * events (two topic-0 alternatives, the hash as topic 1).
  */
 export async function findSafeExecution(a: {
   chainId: number;
@@ -195,35 +202,46 @@ export async function findSafeExecution(a: {
   const client = publicClientFor(a.chainId);
   const address = getAddress(a.safeAddress);
   const latest = await client.getBlockNumber();
-  const fromBlock = latest > EXECUTION_LOOKBACK_BLOCKS ? latest - EXECUTION_LOOKBACK_BLOCKS : BigInt(0);
-  const eventNamed = (name: "ExecutionSuccess" | "ExecutionFailure") => {
-    const item = SAFE_ABI.find((i) => i.type === "event" && i.name === name);
-    if (!item || item.type !== "event") throw new SafeError("config", `${name} missing from SAFE_ABI`);
-    return item;
-  };
-  const [successes, failures] = await Promise.all([
-    client.getLogs({
-      address,
-      event: eventNamed("ExecutionSuccess"),
-      args: { txHash: a.safeTxHash },
-      fromBlock,
-      toBlock: latest,
-    }),
-    client.getLogs({
-      address,
-      event: eventNamed("ExecutionFailure"),
-      args: { txHash: a.safeTxHash },
-      fromBlock,
-      toBlock: latest,
-    }),
-  ]);
-  const logs = [
-    ...successes.map((l) => ({ ...l, success: true })),
-    ...failures.map((l) => ({ ...l, success: false })),
-  ].sort((x, y) => (x.blockNumber < y.blockNumber ? -1 : x.blockNumber > y.blockNumber ? 1 : 0));
-  const log = logs[0];
-  if (!log) return null;
-  return { txHash: log.transactionHash, success: log.success, blockNumber: log.blockNumber };
+  const floor =
+    latest >= EXECUTION_LOOKBACK_BLOCKS ? latest - EXECUTION_LOOKBACK_BLOCKS + BigInt(1) : BigInt(0);
+  const [successTopic, hashTopic] = encodeEventTopics({
+    abi: SAFE_ABI,
+    eventName: "ExecutionSuccess",
+    args: { txHash: a.safeTxHash },
+  });
+  const [failureTopic] = encodeEventTopics({ abi: SAFE_ABI, eventName: "ExecutionFailure" });
+  if (!successTopic || !failureTopic || !hashTopic) {
+    throw new SafeError("config", "Execution events missing from SAFE_ABI");
+  }
+
+  let toBlock = latest;
+  while (toBlock >= floor) {
+    const span = EXECUTION_SCAN_CHUNK_BLOCKS - BigInt(1);
+    const fromBlock = toBlock - span > floor ? toBlock - span : floor;
+    const logs = await client.request({
+      method: "eth_getLogs",
+      params: [
+        {
+          address,
+          topics: [[successTopic, failureTopic], hashTopic],
+          fromBlock: toHex(fromBlock),
+          toBlock: toHex(toBlock),
+        },
+      ],
+    });
+    const found = logs
+      .filter((l) => l.blockNumber !== null && l.transactionHash !== null)
+      .map((l) => ({
+        txHash: l.transactionHash as Hex,
+        success: l.topics[0] === successTopic,
+        blockNumber: hexToBigInt(l.blockNumber as Hex),
+      }))
+      .sort((x, y) => (x.blockNumber < y.blockNumber ? -1 : x.blockNumber > y.blockNumber ? 1 : 0));
+    if (found[0]) return found[0];
+    if (fromBlock === BigInt(0)) break;
+    toBlock = fromBlock - BigInt(1);
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------

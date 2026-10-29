@@ -87,6 +87,9 @@ export async function syncSafe(a: {
   let errors = 0;
   let executed = 0;
   let ownersChanged = false;
+  // What went wrong this pass, kept on the Safe (step 5) so the page can say
+  // the sync is lagging instead of silently showing stale rows.
+  const problems: string[] = [];
 
   const txs = await prisma.fundSafeTransaction.findMany({
     where: {
@@ -129,6 +132,7 @@ export async function syncSafe(a: {
         });
       } catch (e) {
         errors++;
+        problems.push(`execution lookup failed (${tx.id}): ${messageOf(e)}`);
         console.warn("[safe-sync] execution lookup failed", tx.id, messageOf(e));
         continue; // decide next time rather than supersede on a blind spot
       }
@@ -147,6 +151,7 @@ export async function syncSafe(a: {
           }
         } catch (e) {
           errors++;
+          problems.push(`record execution failed (${tx.id}): ${messageOf(e)}`);
           console.error("[safe-sync] record execution failed", tx.id, e);
         }
         continue;
@@ -252,6 +257,7 @@ export async function syncSafe(a: {
           } catch (e) {
             if ((e as { code?: string }).code !== "P2002") {
               errors++;
+              problems.push(`confirmation import failed (${tx.id}): ${messageOf(e)}`);
               console.error("[safe-sync] confirmation import failed", tx.id, e);
             }
           }
@@ -272,6 +278,7 @@ export async function syncSafe(a: {
       }
     } catch (e) {
       errors++;
+      problems.push(`execution failed (${tx.id}): ${messageOf(e)}`);
       console.warn("[safe-sync] execution failed", tx.id, messageOf(e));
     }
   }
@@ -285,12 +292,20 @@ export async function syncSafe(a: {
     }
   }
 
-  // (5)
+  // (5) A pass that hit errors leaves a note on the Safe (the chain-read
+  // failure above does the same); a clean pass clears it.
   await prisma.fundSafe.updateMany({
     where: { id: safe.id, fundId: a.fundId },
-    data: { lastSyncedAt: new Date(), errorMessage: null },
+    data: { lastSyncedAt: new Date(), errorMessage: syncErrorMessage(problems) },
   });
   return { synced: true, executed, errors };
+}
+
+function syncErrorMessage(problems: string[]): string | null {
+  const [first, ...rest] = problems;
+  if (!first) return null;
+  const more = rest.length > 0 ? ` (+${rest.length} more)` : "";
+  return `sync: ${first}`.slice(0, 400) + more;
 }
 
 // Upsert the owner cache from getOwners(): new chain owners become MEMBER
