@@ -203,6 +203,7 @@ export type SafeDetail = {
   status: FundSafeStatus;
   deployTxHash: string | null;
   errorMessage: string | null;
+  configWarning: string | null; // non-canonical wiring found by sync (review S6)
   lastSyncedAt: string | null;
   owners: SafeOwnerView[]; // current (not removed)
   formerOwners: SafeOwnerView[]; // removed on chain, kept for labels
@@ -329,6 +330,7 @@ export const getSafe = cache(
       status: safe.status,
       deployTxHash: safe.deployTxHash,
       errorMessage: safe.errorMessage,
+      configWarning: safe.configWarning,
       lastSyncedAt: safe.lastSyncedAt?.toISOString() ?? null,
       owners: owners.filter((_, i) => safe.owners[i]!.removedAt == null),
       formerOwners: owners.filter((_, i) => safe.owners[i]!.removedAt != null),
@@ -352,6 +354,23 @@ export const getCurrentSignerAddress = cache(
     return signer?.address ?? null;
   },
 );
+
+// Archived Safes (hidden from the main list, restorable — review S7).
+export type ArchivedSafeRow = { id: string; name: string; address: string; archivedAt: string };
+
+export const getArchivedSafes = cache(async (fundId: string): Promise<ArchivedSafeRow[]> => {
+  const rows = await prisma.fundSafe.findMany({
+    where: { fundId, archivedAt: { not: null } },
+    orderBy: { archivedAt: "desc" },
+    select: { id: true, name: true, address: true, archivedAt: true },
+  });
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    address: r.address,
+    archivedAt: r.archivedAt!.toISOString(),
+  }));
+});
 
 // Whether the user can step up with a passkey (the re-auth dialog offers it
 // next to the password only then).

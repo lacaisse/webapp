@@ -31,6 +31,19 @@ export const SAFE_ABI = [
   },
   {
     type: "function",
+    name: "getModulesPaginated",
+    stateMutability: "view",
+    inputs: [
+      { name: "start", type: "address" },
+      { name: "pageSize", type: "uint256" },
+    ],
+    outputs: [
+      { name: "array", type: "address[]" },
+      { name: "next", type: "address" },
+    ],
+  },
+  {
+    type: "function",
     name: "getOwners",
     stateMutability: "view",
     inputs: [],

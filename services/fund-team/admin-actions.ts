@@ -10,6 +10,7 @@ import { REQUIRE_EMAIL_VERIFICATION } from "@/services/auth/better-auth";
 import { requireFundRole, requireUser } from "@/services/auth/dal";
 import { prisma } from "@/services/db/prisma";
 import { sendFundInvited } from "@/services/email/transactional";
+import { safesBlockedByLosingMember } from "@/services/safe/guardrails";
 import { getFundUrl, requireCurrentFund } from "@/services/fund/server";
 import { inviteAcceptCheck } from "./invite-rules";
 import {
@@ -140,7 +141,7 @@ export async function changeFundMemberRoleAction(input: {
 
   const target = await prisma.fundMember.findFirst({
     where: { id: input.membershipId, fundId: fund.id },
-    select: { id: true, role: true },
+    select: { id: true, role: true, userId: true },
   });
   if (!target) return { error: t("team.errors.notFound" as never) };
 
@@ -160,6 +161,18 @@ export async function changeFundMemberRoleAction(input: {
     if (owners <= 1) return { error: t("team.errors.lastOwner" as never) };
   }
 
+  // Dropping below ADMIN takes their Safe signer out of reach (review S8).
+  if (input.role !== "ADMIN" && input.role !== "OWNER") {
+    const blocked = await safesBlockedByLosingMember(fund.id, target.userId);
+    if (blocked.length > 0) {
+      return {
+        error: t("team.errors.memberIsSigner" as never, {
+          safes: blocked.map((s) => s.name).join(", "),
+        } as never),
+      };
+    }
+  }
+
   await prisma.fundMember.update({
     where: { id: target.id },
     data: { role: input.role },
@@ -177,7 +190,7 @@ export async function removeFundMemberAction(input: {
 
   const target = await prisma.fundMember.findFirst({
     where: { id: input.membershipId, fundId: fund.id },
-    select: { id: true, role: true },
+    select: { id: true, role: true, userId: true },
   });
   if (!target) return { error: t("team.errors.notFound" as never) };
 
@@ -190,6 +203,16 @@ export async function removeFundMemberAction(input: {
       where: { fundId: fund.id, role: "OWNER" },
     });
     if (owners <= 1) return { error: t("team.errors.lastOwner" as never) };
+  }
+
+  // Their Safe signer would be out of reach (review S8).
+  const blocked = await safesBlockedByLosingMember(fund.id, target.userId);
+  if (blocked.length > 0) {
+    return {
+      error: t("team.errors.memberIsSigner" as never, {
+        safes: blocked.map((s) => s.name).join(", "),
+      } as never),
+    };
   }
 
   await prisma.fundMember.delete({ where: { id: target.id } });

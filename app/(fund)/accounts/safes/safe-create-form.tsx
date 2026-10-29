@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { createSafeAction } from "@/services/safe/admin-actions";
 import { ADDRESS, CreateSafeSchema } from "@/services/safe/schemas";
 
-import { clampThreshold } from "./format";
+import { clampThreshold, serverCanSignAlone } from "./format";
 import { OwnerAvatar } from "./owner-avatar";
 import { ThresholdStepper } from "./threshold-stepper";
 
@@ -241,6 +241,10 @@ export function SafeCreateForm({
           />
         )}
 
+        {total > 0 && (
+          <CustodyNote threshold={effectiveThreshold} memberOwners={selected.size} />
+        )}
+
         <p className="flex items-start gap-2 text-xs text-muted-foreground">
           <ShieldCheck className="mt-0.5 size-3.5 shrink-0" />
           {t("deployHint")}
@@ -271,5 +275,28 @@ export function SafeCreateForm({
         </Button>
       </DialogFooter>
     </>
+  );
+}
+
+// Who really controls the Safe at this threshold (review S3): all team keys
+// are held by La Caisse, so a threshold the team keys alone can meet is
+// not independent of the server. Shared with the owner-change dialogs.
+export function CustodyNote({
+  threshold,
+  memberOwners,
+}: {
+  threshold: number;
+  memberOwners: number;
+}) {
+  const t = useTranslations("fund.safes.custody");
+  const shared = serverCanSignAlone(threshold, memberOwners);
+  return (
+    <Alert variant={shared ? "warning" : "default"}>
+      <AlertDescription>
+        {shared
+          ? t("shared", { threshold, members: memberOwners })
+          : t("independent")}
+      </AlertDescription>
+    </Alert>
   );
 }

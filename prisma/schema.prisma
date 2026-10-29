@@ -824,6 +824,10 @@ model FundSafe {
   status       FundSafeStatus @default(DEPLOYING)
   deployTxHash String?
   errorMessage String? // last deployment / sync error
+  // Set by sync when the Safe's wiring is not canonical 1.4.1 (a module, a
+  // guard, another singleton / fallback handler). Shown as a red banner and
+  // blocks relayer execution until it clears (review S6).
+  configWarning String?
 
   createdById  String?   @db.Uuid
   createdBy    User?     @relation("FundSafeCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)

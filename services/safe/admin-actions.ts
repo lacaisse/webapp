@@ -17,6 +17,7 @@ import {
   type SafeActionResult,
   type SafeTransfersActionResult,
   type SignActionResult,
+  type WithdrawActionResult,
 } from "./action-types";
 import {
   archiveSafe,
@@ -28,6 +29,8 @@ import {
   retryExecution,
   retrySafeDeployment,
   signTransaction,
+  unarchiveSafe,
+  withdrawProposal,
 } from "./proposals";
 import {
   CreateSafeSchema,
@@ -56,7 +59,13 @@ type T = Awaited<ReturnType<typeof getTranslations>>;
 // reported as `unknown`.
 function errorFor(t: T, e: unknown, context: string): string {
   if (isSafeError(e)) {
-    if (e.code !== "not_owner" && e.code !== "already_signed" && e.code !== "threshold") {
+    if (
+      e.code !== "not_owner" &&
+      e.code !== "already_signed" &&
+      e.code !== "threshold" &&
+      e.code !== "queue_full" &&
+      e.code !== "holds_value"
+    ) {
       console.warn(`[safe] ${context}:`, e.code, e.message);
     }
     return t(`fund.safes.errors.${e.code}` as never);
@@ -123,13 +132,19 @@ export async function renameSafeAction(input: {
   name: string;
 }): Promise<SafeActionResult> {
   const t = await getTranslations();
-  const { fund } = await requireFundRole("ADMIN");
+  const { fund, user, membership } = await requireFundRole("ADMIN");
 
   const parsed = RenameSafeSchema.safeParse(input);
   if (!parsed.success) return { error: t(parsed.error.issues[0].message as never) };
 
   try {
-    await renameSafe({ fundId: fund.id, safeId: parsed.data.safeId, name: parsed.data.name });
+    await renameSafe({
+      fundId: fund.id,
+      safeId: parsed.data.safeId,
+      name: parsed.data.name,
+      userId: user.id,
+      isFundOwner: membership.role === "OWNER",
+    });
     revalidateSafe(parsed.data.safeId);
     return { ok: true };
   } catch (e) {
@@ -139,13 +154,18 @@ export async function renameSafeAction(input: {
 
 export async function archiveSafeAction(input: { safeId: string }): Promise<SafeActionResult> {
   const t = await getTranslations();
-  const { fund } = await requireFundRole("ADMIN");
+  const { fund, user, membership } = await requireFundRole("ADMIN");
 
   const parsed = SafeIdSchema.safeParse(input);
   if (!parsed.success) return { error: t(parsed.error.issues[0].message as never) };
 
   try {
-    await archiveSafe({ fundId: fund.id, safeId: parsed.data.safeId });
+    await archiveSafe({
+      fund,
+      safeId: parsed.data.safeId,
+      userId: user.id,
+      isFundOwner: membership.role === "OWNER",
+    });
     // No refresh(): the client navigates away from the archived detail page
     // (refreshing it would 404); the list is revalidated.
     revalidatePath("/accounts");
@@ -153,6 +173,54 @@ export async function archiveSafeAction(input: { safeId: string }): Promise<Safe
     return { ok: true };
   } catch (e) {
     return { error: errorFor(t, e, "archive") };
+  }
+}
+
+export async function unarchiveSafeAction(input: { safeId: string }): Promise<SafeActionResult> {
+  const t = await getTranslations();
+  const { fund, user, membership } = await requireFundRole("ADMIN");
+
+  const parsed = SafeIdSchema.safeParse(input);
+  if (!parsed.success) return { error: t(parsed.error.issues[0].message as never) };
+
+  try {
+    await unarchiveSafe({
+      fundId: fund.id,
+      safeId: parsed.data.safeId,
+      userId: user.id,
+      isFundOwner: membership.role === "OWNER",
+    });
+    revalidateSafe(parsed.data.safeId);
+    return { ok: true };
+  } catch (e) {
+    return { error: errorFor(t, e, "unarchive") };
+  }
+}
+
+// Withdrawing deletes a proposal nobody executed; it moves no money, so no
+// step-up (unlike propose / sign / reject / retry).
+export async function withdrawProposalAction(input: {
+  safeId: string;
+  transactionId: string;
+}): Promise<WithdrawActionResult> {
+  const t = await getTranslations();
+  const { fund, user, membership } = await requireFundRole("ADMIN");
+
+  const parsed = SafeTxIdSchema.safeParse(input);
+  if (!parsed.success) return { error: t(parsed.error.issues[0].message as never) };
+
+  try {
+    const res = await withdrawProposal({
+      fundId: fund.id,
+      safeId: parsed.data.safeId,
+      transactionId: parsed.data.transactionId,
+      userId: user.id,
+      isFundOwner: membership.role === "OWNER",
+    });
+    revalidateSafe(parsed.data.safeId);
+    return { ok: true, mirrored: res.mirrored };
+  } catch (e) {
+    return { error: errorFor(t, e, "withdraw") };
   }
 }
 

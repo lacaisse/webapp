@@ -5,6 +5,8 @@ import {
   Ban,
   Check,
   Circle,
+  Info,
+  Undo2,
   Loader2,
   PenLine,
   RotateCcw,
@@ -31,10 +33,11 @@ import {
   proposeRejectionAction,
   retryExecutionAction,
   signTransactionAction,
+  withdrawProposalAction,
 } from "@/services/safe/admin-actions";
 
 import type { SafeTxView } from "../data";
-import { sameAddress, summaryLine } from "../format";
+import { sameAddress, shortAddress, summaryLine } from "../format";
 import { useStepUp } from "../reauth-dialog";
 import type { OwnerRow } from "./owners-card";
 import { TxDetails } from "./tx-details";
@@ -57,9 +60,15 @@ export function PendingTxCard({
   rejectionProposed,
   nextNonce,
   hasPasskey,
+  currentUserId,
+  isFundOwner,
+  configBlocked,
 }: {
   nextNonce: number | null; // lowest open nonce — the one the Safe runs next
   hasPasskey: boolean;
+  currentUserId: string;
+  isFundOwner: boolean; // fund OWNER role: may withdraw anyone's proposal
+  configBlocked: boolean; // FundSafe.configWarning set: nothing executes
   safeId: string;
   chainId: number;
   tx: SafeTxView;
@@ -91,6 +100,12 @@ export function PendingTxCard({
     : undefined;
   const canSign =
     canAct && tx.status === "PENDING" && Boolean(me) && !signatureFor(me!.address);
+  // Withdraw deletes a proposal nobody ran: the proposer's own, or any for a
+  // fund OWNER (review S9).
+  const canWithdraw =
+    canAct &&
+    (tx.status === "PENDING" || tx.status === "FAILED") &&
+    (tx.proposedBy?.id === currentUserId || isFundOwner);
   const canReject =
     canAct &&
     tx.kind !== "REJECTION" &&
@@ -187,10 +202,11 @@ export function PendingTxCard({
                   <li
                     key={o.address}
                     className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs text-muted-foreground ring-1 ring-border"
-                    title={t("tx.notSigned")}
+                    title={`${t("tx.notSigned")} · ${o.address}`}
                   >
                     <Circle className="size-3" />
                     {name}
+                    <span className="font-mono">{shortAddress(o.address)}</span>
                   </li>
                 );
               }
@@ -199,10 +215,16 @@ export function PendingTxCard({
                 <li
                   key={o.address}
                   className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-1 text-xs text-success ring-1 ring-success/25"
-                  title={t("tx.signedAt", { date: absolute(sig.signedAt) })}
+                  title={`${t("tx.signedAt", { date: absolute(sig.signedAt) })} · ${o.address}`}
                 >
                   <Check className="size-3" />
                   <span className="font-medium">{name}</span>
+                  <span className="font-mono text-success/80">{shortAddress(o.address)}</span>
+                  {o.isFormerMember && (
+                    <span className="text-warning" title={t("tx.formerMember")}>
+                      <Info className="size-3" />
+                    </span>
+                  )}
                   <time
                     dateTime={sig.signedAt}
                     className="text-success/80"
@@ -279,6 +301,10 @@ export function PendingTxCard({
               line={line}
               hasPasskey={hasPasskey}
             />
+          )}
+          {canWithdraw && <WithdrawDialog safeId={safeId} tx={tx} line={line} />}
+          {configBlocked && tx.status === "PENDING" && (
+            <span className="text-xs text-destructive">{t("tx.configBlocked")}</span>
           )}
           {!canSign && me && tx.status === "PENDING" && signatureFor(me.address) && (
             <span className="text-xs text-muted-foreground">
@@ -465,6 +491,107 @@ function RejectDialog({
           </Button>
         </DialogFooter>
         {stepUp.dialog}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Delete an open proposal (review S9). Not a Safe transaction: nothing is
+// signed or executed, the nonce is simply free again — hence no step-up.
+function WithdrawDialog({
+  safeId,
+  tx,
+  line,
+}: {
+  safeId: string;
+  tx: SafeTxView;
+  line: string;
+}) {
+  const t = useTranslations("fund.safes.tx");
+  const tRoot = useTranslations();
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [mirrored, setMirrored] = useState(false);
+
+  const onConfirm = () => {
+    setError(null);
+    startTransition(async () => {
+      const res = await withdrawProposalAction({ safeId, transactionId: tx.id });
+      if ("error" in res) {
+        setError(res.error);
+        return;
+      }
+      if (res.mirrored) {
+        setMirrored(true);
+        return;
+      }
+      setOpen(false);
+      router.refresh();
+    });
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(n) => {
+        if (pending) return;
+        setOpen(n);
+        if (!n) {
+          setError(null);
+          if (mirrored) router.refresh();
+          setMirrored(false);
+        }
+      }}
+    >
+      <DialogTrigger
+        render={
+          <Button type="button" size="sm" variant="ghost">
+            <Undo2 />
+            {t("withdraw")}
+          </Button>
+        }
+      />
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t("withdrawTitle", { nonce: tx.nonce })}</DialogTitle>
+          <DialogDescription>{line}</DialogDescription>
+        </DialogHeader>
+        {mirrored ? (
+          <Alert variant="warning">
+            <AlertDescription>{t("withdrawMirrored")}</AlertDescription>
+          </Alert>
+        ) : (
+          <p className="text-sm text-muted-foreground">{t("withdrawDescription")}</p>
+        )}
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        <DialogFooter>
+          {mirrored ? (
+            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+              {tRoot("common.close")}
+            </Button>
+          ) : (
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setOpen(false)}
+                disabled={pending}
+              >
+                {tRoot("common.cancel")}
+              </Button>
+              <Button type="button" onClick={onConfirm} disabled={pending}>
+                {pending ? <Loader2 className="size-4 animate-spin" /> : <Undo2 className="size-4" />}
+                {t("withdrawConfirm")}
+              </Button>
+            </>
+          )}
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

@@ -46,12 +46,16 @@ vi.mock("@/services/transaction-annotation/annotate", () => annotate);
 
 import { fake, resetFake } from "./test-fake-prisma";
 import {
+  MAX_OPEN_PROPOSALS_PER_PROPOSER,
+  MAX_OPEN_PROPOSALS_PER_SAFE,
+  lowestFreeNonce,
   proposeOwnerChange,
   proposeRejection,
   proposeTokenTransfer,
   retryExecution,
   signTransaction,
   tryExecute,
+  withdrawProposal,
 } from "./proposals";
 import { SafeError } from "./types";
 
@@ -703,5 +707,114 @@ describe("rejections and owner changes", () => {
     });
     const changeRow = db.fundSafeTransaction.find((t) => t.id === change.transactionId)!;
     expect(changeRow.summary).toEqual({ kind: "CHANGE_THRESHOLD", threshold: 3, previousThreshold: 2 });
+  });
+});
+
+describe("lowestFreeNonce (S9)", () => {
+  it("takes the chain nonce when free, else the first gap above it", () => {
+    expect(lowestFreeNonce(4, [])).toBe(4);
+    expect(lowestFreeNonce(4, [4, 5])).toBe(6);
+    expect(lowestFreeNonce(4, [5, 6])).toBe(4);
+    expect(lowestFreeNonce(4, [4, 6])).toBe(5);
+    expect(lowestFreeNonce(4, [1, 2])).toBe(4); // stale rows below the chain nonce don't count
+  });
+});
+
+describe("proposal queue (S9)", () => {
+  it("reuses a withdrawn slot instead of stacking behind the highest open nonce", async () => {
+    seed({ threshold: 2, owners: OWNERS_3, chainNonce: 4 });
+    const first = await transfer("u-a", "1");
+    const second = await transfer("u-b", "2");
+    expect(db.fundSafeTransaction.map((t) => t.nonce)).toEqual([4, 5]);
+
+    await withdrawProposal({
+      fundId: FUND.id,
+      safeId,
+      transactionId: first.transactionId,
+      userId: "u-a",
+      isFundOwner: false,
+    });
+    expect(db.fundSafeTransaction.map((t) => t.id)).toEqual([second.transactionId]);
+    expect(db.fundSafeSignature.every((s) => s.transactionId === second.transactionId)).toBe(true);
+
+    const third = await transfer("u-c", "3");
+    expect(db.fundSafeTransaction.find((t) => t.id === third.transactionId)!.nonce).toBe(4);
+  });
+
+  it("lets only the proposer or a fund OWNER withdraw, and only open rows", async () => {
+    seed({ threshold: 2, owners: OWNERS_3 });
+    const mine = await transfer("u-a");
+    await expect(
+      withdrawProposal({ fundId: FUND.id, safeId, transactionId: mine.transactionId, userId: "u-b", isFundOwner: false }),
+    ).rejects.toMatchObject({ code: "not_owner" });
+    await expect(
+      withdrawProposal({ fundId: FUND.id, safeId, transactionId: mine.transactionId, userId: "u-b", isFundOwner: true }),
+    ).resolves.toEqual({ mirrored: false });
+
+    const gone = await transfer("u-a");
+    db.fundSafeTransaction.find((t) => t.id === gone.transactionId)!.status = "EXECUTED";
+    await expect(
+      withdrawProposal({ fundId: FUND.id, safeId, transactionId: gone.transactionId, userId: "u-a", isFundOwner: false }),
+    ).rejects.toMatchObject({ code: "invalid_state" });
+  });
+
+  it("caps open proposals per proposer and per Safe; rejections are exempt", async () => {
+    seed({ threshold: 2, owners: OWNERS_3 });
+    for (let i = 0; i < MAX_OPEN_PROPOSALS_PER_PROPOSER; i++) await transfer("u-a", `${i + 1}`);
+    await expect(transfer("u-a")).rejects.toMatchObject({ code: "queue_full" });
+    // Another proposer still can, up to the Safe-wide cap.
+    const target = await transfer("u-b");
+    await expect(
+      proposeRejection({ fund: FUND, safeId, userId: "u-a", transactionId: target.transactionId }),
+    ).resolves.toBeTruthy();
+
+    // Fill the Safe-wide cap with a third proposer's rows (FAILED rows count too).
+    const total = () => db.fundSafeTransaction.filter((t) => t.kind !== "REJECTION").length;
+    for (let i = total(); i < MAX_OPEN_PROPOSALS_PER_SAFE; i++) {
+      db.fundSafeTransaction.push({
+        id: `filler-${i}`,
+        safeId,
+        nonce: 100 + i,
+        kind: "TOKEN_TRANSFER",
+        status: i % 2 ? "FAILED" : "PENDING",
+        proposedById: "u-c",
+        safeTxHash: `0x${String(i).padStart(64, "f")}`,
+      });
+    }
+    await expect(transfer("u-b")).rejects.toMatchObject({ code: "queue_full" });
+  });
+});
+
+describe("execution bookkeeping (S6, S15)", () => {
+  it("persists the broadcast hash before the receipt and keeps it on retry", async () => {
+    seed({ threshold: 1, owners: [OWNERS_3[0]] });
+    const sent = `0x${"5e".repeat(32)}` as const;
+    relayer.execSafeTransaction.mockImplementation(
+      async (a: { onBroadcast?: (h: string) => Promise<void> }) => {
+        await a.onBroadcast?.(sent);
+        const row = db.fundSafeTransaction[0]!;
+        expect(row.status).toBe("EXECUTING");
+        expect(row.txHash).toBe(sent);
+        throw Object.assign(new SafeError("relayer_failed", "no receipt yet"), { txHash: sent });
+      },
+    );
+    await expect(transfer("u-a")).rejects.toMatchObject({ code: "relayer_failed" });
+    const row = db.fundSafeTransaction[0]!;
+    expect(row.status).toBe("FAILED");
+    expect(row.txHash).toBe(sent);
+
+    // Retry: the nonce is still open on chain; the old hash is not wiped.
+    relayer.execSafeTransaction.mockRejectedValue(new SafeError("relayer_failed", "rpc"));
+    await expect(retryExecution({ fundId: FUND.id, transactionId: row.id as string })).rejects.toBeTruthy();
+    expect(row.txHash).toBe(sent);
+  });
+
+  it("does not execute while the Safe's configuration has drifted", async () => {
+    seed({ threshold: 1, owners: [OWNERS_3[0]] });
+    db.fundSafe[0]!.configWarning = "module(s) 0x2222222222222222222222222222222222222222";
+    const res = await transfer("u-a");
+    expect(res.executed).toBe(false);
+    expect(relayer.execSafeTransaction).not.toHaveBeenCalled();
+    expect(db.fundSafeTransaction[0]!.status).toBe("PENDING");
   });
 });

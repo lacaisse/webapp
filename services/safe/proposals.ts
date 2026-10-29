@@ -25,6 +25,7 @@ import {
   isRelayerConfigured,
   readSafeState,
 } from "./relayer";
+import { safeHoldsValue } from "./holdings";
 import {
   addOwnerWithThresholdData,
   buildSafeTx,
@@ -45,6 +46,7 @@ import type {
   ProposeTransferInput,
   TransferToken,
 } from "./schemas";
+import { redactRpcKey } from "./redact";
 import { getOrCreateFundSigner, signSafeTxWithSigner } from "./signer";
 import { syncSafe } from "./sync";
 import { confirmTransaction, isTxServiceEnabled, proposeTransaction } from "./tx-service";
@@ -79,12 +81,24 @@ export type TryExecuteReason =
   | "threshold"
   | "relayer_not_configured"
   | "not_pending"
+  | "config" // configuration drift (FundSafe.configWarning) — see sync.ts
   // Queued behind an earlier nonce (or the nonce is already consumed on
   // chain — sync settles that). Not in the original contract; it saves a
   // guaranteed-revert relayer tx.
   | "nonce";
 
 const ADMIN_ROLES = ["ADMIN", "OWNER"] as const;
+
+// The fund columns the token paths need (fund token + display tokens).
+export type TransferFund = {
+  id: string;
+  tokenChainId: number;
+  tokenAddress: string | null;
+  tokenDecimals: number | null;
+  tokenSymbol: string | null;
+  showNativeBalance: boolean;
+  showEureBalance: boolean;
+};
 const OWNER_CHANGE_KINDS: FundSafeTxKind[] = [
   "ADD_OWNER",
   "REMOVE_OWNER",
@@ -94,6 +108,23 @@ const OWNER_CHANGE_KINDS: FundSafeTxKind[] = [
 // A DEPLOYING row older than this is considered crashed and may be retried.
 const STALE_DEPLOYING_MS = 5 * 60 * 1000;
 
+// Open-proposal caps (review S9): one owner can't queue unlimited
+// transactions that each need a full-threshold rejection to clear.
+export const MAX_OPEN_PROPOSALS_PER_SAFE = 20;
+export const MAX_OPEN_PROPOSALS_PER_PROPOSER = 5;
+
+/**
+ * The lowest nonce ≥ the chain nonce that no open transaction uses, so a
+ * withdrawn or superseded slot is reused instead of pushing every new
+ * proposal behind the highest open one. Pure (review S9).
+ */
+export function lowestFreeNonce(chainNonce: number, openNonces: Iterable<number>): number {
+  const used = new Set(openNonces);
+  let n = chainNonce;
+  while (used.has(n)) n++;
+  return n;
+}
+
 // Canonical owner order for deployment (ascending address). Deterministic so
 // a retry with the stored saltNonce predicts the same CREATE2 address and
 // deploySafe's idempotency catches a deployment that did land.
@@ -102,8 +133,8 @@ function sortAddresses(addresses: Address[]): Address[] {
 }
 
 function errorMessageOf(e: unknown): string {
-  if (isSafeError(e)) return `${e.code}: ${e.message}`;
-  return e instanceof Error ? e.message : String(e);
+  if (isSafeError(e)) return redactRpcKey(`${e.code}: ${e.message}`);
+  return redactRpcKey(e instanceof Error ? e.message : String(e));
 }
 
 function isUniqueViolation(e: unknown): boolean {
@@ -309,29 +340,112 @@ export async function retrySafeDeployment(a: { fundId: string; safeId: string })
   });
 }
 
-export async function renameSafe(a: { fundId: string; safeId: string; name: string }): Promise<void> {
-  const res = await prisma.fundSafe.updateMany({
-    where: { id: a.safeId, fundId: a.fundId, archivedAt: null },
-    data: { name: a.name },
+// Review S7: renaming or archiving a Safe is for someone who answers for it
+// — a current owner (their signer is on it) or a fund OWNER — not any ADMIN.
+async function requireSafeSteward(a: {
+  fundId: string;
+  safeId: string;
+  userId: string;
+  isFundOwner: boolean;
+}): Promise<void> {
+  if (a.isFundOwner) return;
+  const signer = await prisma.fundSigner.findUnique({
+    where: { fundId_userId: { fundId: a.fundId, userId: a.userId } },
+    select: { id: true },
   });
-  if (res.count === 0) throw new SafeError("not_found", "Safe not found");
+  const owner = signer
+    ? await prisma.fundSafeOwner.findFirst({
+        where: { safeId: a.safeId, signerId: signer.id, removedAt: null, safe: { fundId: a.fundId } },
+        select: { id: true },
+      })
+    : null;
+  if (!owner) throw new SafeError("not_owner", "Only an owner of this Safe or a fund owner can do this");
 }
 
-export async function archiveSafe(a: { fundId: string; safeId: string }): Promise<void> {
+export async function renameSafe(a: {
+  fundId: string;
+  safeId: string;
+  name: string;
+  userId: string;
+  isFundOwner: boolean;
+}): Promise<void> {
   const safe = await prisma.fundSafe.findFirst({
     where: { id: a.safeId, fundId: a.fundId, archivedAt: null },
     select: { id: true },
   });
   if (!safe) throw new SafeError("not_found", "Safe not found");
+  await requireSafeSteward(a);
+  await prisma.fundSafe.updateMany({
+    where: { id: a.safeId, fundId: a.fundId, archivedAt: null },
+    data: { name: a.name },
+  });
+}
+
+/**
+ * Archive hides the Safe from La Caisse; the Safe stays on chain. Team
+ * members can no longer sign from here, so (review S7) it is refused while
+ * transactions are open and — unless the external owners alone can reach the
+ * threshold — while the Safe still holds value: archiving a team-only Safe
+ * with a balance would strand that balance. Reversible with
+ * `unarchiveSafe`.
+ */
+export async function archiveSafe(a: {
+  fund: TransferFund;
+  safeId: string;
+  userId: string;
+  isFundOwner: boolean;
+}): Promise<void> {
+  const safe = await prisma.fundSafe.findFirst({
+    where: { id: a.safeId, fundId: a.fund.id, archivedAt: null },
+    select: {
+      id: true,
+      chainId: true,
+      address: true,
+      threshold: true,
+      status: true,
+      owners: { where: { removedAt: null }, select: { kind: true } },
+    },
+  });
+  if (!safe) throw new SafeError("not_found", "Safe not found");
+  await requireSafeSteward({ fundId: a.fund.id, safeId: safe.id, userId: a.userId, isFundOwner: a.isFundOwner });
   const open = await prisma.fundSafeTransaction.count({
-    where: { safeId: safe.id, safe: { fundId: a.fundId }, status: { in: ["PENDING", "EXECUTING"] } },
+    where: { safeId: safe.id, safe: { fundId: a.fund.id }, status: { in: ["PENDING", "EXECUTING"] } },
   });
   if (open > 0) {
     throw new SafeError("invalid_state", "Safe has pending transactions");
   }
+  const externals = safe.owners.filter((o) => o.kind === "EXTERNAL").length;
+  const membersNeeded = externals < safe.threshold;
+  if (membersNeeded && safe.status === "ACTIVE") {
+    const holds = await safeHoldsValue(a.fund, { chainId: safe.chainId, address: safe.address });
+    if (holds === null) {
+      throw new SafeError("relayer_failed", "Could not read the Safe's balances");
+    }
+    if (holds) throw new SafeError("holds_value", "Safe still holds funds that only team members can move");
+  }
+  await prisma.fundSafe.updateMany({
+    where: { id: safe.id, fundId: a.fund.id, archivedAt: null },
+    data: { archivedAt: new Date() },
+  });
+}
+
+export async function unarchiveSafe(a: {
+  fundId: string;
+  safeId: string;
+  userId: string;
+  isFundOwner: boolean;
+}): Promise<void> {
+  const safe = await prisma.fundSafe.findFirst({
+    where: { id: a.safeId, fundId: a.fundId, archivedAt: { not: null } },
+    select: { id: true },
+  });
+  if (!safe) throw new SafeError("not_found", "Safe not found");
+  await requireSafeSteward(a);
   await prisma.fundSafe.updateMany({
     where: { id: safe.id, fundId: a.fundId },
-    data: { archivedAt: new Date() },
+    // Force a sync on the next view: owners / threshold may have moved while
+    // it was out of sight.
+    data: { archivedAt: null, lastSyncedAt: null },
   });
 }
 
@@ -394,12 +508,26 @@ function shouldMirror(chainId: number, owners: { kind: string }[]): boolean {
 
 async function nextNonce(safe: { id: string; chainId: number; address: string }): Promise<number> {
   const state = await readSafeState({ chainId: safe.chainId, safeAddress: safe.address as Address });
-  const agg = await prisma.fundSafeTransaction.aggregate({
+  const open = await prisma.fundSafeTransaction.findMany({
     where: { safeId: safe.id, status: { in: ["PENDING", "EXECUTING"] } },
-    _max: { nonce: true },
+    select: { nonce: true },
   });
-  const dbNext = agg._max.nonce == null ? 0 : agg._max.nonce + 1;
-  return Math.max(state.nonce, dbNext);
+  return lowestFreeNonce(state.nonce, open.map((t) => t.nonce));
+}
+
+// Review S9: a bounded queue per Safe and per proposer. Rejections are
+// exempt — they are how a queue gets cleared.
+async function requireQueueRoom(safeId: string, userId: string): Promise<void> {
+  const open = await prisma.fundSafeTransaction.findMany({
+    where: { safeId, status: { in: ["PENDING", "EXECUTING", "FAILED"] }, kind: { not: "REJECTION" } },
+    select: { proposedById: true },
+  });
+  if (open.length >= MAX_OPEN_PROPOSALS_PER_SAFE) {
+    throw new SafeError("queue_full", "This Safe has too many open transactions");
+  }
+  if (open.filter((t) => t.proposedById === userId).length >= MAX_OPEN_PROPOSALS_PER_PROPOSER) {
+    throw new SafeError("queue_full", "You have too many open proposals on this Safe");
+  }
 }
 
 async function propose(a: {
@@ -415,6 +543,7 @@ async function propose(a: {
   const { safe } = a;
   const signer = await requireOwnerSigner(a.fundId, a.userId, safe.owners);
   const safeAddress = getAddress(safe.address);
+  if (a.kind !== "REJECTION") await requireQueueRoom(safe.id, a.userId);
 
   const nonce = a.nonce ?? (await nextNonce(safe));
   const tx = buildSafeTx({
@@ -539,16 +668,6 @@ async function resolveTransferToken(
     contract: extra.address ? getAddress(extra.address) : null,
   };
 }
-
-type TransferFund = {
-  id: string;
-  tokenChainId: number;
-  tokenAddress: string | null;
-  tokenDecimals: number | null;
-  tokenSymbol: string | null;
-  showNativeBalance: boolean;
-  showEureBalance: boolean;
-};
 
 export async function proposeTokenTransfer(a: {
   fund: TransferFund;
@@ -756,6 +875,46 @@ export async function proposeRejection(a: {
   });
 }
 
+/**
+ * Withdraw an open proposal: the row and its signatures are deleted and the
+ * nonce becomes free again (nothing was executed; the Safe never saw it).
+ * Allowed to the proposer, or to a fund OWNER for anyone's proposal (e.g. a
+ * demoted admin's leftovers). Only PENDING / FAILED rows — an EXECUTING one
+ * may be on chain. For a Safe with external owners the proposal was also
+ * mirrored to the Transaction Service, where it stays visible; Safe{Wallet}
+ * can still gather signatures for it there, so the dialog says so and the
+ * rejection flow remains the way to kill a nonce for good (review S9).
+ */
+export async function withdrawProposal(a: {
+  fundId: string;
+  safeId: string;
+  transactionId: string;
+  userId: string;
+  isFundOwner: boolean;
+}): Promise<{ mirrored: boolean }> {
+  const safe = await loadActiveSafe(a.fundId, a.safeId);
+  const tx = await prisma.fundSafeTransaction.findFirst({
+    where: { id: a.transactionId, safeId: safe.id, safe: { fundId: a.fundId } },
+    select: { id: true, status: true, proposedById: true },
+  });
+  if (!tx) throw new SafeError("not_found", "Transaction not found");
+  if (tx.status !== "PENDING" && tx.status !== "FAILED") {
+    throw new SafeError("invalid_state", "Transaction cannot be withdrawn in its current state");
+  }
+  if (tx.proposedById !== a.userId && !a.isFundOwner) {
+    throw new SafeError("not_owner", "Only the proposer or a fund owner can withdraw it");
+  }
+  const res = await prisma.fundSafeTransaction.deleteMany({
+    where: {
+      id: tx.id,
+      safe: { fundId: a.fundId },
+      status: { in: ["PENDING", "FAILED"] },
+    },
+  });
+  if (res.count === 0) throw new SafeError("invalid_state", "Transaction already changed");
+  return { mirrored: shouldMirror(safe.chainId, safe.owners) };
+}
+
 // ---------------------------------------------------------------------------
 // Signing + execution
 // ---------------------------------------------------------------------------
@@ -865,6 +1024,10 @@ export async function tryExecute(a: {
     return { executed: false, txHash: null, reason: "relayer_not_configured" };
   }
   if (state.nonce !== tx.nonce) return { executed: false, txHash: null, reason: "nonce" };
+  // A Safe whose configuration drifted from canonical 1.4.1 (a module, a
+  // guard, another singleton — review S6) is shown, never driven: the
+  // relayer stops executing until sync sees it clean again.
+  if (safe.configWarning) return { executed: false, txHash: null, reason: "config" };
 
   const claim = await prisma.fundSafeTransaction.updateMany({
     where: { id: tx.id, safe: { fundId: a.fundId }, status: "PENDING" },
@@ -888,6 +1051,14 @@ export async function tryExecute(a: {
       safeAddress,
       tx: safeTxFromRow(tx),
       signatures,
+      // Persist the broadcast hash before the receipt wait (review S15): a
+      // timeout or crash then still leaves the hash on the EXECUTING row.
+      onBroadcast: async (sent) => {
+        await prisma.fundSafeTransaction.updateMany({
+          where: { id: tx.id, safe: { fundId: a.fundId }, status: "EXECUTING" },
+          data: { txHash: sent },
+        });
+      },
     }));
   } catch (e) {
     console.error("[safe] execution failed", tx.id, errorMessageOf(e));
@@ -979,9 +1150,12 @@ export async function retryExecution(a: {
     throw new SafeError("nonce", "Nonce already used on chain");
   }
 
+  // The previous attempt's hash is kept (review S15): if that tx is still
+  // in the mempool and mines after all, sync matches it; a new broadcast
+  // overwrites it.
   const reset = await prisma.fundSafeTransaction.updateMany({
     where: { id: tx.id, safe: { fundId: a.fundId }, status: "FAILED" },
-    data: { status: "PENDING", errorMessage: null, txHash: null },
+    data: { status: "PENDING", errorMessage: null },
   });
   if (reset.count === 0) throw new SafeError("invalid_state", "Transaction has not failed");
 

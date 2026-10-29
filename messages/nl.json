@@ -320,7 +320,9 @@
         "deploying": "De Safe wordt on-chain uitgerold. Dit duurt meestal enkele seconden.",
         "deployFailed": "Uitrol mislukt",
         "pendingTitle": "Wacht op handtekeningen",
-        "pendingEmpty": "Op dit moment niets te tekenen."
+        "pendingEmpty": "Op dit moment niets te tekenen.",
+        "configWarningTitle": "Niet-standaard configuratie",
+        "configWarningBody": "Dit is geen standaard Safe 1.4.1 meer: {drift}. Een module kan uitvoeren zonder handtekeningen en een guard kan transacties blokkeren of filteren. La Caisse voert niets uit tot dit in Safe'{Wallet}' is hersteld."
       },
       "tabs": {
         "transactions": "Transacties",
@@ -361,9 +363,10 @@
       "archive": {
         "trigger": "Archiveren",
         "title": "Deze Safe archiveren?",
-        "description": "Hij verdwijnt uit La Caisse. De Safe, zijn ondertekenaars en zijn tegoed blijven on-chain bestaan en bruikbaar in Safe'{Wallet}'.",
+        "description": "De Safe verdwijnt uit La Caisse; hij blijft op de blockchain. Teamleden kunnen niet meer ondertekenen vanuit La Caisse — alleen externe ondertekenaars kunnen nog handelen in Safe'{Wallet}'. U kunt hem later herstellen.",
         "blocked": "{count, plural, one {Er staat nog # transactie open} other {Er staan nog # transacties open}}. Voer ze uit of wijs ze af voor je archiveert.",
-        "confirm": "Archiveren"
+        "confirm": "Archiveren",
+        "stewardOnly": "Alleen een ondertekenaar van deze Safe of een eigenaar van het fonds kan hem archiveren of hernoemen."
       },
       "transfer": {
         "trigger": "Overboeking voorstellen",
@@ -482,7 +485,14 @@
           "relayer": "Uitgevoerd door La Caisse",
           "external": "Extern uitgevoerd"
         },
-        "signedBy": "Getekend door {names}"
+        "signedBy": "Getekend door {names}",
+        "withdraw": "Intrekken",
+        "withdrawTitle": "Voorstel nr. {nonce} intrekken?",
+        "withdrawDescription": "Het voorstel wordt verwijderd en het nummer komt weer vrij. Er is niets uitgevoerd.",
+        "withdrawMirrored": "Deze Safe heeft externe ondertekenaars: het voorstel blijft zichtbaar in Safe'{Wallet}', waar het nog ondertekend kan worden. Stel een afwijzing voor om het definitief te blokkeren.",
+        "withdrawConfirm": "Voorstel intrekken",
+        "formerMember": "Geen teamlid meer",
+        "configBlocked": "Uitvoering gepauzeerd: de configuratie van de Safe is niet standaard."
       },
       "history": {
         "title": "Geschiedenis",
@@ -520,7 +530,10 @@
         "noteTooLong": "De notitie is te lang (max. 200 tekens).",
         "ownerRequired": "Kies een teamlid of voer een adres in.",
         "duplicateOwner": "Hetzelfde adres staat er twee keer in.",
-        "reauth_required": "Bevestig uw identiteit om door te gaan."
+        "reauth_required": "Bevestig uw identiteit om door te gaan.",
+        "addressChecksum": "Het adres bevat een verkeerde hoofdletter (controlesom). Controleer het of plak het in kleine letters.",
+        "queue_full": "Te veel openstaande transacties op deze Safe. Laat de open voorstellen eerst ondertekenen, afwijzen of intrekken.",
+        "holds_value": "Deze Safe bevat nog tegoeden die alleen teamleden kunnen verplaatsen. Maak hem leeg voordat u archiveert."
       },
       "reauth": {
         "title": "Bevestig uw identiteit",
@@ -531,6 +544,16 @@
         "passkeyButton": "Bevestigen met een passkey",
         "passkeyWaiting": "Wachten op passkey…",
         "passkeyFailed": "De passkey kon niet worden geverifieerd."
+      },
+      "archived": {
+        "title": "Gearchiveerde Safes",
+        "description": "Verborgen in La Caisse maar nog op de blockchain. Herstel er een om de ondertekenaars en transacties terug te krijgen.",
+        "restore": "Herstellen",
+        "restoring": "Herstellen…"
+      },
+      "custody": {
+        "shared": "Met {threshold} handtekening{threshold, plural, one {} other {en}} voor {members} teamsleutel{members, plural, one {} other {s}} heeft La Caisse alleen al genoeg sleutels om te ondertekenen: dit is geen echte multisig tegenover de server. Voeg een externe ondertekenaar (hardwarewallet) toe en zet de drempel boven het aantal teamsleutels voor grotere bedragen.",
+        "independent": "De drempel ligt boven het aantal teamsleutels: minstens één externe ondertekenaar moet elke transactie ondertekenen."
       }
     },
     "team": {
@@ -2140,7 +2163,9 @@
             "addressInvalid": "Voer een geldig contractadres in (0x gevolgd door 40 hexadecimale tekens).",
             "readFailed": "Het contract kon nu niet worden gelezen. Probeer het over een paar minuten opnieuw.",
             "tooMany": "Je kunt maximaal {max} eigen tokens toevoegen.",
-            "notFound": "Deze token staat niet meer in de lijst."
+            "notFound": "Deze token staat niet meer in de lijst.",
+            "addressChecksum": "Het adres bevat een verkeerde hoofdletter (controlesom). Controleer het of plak het in kleine letters.",
+            "symbolCollides": "Het symbool \"{symbol}\" is al dat van het fondstoken of van een ingebouwd token; dat zou verwarrend zijn."
           }
         }
       },
@@ -2685,7 +2710,8 @@
       "inviteInvalid": "Deze uitnodiging is ongeldig of is al gebruikt.",
       "inviteExpired": "Deze uitnodiging is verlopen. Vraag een beheerder om een nieuwe te sturen.",
       "emailMismatch": "Deze uitnodiging is naar een ander e-mailadres gestuurd.",
-      "unverifiedPreexisting": "Dit account bestond al vóór de uitnodiging en het e-mailadres is nooit bevestigd. Stel uw wachtwoord opnieuw in via de aanmeldpagina om het te bevestigen en accepteer de uitnodiging daarna opnieuw."
+      "unverifiedPreexisting": "Dit account bestond al vóór de uitnodiging en het e-mailadres is nooit bevestigd. Stel uw wachtwoord opnieuw in via de aanmeldpagina om het te bevestigen en accepteer de uitnodiging daarna opnieuw.",
+      "memberIsSigner": "Deze persoon ondertekent voor {safes}; zonder deze persoon zou de drempel niet meer gehaald kunnen worden. Verwijder de persoon eerst als ondertekenaar van de Safe."
     }
   },
   "joinTeam": {

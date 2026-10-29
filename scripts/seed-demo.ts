@@ -48,6 +48,28 @@ const TODAY = new Date("2026-05-12T10:00:00.000Z");
 const RESET = process.argv.includes("--reset");
 const DRY = process.argv.includes("--dry");
 
+// `--reset` deletes the fund and everything that cascades off it — including
+// every member's Safe signer key (FundSigner), which has no backup. Refuse to
+// do that against anything but a local database unless the operator says so
+// explicitly (review S18).
+if (RESET && !DRY) {
+  const host = (() => {
+    try {
+      return new URL(process.env.DATABASE_URL!).hostname;
+    } catch {
+      return "";
+    }
+  })();
+  const local = host === "localhost" || host === "127.0.0.1" || host === "::1";
+  if (!local && process.env.SEED_ALLOW_REMOTE_RESET !== "yes") {
+    console.error(
+      `\n✗ --reset against a non-local database (${host || "unknown host"}) refused.\n` +
+        `  It would delete the fund's Safe signer keys. Set SEED_ALLOW_REMOTE_RESET=yes to override.`,
+    );
+    process.exit(1);
+  }
+}
+
 // =============================================================================
 // Generators
 // =============================================================================

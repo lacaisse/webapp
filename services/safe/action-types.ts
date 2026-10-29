@@ -22,6 +22,7 @@ export type ProposeActionResult =
 export type SignActionResult =
   | ActionError
   | { ok: true; executed: boolean; txHash: string | null };
+export type WithdrawActionResult = { error: string } | { ok: true; mirrored: boolean };
 export type SafeTransfersActionResult =
   | { error: string }
   | ({ ok: true } & SafeTransfersPage);

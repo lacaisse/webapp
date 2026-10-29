@@ -3,7 +3,8 @@
 
 import { getTranslations } from "next-intl/server";
 import { revalidatePath } from "next/cache";
-import { getAddress } from "viem";
+import { getAddress, isAddress } from "viem";
+import { symbolCollides } from "@/services/token/symbol";
 import { z } from "zod";
 
 import { requireFundRole } from "@/services/auth/dal";
@@ -272,6 +273,11 @@ const AddDisplayTokenSchema = z.object({
     .trim()
     .regex(/^0x[a-fA-F0-9]{40}$/, {
       error: "fund.settings.token.customTokens.errors.addressInvalid",
+    })
+    // Strict EIP-55: a mixed-case paste with a wrong checksum is a typo, not
+    // "the same address" (review S17).
+    .refine((v: string): boolean => isAddress(v, { strict: true }), {
+      error: "fund.settings.token.customTokens.errors.addressChecksum",
     }),
 });
 
@@ -290,9 +296,7 @@ export async function addDisplayTokenAction(
   if (!parsed.success) {
     return { error: t(parsed.error.issues[0].message as never) };
   }
-  // Lowercase first: a mixed-case paste with a bad checksum is still the
-  // same address.
-  const address = getAddress(parsed.data.address.toLowerCase());
+  const address = getAddress(parsed.data.address);
   const same = (other: string | null | undefined) =>
     !!other && other.toLowerCase() === address.toLowerCase();
 
@@ -322,6 +326,14 @@ export async function addDisplayTokenAction(
     }
     console.error("[settings] custom token metadata read failed", fund.id, address, e);
     return { error: t("fund.settings.token.customTokens.errors.readFailed") };
+  }
+  // A second "EURe" (or a token named like the fund token) would give the
+  // accounts pages two identical lines and the Safe signers an ambiguous
+  // summary (review S8): the symbol must not collide with what is shown.
+  if (symbolCollides(meta.symbol, [fund.tokenSymbol, ...builtIns.map((tok) => tok.symbol)])) {
+    return {
+      error: t("fund.settings.token.customTokens.errors.symbolCollides", { symbol: meta.symbol }),
+    };
   }
 
   try {

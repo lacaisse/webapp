@@ -17,6 +17,8 @@ const relayer = vi.hoisted(() => ({
   execSafeTransaction: vi.fn(),
   errorTxHash: vi.fn(() => null),
   findSafeExecution: vi.fn(),
+  readSafeConfig: vi.fn(),
+  describeSafeConfigDrift: vi.fn<() => string | null>(() => null),
 }));
 vi.mock("@/services/safe/relayer", () => relayer);
 
@@ -308,5 +310,68 @@ describe("syncSafe", () => {
     expect(res.synced).toBe(false);
     expect(db.fundSafe[0].errorMessage).toBe("sync: rpc down");
     warn.mockRestore();
+  });
+});
+
+describe("syncSafe configuration drift (S6)", () => {
+  it("records non-canonical wiring on the Safe and stops executing until it clears", async () => {
+    // Fully signed at threshold 1 — would execute on a clean Safe.
+    const tx = addTx({ nonce: 1 });
+    db.fundSafeSignature.push({
+      id: "sig-a",
+      transactionId: tx.id,
+      ownerAddress: A,
+      signature: sig("1a"),
+      source: "LACAISSE",
+    });
+    chain([A, X], 1, 1);
+    relayer.describeSafeConfigDrift.mockReturnValue("module(s) 0x2222222222222222222222222222222222222222");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const first = await syncSafe({ fundId: FUND_ID, safeId: SAFE_ID, force: true });
+    expect(first.executed).toBe(0);
+    expect(db.fundSafe[0].configWarning).toContain("module(s) 0x2222");
+    expect(relayer.execSafeTransaction).not.toHaveBeenCalled();
+    expect(tx.status).toBe("PENDING");
+
+    // Drift fixed in Safe{Wallet}: the next pass clears the warning and runs it.
+    relayer.describeSafeConfigDrift.mockReturnValue(null);
+    const second = await syncSafe({ fundId: FUND_ID, safeId: SAFE_ID, force: true });
+    expect(db.fundSafe[0].configWarning).toBeNull();
+    expect(second.executed).toBe(1);
+    expect(tx.status).toBe("EXECUTED");
+    warn.mockRestore();
+  });
+
+  it("keeps the previous verdict and notes the problem when the config read fails", async () => {
+    chain([A, X], 2, 1);
+    db.fundSafe[0].configWarning = "guard 0x1111111111111111111111111111111111111111";
+    relayer.readSafeConfig.mockRejectedValue(new Error("rpc down"));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await syncSafe({ fundId: FUND_ID, safeId: SAFE_ID, force: true });
+    expect(db.fundSafe[0].configWarning).toBe("guard 0x1111111111111111111111111111111111111111");
+    expect(db.fundSafe[0].errorMessage).toBe("sync: configuration check failed");
+    warn.mockRestore();
+  });
+});
+
+describe("syncSafe superseded annotation (S12)", () => {
+  it("says when the nonce went to a transaction La Caisse never recorded", async () => {
+    const tx = addTx({ nonce: 0 });
+    chain([A, X], 2, 1);
+    relayer.findSafeExecution.mockResolvedValue(null);
+    await syncSafe({ fundId: FUND_ID, safeId: SAFE_ID, force: true });
+    expect(tx.status).toBe("SUPERSEDED");
+    expect(tx.errorMessage).toContain("did not record");
+  });
+
+  it("stays silent when a sibling row at that nonce executed", async () => {
+    const tx = addTx({ nonce: 0 });
+    addTx({ nonce: 0, status: "EXECUTED", kind: "REJECTION" });
+    chain([A, X], 2, 1);
+    relayer.findSafeExecution.mockResolvedValue(null);
+    await syncSafe({ fundId: FUND_ID, safeId: SAFE_ID, force: true });
+    expect(tx.status).toBe("SUPERSEDED");
+    expect(tx.errorMessage).toBeNull();
   });
 });

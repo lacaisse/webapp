@@ -89,6 +89,8 @@ export type SafeErrorCode =
   | "nonce" // stale / conflicting nonce
   | "invalid_signature"
   | "not_found"
+  | "queue_full" // open-proposal cap reached (review S9)
+  | "holds_value" // archive refused: the Safe still holds funds (review S7)
   | "invalid_state"; // e.g. acting on a non-ACTIVE safe or non-PENDING tx
 
 export class SafeError extends Error {

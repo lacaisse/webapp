@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  ADDRESS,
   ExternalOwnerSchema,
   ProposeOwnerChangeSchema,
   ProposeTransferSchema,
@@ -84,5 +85,25 @@ describe("invisible / bidi characters in proposer text", () => {
     expect(long.error?.issues[0]?.message).toBe("fund.safes.errors.nameTooLong");
     const empty = RenameSafeSchema.safeParse({ safeId: "s", name: `${RLO}${ZWSP} ` });
     expect(empty.error?.issues[0]?.message).toBe("fund.safes.errors.nameRequired");
+  });
+});
+
+describe("ADDRESS checksum (EIP-55)", () => {
+  const lower = "0x8ad5a865cc1942b1b2b36c186403f89bff512aa0";
+  const good = "0x8AD5a865cc1942B1b2b36C186403f89bfF512aA0";
+  const bad = "0x8AD5a865cc1942B1b2b36C186403f89bfF512aa0"; // last 'A' lowered
+
+  it("accepts lowercase and a correct mixed-case checksum", () => {
+    expect(ADDRESS.safeParse(lower).success).toBe(true);
+    expect(ADDRESS.safeParse(good).success).toBe(true);
+    expect(ADDRESS.safeParse(` ${good} `).success).toBe(true);
+  });
+
+  it("refuses a mixed-case address with a wrong checksum", () => {
+    const res = ADDRESS.safeParse(bad);
+    expect(res.success).toBe(false);
+    if (!res.success) {
+      expect(res.error.issues[0]!.message).toBe("fund.safes.errors.addressChecksum");
+    }
   });
 });

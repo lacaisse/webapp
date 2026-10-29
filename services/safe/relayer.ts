@@ -23,7 +23,7 @@ import { alchemyNetwork } from "@/services/alchemy/client";
 import { SAFE_ABI, SAFE_PROXY_FACTORY_ABI } from "@/services/safe/abi";
 import { safeContractsFor } from "@/services/safe/config";
 import { predictSafeAddress, safeSetupData } from "@/services/safe/safe-tx";
-import { SafeError, type Address, type Hex, type SafeTx } from "@/services/safe/types";
+import { SafeError, isSafeError, type Address, type Hex, type SafeTx } from "@/services/safe/types";
 
 // Chain I/O for the Safe feature, through La Caisse's relayer EOA
 // (`SAFE_RELAYER_PRIVATE_KEY`, funded with xDAI). The relayer deploys Safes
@@ -49,6 +49,11 @@ const RECEIPT_TIMEOUT_MS = 90_000;
 // inner call, so a bare estimate can be marginal under the 63/64 rule.
 const GAS_BUFFER_NUM = BigInt(12);
 const GAS_BUFFER_DEN = BigInt(10);
+// Hard ceiling on the gas the relayer will attach to one execTransaction. A
+// Safe transfer or owner change needs well under 300k; a Safe whose inner
+// call wants millions of gas is draining the shared relayer, not paying a
+// bill (review S11). Exported for the tests.
+export const EXEC_GAS_CAP = BigInt(1_500_000);
 
 // Revert reasons of Safe 1.4.1 (GSxxx codes) worth explaining to operators.
 const SAFE_REVERT_REASONS: Record<string, string> = {
@@ -176,6 +181,81 @@ export async function readSafeState(a: {
     nonce: Number(nonce),
   };
 }
+
+// Safe 1.4.1 storage slots (Safe.sol / GuardManager.sol / FallbackManager.sol):
+//   slot 0                    singleton (the implementation the proxy delegates to)
+//   keccak256("guard_manager.guard.address")
+//   keccak256("fallback_manager.handler.address")
+const GUARD_SLOT = "0x4a204f620c8c5ccdca3fd54d003badd85ba500436a431f0cbda4f558c93c34c8";
+const FALLBACK_HANDLER_SLOT = "0x6c9a6c4a39284e37ed1cf53d337577d14212a4870fb976a4366c693b939918d5";
+const MODULES_PAGE = BigInt(10);
+
+export type SafeConfig = {
+  singleton: Address;
+  fallbackHandler: Address;
+  guard: Address;
+  modules: Address[];
+};
+
+function addressFromSlot(word: Hex): Address {
+  return getAddress(`0x${word.slice(-40)}`);
+}
+
+/**
+ * What the Safe is wired to besides owners and threshold: its singleton,
+ * fallback handler, guard and enabled modules. A module can execute without
+ * any signature (CitizenPay's CommunityModule does), a guard can block or
+ * filter executions, a swapped singleton is a different contract altogether
+ * — none of which `getOwners()` shows. Sync compares this to the canonical
+ * 1.4.1 setup (review S6).
+ */
+export async function readSafeConfig(a: {
+  chainId: number;
+  safeAddress: Address;
+}): Promise<SafeConfig> {
+  const client = publicClientFor(a.chainId);
+  const address = getAddress(a.safeAddress);
+  const [singletonWord, guardWord, handlerWord, modulesPage] = await Promise.all([
+    client.getStorageAt({ address, slot: "0x0" }),
+    client.getStorageAt({ address, slot: GUARD_SLOT }),
+    client.getStorageAt({ address, slot: FALLBACK_HANDLER_SLOT }),
+    client.readContract({
+      address,
+      abi: SAFE_ABI,
+      functionName: "getModulesPaginated",
+      args: [SENTINEL_MODULES, MODULES_PAGE],
+    }),
+  ]);
+  const word = (w: Hex | undefined): Hex => (w && w !== "0x" ? w : (`0x${"0".repeat(64)}` as Hex));
+  return {
+    singleton: addressFromSlot(word(singletonWord)),
+    guard: addressFromSlot(word(guardWord)),
+    fallbackHandler: addressFromSlot(word(handlerWord)),
+    modules: modulesPage[0].map((m) => getAddress(m)),
+  };
+}
+
+/**
+ * Human list of what differs from a canonical Safe 1.4.1 with no module and
+ * no guard, or null when everything is as deployed. Pure.
+ */
+export function describeSafeConfigDrift(chainId: number, config: SafeConfig): string | null {
+  const canonical = safeContractsFor(chainId);
+  const drift: string[] = [];
+  if (!sameAddress(config.singleton, canonical.singleton)) {
+    drift.push(`singleton ${config.singleton} (expected ${canonical.singleton})`);
+  }
+  if (!sameAddress(config.guard, ZERO)) drift.push(`guard ${config.guard}`);
+  if (config.modules.length > 0) drift.push(`module(s) ${config.modules.join(", ")}`);
+  if (!sameAddress(config.fallbackHandler, canonical.fallbackHandler)) {
+    drift.push(`fallback handler ${config.fallbackHandler} (expected ${canonical.fallbackHandler})`);
+  }
+  return drift.length === 0 ? null : drift.join("; ");
+}
+
+const ZERO: Address = "0x0000000000000000000000000000000000000000";
+const SENTINEL_MODULES: Address = "0x0000000000000000000000000000000000000001";
+const sameAddress = (x: string, y: string) => x.toLowerCase() === y.toLowerCase();
 
 // How far back findSafeExecution scans for the Safe's execution events.
 // Gnosis mines ~17k blocks a day; the cron reconciles every 2 minutes, so a
@@ -397,6 +477,10 @@ export async function execSafeTransaction(a: {
   safeAddress: Address;
   tx: SafeTx;
   signatures: Hex;
+  // Called as soon as the tx is broadcast, before the receipt wait, so the
+  // caller can persist the hash (a receipt timeout or crash must not lose
+  // it — review S15). Errors from it are logged, never fatal.
+  onBroadcast?: (txHash: Hex) => Promise<void>;
 }): Promise<{ txHash: Hex }> {
   await simulateSafeTransaction(a);
 
@@ -416,14 +500,27 @@ export async function execSafeTransaction(a: {
       ...request,
       account: wallet.account,
     });
-    txHash = await wallet.writeContract({
-      ...request,
-      gas: (estimate * GAS_BUFFER_NUM) / GAS_BUFFER_DEN,
-    });
+    const gas = (estimate * GAS_BUFFER_NUM) / GAS_BUFFER_DEN;
+    if (gas > EXEC_GAS_CAP) {
+      throw new SafeError(
+        "invalid_state",
+        `execTransaction needs ${gas} gas, above the relayer's cap of ${EXEC_GAS_CAP}`,
+      );
+    }
+    txHash = await wallet.writeContract({ ...request, gas });
   } catch (e) {
+    if (isSafeError(e)) throw e;
     throw new SafeError("relayer_failed", `execTransaction not sent: ${shortMessage(e)}`, {
       cause: e,
     });
+  }
+
+  if (a.onBroadcast) {
+    try {
+      await a.onBroadcast(txHash);
+    } catch (e) {
+      console.warn("[safe] onBroadcast failed", txHash, shortMessage(e));
+    }
   }
 
   const receipt = await waitForReceipt(client, txHash, "execTransaction");
