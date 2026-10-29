@@ -6,7 +6,7 @@ import { refresh, revalidatePath } from "next/cache";
 
 import { requireFundRole } from "@/services/auth/dal";
 import { prisma } from "@/services/db/prisma";
-import { enabledExtraTokens } from "@/services/token/extra-tokens";
+import { getDisplayTokens } from "@/services/token/display-tokens";
 
 import type {
   CreateSafeActionResult,
@@ -157,7 +157,9 @@ export async function proposeTransferAction(
     if ((parsed.data.amount.split(".")[1] ?? "").length > 2) {
       return { error: t("fund.safes.errors.amountInvalid" as never) };
     }
-  } else if (!enabledExtraTokens(fund).some((tok) => tok.key === token)) {
+  } else if (!(await getDisplayTokens(fund)).some((tok) => tok.key === token)) {
+    // Built-ins the fund toggled on, or one of its registered custom tokens
+    // (the core re-checks the latter against FundDisplayToken).
     return { error: t("fund.safes.errors.tokenNotEnabled" as never) };
   }
 

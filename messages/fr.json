@@ -2128,6 +2128,27 @@
           "nativeHint": "Sert à payer le gas sur Gnosis Chain ; affiché sur chaque compte et chaque Safe.",
           "eure": "EURe (euro Monerium)",
           "eureHint": "Stablecoin en euros sur Gnosis Chain."
+        },
+        "customTokens": {
+          "title": "Jetons personnalisés",
+          "description": "Ajoutez n'importe quel autre jeton ERC-20 de la chaîne de la caisse : son solde s'affiche comme xDAI et EURe sur les comptes et les Safes, et un Safe peut l'envoyer.",
+          "address": "Adresse du contrat",
+          "addressPlaceholder": "0x…",
+          "add": "Ajouter",
+          "adding": "Ajout…",
+          "remove": "Retirer le jeton",
+          "confirmRemove": "{symbol} ne sera plus affiché sur les comptes et les Safes, et ne pourra plus être envoyé depuis un Safe. Les jetons détenus ne bougent pas ; vous pourrez l'ajouter à nouveau.",
+          "empty": "Aucun jeton personnalisé.",
+          "decimals": "{decimals} décimales",
+          "errors": {
+            "notErc20": "Cette adresse n'est pas un jeton ERC-20 sur la chaîne de la caisse.",
+            "alreadyShown": "Ce jeton est déjà proposé ci-dessus (jeton de la caisse, xDAI ou EURe).",
+            "duplicate": "Ce jeton est déjà dans la liste.",
+            "addressInvalid": "Saisissez une adresse de contrat valide (0x suivi de 40 caractères hexadécimaux).",
+            "readFailed": "Impossible de lire le contrat pour l'instant. Réessayez dans quelques minutes.",
+            "tooMany": "Vous pouvez ajouter au plus {max} jetons personnalisés.",
+            "notFound": "Ce jeton n'est plus dans la liste."
+          }
         }
       },
       "onboarding": {

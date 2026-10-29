@@ -39,6 +39,7 @@ export function createFakePrisma() {
     fundSafeTransaction: [] as Row[],
     fundSafeSignature: [] as Row[],
     tokenOperation: [] as Row[],
+    fundDisplayToken: [] as Row[],
     fundMember: [] as Row[],
     user: [] as Row[],
   };
@@ -236,6 +237,12 @@ export function createFakePrisma() {
         const row = { id: newId("op"), ...a.data };
         db.tokenOperation.push(row);
         return row;
+      },
+    },
+    fundDisplayToken: {
+      findFirst: async (a: { where: Where }) => {
+        const r = db.fundDisplayToken.find((t) => matches(t, a.where));
+        return r ? { ...r } : null;
       },
     },
     fundMember: {

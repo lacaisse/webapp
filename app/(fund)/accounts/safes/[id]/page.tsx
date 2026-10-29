@@ -27,11 +27,8 @@ import {
   safeWalletUrl,
 } from "@/services/safe/config";
 import type { SafeTransfersFund } from "@/services/safe/transfers";
-import {
-  enabledExtraTokens,
-  type BalanceDisplaySettings,
-  type ExtraToken,
-} from "@/services/token/extra-tokens";
+import { getDisplayTokens, type DisplayTokensFund } from "@/services/token/display-tokens";
+import type { ExtraToken } from "@/services/token/extra-tokens";
 
 import { getAccountOptions } from "../../data";
 import { ExtraBalanceLines, extraLinesFor } from "../../extra-balance-lines";
@@ -125,14 +122,16 @@ async function SafeDetailView({
     tokenChainId: fund.tokenChainId,
     tokenDecimals: fund.tokenDecimals,
   };
-  const display: BalanceDisplaySettings = {
+  const display: DisplayTokensFund = {
+    id: fund.id,
     tokenChainId: fund.tokenChainId,
     showNativeBalance: fund.showNativeBalance,
     showEureBalance: fund.showEureBalance,
   };
-  // xDAI / EURe the fund opted into; only for a Safe on the fund's chain.
+  // xDAI / EURe / custom tokens the fund opted into; only for a Safe on the
+  // fund's chain.
   const sameChain = safe.chainId === fund.tokenChainId;
-  const extraTokens = sameChain ? enabledExtraTokens(display) : [];
+  const extraTokens = sameChain ? await getDisplayTokens(display) : [];
   // One Alchemy round-trip for the balance card and the transfer dialog's
   // token picker; both await it inside their own <Suspense>.
   const balances: Promise<SafeBalances> = Promise.all([

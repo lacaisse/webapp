@@ -6,7 +6,11 @@ import { formatUnits, getAddress, parseUnits } from "viem";
 import type { Prisma } from "@/services/db/generated/client";
 import type { FundSafeTxKind } from "@/services/db/generated/enums";
 import { prisma } from "@/services/db/prisma";
-import { enabledExtraTokens } from "@/services/token/extra-tokens";
+import {
+  customTokenAddress,
+  enabledExtraTokens,
+  isCustomTokenKey,
+} from "@/services/token/extra-tokens";
 import {
   ANNOTATION_KINDS,
   ANNOTATION_TRIGGERS,
@@ -39,6 +43,7 @@ import type {
   CreateSafeInput,
   ProposeOwnerChangeInput,
   ProposeTransferInput,
+  TransferToken,
 } from "./schemas";
 import { getOrCreateFundSigner, signSafeTxWithSigner } from "./signer";
 import { syncSafe } from "./sync";
@@ -467,21 +472,23 @@ async function propose(a: {
 }
 
 // What a transfer moves and how: the fund token (an ERC-20 transfer on
-// Fund.tokenAddress), or one of the extra tokens the fund shows next to it
-// (services/token/extra-tokens.ts) — an ERC-20 for EURe, a plain value
-// transfer for the chain's native coin. Refused unless the fund enabled it.
+// Fund.tokenAddress), or one of the display tokens the fund shows next to it
+// (services/token/extra-tokens.ts) — an ERC-20 for EURe and for a custom
+// token the fund registered (FundDisplayToken, key `custom:<address>`), a
+// plain value transfer for the chain's native coin. Refused unless the fund
+// enabled / registered it.
 type ResolvedTransferToken = {
-  token: "fund" | "native" | "eure";
+  token: TransferToken;
   symbol: string | null;
   decimals: number;
   maxFractionDigits: number;
   contract: Address | null; // null = native coin
 };
 
-function resolveTransferToken(
+async function resolveTransferToken(
   fund: TransferFund,
-  token: "fund" | "native" | "eure",
-): ResolvedTransferToken {
+  token: TransferToken,
+): Promise<ResolvedTransferToken> {
   if (token === "fund") {
     if (!fund.tokenAddress || fund.tokenDecimals == null) {
       throw new SafeError("config", "Fund token is not configured");
@@ -493,6 +500,21 @@ function resolveTransferToken(
       // TokenOperation.amount is Decimal(12,2): refuse precision we can't record.
       maxFractionDigits: Math.min(2, fund.tokenDecimals),
       contract: getAddress(fund.tokenAddress),
+    };
+  }
+  if (isCustomTokenKey(token)) {
+    // Must be one of THIS fund's registered tokens (stored checksummed).
+    const row = await prisma.fundDisplayToken.findFirst({
+      where: { fundId: fund.id, address: getAddress(customTokenAddress(token)) },
+      select: { address: true, symbol: true, decimals: true },
+    });
+    if (!row) throw new SafeError("invalid_state", "Token not enabled");
+    return {
+      token,
+      symbol: row.symbol,
+      decimals: row.decimals,
+      maxFractionDigits: row.decimals,
+      contract: getAddress(row.address),
     };
   }
   const extra = enabledExtraTokens(fund).find((tok) => tok.key === token);
@@ -523,9 +545,9 @@ export async function proposeTokenTransfer(a: {
   input: ProposeTransferInput;
 }): Promise<ProposeResult> {
   const { fund, input } = a;
-  const tok = resolveTransferToken(fund, input.token ?? "fund");
+  const tok = await resolveTransferToken(fund, input.token ?? "fund");
   const safe = await loadActiveSafe(fund.id, a.safeId);
-  // Extra tokens are registered per fund chain too, so one check covers both.
+  // Display tokens are registered per fund chain too, so one check covers all.
   if (safe.chainId !== fund.tokenChainId) {
     throw new SafeError("unsupported_chain", "Safe and fund token are on different chains");
   }
@@ -1006,8 +1028,8 @@ export async function recordExecuted(a: {
 
   const summary = tx.summary as SafeTxSummary | null;
   if (tx.kind === "TOKEN_TRANSFER" && summary?.kind === "TOKEN_TRANSFER") {
-    // TokenOperation is the fund-token ledger: xDAI / EURe transfers out of
-    // a Safe only get the annotation. A summary without `token` predates
+    // TokenOperation is the fund-token ledger: xDAI / EURe / custom-token
+    // transfers out of a Safe only get the annotation. A summary without `token` predates
     // multi-token transfers and moved the fund token.
     const fundToken = (summary.token ?? "fund") === "fund";
     if (fundToken && tx.tokenOperationId) return { recorded: true };

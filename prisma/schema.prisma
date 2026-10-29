@@ -283,6 +283,8 @@ model Fund {
   // Off by default; toggled in Settings → Token.
   showNativeBalance              Boolean   @default(false)
   showEureBalance                Boolean   @default(false)
+  // Any other ERC-20 the fund registered to show the same way (Settings →
+  // Token → Custom tokens): FundDisplayToken rows.
   tokenMinterPrivateKeyEnc       String?
   tokenMinterEoaAddress          String?
   tokenMinterSmartAccountAddress String?
@@ -455,6 +457,7 @@ model Fund {
   cardTopUps                CardTopUp[] // open-banking card top-ups (PAY_AND_GO /pay/<serial>)
   safes                     FundSafe[] // multisig Safes managed from La Caisse
   signers                   FundSigner[] // per-user Safe signer keys
+  displayTokens             FundDisplayToken[] // custom ERC-20s shown next to the fund token (Settings → Token)
 
   // Cross-fund card enrollment: requests other funds filed against cards this
   // fund issued (in), and requests this fund filed against other funds' cards (out).
@@ -635,6 +638,28 @@ model FundSigner {
 
   @@unique([fundId, userId])
   @@unique([fundId, address])
+}
+
+// A custom ERC-20 a fund shows on its Accounts pages next to the fund token
+// (balances on named accounts and Safes, Safe history, Safe transfers), in
+// addition to the built-in xDAI / EURe toggles. Registered by an admin from
+// its address; symbol / name / decimals are read from the contract on the
+// fund's token chain at registration and frozen here. Key in the app:
+// `custom:<lowercased address>` (services/token/extra-tokens.ts).
+model FundDisplayToken {
+  id       String @id @default(cuid())
+  fundId   String
+  address  String // EIP-55 checksummed
+  symbol   String
+  name     String
+  decimals Int
+
+  fund Fund @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([fundId, address])
+  @@index([fundId])
 }
 
 enum FundSafeStatus {

@@ -15,6 +15,8 @@ import { prisma } from "@/services/db/prisma";
 import { requireFundRole } from "@/services/auth/dal";
 import { getFundUrl, requireCurrentFund } from "@/services/fund/server";
 import { parseVisibleIf } from "@/services/onboarding/visibility";
+import { alchemyNetwork } from "@/services/alchemy/client";
+import { listCustomDisplayTokens } from "@/services/token/display-tokens";
 import { EXTRA_TOKENS_BY_CHAIN } from "@/services/token/extra-tokens";
 import {
   OnboardingFields,
@@ -33,6 +35,7 @@ import { EmbedsTab } from "./embeds-tab";
 import { CitizenPayConnect } from "./citizenpay-connect";
 import { TokenInfo } from "./token-info";
 import { BalanceDisplayForm } from "./balance-display-form";
+import { CustomTokensForm } from "./custom-tokens-form";
 import {
   BrandingForm,
   CitizenPayForm,
@@ -84,6 +87,12 @@ async function SettingsHeader() {
       <p className="text-sm text-muted-foreground">{t("description")}</p>
     </header>
   );
+}
+
+// The fund's registered custom display tokens (Settings → Token).
+async function CustomTokensSection({ fundId }: { fundId: string }) {
+  const tokens = await listCustomDisplayTokens(fundId);
+  return <CustomTokensForm tokens={tokens} />;
 }
 
 function SettingsHeaderSkeleton() {
@@ -226,15 +235,24 @@ async function SettingsContent({
                 error: fund.topUpOrdersRunError,
               }}
             />
-            {/* Only chains with a known native coin + EURe offer the toggle. */}
-            {(EXTRA_TOKENS_BY_CHAIN[fund.tokenChainId]?.length ?? 0) > 0 && (
-              <div className="mt-6 border-t border-border pt-6">
-                <BalanceDisplayForm
-                  initial={{
-                    showNativeBalance: fund.showNativeBalance,
-                    showEureBalance: fund.showEureBalance,
-                  }}
-                />
+            {/* Only chains with a known native coin + EURe offer the toggle;
+                custom tokens need an RPC for the chain to read the contract. */}
+            {((EXTRA_TOKENS_BY_CHAIN[fund.tokenChainId]?.length ?? 0) > 0 ||
+              alchemyNetwork(fund.tokenChainId) != null) && (
+              <div className="mt-6 space-y-6 border-t border-border pt-6">
+                {(EXTRA_TOKENS_BY_CHAIN[fund.tokenChainId]?.length ?? 0) > 0 && (
+                  <BalanceDisplayForm
+                    initial={{
+                      showNativeBalance: fund.showNativeBalance,
+                      showEureBalance: fund.showEureBalance,
+                    }}
+                  />
+                )}
+                {alchemyNetwork(fund.tokenChainId) != null && (
+                  <Suspense fallback={<Skeleton className="h-32 w-full" />}>
+                    <CustomTokensSection fundId={fund.id} />
+                  </Suspense>
+                )}
               </div>
             )}
           </CardContent>

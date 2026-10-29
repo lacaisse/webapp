@@ -2089,6 +2089,27 @@
           "nativeHint": "Gas en Gnosis Chain; se muestra en cada cuenta y cada Safe.",
           "eure": "EURe (euro de Monerium)",
           "eureHint": "Stablecoin en euros en Gnosis Chain."
+        },
+        "customTokens": {
+          "title": "Tokens personalizados",
+          "description": "Añade cualquier otro token ERC-20 de la cadena del fondo: su saldo se muestra como xDAI y EURe en las cuentas y los Safes, y un Safe puede enviarlo.",
+          "address": "Dirección del contrato",
+          "addressPlaceholder": "0x…",
+          "add": "Añadir",
+          "adding": "Añadiendo…",
+          "remove": "Quitar el token",
+          "confirmRemove": "{symbol} dejará de mostrarse en las cuentas y los Safes, y ya no podrá enviarse desde un Safe. Los tokens que se tienen no se mueven; podrás volver a añadirlo.",
+          "empty": "Todavía no hay tokens personalizados.",
+          "decimals": "{decimals} decimales",
+          "errors": {
+            "notErc20": "Esta dirección no es un token ERC-20 en la cadena del fondo.",
+            "alreadyShown": "Este token ya se ofrece arriba (token del fondo, xDAI o EURe).",
+            "duplicate": "Este token ya está en la lista.",
+            "addressInvalid": "Introduce una dirección de contrato válida (0x seguido de 40 caracteres hexadecimales).",
+            "readFailed": "No se pudo leer el contrato ahora mismo. Inténtalo de nuevo en unos minutos.",
+            "tooMany": "Puedes añadir como máximo {max} tokens personalizados.",
+            "notFound": "Este token ya no está en la lista."
+          }
         }
       },
       "onboarding": {

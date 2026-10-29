@@ -8,10 +8,7 @@ import type {
   AccountTransfer,
   AccountTransfersPage,
 } from "@/services/token-account/transfers";
-import {
-  enabledExtraTokens,
-  type BalanceDisplaySettings,
-} from "@/services/token/extra-tokens";
+import { getDisplayTokens } from "@/services/token/display-tokens";
 import { getAnnotations } from "@/services/transaction-annotation/annotate";
 
 // A Safe's on-chain history, the way a holder reads an account: every move of
@@ -42,8 +39,8 @@ export type SafeTransfersFund = {
 type AssetInfo = { symbol: string | null; decimals: number | null };
 
 /**
- * One page of the Safe's transfers across the fund token and the extra tokens
- * the fund opted into. The Safe must live on the fund's token chain (callers
+ * One page of the Safe's transfers across the fund token and the display
+ * tokens the fund opted into (built-ins and custom, getDisplayTokens). The Safe must live on the fund's token chain (callers
  * check `safe.chainId === fund.tokenChainId`); an undeployed Safe (its address
  * is a `pending:` placeholder) or a fund with nothing to read yields an empty
  * page. Throws on RPC failure — callers degrade.
@@ -57,12 +54,12 @@ export async function loadSafeTransfers(
   const empty: SafeTransfersPage = { transfers: [], nextCursor: null };
   if (fund.tokenChainId == null || !isAddress(safeAddress, { strict: false })) return empty;
 
-  const display: BalanceDisplaySettings = {
+  const extras = await getDisplayTokens({
+    id: fundId,
     tokenChainId: fund.tokenChainId,
     showNativeBalance: fund.showNativeBalance,
     showEureBalance: fund.showEureBalance,
-  };
-  const extras = enabledExtraTokens(display);
+  });
 
   // lowercased contract → symbol / decimals; native under its own entry.
   const byContract = new Map<string, AssetInfo>();
@@ -75,8 +72,13 @@ export async function loadSafeTransfers(
   let native: AssetInfo | null = null;
   for (const tok of extras) {
     const info = { symbol: tok.symbol, decimals: tok.decimals };
-    if (tok.address) byContract.set(tok.address.toLowerCase(), info);
-    else native = info;
+    // The fund token keeps its own entry if a custom token ever duplicates it.
+    if (tok.address) {
+      const contract = tok.address.toLowerCase();
+      if (!byContract.has(contract)) byContract.set(contract, info);
+    } else {
+      native = info;
+    }
   }
   if (byContract.size === 0 && !native) return empty;
 
