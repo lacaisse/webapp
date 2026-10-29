@@ -85,7 +85,16 @@ async function send(
   const headers: Record<string, string> = { accept: "application/json" };
   if (body !== undefined) headers["content-type"] = "application/json";
   const apiKey = process.env.SAFE_API_KEY?.trim();
-  if (apiKey) headers.authorization = `Bearer ${apiKey}`;
+  if (apiKey) {
+    headers.authorization = `Bearer ${apiKey}`;
+    // Safe API keys can be restricted to domains (the dashboard's allowed
+    // hosts, e.g. `lacaisse.eu` / `*.lacaisse.eu`); the service enforces that
+    // on the Referer host and answers 403 "Your referer host is not allowed"
+    // to a server-side call, which carries none. Identify as the apex so a
+    // domain-restricted key still works from the server.
+    const apex = process.env.APP_DOMAIN?.trim();
+    if (apex && apex !== "localhost") headers.referer = `https://${apex}/`;
+  }
 
   let res: Response;
   try {
