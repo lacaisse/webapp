@@ -257,6 +257,15 @@ async function SafeDetailView({
           </AlertDescription>
         </Alert>
       )}
+      {safe.status === "ACTIVE" && safe.errorMessage && (
+        <Alert variant="warning">
+          <AlertTriangle className="size-4" />
+          <AlertTitle>{t("detail.syncProblem")}</AlertTitle>
+          <AlertDescription className="break-words font-mono text-xs">
+            {safe.errorMessage}
+          </AlertDescription>
+        </Alert>
+      )}
       {!relayer.configured && (
         <Alert variant="warning">
           <Info className="size-4" />

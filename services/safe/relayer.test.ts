@@ -5,6 +5,8 @@ import {
   encodeAbiParameters,
   encodeErrorResult,
   encodeEventTopics,
+  hexToBigInt,
+  toHex,
   type Log,
 } from "viem";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -19,6 +21,8 @@ const mocks = vi.hoisted(() => ({
     estimateContractGas: vi.fn(),
     waitForTransactionReceipt: vi.fn(),
     getBalance: vi.fn(),
+    getBlockNumber: vi.fn(),
+    request: vi.fn(),
   },
   walletClient: {
     account: { address: "0x0000000000000000000000000000000000000abc" },
@@ -37,9 +41,11 @@ vi.mock("viem", async (importOriginal) => {
 
 import { SAFE_ABI } from "@/services/safe/abi";
 import {
+  EXECUTION_SCAN_CHUNK_BLOCKS,
   deploySafe,
   errorTxHash,
   execSafeTransaction,
+  findSafeExecution,
   isRelayerConfigured,
   mapSimulationError,
   readSafeState,
@@ -261,5 +267,87 @@ describe("execSafeTransaction", () => {
     const timeout = await execSafeTransaction(args).catch((e) => e);
     expect(timeout.code).toBe("relayer_failed");
     expect(errorTxHash(timeout)).toBe(TX_HASH);
+  });
+});
+
+describe("findSafeExecution", () => {
+  const args = { chainId: 100, safeAddress: SAFE, safeTxHash: TX_HASH };
+  const latest = BigInt(50_000_000);
+  const ONE = BigInt(1);
+
+  function rawLog(eventName: "ExecutionSuccess" | "ExecutionFailure", blockNumber: bigint) {
+    return {
+      address: SAFE,
+      topics: encodeEventTopics({ abi: SAFE_ABI, eventName, args: { txHash: TX_HASH } }),
+      data: "0x",
+      blockNumber: toHex(blockNumber),
+      blockHash: TX_HASH,
+      transactionHash: TX_HASH,
+      transactionIndex: "0x0",
+      logIndex: "0x0",
+      removed: false,
+    };
+  }
+
+  function ranges() {
+    return mocks.publicClient.request.mock.calls.map(([call]) => {
+      const p = (call as { params: [{ fromBlock: Hex; toBlock: Hex; topics: unknown }] }).params[0];
+      return { from: hexToBigInt(p.fromBlock), to: hexToBigInt(p.toBlock), topics: p.topics };
+    });
+  }
+
+  it("walks the lookback newest-first in chunks the RPC accepts and stops at the first hit", async () => {
+    mocks.publicClient.getBlockNumber.mockResolvedValue(latest);
+    const hitBlock = latest - BigInt(12_000);
+    mocks.publicClient.request
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([rawLog("ExecutionSuccess", hitBlock)]);
+
+    await expect(findSafeExecution(args)).resolves.toEqual({
+      txHash: TX_HASH,
+      success: true,
+      blockNumber: hitBlock,
+    });
+
+    const calls = ranges();
+    expect(calls).toHaveLength(2);
+    expect(calls[0].to).toBe(latest);
+    expect(calls[1].to).toBe(calls[0].from - ONE);
+    for (const c of calls) {
+      expect(c.to - c.from + ONE).toBeLessThanOrEqual(EXECUTION_SCAN_CHUNK_BLOCKS);
+    }
+    // One call carries both events for this safeTxHash.
+    const [successTopic, hashTopic] = encodeEventTopics({
+      abi: SAFE_ABI,
+      eventName: "ExecutionSuccess",
+      args: { txHash: TX_HASH },
+    });
+    const [failureTopic] = encodeEventTopics({ abi: SAFE_ABI, eventName: "ExecutionFailure" });
+    expect(calls[0].topics).toEqual([[successTopic, failureTopic], hashTopic]);
+  });
+
+  it("reports a reverted inner call as an unsuccessful execution", async () => {
+    mocks.publicClient.getBlockNumber.mockResolvedValue(latest);
+    mocks.publicClient.request.mockResolvedValueOnce([rawLog("ExecutionFailure", latest - ONE)]);
+
+    await expect(findSafeExecution(args)).resolves.toMatchObject({ success: false, txHash: TX_HASH });
+  });
+
+  it("returns null once the whole lookback window is scanned, and never scans below block 0", async () => {
+    mocks.publicClient.getBlockNumber.mockResolvedValue(latest);
+    mocks.publicClient.request.mockResolvedValue([]);
+
+    await expect(findSafeExecution(args)).resolves.toBeNull();
+    const calls = ranges();
+    expect(calls).toHaveLength(12); // 120 000 / 10 000
+    expect(calls[0].to).toBe(latest);
+    expect(calls[11].from).toBe(latest - BigInt(120_000) + ONE);
+
+    mocks.publicClient.request.mockClear();
+    mocks.publicClient.getBlockNumber.mockResolvedValue(BigInt(15_000));
+    await expect(findSafeExecution(args)).resolves.toBeNull();
+    const young = ranges();
+    expect(young).toHaveLength(2);
+    expect(young[1].from).toBe(BigInt(0));
   });
 });
