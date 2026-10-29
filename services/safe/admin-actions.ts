@@ -5,11 +5,13 @@ import { getTranslations } from "next-intl/server";
 import { refresh, revalidatePath } from "next/cache";
 
 import { requireFundRole } from "@/services/auth/dal";
+import { prisma } from "@/services/db/prisma";
 
 import type {
   CreateSafeActionResult,
   ProposeActionResult,
   SafeActionResult,
+  SafeTransfersActionResult,
   SignActionResult,
 } from "./action-types";
 import {
@@ -35,6 +37,7 @@ import {
   type ProposeTransferInput,
 } from "./schemas";
 import { syncSafe } from "./sync";
+import { loadSafeTransfers } from "./transfers";
 import { isSafeError } from "./types";
 
 // Thin, ADMIN-gated wrappers over the fund-parameterised core in
@@ -291,5 +294,37 @@ export async function syncSafeAction(input: { safeId: string }): Promise<SafeAct
     return { ok: true };
   } catch (e) {
     return { error: errorFor(t, e, "sync") };
+  }
+}
+
+// Load-more for the Safe page's on-chain history (Transactions tab). The Safe
+// is re-scoped to the host fund; a Safe off the fund's token chain, or not yet
+// deployed, has no history to page through.
+export async function getSafeTransfersAction(input: {
+  safeId: string;
+  cursor?: string | null;
+}): Promise<SafeTransfersActionResult> {
+  const t = await getTranslations();
+  const { fund } = await requireFundRole("ADMIN");
+
+  const parsed = SafeIdSchema.safeParse({ safeId: input.safeId });
+  if (!parsed.success) return { error: t(parsed.error.issues[0].message as never) };
+  const cursor = typeof input.cursor === "string" ? input.cursor : null;
+
+  const safe = await prisma.fundSafe.findFirst({
+    where: { id: parsed.data.safeId, fundId: fund.id },
+    select: { address: true, chainId: true },
+  });
+  if (!safe) return { error: t("fund.safes.errors.not_found" as never) };
+  if (safe.chainId !== fund.tokenChainId) {
+    return { ok: true, transfers: [], nextCursor: null };
+  }
+
+  try {
+    const page = await loadSafeTransfers(fund.id, fund, safe.address, cursor);
+    return { ok: true, ...page };
+  } catch (e) {
+    console.error("[safe] transfers failed", parsed.data.safeId, e);
+    return { error: t("fund.accounts.errors.transfersFailed" as never) };
   }
 }

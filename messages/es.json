@@ -318,6 +318,10 @@
         "pendingTitle": "Esperando firmas",
         "pendingEmpty": "Nada que firmar por ahora."
       },
+      "tabs": {
+        "transactions": "Transacciones",
+        "signers": "Firmantes"
+      },
       "owners": {
         "title": "Firmantes",
         "description": "{threshold} firmas necesarias para cada transacción.",

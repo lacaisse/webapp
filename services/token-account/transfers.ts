@@ -21,6 +21,10 @@ export type AccountTransfer = {
   direction: "in" | "out" | "self";
   timestamp: string | null;
   annotation: TxAnnotation | null;
+  // The asset's symbol when a page mixes assets (a Safe's history: fund token,
+  // xDAI, EURe). Absent on a named account's rows — the table falls back to
+  // the fund token's symbol.
+  symbol?: string | null;
 };
 
 export type AccountTransfersPage = {

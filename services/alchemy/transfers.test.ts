@@ -194,3 +194,129 @@ describe("listTransfersForAccount", () => {
     expectOrderedUnion(pages, rows);
   });
 });
+
+describe("listTransfersForAccount — assets", () => {
+  const EURE = "0x420CA0f9B9b604cE0fd9C18EF134C705e5Fa3430";
+
+  function captureParams(transfers: unknown[]) {
+    const seen: Array<Record<string, unknown>> = [];
+    rpc.mockImplementation(async (_net, method, params) => {
+      if (method === "eth_getBlockByNumber") return { timestamp: "0x1" };
+      const p = (params as Array<Record<string, unknown>>)[0]!;
+      seen.push(p);
+      // Serve every row on the out-stream only, so nothing is deduped away.
+      return { transfers: p.fromAddress ? transfers : [] };
+    });
+    return seen;
+  }
+
+  it("keeps the single-contract request shape for existing callers", async () => {
+    const seen = captureParams([]);
+    await listTransfersForAccount({
+      chainId: 100,
+      contractAddress: "0xtoken",
+      account: ME,
+      pageSize: 10,
+    });
+    expect(seen).toHaveLength(2);
+    for (const p of seen) {
+      expect(p.contractAddresses).toEqual(["0xtoken"]);
+      expect(p.category).toEqual(["erc20"]);
+    }
+  });
+
+  it("queries several contracts plus native transfers", async () => {
+    const seen = captureParams([]);
+    await listTransfersForAccount({
+      chainId: 100,
+      contractAddress: "0xignored",
+      contractAddresses: ["0xtoken", EURE],
+      includeNative: true,
+      account: ME,
+      pageSize: 10,
+    });
+    expect(seen).toHaveLength(2);
+    for (const p of seen) {
+      expect(p.contractAddresses).toEqual(["0xtoken", EURE]);
+      expect(p.category).toEqual(["erc20", "external"]);
+    }
+  });
+
+  it("asks for native transfers alone without a contract filter", async () => {
+    const seen = captureParams([]);
+    await listTransfersForAccount({
+      chainId: 100,
+      contractAddresses: [],
+      includeNative: true,
+      account: ME,
+      pageSize: 10,
+    });
+    expect(seen[0]!.category).toEqual(["external"]);
+    expect(seen[0]).not.toHaveProperty("contractAddresses");
+  });
+
+  it("returns an empty page without calling Alchemy when nothing is asked", async () => {
+    const res = await listTransfersForAccount({
+      chainId: 100,
+      contractAddresses: [],
+      account: ME,
+      pageSize: 10,
+    });
+    expect(res).toEqual({ transfers: [], nextPageKey: null });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("exposes contract, asset symbol and decimals per transfer", async () => {
+    captureParams([
+      {
+        uniqueId: "0xa:log:2",
+        blockNum: "0x10",
+        hash: "0xa",
+        from: ME,
+        to: SHOP,
+        value: 1.5,
+        asset: "EURe",
+        category: "erc20",
+        rawContract: { value: "0x14d1120d7b160000", address: EURE, decimal: "0x12" },
+        metadata: {},
+      },
+      {
+        uniqueId: "0xb:external",
+        blockNum: "0xf",
+        hash: "0xb",
+        from: ME,
+        to: BANK,
+        value: 0.1,
+        asset: "XDAI",
+        category: "external",
+        rawContract: { value: "0x16345785d8a0000", address: null, decimal: "0x12" },
+        metadata: {},
+      },
+      {
+        uniqueId: "0xc:log:0",
+        blockNum: "0xe",
+        hash: "0xc",
+        from: ME,
+        to: SHOP,
+        value: 1,
+        category: "erc20",
+        rawContract: { value: "0x1", address: "0xTOKEN" },
+        metadata: {},
+      },
+    ]);
+    const { transfers } = await listTransfersForAccount({
+      chainId: 100,
+      contractAddresses: ["0xtoken", EURE],
+      includeNative: true,
+      account: ME,
+      pageSize: 10,
+    });
+    expect(
+      transfers.map((t) => [t.contractAddress, t.asset, t.decimals]),
+    ).toEqual([
+      [EURE.toLowerCase(), "EURe", 18],
+      [null, "XDAI", 18],
+      ["0xtoken", null, null],
+    ]);
+  });
+});

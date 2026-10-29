@@ -318,6 +318,10 @@
         "pendingTitle": "En attente de signatures",
         "pendingEmpty": "Rien à signer pour le moment."
       },
+      "tabs": {
+        "transactions": "Transactions",
+        "signers": "Signataires"
+      },
       "owners": {
         "title": "Signataires",
         "description": "{threshold} signatures requises pour chaque transaction.",

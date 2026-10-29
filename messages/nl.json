@@ -318,6 +318,10 @@
         "pendingTitle": "Wacht op handtekeningen",
         "pendingEmpty": "Op dit moment niets te tekenen."
       },
+      "tabs": {
+        "transactions": "Transacties",
+        "signers": "Ondertekenaars"
+      },
       "owners": {
         "title": "Ondertekenaars",
         "description": "{threshold} handtekeningen vereist voor elke transactie.",

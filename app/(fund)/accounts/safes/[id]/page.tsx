@@ -8,6 +8,7 @@ import { getTranslations } from "next-intl/server";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, resolveActiveTab } from "@/components/ui/tabs";
 import { requireFundRole } from "@/services/auth/dal";
 import { syncSafe } from "@/services/safe/sync";
 import {
@@ -16,13 +17,16 @@ import {
   safeWalletTxUrl,
   safeWalletUrl,
 } from "@/services/safe/config";
+import type { SafeTransfersFund } from "@/services/safe/transfers";
 import {
   enabledExtraTokens,
   type BalanceDisplaySettings,
 } from "@/services/token/extra-tokens";
 
+import { getAccountOptions } from "../../data";
 import { ExtraBalanceLines, extraLinesFor } from "../../extra-balance-lines";
 import { getExtraBalances } from "../../extra-balances";
+import { TransfersTableSkeleton } from "../../skeleton";
 import {
   getCurrentSignerAddress,
   getEligibleMembers,
@@ -30,6 +34,7 @@ import {
   getRelayerStatus,
   getSafe,
   getSafeBalance,
+  getSafeTransfersFirstPage,
 } from "../data";
 import { formatNative, isDeployedAddress, isLowGas, thresholdLabel } from "../format";
 import { RetryDeployButton } from "../retry-deploy-button";
@@ -40,6 +45,7 @@ import { HistoryList } from "./history-list";
 import { OwnersCard } from "./owners-card";
 import { PendingTxCard } from "./pending-tx-card";
 import { SafeManage } from "./safe-manage";
+import { SafeTransfersTable } from "./safe-transfers-table";
 import { SyncButton } from "./sync-button";
 import { ProposeTransferDialog } from "./transfer-dialog";
 
@@ -47,24 +53,43 @@ import { ProposeTransferDialog } from "./transfer-dialog";
 // for its receipt (relayer.ts, up to 90 s); give them room on Vercel.
 export const maxDuration = 120;
 
+// A Safe is an account first: the page leads with its on-chain history
+// (`?tab=transactions`, the default); owners, threshold and past proposals sit
+// under `?tab=signers`. Open proposals stay above the tabs — they need action.
+const TABS = [{ value: "transactions" }, { value: "signers" }] as const;
+
+type SearchParams = Promise<{ tab?: string | string[] }>;
+
 // Synchronous shell so the route paints its skeleton instantly; the Safe
 // (params-dependent, uncached) streams in behind <Suspense>.
 export default function SafeDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: SearchParams;
 }) {
   return (
     <Suspense fallback={<SafeDetailSkeleton />}>
-      <SafeDetailView params={params} />
+      <SafeDetailView params={params} searchParams={searchParams} />
     </Suspense>
   );
 }
 
-async function SafeDetailView({ params }: { params: Promise<{ id: string }> }) {
+async function SafeDetailView({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: SearchParams;
+}) {
   const { user, fund } = await requireFundRole("ADMIN");
-  const { id } = await params;
-  const t = await getTranslations("fund.safes");
+  const [{ id }, sp] = await Promise.all([params, searchParams]);
+  const activeTab = resolveActiveTab(sp.tab, TABS);
+  const [t, tAccounts] = await Promise.all([
+    getTranslations("fund.safes"),
+    getTranslations("fund.accounts"),
+  ]);
 
   // Pull owners / threshold / Safe{Wallet} confirmations before rendering
   // (30 s debounce inside syncSafe; never fails the page).
@@ -77,11 +102,12 @@ async function SafeDetailView({ params }: { params: Promise<{ id: string }> }) {
   const safe = await getSafe(fund.id, id);
   if (!safe) notFound();
 
-  const [signerAddress, members, recipients, relayer] = await Promise.all([
+  const [signerAddress, members, recipients, relayer, fundAccounts] = await Promise.all([
     getCurrentSignerAddress(fund.id, user.id),
     getEligibleMembers(fund.id),
     getRecipientOptions(fund.id),
     getRelayerStatus(safe.chainId),
+    getAccountOptions(fund.id, ""),
   ]);
 
   const token = {
@@ -101,6 +127,17 @@ async function SafeDetailView({ params }: { params: Promise<{ id: string }> }) {
   for (const o of [...safe.formerOwners, ...safe.owners]) {
     names[o.address.toLowerCase()] = o.displayName;
   }
+
+  // Counterparty names for the on-chain history: the fund's accounts, the
+  // Safe's owners (current and former), and the Safe itself.
+  const transferNames: Record<string, string> = {};
+  for (const a of fundAccounts) {
+    transferNames[a.address.toLowerCase()] = a.name || tAccounts("defaultName");
+  }
+  for (const o of [...safe.formerOwners, ...safe.owners]) {
+    transferNames[o.address.toLowerCase()] = o.displayName;
+  }
+  if (deployed) transferNames[safe.address.toLowerCase()] = safe.name;
 
   // Nonces that already have a competing rejection in flight.
   const rejectedNonces = new Set(
@@ -247,38 +284,17 @@ async function SafeDetailView({ params }: { params: Promise<{ id: string }> }) {
         </div>
       </div>
 
-      <OwnersCard
-        safeId={safe.id}
-        chainId={safe.chainId}
-        threshold={safe.threshold}
-        owners={ownerRows}
-        members={members.map((m) => ({
-          userId: m.userId,
-          name: m.name,
-          email: m.email,
-          signerAddress: m.signerAddress,
-        }))}
-        currentUserId={user.id}
-        canPropose={active}
-      />
-
-      <section className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-heading text-lg font-medium">
-            {t("detail.pendingTitle")}
-            {safe.pending.length > 0 && (
+      {safe.pending.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-heading text-lg font-medium">
+              {t("detail.pendingTitle")}
               <span className="ml-2 text-sm text-muted-foreground tabular-nums">
                 {safe.pending.length}
               </span>
-            )}
-          </h2>
-          {deployed && safe.status !== "DEPLOYING" && <SyncButton safeId={safe.id} />}
-        </div>
-        {safe.pending.length === 0 ? (
-          <div className="rounded-lg border border-border py-8 text-center text-sm text-muted-foreground">
-            {t("detail.pendingEmpty")}
+            </h2>
+            {deployed && safe.status !== "DEPLOYING" && <SyncButton safeId={safe.id} />}
           </div>
-        ) : (
           <div className="space-y-3">
             {safe.pending.map((tx) => (
               <PendingTxCard
@@ -299,43 +315,135 @@ async function SafeDetailView({ params }: { params: Promise<{ id: string }> }) {
               />
             ))}
           </div>
-        )}
-      </section>
+        </section>
+      )}
 
-      <section className="space-y-3">
-        <h2 className="font-heading text-lg font-medium">{t("history.title")}</h2>
-        <Suspense fallback={<SafeTxListSkeleton />}>
-          <HistoryList
+      <Tabs
+        active={activeTab}
+        items={TABS.map((tab) => ({
+          value: tab.value,
+          label: t(`tabs.${tab.value}`),
+        }))}
+      />
+
+      {activeTab === "transactions" && (
+        <section className="space-y-3">
+          <Suspense fallback={<TransfersTableSkeleton />}>
+            <SafeTransfersSection
+              fundId={fund.id}
+              fund={{
+                tokenChainId: fund.tokenChainId,
+                tokenAddress: fund.tokenAddress,
+                tokenDecimals: fund.tokenDecimals,
+                tokenSymbol: fund.tokenSymbol,
+                showNativeBalance: fund.showNativeBalance,
+                showEureBalance: fund.showEureBalance,
+              }}
+              safeId={safe.id}
+              chainId={safe.chainId}
+              address={safe.address}
+              accountNames={transferNames}
+            />
+          </Suspense>
+        </section>
+      )}
+
+      {activeTab === "signers" && (
+        <>
+          <OwnersCard
+            safeId={safe.id}
             chainId={safe.chainId}
-            history={safe.history}
-            tokenSymbol={fund.tokenSymbol}
-            names={names}
+            threshold={safe.threshold}
+            owners={ownerRows}
+            members={members.map((m) => ({
+              userId: m.userId,
+              name: m.name,
+              email: m.email,
+              signerAddress: m.signerAddress,
+            }))}
+            currentUserId={user.id}
+            canPropose={active}
           />
-        </Suspense>
-      </section>
 
-      {relayer.configured && isLowGas(relayer.balanceWei) && (
-        <Alert variant="warning">
-          <Fuel className="size-4" />
-          <AlertTitle>{t("relayer.lowGas")}</AlertTitle>
-          <AlertDescription>
-            {t("relayer.lowGasBody", {
-              balance: formatNative(relayer.balanceWei!),
-            })}
-            {relayer.address && (
-              <a
-                href={explorerAddressUrl(safe.chainId, relayer.address)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="ml-1 font-mono text-xs"
-              >
-                {relayer.address}
-              </a>
-            )}
-          </AlertDescription>
-        </Alert>
+          <section className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="font-heading text-lg font-medium">{t("history.title")}</h2>
+              {/* With proposals open the sync sits on that section, above. */}
+              {safe.pending.length === 0 && deployed && safe.status !== "DEPLOYING" && (
+                <SyncButton safeId={safe.id} />
+              )}
+            </div>
+            <Suspense fallback={<SafeTxListSkeleton />}>
+              <HistoryList
+                chainId={safe.chainId}
+                history={safe.history}
+                tokenSymbol={fund.tokenSymbol}
+                names={names}
+              />
+            </Suspense>
+          </section>
+
+          {relayer.configured && isLowGas(relayer.balanceWei) && (
+            <Alert variant="warning">
+              <Fuel className="size-4" />
+              <AlertTitle>{t("relayer.lowGas")}</AlertTitle>
+              <AlertDescription>
+                {t("relayer.lowGasBody", {
+                  balance: formatNative(relayer.balanceWei!),
+                })}
+                {relayer.address && (
+                  <a
+                    href={explorerAddressUrl(safe.chainId, relayer.address)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ml-1 font-mono text-xs"
+                  >
+                    {relayer.address}
+                  </a>
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
+        </>
       )}
     </div>
+  );
+}
+
+// The on-chain history is an Alchemy round-trip (several assets) — stream it
+// in its own boundary so the header, balance and open proposals paint first.
+async function SafeTransfersSection({
+  fundId,
+  fund,
+  safeId,
+  chainId,
+  address,
+  accountNames,
+}: {
+  fundId: string;
+  fund: SafeTransfersFund;
+  safeId: string;
+  chainId: number;
+  address: string;
+  accountNames: Record<string, string>;
+}) {
+  const t = await getTranslations("fund.accounts");
+  const first = await getSafeTransfersFirstPage(fundId, fund, chainId, address);
+  return (
+    <>
+      {first.error && (
+        <Alert variant="warning">
+          <AlertDescription>{t("transfers.loadError")}</AlertDescription>
+        </Alert>
+      )}
+      <SafeTransfersTable
+        safeId={safeId}
+        initial={first.transfers}
+        initialCursor={first.nextCursor}
+        symbol={fund.tokenSymbol}
+        accountNames={accountNames}
+      />
+    </>
   );
 }
 
