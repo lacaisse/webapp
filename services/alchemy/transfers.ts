@@ -28,6 +28,13 @@ export type AlchemyTransfer = {
   // it. Prefer this over formatting rawValue with a (possibly stale) decimals.
   value: number | null;
   blockTimestamp: string | null; // ISO from metadata, optional
+  // Which asset moved. `contractAddress` is the ERC-20 contract (lowercased),
+  // null for a native-coin (xDAI) transfer; `asset` is Alchemy's symbol for
+  // it; `decimals` comes from `rawContract.decimal` (null when Alchemy has
+  // none). Callers that query a single contract can ignore these.
+  contractAddress: string | null;
+  asset: string | null;
+  decimals: number | null;
 };
 
 type RpcTransferResponse = {
@@ -38,7 +45,13 @@ type RpcTransferResponse = {
     from: string;
     to: string;
     value?: number | null;
-    rawContract?: { value?: string };
+    asset?: string | null;
+    category?: string;
+    rawContract?: {
+      value?: string | null;
+      address?: string | null;
+      decimal?: string | null;
+    };
     metadata?: { blockTimestamp?: string };
   }>;
   pageKey?: string;
@@ -151,9 +164,17 @@ function compareDesc(a: AlchemyTransfer, b: AlchemyTransfer): number {
   return logIndexOf(b) - logIndexOf(a);
 }
 
+// Multi-asset variant (e.g. a Safe's history across the fund token, EURe and
+// xDAI): pass `contractAddresses` instead of `contractAddress`, and
+// `includeNative` to add plain native-coin transfers (Alchemy category
+// `external`). Every asset shares the one block cursor, so the paging rules
+// below hold unchanged — each direction is still a single stream, just over
+// several assets.
 export async function listTransfersForAccount(opts: {
   chainId: number;
-  contractAddress: string;
+  contractAddress?: string;
+  contractAddresses?: string[];
+  includeNative?: boolean;
   account: string;
   pageSize: number;
   cursor?: string | null;
@@ -163,11 +184,19 @@ export async function listTransfersForAccount(opts: {
     throw new Error(`Alchemy: unsupported chain id ${opts.chainId}`);
   }
 
+  const contractAddresses =
+    opts.contractAddresses ??
+    (opts.contractAddress ? [opts.contractAddress] : []);
+  if (contractAddresses.length === 0 && !opts.includeNative) {
+    return { transfers: [], nextPageKey: null };
+  }
+
   const toBlock = decodeBlockCursor(opts.cursor) ?? "latest";
 
   const query = (dir: { fromAddress?: string; toAddress?: string }) =>
     fetchTransfersPage(network, {
-      contractAddress: opts.contractAddress,
+      contractAddresses,
+      includeNative: opts.includeNative,
       pageSize: opts.pageSize,
       toBlock,
       ...dir,
@@ -221,7 +250,9 @@ export async function listTransfersForAccount(opts: {
 async function fetchTransfersPage(
   network: string,
   opts: {
-    contractAddress: string;
+    contractAddress?: string;
+    contractAddresses?: string[];
+    includeNative?: boolean;
     pageSize: number;
     pageKey?: string | null;
     fromAddress?: string;
@@ -231,16 +262,24 @@ async function fetchTransfersPage(
     order?: "asc" | "desc";
   },
 ): Promise<{ transfers: AlchemyTransfer[]; pageKey?: string }> {
+  const contracts =
+    opts.contractAddresses ??
+    (opts.contractAddress ? [opts.contractAddress] : []);
+  const category: string[] = [];
+  if (contracts.length > 0) category.push("erc20");
+  if (opts.includeNative) category.push("external");
   const params: Record<string, unknown> = {
     fromBlock: opts.fromBlock ?? "0x0",
     toBlock: opts.toBlock ?? "latest",
-    contractAddresses: [opts.contractAddress],
-    category: ["erc20"],
+    category,
     order: opts.order ?? "desc",
     withMetadata: true,
     excludeZeroValue: false,
     maxCount: "0x" + Math.min(Math.max(opts.pageSize, 1), 1000).toString(16),
   };
+  // Alchemy applies `contractAddresses` to token categories only; native
+  // `external` rows come back regardless.
+  if (contracts.length > 0) params.contractAddresses = contracts;
   if (opts.pageKey) params.pageKey = opts.pageKey;
   if (opts.fromAddress) params.fromAddress = opts.fromAddress;
   if (opts.toAddress) params.toAddress = opts.toAddress;
@@ -260,9 +299,23 @@ async function fetchTransfersPage(
     rawValue: t.rawContract?.value ?? "0x0",
     value: typeof t.value === "number" ? t.value : null,
     blockTimestamp: t.metadata?.blockTimestamp ?? null,
+    contractAddress:
+      t.category === "external" ? null : (t.rawContract?.address?.toLowerCase() ?? null),
+    asset: t.asset ?? null,
+    decimals: parseDecimals(t.rawContract?.decimal),
   }));
 
   return { transfers, pageKey: result.pageKey };
+}
+
+// `rawContract.decimal` is a hex string ("0x12" = 18); null when absent or
+// unparseable.
+function parseDecimals(raw: string | null | undefined): number | null {
+  if (!raw) return null;
+  const n = raw.startsWith("0x") || raw.startsWith("0X")
+    ? Number.parseInt(raw.slice(2), 16)
+    : Number.parseInt(raw, 10);
+  return Number.isFinite(n) ? n : null;
 }
 
 const BLOCK_FETCH_CONCURRENCY = 10;

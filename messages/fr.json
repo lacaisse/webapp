@@ -165,6 +165,7 @@
       "ACCOUNT_MINT": "Émission",
       "ACCOUNT_BURN": "Brûlage",
       "ACCOUNT_TRANSFER": "Transfert",
+      "SAFE_TRANSFER": "Transfert Safe",
       "system": "Système",
       "by": "par {name}",
       "triggers": {
@@ -176,6 +177,7 @@
         "ACCOUNT_MINT": "Émission sur compte",
         "ACCOUNT_BURN": "Brûlage sur compte",
         "ACCOUNT_TRANSFER": "Transfert de compte",
+        "SAFE_TRANSFER": "Transfert Safe (multisignature)",
         "ORDER_SETTLEMENT_MINT": "Règlement de commande (émission)",
         "ORDER_SETTLEMENT_BURN": "Règlement de commande (brûlage)",
         "PAYOUT_BURN": "Brûlage de virement",
@@ -200,7 +202,7 @@
     },
     "accounts": {
       "title": "Comptes",
-      "description": "Comptes nommés dérivés de la clé de la caisse. Consultez le solde et l'historique des transactions de chacun.",
+      "description": "Les comptes qui détiennent les jetons de la caisse. Chacun est contrôlé soit par la clé de la caisse, soit par plusieurs signatures (un Safe). Consultez le solde et l'historique des transactions de chacun.",
       "notConnected": "Connectez d'abord cette caisse à Citizen Pay pour créer des comptes.",
       "balancesError": "Impossible de charger les soldes on-chain. Réessayez bientôt.",
       "empty": "Aucun compte pour le moment. Créez-en un pour commencer.",
@@ -210,8 +212,12 @@
       "table": {
         "name": "Nom",
         "address": "Adresse",
-        "serial": "Série",
+        "security": "Sécurité",
         "balance": "Solde"
+      },
+      "security": {
+        "fundKey": "Clé de la caisse",
+        "safe": "{threshold} {m, plural, one {signature} other {signatures}}"
       },
       "detail": {
         "back": "Tous les comptes",
@@ -222,6 +228,11 @@
         "trigger": "Nouveau compte",
         "title": "Créer un compte",
         "description": "Un nouveau compte on-chain dérivé de la clé de la caisse.",
+        "securityLabel": "Sécurité",
+        "securityFundKey": "Clé de la caisse",
+        "securityFundKeyHint": "Géré par la clé de la caisse, comme le compte principal. Pratique au quotidien.",
+        "securitySafe": "Plusieurs signatures (Safe)",
+        "securitySafeHint": "L'argent ne bouge que si assez de signataires signent, par ex. 2 sur 3. Pour les réserves et les montants importants.",
         "name": "Nom",
         "namePlaceholder": "ex. Réserve, Frais, Événements",
         "sourceLabel": "Compte source de carte",
@@ -291,6 +302,219 @@
         "transferFailed": "Échec du transfert on-chain. Réessayez bientôt.",
         "cannotTransferSource": "Les comptes source de carte ne peuvent pas transférer vers l'extérieur.",
         "transfersFailed": "Impossible de charger les transactions. Réessayez bientôt."
+      }
+    },
+    "safes": {
+      "relayerMissing": "Le relayeur de La Caisse n'est pas configuré : impossible de créer ou d'exécuter des Safes pour l'instant. Demandez à l'équipe de la plateforme de le mettre en place.",
+      "balancesError": "Impossible de charger les soldes on-chain. Réessayez dans un instant.",
+      "openInSafeWallet": "Ouvrir dans Safe'{Wallet}'",
+      "you": "Vous",
+      "retryDeploy": "Relancer le déploiement",
+      "thresholdOf": "{n} sur {m}",
+      "thresholdLabel": "Signatures requises",
+      "thresholdRequired": "{n} sur {m} {n, plural, one {signature requise} other {signatures requises}}",
+      "thresholdDecrease": "Moins de signatures",
+      "thresholdIncrease": "Plus de signatures",
+      "table": {
+        "pendingCount": "{count} en attente"
+      },
+      "status": {
+        "DEPLOYING": "Déploiement…",
+        "ACTIVE": "Actif",
+        "FAILED": "Échec du déploiement"
+      },
+      "detail": {
+        "back": "Tous les comptes",
+        "balance": "Solde",
+        "threshold": "Signatures requises",
+        "thresholdChip": "{threshold} pour signer",
+        "thresholdHint": "Chaque transaction exige {threshold, plural, one {# signature} other {# signatures}}.",
+        "deploying": "Le Safe est en cours de déploiement on-chain. Cela prend généralement quelques secondes.",
+        "deployFailed": "Échec du déploiement",
+        "pendingTitle": "En attente de signatures",
+        "pendingEmpty": "Rien à signer pour le moment."
+      },
+      "tabs": {
+        "transactions": "Transactions",
+        "signers": "Signataires"
+      },
+      "owners": {
+        "title": "Signataires",
+        "description": "{threshold} signatures requises pour chaque transaction.",
+        "kind": {
+          "MEMBER": "Équipe",
+          "EXTERNAL": "Externe"
+        },
+        "externalHint": "Signe dans Safe'{Wallet}'.",
+        "formerMember": "Ne fait plus partie de l'équipe — pensez à retirer ou remplacer ce signataire."
+      },
+      "create": {
+        "description": "Choisissez qui détient le Safe et combien de signataires doivent approuver chaque transaction.",
+        "name": "Nom",
+        "namePlaceholder": "ex. Réserve, Bureau",
+        "teamOwners": "Signataires de l'équipe",
+        "teamOwnersHint": "Les membres de l'équipe signent dans La Caisse en un clic, sans wallet.",
+        "noMembers": "Aucun administrateur de cette caisse ne peut encore détenir un Safe.",
+        "externalOwners": "Signataires externes",
+        "externalOwnersHint": "N'importe quelle adresse (un wallet matériel, un partenaire…). Les signataires externes signent dans Safe'{Wallet}', sur app.safe.global.",
+        "externalAddress": "Adresse du signataire externe {index}",
+        "externalLabel": "Nom du signataire externe {index}",
+        "externalLabelPlaceholder": "Nom",
+        "addExternal": "Ajouter un signataire externe",
+        "removeExternal": "Retirer ce signataire",
+        "deployHint": "Le Safe est déployé sur Gnosis par La Caisse, sans frais pour la caisse.",
+        "confirm": "Créer le Safe"
+      },
+      "rename": {
+        "trigger": "Renommer",
+        "title": "Renommer le Safe",
+        "name": "Nom"
+      },
+      "archive": {
+        "trigger": "Archiver",
+        "title": "Archiver ce Safe ?",
+        "description": "Il disparaît de La Caisse. Le Safe, ses signataires et ses fonds restent on-chain et utilisables dans Safe'{Wallet}'.",
+        "blocked": "{count, plural, one {# transaction est encore ouverte} other {# transactions sont encore ouvertes}}. Exécutez-les ou rejetez-les avant d'archiver.",
+        "confirm": "Archiver"
+      },
+      "transfer": {
+        "trigger": "Proposer un transfert",
+        "title": "Proposer un transfert",
+        "description": "Le transfert part dès que {threshold, plural, one {# signataire a signé} other {# signataires ont signé}}.",
+        "recipient": "Destinataire",
+        "pickRecipient": "Choisir un compte ou une carte…",
+        "groupAccounts": "Comptes de la caisse",
+        "groupCards": "Cartes de l'équipe",
+        "recipientIs": "Destinataire : {label}",
+        "token": "Jeton",
+        "amount": "Montant",
+        "note": "Note (facultatif)",
+        "notePlaceholder": "À quoi sert-il ?",
+        "confirm": "Proposer",
+        "cardLabel": "Carte de {name}"
+      },
+      "proposal": {
+        "executed": "Signé et exécuté.",
+        "proposed": "Proposé. Exécuté dès que {threshold, plural, one {# signataire aura signé} other {# signataires auront signé}}."
+      },
+      "ownerChange": {
+        "needsSignatures": "Ce changement est lui-même une transaction du Safe : il s'applique dès que {threshold, plural, one {# signataire actuel a signé} other {# signataires actuels ont signé}}.",
+        "addTrigger": "Ajouter un signataire",
+        "addTitle": "Ajouter un signataire",
+        "addDescription": "Ajoutez un membre de l'équipe ou une adresse externe aux signataires.",
+        "modeMember": "Membre de l'équipe",
+        "modeExternal": "Adresse externe",
+        "member": "Membre de l'équipe",
+        "pickMember": "Choisir un membre…",
+        "memberHint": "Il ou elle signera dans La Caisse.",
+        "address": "Adresse",
+        "label": "Nom",
+        "labelPlaceholder": "ex. Ledger du trésorier",
+        "externalHint": "Les signataires externes signent dans Safe'{Wallet}'.",
+        "addConfirm": "Proposer",
+        "removeTrigger": "Retirer",
+        "removeTitle": "Retirer {owner} ?",
+        "removeDescription": "{address} ne pourra plus signer pour ce Safe.",
+        "thresholdMustDrop": "Il ne reste que {remaining, plural, one {# signataire} other {# signataires}} : le seuil passe à {threshold}.",
+        "removeSelf": "C'est vous : vous ne pourrez plus signer pour ce Safe.",
+        "removeConfirm": "Proposer le retrait",
+        "thresholdTrigger": "Modifier le seuil",
+        "thresholdTitle": "Modifier le seuil",
+        "thresholdDescription": "Combien de signataires doivent approuver chaque transaction.",
+        "thresholdConfirm": "Proposer"
+      },
+      "tx": {
+        "kinds": {
+          "TOKEN_TRANSFER": "Transfert",
+          "ADD_OWNER": "Ajout de signataire",
+          "REMOVE_OWNER": "Retrait de signataire",
+          "SWAP_OWNER": "Remplacement de signataire",
+          "CHANGE_THRESHOLD": "Changement de seuil",
+          "REJECTION": "Rejet",
+          "UNKNOWN": "Transaction"
+        },
+        "summary": {
+          "transfer": "Envoyer {amount} à {recipient}",
+          "addOwner": "Ajouter {owner} comme signataire, {threshold, plural, one {# signature requise} other {# signatures requises}}",
+          "removeOwner": "Retirer le signataire {owner}, {threshold, plural, one {# signature requise} other {# signatures requises}}",
+          "swapOwner": "Remplacer le signataire {oldOwner} par {newOwner}",
+          "changeThreshold": "Passer le seuil à {threshold, plural, one {# signature} other {# signatures}}",
+          "rejection": "Rejeter la transaction n° {nonce}"
+        },
+        "status": {
+          "PENDING": "En attente",
+          "EXECUTING": "En cours",
+          "EXECUTED": "Exécutée",
+          "FAILED": "Échouée",
+          "SUPERSEDED": "Remplacée"
+        },
+        "source": {
+          "LACAISSE": "dans La Caisse",
+          "SAFE_WALLET": "dans Safe'{Wallet}'"
+        },
+        "nonce": "n° {nonce}",
+        "proposedBy": "Proposée par {name}",
+        "proposedExternally": "Proposée dans Safe'{Wallet}'",
+        "rejectionProposed": "Rejet proposé",
+        "nextInLine": "Prochaine à exécuter",
+        "waitsFor": "Attend la n° {nonce}",
+        "signatures": "{count} {count, plural, one {signature} other {signatures}} sur {total}",
+        "notSigned": "Pas encore signé",
+        "signedAt": "Signé le {date}",
+        "youName": "{name} (vous)",
+        "youSigned": "Vous avez signé cette transaction.",
+        "waitingExternal": "En attente de la signature de {names} dans Safe'{Wallet}'.",
+        "sign": "Signer",
+        "reject": "Rejeter",
+        "rejectTitle": "Rejeter la transaction n° {nonce} ?",
+        "rejectDescription": "Cela propose une transaction vide portant le même numéro (n° {nonce}). Dès que {threshold, plural, one {# signataire l'a signée} other {# signataires l'ont signée}}, elle s'exécute à la place et l'originale ne pourra plus jamais l'être.",
+        "rejectConfirm": "Proposer le rejet",
+        "retry": "Réessayer",
+        "executing": "Exécution…",
+        "refresh": "Actualiser",
+        "refreshHint": "Récupérer les signataires, le seuil et les signatures Safe'{Wallet}' depuis la blockchain",
+        "executedBy": {
+          "relayer": "Exécutée par La Caisse",
+          "external": "Exécutée en dehors de La Caisse"
+        },
+        "signedBy": "Signée par {names}"
+      },
+      "history": {
+        "title": "Historique",
+        "empty": "Aucune transaction exécutée pour l'instant."
+      },
+      "relayer": {
+        "lowGas": "Relayeur bientôt à court de gas",
+        "lowGasBody": "Il reste {balance} xDAI au relayeur de La Caisse pour payer les exécutions. Rechargez-le bientôt :",
+        "status": "Solde du relayeur : {balance} xDAI. Envoyez des xDAI à cette adresse pour payer les déploiements et exécutions :"
+      },
+      "errors": {
+        "config": "Le jeton de la caisse n'est pas encore configuré. Connectez d'abord Citizen Pay.",
+        "unsupported_chain": "Ce réseau n'est pas pris en charge pour les Safes.",
+        "relayer_not_configured": "Le relais de transactions n'est pas configuré. Contactez le support.",
+        "relayer_failed": "La transaction n'a pas pu être envoyée. Réessayez dans un instant.",
+        "tx_reverted": "La transaction a été rejetée sur la blockchain.",
+        "tx_service": "Safe'{Wallet}' est injoignable.",
+        "not_owner": "Vous n'êtes pas signataire de ce Safe.",
+        "already_signed": "Vous avez déjà signé cette transaction.",
+        "threshold": "Pas encore assez de signatures.",
+        "nonce": "L'emplacement de cette transaction a déjà été utilisé par une autre transaction.",
+        "invalid_signature": "Une signature est invalide.",
+        "not_found": "Safe ou transaction introuvable.",
+        "invalid_state": "Cette action n'est pas possible dans l'état actuel.",
+        "unknown": "Une erreur s'est produite. Réessayez.",
+        "tokenNotEnabled": "Ce jeton n'est pas activé pour cette caisse (Paramètres → Jeton).",
+        "nameRequired": "Saisissez un nom.",
+        "nameTooLong": "Le nom est trop long (60 caractères max.).",
+        "addressInvalid": "Saisissez une adresse valide (0x…).",
+        "amountInvalid": "Saisissez un montant positif avec 2 décimales au plus.",
+        "thresholdInvalid": "Le seuil doit être d'au moins 1.",
+        "labelTooLong": "Le libellé est trop long (60 caractères max.).",
+        "ownersRequired": "Ajoutez au moins un signataire.",
+        "thresholdTooHigh": "Le seuil ne peut pas dépasser le nombre de signataires.",
+        "noteTooLong": "La note est trop longue (200 caractères max.).",
+        "ownerRequired": "Choisissez un membre ou saisissez une adresse.",
+        "duplicateOwner": "La même adresse figure deux fois."
       }
     },
     "team": {
@@ -1912,6 +2136,35 @@
           "failedLabel": "Échecs",
           "errorLabel": "Dernière erreur",
           "neverRan": "Aucune exécution pour l’instant."
+        },
+        "balances": {
+          "title": "Soldes affichés sur les comptes",
+          "description": "Les comptes peuvent détenir d'autres jetons que celui de la caisse. Choisissez les soldes supplémentaires affichés sur la page Comptes.",
+          "native": "xDAI (monnaie native)",
+          "nativeHint": "Sert à payer le gas sur Gnosis Chain ; affiché sur chaque compte et chaque Safe.",
+          "eure": "EURe (euro Monerium)",
+          "eureHint": "Stablecoin en euros sur Gnosis Chain."
+        },
+        "customTokens": {
+          "title": "Jetons personnalisés",
+          "description": "Ajoutez n'importe quel autre jeton ERC-20 de la chaîne de la caisse : son solde s'affiche comme xDAI et EURe sur les comptes et les Safes, et un Safe peut l'envoyer.",
+          "address": "Adresse du contrat",
+          "addressPlaceholder": "0x…",
+          "add": "Ajouter",
+          "adding": "Ajout…",
+          "remove": "Retirer le jeton",
+          "confirmRemove": "{symbol} ne sera plus affiché sur les comptes et les Safes, et ne pourra plus être envoyé depuis un Safe. Les jetons détenus ne bougent pas ; vous pourrez l'ajouter à nouveau.",
+          "empty": "Aucun jeton personnalisé.",
+          "decimals": "{decimals} décimales",
+          "errors": {
+            "notErc20": "Cette adresse n'est pas un jeton ERC-20 sur la chaîne de la caisse.",
+            "alreadyShown": "Ce jeton est déjà proposé ci-dessus (jeton de la caisse, xDAI ou EURe).",
+            "duplicate": "Ce jeton est déjà dans la liste.",
+            "addressInvalid": "Saisissez une adresse de contrat valide (0x suivi de 40 caractères hexadécimaux).",
+            "readFailed": "Impossible de lire le contrat pour l'instant. Réessayez dans quelques minutes.",
+            "tooMany": "Vous pouvez ajouter au plus {max} jetons personnalisés.",
+            "notFound": "Ce jeton n'est plus dans la liste."
+          }
         }
       },
       "onboarding": {

@@ -34,13 +34,21 @@ export type PublishOutcome = "ok" | "skipped" | string;
 
 const DEFAULT_CONCURRENCY = 4;
 
-// A fund with no CP API key has no treasury to publish to (and live mode
-// would throw building the client) — skip it quietly.
-function isConnected(fund: PublishHolderNameFund): boolean {
+/**
+ * A fund with no CP API key has no treasury to publish to (and live mode
+ * would throw building the client) — skip it quietly. Shared with the
+ * token-account name publish (services/token-account/publish-name.ts).
+ */
+export function isConnected(fund: PublishHolderNameFund): boolean {
   return Boolean(fund.citizenPayApiKeyId && fund.citizenPayApiKeyEnc);
 }
 
-function failureCode(e: unknown): string {
+/**
+ * Reduce a publish error to a loggable code: the HTTP status, "network"
+ * (unreachable / timed out), or "error". Never CP's message text, which can
+ * echo the name.
+ */
+export function failureCode(e: unknown): string {
   if (e instanceof CitizenPayApiError) return String(e.status);
   // fetch rejects with a TypeError when the host is unreachable, and the
   // request timeout aborts with AbortError / TimeoutError.
@@ -147,9 +155,11 @@ export async function publishCardHolderNames(
   return summary;
 }
 
-// Only the credential columns are captured by the deferred callback, not the
-// caller's whole fund row.
-function credsOf(fund: PublishHolderNameFund): PublishHolderNameFund {
+/**
+ * Only the credential columns are captured by a deferred `after()` callback,
+ * not the caller's whole fund row.
+ */
+export function credsOf(fund: PublishHolderNameFund): PublishHolderNameFund {
   return {
     id: fund.id,
     citizenPayApiKeyId: fund.citizenPayApiKeyId,

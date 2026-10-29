@@ -149,6 +149,7 @@
       "ACCOUNT_MINT": "Uitgifte",
       "ACCOUNT_BURN": "Vernietiging",
       "ACCOUNT_TRANSFER": "Overdracht",
+      "SAFE_TRANSFER": "Safe-overdracht",
       "system": "Systeem",
       "by": "door {name}",
       "triggers": {
@@ -160,6 +161,7 @@
         "ACCOUNT_MINT": "Uitgifte op rekening",
         "ACCOUNT_BURN": "Vernietiging op rekening",
         "ACCOUNT_TRANSFER": "Rekeningoverdracht",
+        "SAFE_TRANSFER": "Safe-overdracht (multisig)",
         "ORDER_SETTLEMENT_MINT": "Orderafwikkeling (uitgifte)",
         "ORDER_SETTLEMENT_BURN": "Orderafwikkeling (vernietiging)",
         "PAYOUT_BURN": "Uitbetaling vernietigd",
@@ -184,7 +186,7 @@
     },
     "accounts": {
       "title": "Rekeningen",
-      "description": "Benoemde rekeningen afgeleid van de sleutel van het fonds. Bekijk per rekening het saldo en de transactiegeschiedenis.",
+      "description": "De rekeningen die de tokens van het fonds bevatten. Elke rekening wordt beheerd met de sleutel van het fonds of met meerdere handtekeningen (een Safe). Bekijk per rekening het saldo en de transactiegeschiedenis.",
       "notConnected": "Verbind dit fonds eerst met Citizen Pay om rekeningen aan te maken.",
       "balancesError": "Kon de on-chain saldi niet laden. Probeer het zo opnieuw.",
       "empty": "Nog geen rekeningen. Maak er een aan om te beginnen.",
@@ -194,8 +196,12 @@
       "table": {
         "name": "Naam",
         "address": "Adres",
-        "serial": "Serie",
+        "security": "Beveiliging",
         "balance": "Saldo"
+      },
+      "security": {
+        "fundKey": "Sleutel van het fonds",
+        "safe": "{threshold} {m, plural, one {handtekening} other {handtekeningen}}"
       },
       "detail": {
         "back": "Alle rekeningen",
@@ -206,6 +212,11 @@
         "trigger": "Nieuwe rekening",
         "title": "Rekening aanmaken",
         "description": "Een nieuwe on-chain rekening afgeleid van de sleutel van het fonds.",
+        "securityLabel": "Beveiliging",
+        "securityFundKey": "Sleutel van het fonds",
+        "securityFundKeyHint": "Beheerd met de sleutel van het fonds, zoals de hoofdrekening. Handig voor dagelijks gebruik.",
+        "securitySafe": "Meerdere handtekeningen (Safe)",
+        "securitySafeHint": "Geld beweegt pas als genoeg ondertekenaars tekenen, bv. 2 van 3. Voor reserves en grotere bedragen.",
         "name": "Naam",
         "namePlaceholder": "bijv. Reserve, Kosten, Evenementen",
         "sourceLabel": "Bronrekening voor kaarten",
@@ -275,6 +286,219 @@
         "transferFailed": "On-chain overdracht mislukt. Probeer het zo opnieuw.",
         "cannotTransferSource": "Bronrekeningen voor kaarten kunnen niet naar buiten overmaken.",
         "transfersFailed": "Kon de transacties niet laden. Probeer het zo opnieuw."
+      }
+    },
+    "safes": {
+      "relayerMissing": "De relayer van La Caisse is niet ingesteld, dus Safes kunnen nog niet worden aangemaakt of uitgevoerd. Vraag het platformteam om hem in te stellen.",
+      "balancesError": "Kon de on-chain saldi niet laden. Probeer het zo opnieuw.",
+      "openInSafeWallet": "Openen in Safe'{Wallet}'",
+      "you": "Jij",
+      "retryDeploy": "Uitrol opnieuw proberen",
+      "thresholdOf": "{n} van {m}",
+      "thresholdLabel": "Vereiste handtekeningen",
+      "thresholdRequired": "{n} van {m} {m, plural, one {handtekening} other {handtekeningen}} vereist",
+      "thresholdDecrease": "Minder handtekeningen",
+      "thresholdIncrease": "Meer handtekeningen",
+      "table": {
+        "pendingCount": "{count} openstaand"
+      },
+      "status": {
+        "DEPLOYING": "Wordt uitgerold…",
+        "ACTIVE": "Actief",
+        "FAILED": "Uitrol mislukt"
+      },
+      "detail": {
+        "back": "Alle rekeningen",
+        "balance": "Saldo",
+        "threshold": "Vereiste handtekeningen",
+        "thresholdChip": "{threshold} om te tekenen",
+        "thresholdHint": "Elke transactie vereist {threshold, plural, one {# handtekening} other {# handtekeningen}}.",
+        "deploying": "De Safe wordt on-chain uitgerold. Dit duurt meestal enkele seconden.",
+        "deployFailed": "Uitrol mislukt",
+        "pendingTitle": "Wacht op handtekeningen",
+        "pendingEmpty": "Op dit moment niets te tekenen."
+      },
+      "tabs": {
+        "transactions": "Transacties",
+        "signers": "Ondertekenaars"
+      },
+      "owners": {
+        "title": "Ondertekenaars",
+        "description": "{threshold} handtekeningen vereist voor elke transactie.",
+        "kind": {
+          "MEMBER": "Team",
+          "EXTERNAL": "Extern"
+        },
+        "externalHint": "Tekent in Safe'{Wallet}'.",
+        "formerMember": "Geen teamlid meer — overweeg deze ondertekenaar te verwijderen of te vervangen."
+      },
+      "create": {
+        "description": "Kies wie eigenaar is van de Safe en hoeveel van hen elke transactie moeten ondertekenen.",
+        "name": "Naam",
+        "namePlaceholder": "bv. Reserve, Bestuur",
+        "teamOwners": "Ondertekenaars uit het team",
+        "teamOwnersHint": "Teamleden tekenen in La Caisse met één klik, zonder wallet.",
+        "noMembers": "Nog geen beheerder van dit fonds kan eigenaar zijn van een Safe.",
+        "externalOwners": "Externe ondertekenaars",
+        "externalOwnersHint": "Elk walletadres (een hardware wallet, een partner…). Externe ondertekenaars tekenen in Safe'{Wallet}', op app.safe.global.",
+        "externalAddress": "Adres van externe ondertekenaar {index}",
+        "externalLabel": "Naam van externe ondertekenaar {index}",
+        "externalLabelPlaceholder": "Naam",
+        "addExternal": "Externe ondertekenaar toevoegen",
+        "removeExternal": "Deze ondertekenaar verwijderen",
+        "deployHint": "La Caisse rolt de Safe uit op Gnosis, zonder kosten voor het fonds.",
+        "confirm": "Safe aanmaken"
+      },
+      "rename": {
+        "trigger": "Hernoemen",
+        "title": "Safe hernoemen",
+        "name": "Naam"
+      },
+      "archive": {
+        "trigger": "Archiveren",
+        "title": "Deze Safe archiveren?",
+        "description": "Hij verdwijnt uit La Caisse. De Safe, zijn ondertekenaars en zijn tegoed blijven on-chain bestaan en bruikbaar in Safe'{Wallet}'.",
+        "blocked": "{count, plural, one {Er staat nog # transactie open} other {Er staan nog # transacties open}}. Voer ze uit of wijs ze af voor je archiveert.",
+        "confirm": "Archiveren"
+      },
+      "transfer": {
+        "trigger": "Overboeking voorstellen",
+        "title": "Een overboeking voorstellen",
+        "description": "De overboeking wordt verstuurd zodra {threshold, plural, one {# ondertekenaar heeft} other {# ondertekenaars hebben}} getekend.",
+        "recipient": "Ontvanger",
+        "pickRecipient": "Kies een rekening of kaart…",
+        "groupAccounts": "Fondsrekeningen",
+        "groupCards": "Kaarten van het team",
+        "recipientIs": "Ontvanger: {label}",
+        "token": "Token",
+        "amount": "Bedrag",
+        "note": "Notitie (optioneel)",
+        "notePlaceholder": "Waarvoor is het?",
+        "confirm": "Voorstellen",
+        "cardLabel": "Kaart van {name}"
+      },
+      "proposal": {
+        "executed": "Getekend en uitgevoerd.",
+        "proposed": "Voorgesteld. Wordt uitgevoerd zodra {threshold, plural, one {# ondertekenaar heeft} other {# ondertekenaars hebben}} getekend."
+      },
+      "ownerChange": {
+        "needsSignatures": "Deze wijziging is zelf een Safe-transactie: ze gaat in zodra {threshold, plural, one {# huidige ondertekenaar heeft} other {# huidige ondertekenaars hebben}} getekend.",
+        "addTrigger": "Ondertekenaar toevoegen",
+        "addTitle": "Een ondertekenaar toevoegen",
+        "addDescription": "Voeg een teamlid of een extern adres toe aan de ondertekenaars.",
+        "modeMember": "Teamlid",
+        "modeExternal": "Extern adres",
+        "member": "Teamlid",
+        "pickMember": "Kies een teamlid…",
+        "memberHint": "Diegene tekent in La Caisse.",
+        "address": "Adres",
+        "label": "Naam",
+        "labelPlaceholder": "bv. Ledger van de penningmeester",
+        "externalHint": "Externe ondertekenaars tekenen in Safe'{Wallet}'.",
+        "addConfirm": "Voorstellen",
+        "removeTrigger": "Verwijderen",
+        "removeTitle": "{owner} verwijderen?",
+        "removeDescription": "{address} kan dan niet meer tekenen voor deze Safe.",
+        "thresholdMustDrop": "{remaining, plural, one {Er blijft maar # ondertekenaar over} other {Er blijven maar # ondertekenaars over}}, dus de drempel zakt naar {threshold}.",
+        "removeSelf": "Dat ben jij: je kunt dan niet meer tekenen voor deze Safe.",
+        "removeConfirm": "Verwijdering voorstellen",
+        "thresholdTrigger": "Drempel wijzigen",
+        "thresholdTitle": "De drempel wijzigen",
+        "thresholdDescription": "Hoeveel ondertekenaars elke transactie moeten goedkeuren.",
+        "thresholdConfirm": "Voorstellen"
+      },
+      "tx": {
+        "kinds": {
+          "TOKEN_TRANSFER": "Overboeking",
+          "ADD_OWNER": "Ondertekenaar toevoegen",
+          "REMOVE_OWNER": "Ondertekenaar verwijderen",
+          "SWAP_OWNER": "Ondertekenaar vervangen",
+          "CHANGE_THRESHOLD": "Drempel wijzigen",
+          "REJECTION": "Afwijzing",
+          "UNKNOWN": "Transactie"
+        },
+        "summary": {
+          "transfer": "{amount} sturen naar {recipient}",
+          "addOwner": "{owner} toevoegen als ondertekenaar, {threshold, plural, one {# handtekening} other {# handtekeningen}} vereist",
+          "removeOwner": "Ondertekenaar {owner} verwijderen, {threshold, plural, one {# handtekening} other {# handtekeningen}} vereist",
+          "swapOwner": "Ondertekenaar {oldOwner} vervangen door {newOwner}",
+          "changeThreshold": "Drempel wijzigen naar {threshold, plural, one {# handtekening} other {# handtekeningen}}",
+          "rejection": "Transactie nr. {nonce} afwijzen"
+        },
+        "status": {
+          "PENDING": "Openstaand",
+          "EXECUTING": "Wordt uitgevoerd",
+          "EXECUTED": "Uitgevoerd",
+          "FAILED": "Mislukt",
+          "SUPERSEDED": "Vervangen"
+        },
+        "source": {
+          "LACAISSE": "in La Caisse",
+          "SAFE_WALLET": "in Safe'{Wallet}'"
+        },
+        "nonce": "nr. {nonce}",
+        "proposedBy": "Voorgesteld door {name}",
+        "proposedExternally": "Voorgesteld in Safe'{Wallet}'",
+        "rejectionProposed": "Afwijzing voorgesteld",
+        "nextInLine": "Volgende in de rij",
+        "waitsFor": "Wacht op nr. {nonce}",
+        "signatures": "{count} van {total} {total, plural, one {handtekening} other {handtekeningen}}",
+        "notSigned": "Nog niet getekend",
+        "signedAt": "Getekend op {date}",
+        "youName": "{name} (jij)",
+        "youSigned": "Je hebt deze transactie getekend.",
+        "waitingExternal": "Wacht tot {names} tekent in Safe'{Wallet}'.",
+        "sign": "Tekenen",
+        "reject": "Afwijzen",
+        "rejectTitle": "Transactie nr. {nonce} afwijzen?",
+        "rejectDescription": "Dit stelt een lege transactie met hetzelfde nummer (nr. {nonce}) voor. Zodra {threshold, plural, one {# ondertekenaar ze heeft getekend} other {# ondertekenaars ze hebben getekend}}, wordt ze in de plaats uitgevoerd en kan de oorspronkelijke nooit meer worden uitgevoerd.",
+        "rejectConfirm": "Afwijzing voorstellen",
+        "retry": "Opnieuw proberen",
+        "executing": "Wordt uitgevoerd…",
+        "refresh": "Vernieuwen",
+        "refreshHint": "Ondertekenaars, drempel en Safe'{Wallet}'-handtekeningen ophalen van de blockchain",
+        "executedBy": {
+          "relayer": "Uitgevoerd door La Caisse",
+          "external": "Extern uitgevoerd"
+        },
+        "signedBy": "Getekend door {names}"
+      },
+      "history": {
+        "title": "Geschiedenis",
+        "empty": "Nog geen uitgevoerde transacties."
+      },
+      "relayer": {
+        "lowGas": "Relayer heeft bijna geen gas meer",
+        "lowGasBody": "De relayer van La Caisse heeft nog {balance} xDAI om uitvoeringen te betalen. Vul hem binnenkort aan:",
+        "status": "Saldo van de relayer: {balance} xDAI. Stuur xDAI naar dit adres om deployments en uitvoeringen te betalen:"
+      },
+      "errors": {
+        "config": "Het fondstoken is nog niet ingesteld. Koppel eerst Citizen Pay.",
+        "unsupported_chain": "Dit netwerk wordt niet ondersteund voor Safes.",
+        "relayer_not_configured": "De transactie-relayer is niet ingesteld. Neem contact op met support.",
+        "relayer_failed": "De transactie kon niet worden verstuurd. Probeer het zo opnieuw.",
+        "tx_reverted": "De transactie werd on-chain geweigerd.",
+        "tx_service": "Safe'{Wallet}' is niet bereikbaar.",
+        "not_owner": "Je bent geen ondertekenaar van deze Safe.",
+        "already_signed": "Je hebt deze transactie al getekend.",
+        "threshold": "Nog niet genoeg handtekeningen.",
+        "nonce": "De plaats van deze transactie is al door een andere transactie gebruikt.",
+        "invalid_signature": "Een handtekening is ongeldig.",
+        "not_found": "Safe of transactie niet gevonden.",
+        "invalid_state": "Deze actie is in de huidige toestand niet mogelijk.",
+        "unknown": "Er ging iets mis. Probeer het opnieuw.",
+        "tokenNotEnabled": "Deze token is niet ingeschakeld voor dit fonds (Instellingen → Token).",
+        "nameRequired": "Voer een naam in.",
+        "nameTooLong": "De naam is te lang (max. 60 tekens).",
+        "addressInvalid": "Voer een geldig adres in (0x…).",
+        "amountInvalid": "Voer een positief bedrag in met maximaal 2 decimalen.",
+        "thresholdInvalid": "De drempel moet minstens 1 zijn.",
+        "labelTooLong": "Het label is te lang (max. 60 tekens).",
+        "ownersRequired": "Voeg minstens één ondertekenaar toe.",
+        "thresholdTooHigh": "De drempel kan niet hoger zijn dan het aantal ondertekenaars.",
+        "noteTooLong": "De notitie is te lang (max. 200 tekens).",
+        "ownerRequired": "Kies een teamlid of voer een adres in.",
+        "duplicateOwner": "Hetzelfde adres staat er twee keer in."
       }
     },
     "team": {
@@ -1857,6 +2081,35 @@
           "failedLabel": "Mislukt",
           "errorLabel": "Laatste fout",
           "neverRan": "Nog geen uitvoering."
+        },
+        "balances": {
+          "title": "Saldi op de rekeningen",
+          "description": "Rekeningen kunnen meer bevatten dan de token van het fonds. Kies welke andere saldi de pagina Rekeningen toont.",
+          "native": "xDAI (native munt)",
+          "nativeHint": "Gas op Gnosis Chain; getoond bij elke rekening en elke Safe.",
+          "eure": "EURe (Monerium-euro)",
+          "eureHint": "Euro-stablecoin op Gnosis Chain."
+        },
+        "customTokens": {
+          "title": "Eigen tokens",
+          "description": "Voeg elke andere ERC-20-token op de chain van het fonds toe: het saldo verschijnt zoals xDAI en EURe bij rekeningen en Safes, en een Safe kan hem versturen.",
+          "address": "Contractadres",
+          "addressPlaceholder": "0x…",
+          "add": "Toevoegen",
+          "adding": "Toevoegen…",
+          "remove": "Token verwijderen",
+          "confirmRemove": "{symbol} wordt niet meer getoond bij rekeningen en Safes, en kan niet meer vanuit een Safe worden verstuurd. Tokens die al worden aangehouden bewegen niet; je kunt hem later opnieuw toevoegen.",
+          "empty": "Nog geen eigen tokens.",
+          "decimals": "{decimals} decimalen",
+          "errors": {
+            "notErc20": "Dit adres is geen ERC-20-token op de chain van het fonds.",
+            "alreadyShown": "Deze token wordt hierboven al aangeboden (fondstoken, xDAI of EURe).",
+            "duplicate": "Deze token staat al in de lijst.",
+            "addressInvalid": "Voer een geldig contractadres in (0x gevolgd door 40 hexadecimale tekens).",
+            "readFailed": "Het contract kon nu niet worden gelezen. Probeer het over een paar minuten opnieuw.",
+            "tooMany": "Je kunt maximaal {max} eigen tokens toevoegen.",
+            "notFound": "Deze token staat niet meer in de lijst."
+          }
         }
       },
       "onboarding": {

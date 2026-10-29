@@ -149,6 +149,7 @@
       "ACCOUNT_MINT": "Emisión",
       "ACCOUNT_BURN": "Quema",
       "ACCOUNT_TRANSFER": "Transferencia",
+      "SAFE_TRANSFER": "Transferencia Safe",
       "system": "Sistema",
       "by": "por {name}",
       "triggers": {
@@ -160,6 +161,7 @@
         "ACCOUNT_MINT": "Emisión en cuenta",
         "ACCOUNT_BURN": "Quema en cuenta",
         "ACCOUNT_TRANSFER": "Transferencia de cuenta",
+        "SAFE_TRANSFER": "Transferencia Safe (multifirma)",
         "ORDER_SETTLEMENT_MINT": "Liquidación de pedido (emisión)",
         "ORDER_SETTLEMENT_BURN": "Liquidación de pedido (quema)",
         "PAYOUT_BURN": "Quema de pago",
@@ -184,7 +186,7 @@
     },
     "accounts": {
       "title": "Cuentas",
-      "description": "Cuentas con nombre derivadas de la clave del fondo. Consulta el saldo y el historial de transacciones de tokens de cada una.",
+      "description": "Las cuentas que guardan los tokens del fondo. Cada una se controla con la clave del fondo o con varias firmas (un Safe). Consulta el saldo y el historial de transacciones de cada una.",
       "notConnected": "Conecta primero este fondo a Citizen Pay para crear cuentas.",
       "balancesError": "No se pudieron cargar los saldos en cadena. Vuelve a intentarlo en breve.",
       "empty": "Aún no hay cuentas. Crea una para empezar.",
@@ -194,8 +196,12 @@
       "table": {
         "name": "Nombre",
         "address": "Dirección",
-        "serial": "N.º de serie",
+        "security": "Seguridad",
         "balance": "Saldo"
+      },
+      "security": {
+        "fundKey": "Clave del fondo",
+        "safe": "{threshold} {m, plural, one {firma} other {firmas}}"
       },
       "detail": {
         "back": "Todas las cuentas",
@@ -206,6 +212,11 @@
         "trigger": "Nueva cuenta",
         "title": "Crear cuenta",
         "description": "Una nueva cuenta en cadena derivada de la clave del fondo.",
+        "securityLabel": "Seguridad",
+        "securityFundKey": "Clave del fondo",
+        "securityFundKeyHint": "Controlada por la clave del fondo, como la cuenta principal. Práctica para el día a día.",
+        "securitySafe": "Varias firmas (Safe)",
+        "securitySafeHint": "El dinero solo se mueve cuando firman suficientes firmantes, p. ej. 2 de 3. Para reservas y sumas importantes.",
         "name": "Nombre",
         "namePlaceholder": "p. ej. Reserva, Comisiones, Eventos",
         "sourceLabel": "Cuenta fuente de tarjetas",
@@ -275,6 +286,219 @@
         "transferFailed": "La transferencia en cadena falló. Vuelve a intentarlo en breve.",
         "cannotTransferSource": "Las cuentas fuente de tarjetas no pueden transferir hacia fuera.",
         "transfersFailed": "No se pudieron cargar las transacciones. Vuelve a intentarlo en breve."
+      }
+    },
+    "safes": {
+      "relayerMissing": "El relayer de La Caisse no está configurado, así que aún no se pueden crear ni ejecutar Safes. Pide al equipo de la plataforma que lo configure.",
+      "balancesError": "No se pudieron cargar los saldos on-chain. Inténtalo de nuevo en un momento.",
+      "openInSafeWallet": "Abrir en Safe'{Wallet}'",
+      "you": "Tú",
+      "retryDeploy": "Reintentar el despliegue",
+      "thresholdOf": "{n} de {m}",
+      "thresholdLabel": "Firmas necesarias",
+      "thresholdRequired": "{n, plural, one {Se necesita # de {m} firmas} other {Se necesitan # de {m} firmas}}",
+      "thresholdDecrease": "Menos firmas",
+      "thresholdIncrease": "Más firmas",
+      "table": {
+        "pendingCount": "{count} {count, plural, one {pendiente} other {pendientes}}"
+      },
+      "status": {
+        "DEPLOYING": "Desplegando…",
+        "ACTIVE": "Activo",
+        "FAILED": "Despliegue fallido"
+      },
+      "detail": {
+        "back": "Todas las cuentas",
+        "balance": "Saldo",
+        "threshold": "Firmas necesarias",
+        "thresholdChip": "{threshold} para firmar",
+        "thresholdHint": "Cada transacción necesita {threshold, plural, one {# firma} other {# firmas}}.",
+        "deploying": "El Safe se está desplegando on-chain. Suele tardar unos segundos.",
+        "deployFailed": "Despliegue fallido",
+        "pendingTitle": "Esperando firmas",
+        "pendingEmpty": "Nada que firmar por ahora."
+      },
+      "tabs": {
+        "transactions": "Transacciones",
+        "signers": "Firmantes"
+      },
+      "owners": {
+        "title": "Firmantes",
+        "description": "{threshold} firmas necesarias para cada transacción.",
+        "kind": {
+          "MEMBER": "Equipo",
+          "EXTERNAL": "Externo"
+        },
+        "externalHint": "Firma en Safe'{Wallet}'.",
+        "formerMember": "Ya no forma parte del equipo — considera quitar o sustituir a este firmante."
+      },
+      "create": {
+        "description": "Elige quién es propietario del Safe y cuántos deben firmar cada transacción.",
+        "name": "Nombre",
+        "namePlaceholder": "p. ej. Reserva, Junta",
+        "teamOwners": "Firmantes del equipo",
+        "teamOwnersHint": "Los miembros del equipo firman en La Caisse con un clic, sin wallet.",
+        "noMembers": "Ningún administrador de este fondo puede ser propietario de un Safe todavía.",
+        "externalOwners": "Firmantes externos",
+        "externalOwnersHint": "Cualquier dirección (una wallet física, un socio…). Los firmantes externos firman en Safe'{Wallet}', en app.safe.global.",
+        "externalAddress": "Dirección del firmante externo {index}",
+        "externalLabel": "Nombre del firmante externo {index}",
+        "externalLabelPlaceholder": "Nombre",
+        "addExternal": "Añadir un firmante externo",
+        "removeExternal": "Quitar este firmante",
+        "deployHint": "La Caisse despliega el Safe en Gnosis sin coste para el fondo.",
+        "confirm": "Crear Safe"
+      },
+      "rename": {
+        "trigger": "Renombrar",
+        "title": "Renombrar el Safe",
+        "name": "Nombre"
+      },
+      "archive": {
+        "trigger": "Archivar",
+        "title": "¿Archivar este Safe?",
+        "description": "Desaparece de La Caisse. El Safe, sus firmantes y sus fondos siguen on-chain y se pueden usar en Safe'{Wallet}'.",
+        "blocked": "{count, plural, one {Aún hay # transacción abierta} other {Aún hay # transacciones abiertas}}. Ejecútalas o recházalas antes de archivar.",
+        "confirm": "Archivar"
+      },
+      "transfer": {
+        "trigger": "Proponer transferencia",
+        "title": "Proponer una transferencia",
+        "description": "La transferencia se envía en cuanto {threshold, plural, one {# firmante haya firmado} other {# firmantes hayan firmado}}.",
+        "recipient": "Destinatario",
+        "pickRecipient": "Elige una cuenta o una tarjeta…",
+        "groupAccounts": "Cuentas del fondo",
+        "groupCards": "Tarjetas del equipo",
+        "recipientIs": "Destinatario: {label}",
+        "token": "Token",
+        "amount": "Importe",
+        "note": "Nota (opcional)",
+        "notePlaceholder": "¿Para qué es?",
+        "confirm": "Proponer",
+        "cardLabel": "Tarjeta de {name}"
+      },
+      "proposal": {
+        "executed": "Firmada y ejecutada.",
+        "proposed": "Propuesta. Se ejecuta en cuanto {threshold, plural, one {# firmante haya firmado} other {# firmantes hayan firmado}}."
+      },
+      "ownerChange": {
+        "needsSignatures": "Este cambio también es una transacción del Safe: se aplica en cuanto {threshold, plural, one {# firmante actual haya firmado} other {# firmantes actuales hayan firmado}}.",
+        "addTrigger": "Añadir firmante",
+        "addTitle": "Añadir un firmante",
+        "addDescription": "Añade un miembro del equipo o una dirección externa a los firmantes.",
+        "modeMember": "Miembro del equipo",
+        "modeExternal": "Dirección externa",
+        "member": "Miembro del equipo",
+        "pickMember": "Elige un miembro…",
+        "memberHint": "Firmará en La Caisse.",
+        "address": "Dirección",
+        "label": "Nombre",
+        "labelPlaceholder": "p. ej. Ledger del tesorero",
+        "externalHint": "Los firmantes externos firman en Safe'{Wallet}'.",
+        "addConfirm": "Proponer",
+        "removeTrigger": "Quitar",
+        "removeTitle": "¿Quitar a {owner}?",
+        "removeDescription": "{address} ya no podrá firmar por este Safe.",
+        "thresholdMustDrop": "{remaining, plural, one {Solo queda # firmante} other {Solo quedan # firmantes}}, así que el umbral baja a {threshold}.",
+        "removeSelf": "Eres tú: ya no podrás firmar por este Safe.",
+        "removeConfirm": "Proponer la retirada",
+        "thresholdTrigger": "Cambiar el umbral",
+        "thresholdTitle": "Cambiar el umbral",
+        "thresholdDescription": "Cuántos firmantes deben aprobar cada transacción.",
+        "thresholdConfirm": "Proponer"
+      },
+      "tx": {
+        "kinds": {
+          "TOKEN_TRANSFER": "Transferencia",
+          "ADD_OWNER": "Añadir firmante",
+          "REMOVE_OWNER": "Quitar firmante",
+          "SWAP_OWNER": "Sustituir firmante",
+          "CHANGE_THRESHOLD": "Cambiar umbral",
+          "REJECTION": "Rechazo",
+          "UNKNOWN": "Transacción"
+        },
+        "summary": {
+          "transfer": "Enviar {amount} a {recipient}",
+          "addOwner": "Añadir a {owner} como firmante, {threshold, plural, one {# firma necesaria} other {# firmas necesarias}}",
+          "removeOwner": "Quitar al firmante {owner}, {threshold, plural, one {# firma necesaria} other {# firmas necesarias}}",
+          "swapOwner": "Sustituir al firmante {oldOwner} por {newOwner}",
+          "changeThreshold": "Cambiar el umbral a {threshold, plural, one {# firma} other {# firmas}}",
+          "rejection": "Rechazar la transacción n.º {nonce}"
+        },
+        "status": {
+          "PENDING": "Pendiente",
+          "EXECUTING": "Ejecutando",
+          "EXECUTED": "Ejecutada",
+          "FAILED": "Fallida",
+          "SUPERSEDED": "Sustituida"
+        },
+        "source": {
+          "LACAISSE": "en La Caisse",
+          "SAFE_WALLET": "en Safe'{Wallet}'"
+        },
+        "nonce": "n.º {nonce}",
+        "proposedBy": "Propuesta por {name}",
+        "proposedExternally": "Propuesta en Safe'{Wallet}'",
+        "rejectionProposed": "Rechazo propuesto",
+        "nextInLine": "La siguiente",
+        "waitsFor": "Espera a la n.º {nonce}",
+        "signatures": "{count} de {total} firmas",
+        "notSigned": "Aún sin firmar",
+        "signedAt": "Firmado el {date}",
+        "youName": "{name} (tú)",
+        "youSigned": "Has firmado esta transacción.",
+        "waitingExternal": "Esperando a que {names} firme en Safe'{Wallet}'.",
+        "sign": "Firmar",
+        "reject": "Rechazar",
+        "rejectTitle": "¿Rechazar la transacción n.º {nonce}?",
+        "rejectDescription": "Esto propone una transacción vacía con el mismo número (n.º {nonce}). En cuanto {threshold, plural, one {# firmante la firme} other {# firmantes la firmen}}, se ejecuta en su lugar y la original ya no podrá ejecutarse nunca.",
+        "rejectConfirm": "Proponer el rechazo",
+        "retry": "Reintentar",
+        "executing": "Ejecutando…",
+        "refresh": "Actualizar",
+        "refreshHint": "Obtener firmantes, umbral y firmas de Safe'{Wallet}' desde la blockchain",
+        "executedBy": {
+          "relayer": "Ejecutada por La Caisse",
+          "external": "Ejecutada fuera de La Caisse"
+        },
+        "signedBy": "Firmada por {names}"
+      },
+      "history": {
+        "title": "Historial",
+        "empty": "Aún no hay transacciones ejecutadas."
+      },
+      "relayer": {
+        "lowGas": "Al relayer le queda poco gas",
+        "lowGasBody": "Al relayer de La Caisse le quedan {balance} xDAI para pagar las ejecuciones. Recárgalo pronto:",
+        "status": "Saldo del relayer: {balance} xDAI. Envía xDAI a esta dirección para pagar los despliegues y ejecuciones:"
+      },
+      "errors": {
+        "config": "El token del fondo aún no está configurado. Conecta primero Citizen Pay.",
+        "unsupported_chain": "Esta red no es compatible con los Safes.",
+        "relayer_not_configured": "El relayer de transacciones no está configurado. Contacta con soporte.",
+        "relayer_failed": "No se pudo enviar la transacción. Inténtalo de nuevo en un momento.",
+        "tx_reverted": "La transacción fue rechazada en la blockchain.",
+        "tx_service": "No se pudo contactar con Safe'{Wallet}'.",
+        "not_owner": "No eres firmante de este Safe.",
+        "already_signed": "Ya has firmado esta transacción.",
+        "threshold": "Todavía no hay suficientes firmas.",
+        "nonce": "El hueco de esta transacción ya lo ha usado otra transacción.",
+        "invalid_signature": "Una firma no es válida.",
+        "not_found": "Safe o transacción no encontrados.",
+        "invalid_state": "Esta acción no es posible en el estado actual.",
+        "unknown": "Algo salió mal. Inténtalo de nuevo.",
+        "tokenNotEnabled": "Este token no está activado para este fondo (Ajustes → Token).",
+        "nameRequired": "Introduce un nombre.",
+        "nameTooLong": "El nombre es demasiado largo (máx. 60 caracteres).",
+        "addressInvalid": "Introduce una dirección válida (0x…).",
+        "amountInvalid": "Introduce un importe positivo con 2 decimales como máximo.",
+        "thresholdInvalid": "El umbral debe ser al menos 1.",
+        "labelTooLong": "La etiqueta es demasiado larga (máx. 60 caracteres).",
+        "ownersRequired": "Añade al menos un firmante.",
+        "thresholdTooHigh": "El umbral no puede superar el número de firmantes.",
+        "noteTooLong": "La nota es demasiado larga (máx. 200 caracteres).",
+        "ownerRequired": "Elige un miembro o introduce una dirección.",
+        "duplicateOwner": "La misma dirección aparece dos veces."
       }
     },
     "team": {
@@ -1857,6 +2081,35 @@
           "failedLabel": "Fallos",
           "errorLabel": "Último error",
           "neverRan": "Todavía no se ha ejecutado."
+        },
+        "balances": {
+          "title": "Saldos mostrados en las cuentas",
+          "description": "Las cuentas pueden tener más que el token del fondo. Elige qué otros saldos muestra la página Cuentas.",
+          "native": "xDAI (moneda nativa)",
+          "nativeHint": "Gas en Gnosis Chain; se muestra en cada cuenta y cada Safe.",
+          "eure": "EURe (euro de Monerium)",
+          "eureHint": "Stablecoin en euros en Gnosis Chain."
+        },
+        "customTokens": {
+          "title": "Tokens personalizados",
+          "description": "Añade cualquier otro token ERC-20 de la cadena del fondo: su saldo se muestra como xDAI y EURe en las cuentas y los Safes, y un Safe puede enviarlo.",
+          "address": "Dirección del contrato",
+          "addressPlaceholder": "0x…",
+          "add": "Añadir",
+          "adding": "Añadiendo…",
+          "remove": "Quitar el token",
+          "confirmRemove": "{symbol} dejará de mostrarse en las cuentas y los Safes, y ya no podrá enviarse desde un Safe. Los tokens que se tienen no se mueven; podrás volver a añadirlo.",
+          "empty": "Todavía no hay tokens personalizados.",
+          "decimals": "{decimals} decimales",
+          "errors": {
+            "notErc20": "Esta dirección no es un token ERC-20 en la cadena del fondo.",
+            "alreadyShown": "Este token ya se ofrece arriba (token del fondo, xDAI o EURe).",
+            "duplicate": "Este token ya está en la lista.",
+            "addressInvalid": "Introduce una dirección de contrato válida (0x seguido de 40 caracteres hexadecimales).",
+            "readFailed": "No se pudo leer el contrato ahora mismo. Inténtalo de nuevo en unos minutos.",
+            "tooMany": "Puedes añadir como máximo {max} tokens personalizados.",
+            "notFound": "Este token ya no está en la lista."
+          }
         }
       },
       "onboarding": {
