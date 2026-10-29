@@ -954,7 +954,19 @@
           "unresolved": "Huidig: {serial}",
           "clear": "Bron verwijderen",
           "open": "Lijst openen",
-          "hint": "Als deze kaart een betaling niet kan dekken, wordt het ontbrekende bedrag van haar bron gehaald (een andere kaart of een bronrekening)."
+          "hint": "Als deze kaart een betaling niet kan dekken, wordt het ontbrekende bedrag van haar bron gehaald (een andere kaart of een bronrekening).",
+          "weeklyLimit": {
+            "label": "Weeklimiet",
+            "placeholder": "Geen limiet",
+            "hint": "Het maximum dat deze kaart per week (maandag tot zondag) van haar bron mag halen. Laat leeg voor geen limiet.",
+            "noSource": "Kies eerst een bron: de limiet begrenst wat de kaart ervan haalt.",
+            "usage": "{spent} van {limit} gebruikt deze week · reset {resetsAt}",
+            "errors": {
+              "invalid": "Voer een bedrag in euro in, bv. 10 of 10,50.",
+              "negative": "De limiet kan niet negatief zijn.",
+              "tooLarge": "De limiet kan niet hoger zijn dan {max}."
+            }
+          }
         },
         "onboardingLetter": {
           "rowLabel": "Onboardingbrief",
@@ -3148,7 +3160,9 @@
           "notFound": "Kaart niet gevonden.",
           "sourceNotFound": "Bronkaart niet gevonden.",
           "self": "Een kaart kan niet haar eigen bron zijn.",
-          "failed": "Kon de bronkaart niet bijwerken. Probeer het zo weer."
+          "failed": "Kon de bronkaart niet bijwerken. Probeer het zo weer.",
+          "limitInvalid": "Ongeldige weeklimiet.",
+          "limitFailed": "Kon de weeklimiet niet bijwerken. Probeer het zo weer."
         }
       },
       "unassign": {

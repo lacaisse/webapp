@@ -954,7 +954,19 @@
           "unresolved": "Actual: {serial}",
           "clear": "Quitar la fuente",
           "open": "Abrir la lista",
-          "hint": "Si el saldo de esta tarjeta no alcanza para un pago, el importe que falta se toma de su fuente (otra tarjeta o una cuenta fuente)."
+          "hint": "Si el saldo de esta tarjeta no alcanza para un pago, el importe que falta se toma de su fuente (otra tarjeta o una cuenta fuente).",
+          "weeklyLimit": {
+            "label": "Límite semanal",
+            "placeholder": "Sin límite",
+            "hint": "Lo máximo que esta tarjeta puede tomar de su fuente cada semana (de lunes a domingo). Déjalo vacío para no fijar límite.",
+            "noSource": "Elige primero una fuente: el límite acota lo que la tarjeta toma de ella.",
+            "usage": "{spent} de {limit} usados esta semana · se reinicia el {resetsAt}",
+            "errors": {
+              "invalid": "Introduce un importe en euros, p. ej. 10 o 10,50.",
+              "negative": "El límite no puede ser negativo.",
+              "tooLarge": "El límite no puede superar {max}."
+            }
+          }
         },
         "onboardingLetter": {
           "rowLabel": "Carta de bienvenida",
@@ -3148,7 +3160,9 @@
           "notFound": "Tarjeta no encontrada.",
           "sourceNotFound": "Tarjeta fuente no encontrada.",
           "self": "Una tarjeta no puede ser su propia fuente.",
-          "failed": "No se pudo actualizar la tarjeta fuente. Vuelve a intentarlo en un momento."
+          "failed": "No se pudo actualizar la tarjeta fuente. Vuelve a intentarlo en un momento.",
+          "limitInvalid": "Límite semanal no válido.",
+          "limitFailed": "No se pudo actualizar el límite semanal. Vuelve a intentarlo en un momento."
         }
       },
       "unassign": {
