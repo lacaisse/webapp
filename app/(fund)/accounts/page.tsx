@@ -19,9 +19,12 @@ import { shortAddress } from "@/services/alchemy/format";
 import { requireFundRole, requireUser } from "@/services/auth/dal";
 import { requireCurrentFund } from "@/services/fund/server";
 import { explorerAddressUrl, safeWalletUrl } from "@/services/safe/config";
+import { enabledExtraTokens } from "@/services/token/extra-tokens";
 
 import { CreateAccountDialog } from "./create-account-dialog";
 import { getTokenAccounts } from "./data";
+import { ExtraBalanceLines, extraLinesFor } from "./extra-balance-lines";
+import { getExtraBalances } from "./extra-balances";
 import { getEligibleMembers, getRelayerStatus, getSafes } from "./safes/data";
 import { formatNative, isDeployedAddress, thresholdLabel } from "./safes/format";
 import { RetryDeployButton } from "./safes/retry-deploy-button";
@@ -131,6 +134,15 @@ async function AccountsTable() {
   const [{ accounts, balancesError }, { safes, balancesError: safesBalancesError }] =
     await Promise.all([getTokenAccounts(fund.id, token), getSafes(fund.id, token)]);
 
+  // xDAI / EURe lines the fund opted into (Settings → Token): one read for
+  // every row. Safes on another chain can't hold them.
+  const extraTokens = enabledExtraTokens(fund);
+  const sameChainSafes = safes.filter((s) => s.chainId === fund.tokenChainId);
+  const extra = await getExtraBalances(fund, [
+    ...accounts.map((a) => a.address),
+    ...sameChainSafes.map((s) => s.address),
+  ]);
+
   const formatBalance = (balance: string | null) =>
     balance == null
       ? "—"
@@ -192,6 +204,9 @@ async function AccountsTable() {
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
                   {formatBalance(a.balance)}
+                  <ExtraBalanceLines
+                    lines={extraLinesFor(a.address, extraTokens, extra)}
+                  />
                 </TableCell>
               </TableRow>
             ))}
@@ -235,6 +250,14 @@ async function AccountsTable() {
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
                   {formatBalance(s.balance)}
+                  <ExtraBalanceLines
+                    lines={extraLinesFor(
+                      s.address,
+                      extraTokens,
+                      extra,
+                      s.chainId === fund.tokenChainId,
+                    )}
+                  />
                 </TableCell>
               </TableRow>
             ))}

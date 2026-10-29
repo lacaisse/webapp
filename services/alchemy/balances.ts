@@ -94,3 +94,56 @@ export async function getBalances(opts: {
     rawBalance: balanceByAddress.get(addr) ?? "0x0",
   }));
 }
+
+// ---------------------------------------------------------------------------
+// Native coin (xDAI on Gnosis)
+// ---------------------------------------------------------------------------
+
+/** `eth_getBalance` for one wallet, memoised per render like `getBalance`. */
+const getNativeBalance = cache(
+  async (network: string, address: string): Promise<string> => {
+    const result = await alchemyRpc<string>(network, "eth_getBalance", [
+      address,
+      "latest",
+    ]);
+    return typeof result === "string" && result ? result : "0x0";
+  },
+);
+
+/**
+ * Native-coin balance per address (wei, hex) — same dedupe, concurrency and
+ * output shape as `getBalances` (one row per input address, input order).
+ */
+export async function getNativeBalances(opts: {
+  chainId: number;
+  addresses: string[];
+}): Promise<WalletBalance[]> {
+  const network = alchemyNetwork(opts.chainId);
+  if (!network) {
+    throw new Error(`Alchemy: unsupported chain id ${opts.chainId}`);
+  }
+  if (opts.addresses.length === 0) return [];
+
+  const normalised = opts.addresses.map((a) => a.toLowerCase());
+  const unique = [...new Set(normalised)];
+
+  const balanceByAddress = new Map<string, string>();
+  let cursor = 0;
+  const workers = Array.from(
+    { length: Math.min(CONCURRENCY, unique.length) },
+    async () => {
+      while (true) {
+        const i = cursor++;
+        if (i >= unique.length) return;
+        const addr = unique[i]!;
+        balanceByAddress.set(addr, await getNativeBalance(network, addr));
+      }
+    },
+  );
+  await Promise.all(workers);
+
+  return normalised.map((addr) => ({
+    address: addr,
+    rawBalance: balanceByAddress.get(addr) ?? "0x0",
+  }));
+}

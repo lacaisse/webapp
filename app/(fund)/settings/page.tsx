@@ -15,6 +15,7 @@ import { prisma } from "@/services/db/prisma";
 import { requireFundRole } from "@/services/auth/dal";
 import { getFundUrl, requireCurrentFund } from "@/services/fund/server";
 import { parseVisibleIf } from "@/services/onboarding/visibility";
+import { EXTRA_TOKENS_BY_CHAIN } from "@/services/token/extra-tokens";
 import {
   OnboardingFields,
   type FieldRow,
@@ -31,6 +32,7 @@ import { DocumentsTab } from "./documents-tab";
 import { EmbedsTab } from "./embeds-tab";
 import { CitizenPayConnect } from "./citizenpay-connect";
 import { TokenInfo } from "./token-info";
+import { BalanceDisplayForm } from "./balance-display-form";
 import {
   BrandingForm,
   CitizenPayForm,
@@ -224,6 +226,17 @@ async function SettingsContent({
                 error: fund.topUpOrdersRunError,
               }}
             />
+            {/* Only chains with a known native coin + EURe offer the toggle. */}
+            {(EXTRA_TOKENS_BY_CHAIN[fund.tokenChainId]?.length ?? 0) > 0 && (
+              <div className="mt-6 border-t border-border pt-6">
+                <BalanceDisplayForm
+                  initial={{
+                    showNativeBalance: fund.showNativeBalance,
+                    showEureBalance: fund.showEureBalance,
+                  }}
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

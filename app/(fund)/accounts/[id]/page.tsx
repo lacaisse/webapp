@@ -9,11 +9,14 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { requireFundRole } from "@/services/auth/dal";
 import { requireCurrentFund } from "@/services/fund/server";
+import { enabledExtraTokens } from "@/services/token/extra-tokens";
 
 import { AccountManage } from "./account-manage";
 import { MoveTokensDialog } from "./move-tokens-dialog";
 import { TransferDialog } from "./transfer-dialog";
 import { TransfersTable } from "./transfers-table";
+import { ExtraBalanceLines, extraLinesFor } from "../extra-balance-lines";
+import { getExtraBalances } from "../extra-balances";
 import { AccountDetailSkeleton } from "../skeleton";
 
 import {
@@ -55,7 +58,10 @@ async function AccountDetail({
     tokenChainId: fund.tokenChainId,
     tokenDecimals: fund.tokenDecimals,
   };
-  const balance = await getAccountBalance(account.address, token);
+  const [balance, extra] = await Promise.all([
+    getAccountBalance(account.address, token),
+    getExtraBalances(fund, [account.address]),
+  ]);
   const otherAccounts = (await getAccountOptions(fund.id, account.id)).map(
     (a) => ({ ...a, name: a.name || t("defaultName") }),
   );
@@ -114,6 +120,14 @@ async function AccountDetail({
               ? "—"
               : `${balance}${fund.tokenSymbol ? ` ${fund.tokenSymbol}` : ""}`}
           </div>
+          <ExtraBalanceLines
+            lines={extraLinesFor(
+              account.address,
+              enabledExtraTokens(fund),
+              extra,
+            )}
+            className="mt-1"
+          />
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
           <MoveTokensDialog
