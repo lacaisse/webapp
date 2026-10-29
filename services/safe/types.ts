@@ -41,18 +41,26 @@ export type SafeTxSummary =
       // multi-token transfers: treat as "fund" (and show the fund's symbol).
       token?: "fund" | ExtraTokenKey;
       symbol?: string; // frozen at proposal time ("EURe", "xDAI", "USDC.e", fund symbol)
+      // The ERC-20 contract the Safe calls (checksummed), null for the native
+      // coin (a plain value transfer). Lets signers see which contract really
+      // moves, not just a symbol. Missing on rows written before it existed.
+      contract?: Address | null;
     }
   | {
       kind: "ADD_OWNER";
       owner: Address;
       ownerLabel: string | null;
       threshold: number; // threshold after the change
+      // On-chain threshold when the change was proposed (so the UI can show
+      // "2 → 1"). Missing on rows written before it existed.
+      previousThreshold?: number;
     }
   | {
       kind: "REMOVE_OWNER";
       owner: Address;
       ownerLabel: string | null;
-      threshold: number;
+      threshold: number; // threshold after the change
+      previousThreshold?: number; // on-chain threshold at proposal time
     }
   | {
       kind: "SWAP_OWNER";
@@ -61,7 +69,11 @@ export type SafeTxSummary =
       newOwner: Address;
       newOwnerLabel: string | null;
     }
-  | { kind: "CHANGE_THRESHOLD"; threshold: number }
+  | {
+      kind: "CHANGE_THRESHOLD";
+      threshold: number; // new threshold
+      previousThreshold?: number; // on-chain threshold at proposal time
+    }
   | { kind: "REJECTION"; rejectsNonce: number };
 
 export type SafeErrorCode =

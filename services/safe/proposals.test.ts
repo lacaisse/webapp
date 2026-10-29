@@ -81,7 +81,13 @@ const sigFor = (enc: string) => `0x${enc.slice(-2).repeat(65)}` as `0x${string}`
 
 let safeId: string;
 
-function seed(opts: { threshold: number; owners: { userId: string; address: string; byte: string }[]; chainNonce?: number }) {
+function seed(opts: {
+  threshold: number;
+  owners: { userId: string; address: string; byte: string }[];
+  // Owners that sign outside La Caisse (Safe{Wallet}): owner rows only, no signer.
+  external?: { address: string; label: string }[];
+  chainNonce?: number;
+}) {
   for (const o of opts.owners) {
     db.user.push({ id: o.userId, name: `User ${o.userId}`, email: `${o.userId}@x.test` });
     db.fundMember.push({ fundId: FUND.id, userId: o.userId, role: "ADMIN" });
@@ -117,9 +123,20 @@ function seed(opts: { threshold: number; owners: { userId: string; address: stri
       removedAt: null,
     });
   }
+  for (const [i, o] of (opts.external ?? []).entries()) {
+    db.fundSafeOwner.push({
+      id: `owner-ext-${i}`,
+      safeId,
+      address: o.address,
+      kind: "EXTERNAL",
+      signerId: null,
+      label: o.label,
+      removedAt: null,
+    });
+  }
   relayer.readSafeState.mockResolvedValue({
     deployed: true,
-    owners: opts.owners.map((o) => o.address),
+    owners: [...opts.owners.map((o) => o.address), ...(opts.external ?? []).map((o) => o.address)],
     threshold: opts.threshold,
     nonce: opts.chainNonce ?? 0,
   });
@@ -181,6 +198,7 @@ describe("proposeTokenTransfer", () => {
       recipientLabel: "Bakery",
       token: "fund",
       symbol: "CAISSE",
+      contract: TOKEN,
     });
     expect(db.tokenOperation).toHaveLength(1);
     expect(db.tokenOperation[0]).toMatchObject({
@@ -246,6 +264,7 @@ describe("proposeTokenTransfer", () => {
       recipientLabel: null,
       token: "native",
       symbol: "xDAI",
+      contract: null,
     });
     expect(db.tokenOperation).toHaveLength(0);
     expect(tx.tokenOperationId).toBeNull();
@@ -272,7 +291,7 @@ describe("proposeTokenTransfer", () => {
     expect(tx.data).toBe(
       `0xa9059cbb${RECIPIENT.slice(2).toLowerCase().padStart(64, "0")}${units.toString(16).padStart(64, "0")}`,
     );
-    expect(tx.summary).toMatchObject({ token: "eure", symbol: "EURe", amount: "0.75" });
+    expect(tx.summary).toMatchObject({ token: "eure", symbol: "EURe", amount: "0.75", contract: EURE });
 
     await signTransaction({ fundId: FUND.id, transactionId: tx.id as string, userId: "u-b" });
     expect(tx.status).toBe("EXECUTED");
@@ -332,6 +351,7 @@ describe("proposeTokenTransfer", () => {
       recipientLabel: null,
       token: key,
       symbol: "USDC.e",
+      contract: USDCE,
     });
     expect(db.tokenOperation).toHaveLength(0);
     expect(tx.tokenOperationId).toBeNull();
@@ -435,7 +455,8 @@ describe("proposeTokenTransfer", () => {
   });
 
   it("tx-service failures do not fail propose or sign", async () => {
-    seed({ threshold: 2, owners: OWNERS_3 });
+    // An EXTERNAL owner makes the Safe mirror to the tx-service at all.
+    seed({ threshold: 2, owners: OWNERS_3, external: [{ address: D, label: "Auditor" }] });
     txService.isTxServiceEnabled.mockReturnValue(true);
     txService.proposeTransaction.mockRejectedValue(new SafeError("tx_service", "down"));
     txService.confirmTransaction.mockRejectedValue(new SafeError("tx_service", "down"));
@@ -449,6 +470,53 @@ describe("proposeTokenTransfer", () => {
     expect(signed.executed).toBe(true);
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
+  });
+
+  it("does not mirror to the tx-service when all owners are MEMBER", async () => {
+    seed({ threshold: 2, owners: OWNERS_3 });
+    txService.isTxServiceEnabled.mockReturnValue(true);
+
+    const proposed = await transfer("u-a");
+    const signed = await signTransaction({ fundId: FUND.id, transactionId: proposed.transactionId, userId: "u-b" });
+
+    expect(signed.executed).toBe(true);
+    expect(txService.proposeTransaction).not.toHaveBeenCalled();
+    expect(txService.confirmTransaction).not.toHaveBeenCalled();
+  });
+
+  it("mirrors when an EXTERNAL owner exists", async () => {
+    seed({ threshold: 3, owners: OWNERS_3, external: [{ address: D, label: "Auditor" }] });
+    txService.isTxServiceEnabled.mockReturnValue(true);
+    txService.proposeTransaction.mockResolvedValue(undefined);
+    txService.confirmTransaction.mockResolvedValue(undefined);
+
+    const proposed = await transfer("u-a");
+    expect(txService.proposeTransaction).toHaveBeenCalledTimes(1);
+    expect(txService.proposeTransaction.mock.calls[0][0]).toMatchObject({
+      chainId: 100,
+      safeAddress: SAFE,
+      safeTxHash: proposed.safeTxHash,
+      sender: A,
+      signature: sigFor("enc-1a"),
+    });
+
+    await signTransaction({ fundId: FUND.id, transactionId: proposed.transactionId, userId: "u-b" });
+    expect(txService.confirmTransaction).toHaveBeenCalledTimes(1);
+    expect(txService.confirmTransaction.mock.calls[0][0]).toMatchObject({
+      chainId: 100,
+      safeTxHash: proposed.safeTxHash,
+      signature: sigFor("enc-1b"),
+    });
+  });
+
+  it("does not mirror when the tx-service is off for the chain, even with an EXTERNAL owner", async () => {
+    seed({ threshold: 2, owners: OWNERS_3, external: [{ address: D, label: "Auditor" }] });
+
+    const proposed = await transfer("u-a");
+    await signTransaction({ fundId: FUND.id, transactionId: proposed.transactionId, userId: "u-b" });
+
+    expect(txService.proposeTransaction).not.toHaveBeenCalled();
+    expect(txService.confirmTransaction).not.toHaveBeenCalled();
   });
 
   it("marks FAILED with the error on a revert, keeping signatures (retryable)", async () => {
@@ -596,7 +664,44 @@ describe("rejections and owner changes", () => {
     expect(res.executed).toBe(true);
     const row = db.fundSafeTransaction[0];
     expect(row).toMatchObject({ kind: "ADD_OWNER", to: SAFE });
-    expect(row.summary).toEqual({ kind: "ADD_OWNER", owner: D, ownerLabel: "Auditor", threshold: 1 });
+    expect(row.summary).toEqual({
+      kind: "ADD_OWNER",
+      owner: D,
+      ownerLabel: "Auditor",
+      threshold: 1,
+      previousThreshold: 1,
+    });
     expect(sync.syncSafe).toHaveBeenCalledWith({ fundId: FUND.id, safeId, force: true });
+  });
+
+  it("owner / threshold summaries carry the on-chain threshold at proposal time", async () => {
+    seed({ threshold: 2, owners: OWNERS_3 });
+
+    const add = await proposeOwnerChange({
+      fund: FUND,
+      safeId,
+      userId: "u-a",
+      input: { safeId, change: { kind: "ADD_OWNER", address: D, label: "Auditor", threshold: 3 } },
+    });
+    const addRow = db.fundSafeTransaction.find((t) => t.id === add.transactionId)!;
+    expect(addRow.summary).toMatchObject({ kind: "ADD_OWNER", threshold: 3, previousThreshold: 2 });
+
+    const remove = await proposeOwnerChange({
+      fund: FUND,
+      safeId,
+      userId: "u-a",
+      input: { safeId, change: { kind: "REMOVE_OWNER", address: C, threshold: 1 } },
+    });
+    const removeRow = db.fundSafeTransaction.find((t) => t.id === remove.transactionId)!;
+    expect(removeRow.summary).toMatchObject({ kind: "REMOVE_OWNER", owner: C, threshold: 1, previousThreshold: 2 });
+
+    const change = await proposeOwnerChange({
+      fund: FUND,
+      safeId,
+      userId: "u-a",
+      input: { safeId, change: { kind: "CHANGE_THRESHOLD", threshold: 3 } },
+    });
+    const changeRow = db.fundSafeTransaction.find((t) => t.id === change.transactionId)!;
+    expect(changeRow.summary).toEqual({ kind: "CHANGE_THRESHOLD", threshold: 3, previousThreshold: 2 });
   });
 });

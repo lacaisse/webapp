@@ -241,6 +241,25 @@ export async function burnDirect(
     };
   }
 
+  // Never burn from one of this fund's Safes: the issuer's `burnFrom` needs no
+  // allowance, so a single ADMIN could empty a Safe from /token and re-mint
+  // elsewhere, bypassing the Safe's signature threshold. Archived and
+  // not-yet-ACTIVE Safes count too — the tokens are still there.
+  const safe = await prisma.fundSafe.findFirst({
+    where: {
+      fundId: fund.id,
+      address: { equals: parsed.data.from, mode: "insensitive" },
+    },
+    select: { id: true },
+  });
+  if (safe) {
+    return {
+      error: t("tokenOps.errors.fromIsSafe"),
+      field: "from",
+      broadcast: false,
+    };
+  }
+
   const op = await prisma.tokenOperation.create({
     data: {
       fundId: fund.id,

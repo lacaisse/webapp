@@ -144,9 +144,14 @@ async function SafeDetailView({
   const ownersTotal = safe.owners.length;
 
   // Address → name for summaries and signer lists: owners (current and
-  // former) first, then the fund's accounts / staff cards.
+  // former) first, then members' La Caisse signer keys (a proposed new owner
+  // is usually one), then the fund's accounts / staff cards. An address
+  // missing here is flagged "unknown" on open proposals.
   const names: Record<string, string> = {};
   for (const r of recipients) names[r.address.toLowerCase()] = r.label;
+  for (const m of members) {
+    if (m.signerAddress) names[m.signerAddress.toLowerCase()] = m.name;
+  }
   for (const o of [...safe.formerOwners, ...safe.owners]) {
     names[o.address.toLowerCase()] = o.displayName;
   }
@@ -171,6 +176,10 @@ async function SafeDetailView({
   // in line, everything above it waits for it.
   const nextNonce = safe.pending.length > 0 ? safe.pending[0]!.nonce : null;
 
+  // Proposals are mirrored to the Safe Transaction Service only when an
+  // external owner may sign there (services/safe/proposals.ts shouldMirror),
+  // so the Safe{Wallet} transaction link only resolves for those Safes.
+  const hasExternalOwner = safe.owners.some((o) => o.kind === "EXTERNAL");
   const ownerRows = safe.owners.map((o) => ({
     address: o.address,
     kind: o.kind,
@@ -341,6 +350,7 @@ async function SafeDetailView({
                 nextNonce={nextNonce}
                 key={tx.id}
                 safeId={safe.id}
+                chainId={safe.chainId}
                 tx={tx}
                 owners={ownerRows}
                 threshold={safe.threshold}
@@ -348,7 +358,9 @@ async function SafeDetailView({
                 tokenSymbol={fund.tokenSymbol}
                 names={names}
                 safeWalletTxHref={
-                  deployed ? safeWalletTxUrl(safe.chainId, safe.address, tx.safeTxHash) : null
+                  deployed && hasExternalOwner
+                    ? safeWalletTxUrl(safe.chainId, safe.address, tx.safeTxHash)
+                    : null
                 }
                 canAct={active}
                 rejectionProposed={tx.kind !== "REJECTION" && rejectedNonces.has(tx.nonce)}
