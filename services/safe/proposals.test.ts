@@ -65,6 +65,7 @@ const C = getAddress("0xcccccccccccccccccccccccccccccccccccccccc");
 const D = getAddress("0xdddddddddddddddddddddddddddddddddddddddd");
 const EXEC_HASH = `0x${"e1".repeat(32)}` as const;
 const EURE = getAddress("0x420CA0f9B9b604cE0fd9C18EF134C705e5Fa3430"); // extra-tokens.ts, chain 100
+const USDCE = getAddress("0x2a22f9c3b484c3629090FeED35F17Ff8F88f76F0"); // a custom display token
 const FUND = {
   id: "fund-1",
   tokenChainId: 100,
@@ -295,6 +296,76 @@ describe("proposeTokenTransfer", () => {
         }),
       ).rejects.toMatchObject({ code: "invalid_state", message: "Token not enabled" });
     }
+    expect(db.fundSafeTransaction).toHaveLength(0);
+  });
+
+  it("custom token: an ERC-20 transfer on the registered address in its own decimals, no TokenOperation", async () => {
+    seed({ threshold: 1, owners: [OWNERS_3[0]] });
+    db.fundDisplayToken.push({
+      id: "dt-1",
+      fundId: FUND.id,
+      address: USDCE,
+      symbol: "USDC.e",
+      name: "Bridged USDC",
+      decimals: 6,
+    });
+    const key = `custom:${USDCE.toLowerCase()}` as const;
+
+    const res = await proposeTokenTransfer({
+      fund: FUND,
+      safeId,
+      userId: "u-a",
+      input: { safeId, recipient: RECIPIENT, amount: "2.345678", token: key },
+    });
+
+    expect(res).toMatchObject({ executed: true, txHash: EXEC_HASH });
+    const tx = db.fundSafeTransaction[0];
+    expect(tx).toMatchObject({ status: "EXECUTED", kind: "TOKEN_TRANSFER", to: USDCE, value: "0" });
+    const units = BigInt(2_345_678);
+    expect(tx.data).toBe(
+      `0xa9059cbb${RECIPIENT.slice(2).toLowerCase().padStart(64, "0")}${units.toString(16).padStart(64, "0")}`,
+    );
+    expect(tx.summary).toEqual({
+      kind: "TOKEN_TRANSFER",
+      amount: "2.345678",
+      recipient: RECIPIENT,
+      recipientLabel: null,
+      token: key,
+      symbol: "USDC.e",
+    });
+    expect(db.tokenOperation).toHaveLength(0);
+    expect(tx.tokenOperationId).toBeNull();
+    expect(annotate.annotateTransaction).toHaveBeenCalledTimes(1);
+
+    // More precision than the token has is refused.
+    await expect(
+      proposeTokenTransfer({
+        fund: FUND,
+        safeId,
+        userId: "u-a",
+        input: { safeId, recipient: RECIPIENT, amount: "0.0000001", token: key },
+      }),
+    ).rejects.toMatchObject({ code: "invalid_state" });
+  });
+
+  it("refuses a custom token the fund has not registered (incl. another fund's)", async () => {
+    seed({ threshold: 1, owners: [OWNERS_3[0]] });
+    db.fundDisplayToken.push({
+      id: "dt-other",
+      fundId: "fund-2",
+      address: USDCE,
+      symbol: "USDC.e",
+      name: "Bridged USDC",
+      decimals: 6,
+    });
+    await expect(
+      proposeTokenTransfer({
+        fund: FUND,
+        safeId,
+        userId: "u-a",
+        input: { safeId, recipient: RECIPIENT, amount: "1", token: `custom:${USDCE.toLowerCase()}` },
+      }),
+    ).rejects.toMatchObject({ code: "invalid_state", message: "Token not enabled" });
     expect(db.fundSafeTransaction).toHaveLength(0);
   });
 

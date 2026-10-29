@@ -19,7 +19,7 @@ import { shortAddress } from "@/services/alchemy/format";
 import { requireFundRole, requireUser } from "@/services/auth/dal";
 import { requireCurrentFund } from "@/services/fund/server";
 import { explorerAddressUrl, safeWalletUrl } from "@/services/safe/config";
-import { enabledExtraTokens } from "@/services/token/extra-tokens";
+import { getDisplayTokens } from "@/services/token/display-tokens";
 
 import { CreateAccountDialog } from "./create-account-dialog";
 import { getTokenAccounts } from "./data";
@@ -134,13 +134,15 @@ async function AccountsTable() {
   const [{ accounts, balancesError }, { safes, balancesError: safesBalancesError }] =
     await Promise.all([getTokenAccounts(fund.id, token), getSafes(fund.id, token)]);
 
-  // xDAI / EURe lines the fund opted into (Settings → Token): one read for
-  // every row. Safes on another chain can't hold them.
-  const extraTokens = enabledExtraTokens(fund);
+  // xDAI / EURe / custom-token lines the fund opted into (Settings → Token):
+  // one read for every row. Safes on another chain can't hold them.
   const sameChainSafes = safes.filter((s) => s.chainId === fund.tokenChainId);
-  const extra = await getExtraBalances(fund, [
-    ...accounts.map((a) => a.address),
-    ...sameChainSafes.map((s) => s.address),
+  const [extraTokens, extra] = await Promise.all([
+    getDisplayTokens(fund),
+    getExtraBalances(fund, [
+      ...accounts.map((a) => a.address),
+      ...sameChainSafes.map((s) => s.address),
+    ]),
   ]);
 
   const formatBalance = (balance: string | null) =>

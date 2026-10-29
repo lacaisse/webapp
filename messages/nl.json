@@ -2089,6 +2089,27 @@
           "nativeHint": "Gas op Gnosis Chain; getoond bij elke rekening en elke Safe.",
           "eure": "EURe (Monerium-euro)",
           "eureHint": "Euro-stablecoin op Gnosis Chain."
+        },
+        "customTokens": {
+          "title": "Eigen tokens",
+          "description": "Voeg elke andere ERC-20-token op de chain van het fonds toe: het saldo verschijnt zoals xDAI en EURe bij rekeningen en Safes, en een Safe kan hem versturen.",
+          "address": "Contractadres",
+          "addressPlaceholder": "0x…",
+          "add": "Toevoegen",
+          "adding": "Toevoegen…",
+          "remove": "Token verwijderen",
+          "confirmRemove": "{symbol} wordt niet meer getoond bij rekeningen en Safes, en kan niet meer vanuit een Safe worden verstuurd. Tokens die al worden aangehouden bewegen niet; je kunt hem later opnieuw toevoegen.",
+          "empty": "Nog geen eigen tokens.",
+          "decimals": "{decimals} decimalen",
+          "errors": {
+            "notErc20": "Dit adres is geen ERC-20-token op de chain van het fonds.",
+            "alreadyShown": "Deze token wordt hierboven al aangeboden (fondstoken, xDAI of EURe).",
+            "duplicate": "Deze token staat al in de lijst.",
+            "addressInvalid": "Voer een geldig contractadres in (0x gevolgd door 40 hexadecimale tekens).",
+            "readFailed": "Het contract kon nu niet worden gelezen. Probeer het over een paar minuten opnieuw.",
+            "tooMany": "Je kunt maximaal {max} eigen tokens toevoegen.",
+            "notFound": "Deze token staat niet meer in de lijst."
+          }
         }
       },
       "onboarding": {

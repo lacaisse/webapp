@@ -8,7 +8,7 @@ import { getTranslations } from "next-intl/server";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { requireFundRole } from "@/services/auth/dal";
 import { requireCurrentFund } from "@/services/fund/server";
-import { enabledExtraTokens } from "@/services/token/extra-tokens";
+import { getDisplayTokens } from "@/services/token/display-tokens";
 
 import { AccountManage } from "./account-manage";
 import { MoveTokensDialog } from "./move-tokens-dialog";
@@ -57,8 +57,9 @@ async function AccountDetail({
     tokenChainId: fund.tokenChainId,
     tokenDecimals: fund.tokenDecimals,
   };
-  const [balance, extra] = await Promise.all([
+  const [balance, extraTokens, extra] = await Promise.all([
     getAccountBalance(account.address, token),
+    getDisplayTokens(fund),
     getExtraBalances(fund, [account.address]),
   ]);
   const otherAccounts = (await getAccountOptions(fund.id, account.id)).map(
@@ -120,11 +121,7 @@ async function AccountDetail({
               : `${balance}${fund.tokenSymbol ? ` ${fund.tokenSymbol}` : ""}`}
           </div>
           <ExtraBalanceLines
-            lines={extraLinesFor(
-              account.address,
-              enabledExtraTokens(fund),
-              extra,
-            )}
+            lines={extraLinesFor(account.address, extraTokens, extra)}
             className="mt-1"
           />
         </div>

@@ -8,6 +8,19 @@ vi.mock("@/services/alchemy/transfers", () => ({
 vi.mock("@/services/transaction-annotation/annotate", () => ({
   getAnnotations: vi.fn(async () => new Map()),
 }));
+// The real built-in registry plus the fund's custom tokens (set per test).
+const custom = vi.hoisted(() => ({
+  tokens: [] as { key: `custom:${string}`; symbol: string; decimals: number; address: `0x${string}` }[],
+}));
+vi.mock("@/services/token/display-tokens", async () => {
+  const { enabledExtraTokens } = await import("@/services/token/extra-tokens");
+  return {
+    getDisplayTokens: vi.fn(async (fund: Parameters<typeof enabledExtraTokens>[0]) => [
+      ...enabledExtraTokens(fund),
+      ...custom.tokens,
+    ]),
+  };
+});
 
 import {
   listTransfersForAccount,
@@ -51,6 +64,7 @@ function tr(over: Partial<AlchemyTransfer>): AlchemyTransfer {
 
 beforeEach(() => {
   list.mockReset();
+  custom.tokens = [];
 });
 
 describe("loadSafeTransfers", () => {
@@ -150,6 +164,34 @@ describe("loadSafeTransfers", () => {
     });
     const [row] = (await loadSafeTransfers("fund", FUND, SAFE, null)).transfers;
     expect([row!.value, row!.symbol]).toEqual(["1.23", "FOO"]);
+  });
+
+  it("includes the fund's custom tokens and labels their rows", async () => {
+    const USDCE = "0x2a22f9c3b484c3629090FeED35F17Ff8F88f76F0" as const;
+    custom.tokens = [
+      { key: `custom:${USDCE.toLowerCase()}`, symbol: "USDC.e", decimals: 6, address: USDCE },
+    ];
+    list.mockResolvedValue({
+      transfers: [
+        tr({ uniqueId: "u", contractAddress: USDCE.toLowerCase(), rawValue: "0x2625a0" }), // 2.5 at 6
+      ],
+      nextPageKey: null,
+    });
+
+    const page = await loadSafeTransfers(
+      "fund",
+      { ...FUND, showNativeBalance: false, showEureBalance: false },
+      SAFE,
+      null,
+    );
+
+    expect(list).toHaveBeenCalledWith(
+      expect.objectContaining({
+        contractAddresses: [TOKEN.toLowerCase(), USDCE.toLowerCase()],
+        includeNative: false,
+      }),
+    );
+    expect(page.transfers.map((t) => [t.value, t.symbol])).toEqual([["2.5", "USDC.e"]]);
   });
 
   it("returns an empty page for an undeployed Safe", async () => {

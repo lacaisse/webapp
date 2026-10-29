@@ -31,9 +31,9 @@ type RecipientOption = {
   kind: "ACCOUNT" | "CARD";
 };
 
-// One balance the Safe can send: the fund token (first, the default) or an
-// extra token the fund shows (xDAI / EURe). `balance` is the human amount on
-// the Safe, null when the read failed.
+// One balance the Safe can send: the fund token (first, the default) or a
+// display token the fund shows (xDAI / EURe / a custom ERC-20). `balance` is
+// the human amount on the Safe, null when the read failed.
 export type TransferTokenOption = {
   key: TransferToken;
   symbol: string | null;
@@ -44,8 +44,8 @@ const SELECT_CLASS =
   "h-8 w-full rounded-md bg-background px-2 text-sm ring-1 ring-foreground/15 outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 // Propose sending one of the Safe's balances out — the fund token by default,
-// or an extra token the fund shows (xDAI / EURe; picker hidden when there is
-// none). Pick one of the fund's accounts / staff cards, or paste any address.
+// or a display token the fund shows (xDAI / EURe / custom; picker hidden
+// when there is none). Pick one of the fund's accounts / staff cards, or paste any address.
 // The proposal then collects signatures; it executes as soon as the
 // threshold is met.
 export function ProposeTransferDialog({

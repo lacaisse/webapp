@@ -2128,6 +2128,27 @@
           "nativeHint": "Gas on Gnosis Chain; shown on every account and Safe.",
           "eure": "EURe (Monerium euro)",
           "eureHint": "Euro stablecoin on Gnosis Chain."
+        },
+        "customTokens": {
+          "title": "Custom tokens",
+          "description": "Add any other ERC-20 token on the fund's chain: its balance shows like xDAI and EURe on accounts and Safes, and a Safe can send it.",
+          "address": "Contract address",
+          "addressPlaceholder": "0x…",
+          "add": "Add",
+          "adding": "Adding…",
+          "remove": "Remove token",
+          "confirmRemove": "{symbol} will no longer show on accounts and Safes, and can no longer be sent from a Safe. Tokens already held don't move; you can add it again later.",
+          "empty": "No custom tokens yet.",
+          "decimals": "{decimals} decimals",
+          "errors": {
+            "notErc20": "This address is not an ERC-20 token on the fund's chain.",
+            "alreadyShown": "This token is already offered above (fund token, xDAI or EURe).",
+            "duplicate": "This token is already in the list.",
+            "addressInvalid": "Enter a valid contract address (0x followed by 40 hex characters).",
+            "readFailed": "Couldn't read the contract right now. Try again in a few minutes.",
+            "tooMany": "You can add at most {max} custom tokens.",
+            "notFound": "This token is no longer in the list."
+          }
         }
       },
       "onboarding": {

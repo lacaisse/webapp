@@ -3,6 +3,7 @@
 
 import { getTranslations } from "next-intl/server";
 import { revalidatePath } from "next/cache";
+import { getAddress } from "viem";
 import { z } from "zod";
 
 import { requireFundRole } from "@/services/auth/dal";
@@ -14,6 +15,8 @@ import {
 } from "@/services/citizenpay/token-roles";
 import { prisma } from "@/services/db/prisma";
 import { isSupportedLocale } from "@/services/i18n/config";
+import { Erc20MetadataError, readErc20Metadata } from "@/services/token/erc20-metadata";
+import { EXTRA_TOKENS_BY_CHAIN } from "@/services/token/extra-tokens";
 
 export type SettingsResult = { ok: true } | { error: string };
 
@@ -254,6 +257,115 @@ export async function updateBalanceDisplayAction(
   // The list and both detail pages under /accounts read the flags.
   if ("ok" in result) revalidatePath("/accounts", "layout");
   return result;
+}
+
+// --- Custom display tokens (Settings → Token) ---------------------------
+// Any other ERC-20 on the fund's token chain, shown like xDAI / EURe on the
+// Accounts pages (FundDisplayToken; services/token/display-tokens.ts). The
+// admin gives the address; symbol / name / decimals come from the contract.
+
+const CUSTOM_TOKENS_MAX = 10;
+
+const AddDisplayTokenSchema = z.object({
+  address: z
+    .string()
+    .trim()
+    .regex(/^0x[a-fA-F0-9]{40}$/, {
+      error: "fund.settings.token.customTokens.errors.addressInvalid",
+    }),
+});
+
+const RemoveDisplayTokenSchema = z.object({ id: z.string().min(1) });
+
+export type AddDisplayTokenResult =
+  | { ok: true; token: { id: string; address: string; symbol: string; name: string; decimals: number } }
+  | { error: string };
+
+export async function addDisplayTokenAction(
+  input: z.infer<typeof AddDisplayTokenSchema>,
+): Promise<AddDisplayTokenResult> {
+  const t = await getTranslations();
+  const { fund } = await requireFundRole("ADMIN");
+  const parsed = AddDisplayTokenSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: t(parsed.error.issues[0].message as never) };
+  }
+  // Lowercase first: a mixed-case paste with a bad checksum is still the
+  // same address.
+  const address = getAddress(parsed.data.address.toLowerCase());
+  const same = (other: string | null | undefined) =>
+    !!other && other.toLowerCase() === address.toLowerCase();
+
+  const builtIns = EXTRA_TOKENS_BY_CHAIN[fund.tokenChainId] ?? [];
+  if (same(fund.tokenAddress) || builtIns.some((tok) => same(tok.address))) {
+    return { error: t("fund.settings.token.customTokens.errors.alreadyShown") };
+  }
+  const existing = await prisma.fundDisplayToken.findMany({
+    where: { fundId: fund.id },
+    select: { address: true },
+  });
+  if (existing.some((row) => same(row.address))) {
+    return { error: t("fund.settings.token.customTokens.errors.duplicate") };
+  }
+  if (existing.length >= CUSTOM_TOKENS_MAX) {
+    return {
+      error: t("fund.settings.token.customTokens.errors.tooMany", { max: CUSTOM_TOKENS_MAX }),
+    };
+  }
+
+  let meta;
+  try {
+    meta = await readErc20Metadata(fund.tokenChainId, address);
+  } catch (e) {
+    if (e instanceof Erc20MetadataError && e.code === "not_erc20") {
+      return { error: t("fund.settings.token.customTokens.errors.notErc20") };
+    }
+    console.error("[settings] custom token metadata read failed", fund.id, address, e);
+    return { error: t("fund.settings.token.customTokens.errors.readFailed") };
+  }
+
+  try {
+    const token = await prisma.fundDisplayToken.create({
+      data: {
+        fundId: fund.id,
+        address: meta.address,
+        symbol: meta.symbol,
+        name: meta.name,
+        decimals: meta.decimals,
+      },
+      select: { id: true, address: true, symbol: true, name: true, decimals: true },
+    });
+    revalidatePath("/settings");
+    // The list and both detail pages under /accounts read the token list.
+    revalidatePath("/accounts", "layout");
+    return { ok: true, token };
+  } catch (e) {
+    if ((e as { code?: string }).code === "P2002") {
+      return { error: t("fund.settings.token.customTokens.errors.duplicate") };
+    }
+    throw e;
+  }
+}
+
+export async function removeDisplayTokenAction(
+  input: z.infer<typeof RemoveDisplayTokenSchema>,
+): Promise<SettingsResult> {
+  const t = await getTranslations();
+  const { fund } = await requireFundRole("ADMIN");
+  const parsed = RemoveDisplayTokenSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: t("fund.settings.token.customTokens.errors.notFound") };
+  }
+  // Scoped by the host fund: an id from another fund deletes nothing.
+  const res = await prisma.fundDisplayToken.deleteMany({
+    where: { id: parsed.data.id, fundId: fund.id },
+  });
+  if (res.count === 0) {
+    return { error: t("fund.settings.token.customTokens.errors.notFound") };
+  }
+  revalidatePath("/settings");
+  revalidatePath("/accounts", "layout");
+  return { ok: true };
 }
 
 // --- Referrals -----------------------------------------------------------

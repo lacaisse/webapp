@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { z } from "zod";
 
+import type { ExtraTokenKey } from "@/services/token/extra-tokens";
+
 // Zod schemas shared by the Safe dialogs (client validation) and the server
 // actions in services/safe/admin-actions.ts (re-validation). Messages are
 // i18n keys under `fund.safes.errors.*`, resolved by the caller.
@@ -59,23 +61,34 @@ export const SafeTxIdSchema = z.object({
 });
 
 // Which of the Safe's balances a transfer moves: the fund token, or one of the
-// extra tokens the fund shows (services/token/extra-tokens.ts — xDAI is
-// "native", a plain value transfer). Decimal caps are enforced server-side
-// per token (2 for the fund token: TokenOperation.amount is Decimal(12,2)).
+// display tokens the fund shows (services/token/extra-tokens.ts — xDAI is
+// "native", a plain value transfer; a fund-registered ERC-20 is
+// `custom:<lowercased address>`). Whether the fund actually shows that token
+// is checked server-side. Decimal caps are enforced server-side per token (2
+// for the fund token: TokenOperation.amount is Decimal(12,2)).
 export const TRANSFER_TOKENS = ["fund", "native", "eure"] as const;
-export type TransferToken = (typeof TRANSFER_TOKENS)[number];
+export type TransferToken = "fund" | ExtraTokenKey;
+
+const TRANSFER_TOKEN_RE = /^(?:fund|native|eure|custom:0x[0-9a-f]{40})$/;
+
+const TRANSFER_TOKEN = z
+  .string()
+  .regex(TRANSFER_TOKEN_RE, "fund.safes.errors.tokenNotEnabled")
+  .transform((v) => v as TransferToken);
 
 export const ProposeTransferSchema = z.object({
   safeId: z.string().min(1),
   recipient: ADDRESS,
   amount: DECIMAL_AMOUNT,
-  token: z.enum(TRANSFER_TOKENS).default("fund"),
+  token: TRANSFER_TOKEN.default("fund"),
   recipientLabel: z.string().trim().max(80).optional(),
   note: z.string().trim().max(200, "fund.safes.errors.noteTooLong").optional(),
 });
 // Input (token optional, defaults to "fund") — what callers pass; the core
 // reads `token ?? "fund"`.
-export type ProposeTransferInput = z.input<typeof ProposeTransferSchema>;
+export type ProposeTransferInput = Omit<z.input<typeof ProposeTransferSchema>, "token"> & {
+  token?: TransferToken;
+};
 
 // Owner / threshold changes. A new owner is either a fund member (we create
 // or reuse their FundSigner) or an external address with a label.
