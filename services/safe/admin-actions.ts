@@ -5,15 +5,18 @@ import { getTranslations } from "next-intl/server";
 import { refresh, revalidatePath } from "next/cache";
 
 import { requireFundRole } from "@/services/auth/dal";
+import { hasRecentAuth } from "@/services/auth/step-up";
 import { prisma } from "@/services/db/prisma";
 import { getDisplayTokens } from "@/services/token/display-tokens";
 
-import type {
-  CreateSafeActionResult,
-  ProposeActionResult,
-  SafeActionResult,
-  SafeTransfersActionResult,
-  SignActionResult,
+import {
+  REAUTH_REQUIRED,
+  type ActionError,
+  type CreateSafeActionResult,
+  type ProposeActionResult,
+  type SafeActionResult,
+  type SafeTransfersActionResult,
+  type SignActionResult,
 } from "./action-types";
 import {
   archiveSafe,
@@ -60,6 +63,16 @@ function errorFor(t: T, e: unknown, context: string): string {
   }
   console.error(`[safe] ${context} failed`, e);
   return t("fund.safes.errors.unknown" as never);
+}
+
+// Step-up (review S4): proposing, signing, rejecting and retrying move the
+// Safe's money or change who controls it, so a session cookie alone is not
+// enough — the acting user must have re-entered their password or asserted
+// a passkey within the last 10 minutes. Checked after the role and input
+// checks, before anything is written; the dialogs understand the code.
+async function requireStepUp(t: T): Promise<ActionError | null> {
+  if (await hasRecentAuth()) return null;
+  return { error: t("fund.safes.errors.reauth_required" as never), code: REAUTH_REQUIRED };
 }
 
 function revalidateSafe(safeId?: string) {
@@ -163,6 +176,9 @@ export async function proposeTransferAction(
     return { error: t("fund.safes.errors.tokenNotEnabled" as never) };
   }
 
+  const stepUp = await requireStepUp(t);
+  if (stepUp) return stepUp;
+
   try {
     const res = await proposeTokenTransfer({
       fund,
@@ -191,6 +207,9 @@ export async function proposeOwnerChangeAction(
 
   const parsed = ProposeOwnerChangeSchema.safeParse(input);
   if (!parsed.success) return { error: t(parsed.error.issues[0].message as never) };
+
+  const stepUp = await requireStepUp(t);
+  if (stepUp) return stepUp;
 
   try {
     const res = await proposeOwnerChange({
@@ -222,6 +241,9 @@ export async function proposeRejectionAction(input: {
   const parsed = SafeTxIdSchema.safeParse(input);
   if (!parsed.success) return { error: t(parsed.error.issues[0].message as never) };
 
+  const stepUp = await requireStepUp(t);
+  if (stepUp) return stepUp;
+
   try {
     const res = await proposeRejection({
       fund,
@@ -252,6 +274,9 @@ export async function signTransactionAction(input: {
   const parsed = SafeTxIdSchema.safeParse(input);
   if (!parsed.success) return { error: t(parsed.error.issues[0].message as never) };
 
+  const stepUp = await requireStepUp(t);
+  if (stepUp) return stepUp;
+
   try {
     const res = await signTransaction({
       fundId: fund.id,
@@ -275,6 +300,9 @@ export async function retryExecutionAction(input: {
 
   const parsed = SafeTxIdSchema.safeParse(input);
   if (!parsed.success) return { error: t(parsed.error.issues[0].message as never) };
+
+  const stepUp = await requireStepUp(t);
+  if (stepUp) return stepUp;
 
   try {
     const res = await retryExecution({

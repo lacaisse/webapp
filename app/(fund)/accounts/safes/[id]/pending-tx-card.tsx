@@ -36,6 +36,7 @@ import {
 
 import type { SafeTxView } from "../data";
 import { sameAddress, summaryLine } from "../format";
+import { useStepUp } from "../reauth-dialog";
 import type { OwnerRow } from "./owners-card";
 import { TxKindIcon } from "./tx-kind-icon";
 
@@ -54,8 +55,10 @@ export function PendingTxCard({
   canAct,
   rejectionProposed,
   nextNonce,
+  hasPasskey,
 }: {
   nextNonce: number | null; // lowest open nonce — the one the Safe runs next
+  hasPasskey: boolean;
   safeId: string;
   tx: SafeTxView;
   owners: OwnerRow[];
@@ -74,6 +77,7 @@ export function PendingTxCard({
   const [signing, startSign] = useTransition();
   const [retrying, startRetry] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const stepUp = useStepUp(hasPasskey);
 
   const signatureFor = (address: string) =>
     tx.signatures.find((s) => sameAddress(s.ownerAddress, address));
@@ -106,6 +110,7 @@ export function PendingTxCard({
     setError(null);
     startSign(async () => {
       const res = await signTransactionAction({ safeId, transactionId: tx.id });
+      if (stepUp.check(res, onSign)) return;
       // Refresh on errors too: the signature may be stored and the execution
       // marked FAILED with its reason.
       if ("error" in res) setError(res.error);
@@ -117,6 +122,7 @@ export function PendingTxCard({
     setError(null);
     startRetry(async () => {
       const res = await retryExecutionAction({ safeId, transactionId: tx.id });
+      if (stepUp.check(res, onRetry)) return;
       if ("error" in res) setError(res.error);
       router.refresh();
     });
@@ -271,7 +277,13 @@ export function PendingTxCard({
             </Button>
           )}
           {canReject && (
-            <RejectDialog safeId={safeId} tx={tx} threshold={threshold} line={line} />
+            <RejectDialog
+              safeId={safeId}
+              tx={tx}
+              threshold={threshold}
+              line={line}
+              hasPasskey={hasPasskey}
+            />
           )}
           {!canSign && me && tx.status === "PENDING" && signatureFor(me.address) && (
             <span className="text-xs text-muted-foreground">
@@ -279,6 +291,7 @@ export function PendingTxCard({
             </span>
           )}
         </div>
+        {stepUp.dialog}
       </CardContent>
     </Card>
   );
@@ -289,11 +302,13 @@ function RejectDialog({
   tx,
   threshold,
   line,
+  hasPasskey,
 }: {
   safeId: string;
   tx: SafeTxView;
   threshold: number;
   line: string;
+  hasPasskey: boolean;
 }) {
   const t = useTranslations("fund.safes.tx");
   const tRoot = useTranslations();
@@ -301,11 +316,13 @@ function RejectDialog({
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const stepUp = useStepUp(hasPasskey);
 
   const onConfirm = () => {
     setError(null);
     startTransition(async () => {
       const res = await proposeRejectionAction({ safeId, transactionId: tx.id });
+      if (stepUp.check(res, onConfirm)) return;
       router.refresh();
       if ("error" in res) {
         setError(res.error);
@@ -319,7 +336,7 @@ function RejectDialog({
     <Dialog
       open={open}
       onOpenChange={(n) => {
-        if (pending) return;
+        if (pending || stepUp.pending) return;
         setOpen(n);
         if (!n) setError(null);
       }}
@@ -364,6 +381,7 @@ function RejectDialog({
             {t("rejectConfirm")}
           </Button>
         </DialogFooter>
+        {stepUp.dialog}
       </DialogContent>
     </Dialog>
   );

@@ -353,6 +353,12 @@ export const getCurrentSignerAddress = cache(
   },
 );
 
+// Whether the user can step up with a passkey (the re-auth dialog offers it
+// next to the password only then).
+export const userHasPasskey = cache(async (userId: string): Promise<boolean> => {
+  return (await prisma.passkey.count({ where: { userId } })) > 0;
+});
+
 export type EligibleMember = {
   userId: string;
   name: string;

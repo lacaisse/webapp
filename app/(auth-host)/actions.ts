@@ -12,6 +12,7 @@ import {
   oauthResumeCallContext,
 } from "@/services/auth/oauth-resume";
 import { buildPostAuthRedirect } from "@/services/auth/redirects";
+import { createInvitedAccount } from "@/services/auth/signup";
 import { getApexUrl } from "@/services/fund/server";
 import { getAuthUrl } from "@/services/host/server";
 import {
@@ -119,59 +120,48 @@ export async function signupAction(
 ): Promise<ActionResult> {
   const t = await getTranslations("auth");
 
-  // Self-serve signups are closed (waitlist-only). Invited users carry a
-  // `returnTo` (e.g. a team-invite accept URL) — only those may create an
-  // account. The public signup route no longer renders the form, so this is
-  // defense-in-depth against a direct POST.
-  if (!returnTo) {
-    return { error: t("errors.signupsClosed") };
-  }
-
+  // Self-serve signups are closed (waitlist-only). An account is created
+  // only for the address of a live staff invite whose token the visitor
+  // holds: the invite accept URL rides in as `returnTo` (the public signup
+  // route renders the form only with one). Better Auth's own sign-up
+  // endpoint is disabled, so this action is the single door.
   const parsed = SignupSchema.safeParse(input);
   if (!parsed.success) {
     return { error: t("errors.invalidInput") };
   }
 
-  let result: { user: { id: string; email: string } };
+  const created = await createInvitedAccount({
+    email: parsed.data.email,
+    password: parsed.data.password,
+    returnTo,
+  });
+  if ("error" in created) {
+    if (created.error === "email_mismatch") return { error: t("errors.signupEmailMismatch") };
+    if (created.error === "exists") return { error: t("errors.accountExists") };
+    return { error: t("errors.signupsClosed") };
+  }
+
+  // Sign the new account in on this host the same way the login form does
+  // (nextCookies writes the session cookie on this action's response), then
+  // hand it to the invite page through the cross-host exchange —
+  // `buildPostAuthRedirect` validates the target host and falls back to the
+  // apex if it's not allowed. The invite accept page doesn't bounce off
+  // requireFundRole, so a fresh signup is safe there.
   try {
-    // Better Auth's email sign-up auto-creates a session when
-    // requireEmailVerification is false. The `name` field is required by
-    // Better Auth's schema; we derive a stub from the email local-part and
-    // let the user edit it later in account settings.
-    result = await auth.api.signUpEmail({
-      body: {
-        email: parsed.data.email,
-        password: parsed.data.password,
-        name: parsed.data.email.split("@")[0] ?? "",
-      },
+    await auth.api.signInEmail({
+      body: { email: created.user.email, password: parsed.data.password },
       headers: await headers(),
     });
   } catch (e) {
-    if (isAPIError(e)) {
-      const next = oauthRedirectFromError(e);
-      if (next) return { ok: true, redirectTo: next };
-      // Surface the localized message Better Auth returned (e.g. "user already
-      // exists"). Falls back to a generic "invalid input" if absent.
-      return { error: e.body?.message ?? t("errors.invalidInput") };
-    }
-    throw e;
+    if (!isAPIError(e)) throw e;
+    console.error("[auth] sign-in after invited sign-up failed:", e.body);
+    return { error: t("errors.signInFailed") };
   }
 
-  // When an explicit `returnTo` rode in (e.g. a staff-invite accept page on a
-  // fund host), honour it — `buildPostAuthRedirect` validates the target host
-  // and falls back to the apex if it's not allowed. Those public landing
-  // pages don't bounce off requireFundRole, so a fresh signup is safe there.
-  //
-  // Otherwise fresh signups have no fund memberships, so we send them to the
-  // apex picker (its empty state shows a "create your first fund" CTA).
-  // `welcome=passkey` rides along through the exchange (preserved as the
-  // return_to path) so the apex picker can offer the just-registered user a
-  // one-tap passkey setup. The apex is a subdomain of rpID (= APP_DOMAIN), so
-  // the WebAuthn ceremony works there.
   redirect(
     await buildPostAuthRedirect({
-      userId: result.user.id,
-      email: result.user.email,
+      userId: created.user.id,
+      email: created.user.email,
       returnTo: returnTo || getApexUrl("/?welcome=passkey"),
     }),
   );

@@ -18,8 +18,15 @@ import { auth } from "./better-auth";
 // here because callers need globalRole + relations that Better Auth's
 // session.user shape doesn't include.
 
+// The Better Auth session of the request (user + session row), cached per
+// request. Step-up (services/auth/step-up.ts) binds its proof to
+// `session.session.token`; everything else wants the Prisma user below.
+export const getCurrentSession = cache(async () => {
+  return auth.api.getSession({ headers: await headers() });
+});
+
 export const getCurrentUser = cache(async () => {
-  const session = await auth.api.getSession({ headers: await headers() });
+  const session = await getCurrentSession();
   if (!session?.user) return null;
 
   return prisma.user.findUnique({

@@ -86,7 +86,11 @@
       "signInFailed": "Error al iniciar sesión.",
       "sessionExpired": "La sesión de inicio caducó. Inténtelo de nuevo.",
       "establishSessionFailed": "No se pudo establecer la sesión.",
-      "incorrectPassword": "Su contraseña actual es incorrecta."
+      "incorrectPassword": "Su contraseña actual es incorrecta.",
+      "tooManyAttempts": "Demasiados intentos. Espere un minuto antes de volver a intentarlo.",
+      "noPassword": "Esta cuenta no tiene contraseña. Use su passkey.",
+      "signupEmailMismatch": "La invitación se envió a otra dirección de correo. Cree la cuenta con la dirección invitada.",
+      "accountExists": "Ya existe una cuenta con esta dirección de correo. Inicie sesión o restablezca su contraseña si esa cuenta no es suya."
     },
     "emails": {
       "resetPassword": {
@@ -498,7 +502,18 @@
         "thresholdTooHigh": "El umbral no puede superar el número de firmantes.",
         "noteTooLong": "La nota es demasiado larga (máx. 200 caracteres).",
         "ownerRequired": "Elige un miembro o introduce una dirección.",
-        "duplicateOwner": "La misma dirección aparece dos veces."
+        "duplicateOwner": "La misma dirección aparece dos veces.",
+        "reauth_required": "Confirme su identidad para continuar."
+      },
+      "reauth": {
+        "title": "Confirme su identidad",
+        "description": "Para proponer o firmar una transacción de un Safe hace falta una confirmación reciente de que es usted. Sigue siendo válida durante 10 minutos.",
+        "password": "Contraseña",
+        "confirm": "Confirmar",
+        "confirming": "Comprobando…",
+        "passkeyButton": "Confirmar con una passkey",
+        "passkeyWaiting": "Esperando la passkey…",
+        "passkeyFailed": "No se pudo verificar la passkey."
       }
     },
     "team": {
@@ -2651,7 +2666,8 @@
       "lastOwner": "Este es el único propietario; primero asciende a otra persona a propietario.",
       "inviteInvalid": "Esta invitación no es válida o ya se ha utilizado.",
       "inviteExpired": "Esta invitación ha caducado. Pide a un administrador que envíe una nueva.",
-      "emailMismatch": "Esta invitación se envió a una dirección de correo electrónico diferente."
+      "emailMismatch": "Esta invitación se envió a una dirección de correo electrónico diferente.",
+      "unverifiedPreexisting": "Esta cuenta existía antes de la invitación y su dirección de correo nunca se confirmó. Restablezca su contraseña desde la página de inicio de sesión para confirmarla y vuelva a aceptar la invitación."
     }
   },
   "joinTeam": {

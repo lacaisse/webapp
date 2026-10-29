@@ -6,10 +6,12 @@ import { getTranslations } from "next-intl/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { REQUIRE_EMAIL_VERIFICATION } from "@/services/auth/better-auth";
 import { requireFundRole, requireUser } from "@/services/auth/dal";
 import { prisma } from "@/services/db/prisma";
 import { sendFundInvited } from "@/services/email/transactional";
 import { getFundUrl, requireCurrentFund } from "@/services/fund/server";
+import { inviteAcceptCheck } from "./invite-rules";
 import {
   INVITABLE_ROLES,
   InviteFundMemberSchema,
@@ -212,8 +214,11 @@ export async function revokeFundInviteAction(input: {
 }
 
 // Called from the public accept page once the visitor is logged in. Verifies
-// the invite belongs to the current fund, hasn't expired/been used, and that
-// the signed-in user's email matches, then materializes the FundMember.
+// the invite belongs to the current fund, hasn't expired/been used, that the
+// signed-in user's email matches, and that the account is not an unverified
+// one from before the invite (review S5 — see invite-rules.ts for the rule),
+// then materializes the FundMember. Holding the token proves control of the
+// invited inbox, so the account's email is marked verified on the way.
 export async function acceptFundInviteAction(input: {
   token: string;
 }): Promise<FundTeamResult> {
@@ -233,6 +238,15 @@ export async function acceptFundInviteAction(input: {
   if (user.email.toLowerCase() !== invite.email.toLowerCase()) {
     return { error: t("team.errors.emailMismatch" as never) };
   }
+  if (
+    inviteAcceptCheck({
+      user,
+      invite,
+      requireEmailVerification: REQUIRE_EMAIL_VERIFICATION,
+    }) === "unverified_preexisting"
+  ) {
+    return { error: t("team.errors.unverifiedPreexisting" as never) };
+  }
 
   await prisma.$transaction(async (tx) => {
     await tx.fundMember.upsert({
@@ -244,6 +258,9 @@ export async function acceptFundInviteAction(input: {
       where: { id: invite.id },
       data: { acceptedAt: new Date(), acceptedById: user.id },
     });
+    if (!user.emailVerified) {
+      await tx.user.update({ where: { id: user.id }, data: { emailVerified: true } });
+    }
   });
 
   redirect("/dashboard");
