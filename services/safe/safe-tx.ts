@@ -113,6 +113,28 @@ export function safeTxHash(a: { chainId: number; safeAddress: Address; tx: SafeT
  * (owner addresses strictly ascending). Only 65-byte ECDSA signatures (v 27/28
  * or eth_sign-style 31/32) are supported.
  */
+// Case-insensitive address helpers shared by proposals / sync / UI loaders.
+export const lc = (a: string): string => a.toLowerCase();
+export const sameAddress = (a: string, b: string): boolean => lc(a) === lc(b);
+
+// Rebuild the SafeTx from a stored FundSafeTransaction row (gas fields are
+// always zero for our transactions).
+export function safeTxFromRow(row: {
+  to: string;
+  value: string;
+  data: string;
+  operation: number;
+  nonce: number;
+}): SafeTx {
+  return buildSafeTx({
+    to: row.to as Address,
+    value: BigInt(row.value),
+    data: row.data as Hex,
+    nonce: BigInt(row.nonce),
+    operation: row.operation === 1 ? 1 : 0,
+  });
+}
+
 export function packSignatures(sigs: { owner: Address; signature: Hex }[]): Hex {
   const seen = new Set<string>();
   for (const s of sigs) {

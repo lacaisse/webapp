@@ -16,6 +16,7 @@ const relayer = vi.hoisted(() => ({
   deploySafe: vi.fn(),
   execSafeTransaction: vi.fn(),
   errorTxHash: vi.fn((e: unknown) => (e as { txHash?: string }).txHash ?? null),
+  findSafeExecution: vi.fn(),
 }));
 vi.mock("@/services/safe/relayer", () => relayer);
 
@@ -264,6 +265,62 @@ describe("proposeTokenTransfer", () => {
     const retried = await retryExecution({ fundId: FUND.id, transactionId: tx.id as string });
     expect(retried).toEqual({ executed: true, txHash: EXEC_HASH });
     expect(tx.status).toBe("EXECUTED");
+    err.mockRestore();
+  });
+});
+
+describe("tryExecute failure handling", () => {
+  it("hands a pre-broadcast relayer failure back to PENDING (nothing reached the chain)", async () => {
+    seed({ threshold: 1, owners: [OWNERS_3[0]] });
+    relayer.execSafeTransaction.mockRejectedValueOnce(
+      new SafeError("relayer_failed", "execTransaction not sent: nonce too low"),
+    );
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await expect(transfer("u-a")).rejects.toMatchObject({ code: "relayer_failed" });
+
+    const tx = db.fundSafeTransaction[0];
+    expect(tx.status).toBe("PENDING");
+    expect(db.fundSafeSignature).toHaveLength(1);
+
+    // The next attempt (cron / page sync) executes it without human help.
+    relayer.execSafeTransaction.mockResolvedValueOnce({ txHash: EXEC_HASH });
+    const res = await tryExecute({ fundId: FUND.id, transactionId: tx.id as string });
+    expect(res.executed).toBe(true);
+    err.mockRestore();
+  });
+
+  it("judges readiness from the chain's threshold, not the cached one", async () => {
+    seed({ threshold: 2, owners: OWNERS_3 });
+    // Threshold lowered to 1 in Safe{Wallet}; the DB still says 2.
+    relayer.readSafeState.mockResolvedValue({
+      deployed: true,
+      owners: OWNERS_3.map((o) => o.address),
+      threshold: 1,
+      nonce: 0,
+    });
+
+    const res = await transfer("u-a");
+
+    expect(res.executed).toBe(true);
+  });
+
+  it("retryExecution reconciles a FAILED tx that did mine when the nonce moved on", async () => {
+    seed({ threshold: 1, owners: [OWNERS_3[0]] });
+    const revert = Object.assign(new SafeError("relayer_failed", "no receipt yet"), { txHash: EXEC_HASH });
+    relayer.execSafeTransaction.mockRejectedValueOnce(revert);
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(transfer("u-a")).rejects.toMatchObject({ code: "relayer_failed" });
+    const tx = db.fundSafeTransaction[0];
+    expect(tx.status).toBe("FAILED");
+
+    relayer.readSafeState.mockResolvedValue({ deployed: true, owners: [OWNERS_3[0].address], threshold: 1, nonce: 1 });
+    relayer.findSafeExecution.mockResolvedValue({ txHash: EXEC_HASH, success: true, blockNumber: BigInt(1) });
+
+    const retried = await retryExecution({ fundId: FUND.id, transactionId: tx.id as string });
+    expect(retried).toEqual({ executed: true, txHash: EXEC_HASH });
+    expect(tx).toMatchObject({ status: "EXECUTED", executedBy: "relayer" });
+    expect(db.tokenOperation).toHaveLength(1);
     err.mockRestore();
   });
 });

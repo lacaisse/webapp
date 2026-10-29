@@ -9,6 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { requireFundRole } from "@/services/auth/dal";
+import { syncSafe } from "@/services/safe/sync";
 import {
   explorerAddressUrl,
   explorerTxUrl,
@@ -36,6 +37,10 @@ import { SafeManage } from "./safe-manage";
 import { SyncButton } from "./sync-button";
 import { ProposeTransferDialog } from "./transfer-dialog";
 
+// Server actions invoked from this route broadcast a Safe transaction and wait
+// for its receipt (relayer.ts, up to 90 s); give them room on Vercel.
+export const maxDuration = 120;
+
 // Synchronous shell so the route paints its skeleton instantly; the Safe
 // (params-dependent, uncached) streams in behind <Suspense>.
 export default function SafeDetailPage({
@@ -54,6 +59,14 @@ async function SafeDetailView({ params }: { params: Promise<{ id: string }> }) {
   const { user, fund } = await requireFundRole("ADMIN");
   const { id } = await params;
   const t = await getTranslations("fund.safes");
+
+  // Pull owners / threshold / Safe{Wallet} confirmations before rendering
+  // (30 s debounce inside syncSafe; never fails the page).
+  try {
+    await syncSafe({ fundId: fund.id, safeId: id });
+  } catch (e) {
+    console.warn("[safes] page sync failed", id, e);
+  }
 
   const safe = await getSafe(fund.id, id);
   if (!safe) notFound();

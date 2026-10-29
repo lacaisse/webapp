@@ -16,6 +16,7 @@ const relayer = vi.hoisted(() => ({
   deploySafe: vi.fn(),
   execSafeTransaction: vi.fn(),
   errorTxHash: vi.fn(() => null),
+  findSafeExecution: vi.fn(),
 }));
 vi.mock("@/services/safe/relayer", () => relayer);
 
@@ -24,6 +25,7 @@ const txService = vi.hoisted(() => ({
   proposeTransaction: vi.fn(),
   confirmTransaction: vi.fn(),
   getMultisigTransaction: vi.fn(),
+  listPendingTransactions: vi.fn(),
 }));
 vi.mock("@/services/safe/tx-service", () => txService);
 
@@ -99,6 +101,8 @@ beforeEach(() => {
   relayer.execSafeTransaction.mockResolvedValue({ txHash: EXEC_HASH });
   txService.isTxServiceEnabled.mockReturnValue(true);
   txService.getMultisigTransaction.mockResolvedValue(null);
+  txService.listPendingTransactions.mockResolvedValue([]);
+  relayer.findSafeExecution.mockResolvedValue(null);
 
   db.fundSigner.push({ id: "signer-a", fundId: FUND_ID, userId: "u-a", address: A, privateKeyEnc: "enc" });
   db.fundSafe.push({
@@ -125,22 +129,25 @@ describe("syncSafe", () => {
   it("imports a verified Safe{Wallet} confirmation and executes at threshold", async () => {
     const tx = addTx();
     db.fundSafeSignature.push({ id: "s-a", transactionId: tx.id, ownerAddress: A, signature: sig("1a"), source: "LACAISSE" });
-    txService.getMultisigTransaction.mockResolvedValue({
-      safeTxHash: tx.safeTxHash,
-      nonce: 0,
-      isExecuted: false,
-      isSuccessful: null,
-      transactionHash: null,
-      executionDate: null,
-      confirmations: [
-        { owner: X.toLowerCase(), signature: sig("2b"), signatureType: "EOA", submissionDate: "" },
-      ],
-    });
+    txService.listPendingTransactions.mockResolvedValue([
+      {
+        safeTxHash: tx.safeTxHash,
+        nonce: 0,
+        isExecuted: false,
+        isSuccessful: null,
+        transactionHash: null,
+        executionDate: null,
+        confirmations: [
+          { owner: X.toLowerCase(), signature: sig("2b"), signatureType: "EOA", submissionDate: "" },
+        ],
+      },
+    ]);
     recoverSafeTxSigner.mockResolvedValue(X);
 
     const res = await syncSafe({ fundId: FUND_ID, safeId: SAFE_ID, force: true });
 
     expect(res).toMatchObject({ synced: true, executed: 1, errors: 0 });
+    expect(txService.listPendingTransactions).toHaveBeenCalledTimes(1);
     const imported = db.fundSafeSignature.find((s) => s.ownerAddress === X);
     expect(imported).toMatchObject({ source: "SAFE_WALLET", signature: sig("2b") });
     expect(relayer.execSafeTransaction).toHaveBeenCalledTimes(1);
@@ -150,14 +157,16 @@ describe("syncSafe", () => {
 
   it("skips a confirmation whose signature does not recover to its owner", async () => {
     const tx = addTx();
-    txService.getMultisigTransaction.mockResolvedValue({
-      safeTxHash: tx.safeTxHash,
-      isExecuted: false,
-      isSuccessful: null,
-      transactionHash: null,
-      executionDate: null,
-      confirmations: [{ owner: X, signature: sig("2b"), signatureType: "EOA", submissionDate: "" }],
-    });
+    txService.listPendingTransactions.mockResolvedValue([
+      {
+        safeTxHash: tx.safeTxHash,
+        isExecuted: false,
+        isSuccessful: null,
+        transactionHash: null,
+        executionDate: null,
+        confirmations: [{ owner: X, signature: sig("2b"), signatureType: "EOA", submissionDate: "" }],
+      },
+    ]);
     recoverSafeTxSigner.mockResolvedValue(Y);
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
@@ -168,34 +177,66 @@ describe("syncSafe", () => {
     warn.mockRestore();
   });
 
-  it("marks a transaction executed outside La Caisse as EXECUTED external", async () => {
+  it("marks a transaction executed outside La Caisse as EXECUTED external (from the Safe's event)", async () => {
     const tx = addTx();
     chain([A, X], 2, 1);
-    txService.getMultisigTransaction.mockResolvedValue({
-      safeTxHash: tx.safeTxHash,
-      isExecuted: true,
-      isSuccessful: true,
-      transactionHash: EXT_HASH,
-      executionDate: "2026-10-29T10:00:00Z",
-      confirmations: [],
-    });
+    relayer.findSafeExecution.mockResolvedValue({ txHash: EXT_HASH, success: true, blockNumber: BigInt(1) });
 
     await syncSafe({ fundId: FUND_ID, safeId: SAFE_ID, force: true });
 
+    expect(relayer.findSafeExecution).toHaveBeenCalledWith(
+      expect.objectContaining({ safeTxHash: tx.safeTxHash }),
+    );
     expect(tx).toMatchObject({ status: "EXECUTED", executedBy: "external", txHash: EXT_HASH });
-    expect(tx.executedAt).toEqual(new Date("2026-10-29T10:00:00Z"));
+    expect(tx.executedAt).toBeInstanceOf(Date);
     expect(db.tokenOperation).toHaveLength(1);
     expect(db.tokenOperation[0]).toMatchObject({ type: "TRANSFER", amount: "5", txHash: EXT_HASH });
     expect(relayer.execSafeTransaction).not.toHaveBeenCalled();
   });
 
-  it("supersedes a PENDING transaction whose nonce was consumed on chain", async () => {
-    const tx = addTx({ nonce: 0 });
+  it("supersedes PENDING and FAILED transactions whose nonce was consumed by another tx", async () => {
+    const pending = addTx({ nonce: 0 });
+    const failed = addTx({ nonce: 0, status: "FAILED", errorMessage: "relayer_failed: boom" });
     chain([A, X], 2, 1);
 
     await syncSafe({ fundId: FUND_ID, safeId: SAFE_ID, force: true });
 
-    expect(tx.status).toBe("SUPERSEDED");
+    expect(pending.status).toBe("SUPERSEDED");
+    expect(failed.status).toBe("SUPERSEDED");
+  });
+
+  it("recovers a FAILED relayer execution that did mine (lost bookkeeping)", async () => {
+    const tx = addTx({ nonce: 0, status: "FAILED", txHash: EXEC_HASH, errorMessage: "execution timed out" });
+    chain([A, X], 2, 1);
+    relayer.findSafeExecution.mockResolvedValue({ txHash: EXEC_HASH, success: true, blockNumber: BigInt(1) });
+
+    await syncSafe({ fundId: FUND_ID, safeId: SAFE_ID, force: true });
+
+    expect(tx).toMatchObject({ status: "EXECUTED", executedBy: "relayer", txHash: EXEC_HASH });
+    expect(db.tokenOperation).toHaveLength(1);
+  });
+
+  it("re-proposes to the Transaction Service a PENDING tx the service does not know", async () => {
+    const tx = addTx();
+    db.fundSafeSignature.push({ id: "s-a", transactionId: tx.id, ownerAddress: A, signature: sig("1a"), source: "LACAISSE" });
+
+    await syncSafe({ fundId: FUND_ID, safeId: SAFE_ID, force: true });
+
+    expect(txService.proposeTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({ safeTxHash: tx.safeTxHash, sender: A, signature: sig("1a") }),
+    );
+  });
+
+  it("never touches the Transaction Service for a Safe with team-only owners", async () => {
+    db.fundSafeOwner.splice(1, 1); // drop the external owner
+    chain([A], 1, 0);
+    addTx();
+    relayer.isRelayerConfigured.mockReturnValue(false);
+
+    await syncSafe({ fundId: FUND_ID, safeId: SAFE_ID, force: true });
+
+    expect(txService.listPendingTransactions).not.toHaveBeenCalled();
+    expect(txService.proposeTransaction).not.toHaveBeenCalled();
   });
 
   it("fails a stuck EXECUTING transaction after 10 minutes", async () => {

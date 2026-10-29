@@ -174,6 +174,58 @@ export async function readSafeState(a: {
   };
 }
 
+// How far back findSafeExecution scans for the Safe's execution events.
+// Gnosis mines ~17k blocks a day; the cron reconciles every 2 minutes, so a
+// week covers any realistic gap. Kept bounded for the RPC provider's
+// eth_getLogs limits.
+const EXECUTION_LOOKBACK_BLOCKS = BigInt(120_000);
+
+/**
+ * Chain-only answer to "did this SafeTx execute?": the Safe emits
+ * ExecutionSuccess / ExecutionFailure with the safeTxHash as indexed topic.
+ * Independent of the Transaction Service, so a lost receipt or bookkeeping
+ * failure can be reconciled from the chain alone. Null when no event is
+ * found in the lookback window.
+ */
+export async function findSafeExecution(a: {
+  chainId: number;
+  safeAddress: Address;
+  safeTxHash: Hex;
+}): Promise<{ txHash: Hex; success: boolean; blockNumber: bigint } | null> {
+  const client = publicClientFor(a.chainId);
+  const address = getAddress(a.safeAddress);
+  const latest = await client.getBlockNumber();
+  const fromBlock = latest > EXECUTION_LOOKBACK_BLOCKS ? latest - EXECUTION_LOOKBACK_BLOCKS : BigInt(0);
+  const eventNamed = (name: "ExecutionSuccess" | "ExecutionFailure") => {
+    const item = SAFE_ABI.find((i) => i.type === "event" && i.name === name);
+    if (!item || item.type !== "event") throw new SafeError("config", `${name} missing from SAFE_ABI`);
+    return item;
+  };
+  const [successes, failures] = await Promise.all([
+    client.getLogs({
+      address,
+      event: eventNamed("ExecutionSuccess"),
+      args: { txHash: a.safeTxHash },
+      fromBlock,
+      toBlock: latest,
+    }),
+    client.getLogs({
+      address,
+      event: eventNamed("ExecutionFailure"),
+      args: { txHash: a.safeTxHash },
+      fromBlock,
+      toBlock: latest,
+    }),
+  ]);
+  const logs = [
+    ...successes.map((l) => ({ ...l, success: true })),
+    ...failures.map((l) => ({ ...l, success: false })),
+  ].sort((x, y) => (x.blockNumber < y.blockNumber ? -1 : x.blockNumber > y.blockNumber ? 1 : 0));
+  const log = logs[0];
+  if (!log) return null;
+  return { txHash: log.transactionHash, success: log.success, blockNumber: log.blockNumber };
+}
+
 // ---------------------------------------------------------------------------
 // Deployment
 // ---------------------------------------------------------------------------

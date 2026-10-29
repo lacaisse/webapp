@@ -6,9 +6,15 @@ import { getAddress } from "viem";
 import { prisma } from "@/services/db/prisma";
 
 import { isOwnerChangeKind, recordExecuted, tryExecute } from "./proposals";
-import { readSafeState } from "./relayer";
-import { buildSafeTx, recoverSafeTxSigner } from "./safe-tx";
-import { getMultisigTransaction, isTxServiceEnabled } from "./tx-service";
+import { findSafeExecution, readSafeState } from "./relayer";
+import { lc, recoverSafeTxSigner, safeTxFromRow, sameAddress } from "./safe-tx";
+import {
+  confirmTransaction,
+  isTxServiceEnabled,
+  listPendingTransactions,
+  proposeTransaction,
+  type TxServiceMultisigTx,
+} from "./tx-service";
 import { isSafeError, type Address, type Hex, type SafeTxSummary } from "./types";
 
 // Mirror a fund Safe's chain + Safe Transaction Service state into the DB:
@@ -20,8 +26,6 @@ import { isSafeError, type Address, type Hex, type SafeTxSummary } from "./types
 const MIN_SYNC_INTERVAL_MS = 30 * 1000;
 const STALE_EXECUTING_MS = 10 * 60 * 1000;
 const IDLE_RESYNC_MS = 60 * 60 * 1000;
-
-const lc = (a: string) => a.toLowerCase();
 
 function messageOf(e: unknown): string {
   if (isSafeError(e)) return `${e.code}: ${e.message}`;
@@ -71,7 +75,15 @@ export async function syncSafe(a: {
   });
   const ownerSet = new Set(owners.map((o) => lc(o.address)));
 
-  const serviceOn = isTxServiceEnabled(safe.chainId);
+  // The Transaction Service only matters when an owner signs outside La
+  // Caisse: with team-only owners nothing external can ever arrive, so we
+  // don't spend the API quota on it.
+  const ownerRows = await prisma.fundSafeOwner.findMany({
+    where: { safeId: safe.id, removedAt: null, safe: { fundId: a.fundId } },
+    select: { kind: true },
+  });
+  const hasExternal = ownerRows.some((o) => o.kind === "EXTERNAL");
+  const serviceOn = hasExternal && isTxServiceEnabled(safe.chainId);
   let errors = 0;
   let executed = 0;
   let ownersChanged = false;
@@ -82,63 +94,82 @@ export async function syncSafe(a: {
       safe: { fundId: a.fundId },
       status: { in: ["PENDING", "EXECUTING", "FAILED"] },
     },
-    include: { signatures: { select: { ownerAddress: true } } },
+    include: {
+      signatures: { select: { ownerAddress: true, signature: true, source: true } },
+    },
     orderBy: [{ nonce: "asc" }, { createdAt: "asc" }],
   });
+
+  // One read for the whole Safe: its open proposals on the service, by hash.
+  let remoteByHash = new Map<string, TxServiceMultisigTx>();
+  if (serviceOn && txs.some((t) => t.status === "PENDING")) {
+    try {
+      const list = await listPendingTransactions({ chainId: safe.chainId, safeAddress });
+      remoteByHash = new Map(list.map((r) => [lc(r.safeTxHash), r]));
+    } catch (e) {
+      console.warn("[safe-sync] tx-service list failed", safe.id, messageOf(e));
+    }
+  }
 
   const stillPending: { id: string; kind: (typeof txs)[number]["kind"] }[] = [];
 
   for (const tx of txs) {
-    // FAILED rows only matter when the service says they ran after all.
-    let remote: Awaited<ReturnType<typeof getMultisigTransaction>> = null;
-    if (serviceOn) {
+    // (2) The nonce moved past this transaction. Either it executed (ours
+    // with lost bookkeeping, or an owner ran it from Safe{Wallet}) or another
+    // transaction consumed the nonce. The Safe's own ExecutionSuccess /
+    // ExecutionFailure event, indexed by safeTxHash, tells which — no
+    // Transaction Service needed.
+    if (state.nonce > tx.nonce) {
+      let seen: Awaited<ReturnType<typeof findSafeExecution>> = null;
       try {
-        remote = await getMultisigTransaction({ chainId: safe.chainId, safeTxHash: tx.safeTxHash as Hex });
-      } catch (e) {
-        console.warn("[safe-sync] tx-service read failed", tx.id, messageOf(e));
-      }
-    }
-
-    // (2b) executed outside La Caisse (or our own execution whose bookkeeping
-    // was lost) → EXECUTED.
-    if (remote?.isExecuted) {
-      if (remote.isSuccessful === false) {
-        // The Safe consumed the nonce but the inner call reverted.
-        await prisma.fundSafeTransaction.updateMany({
-          where: { id: tx.id, safe: { fundId: a.fundId }, status: { in: ["PENDING", "EXECUTING", "FAILED"] } },
-          data: {
-            status: "FAILED",
-            txHash: remote.transactionHash ?? tx.txHash,
-            errorMessage: "tx_reverted: executed on chain but the call failed",
-          },
+        seen = await findSafeExecution({
+          chainId: safe.chainId,
+          safeAddress,
+          safeTxHash: tx.safeTxHash as Hex,
         });
-        continue;
-      }
-      const remoteHash = remote.transactionHash;
-      const ours = !!tx.txHash && !!remoteHash && lc(tx.txHash) === lc(remoteHash);
-      try {
-        const res = await recordExecuted({
-          fundId: a.fundId,
-          transactionId: tx.id,
-          txHash: remoteHash,
-          executedBy: ours ? "relayer" : "external",
-          executedAt: remote.executionDate ? new Date(remote.executionDate) : new Date(),
-        });
-        if (res.recorded) {
-          executed++;
-          if (isOwnerChangeKind(tx.kind)) ownersChanged = true;
-        }
       } catch (e) {
         errors++;
-        console.error("[safe-sync] record external execution failed", tx.id, e);
+        console.warn("[safe-sync] execution lookup failed", tx.id, messageOf(e));
+        continue; // decide next time rather than supersede on a blind spot
       }
+      if (seen?.success) {
+        try {
+          const res = await recordExecuted({
+            fundId: a.fundId,
+            transactionId: tx.id,
+            txHash: seen.txHash,
+            executedBy: tx.txHash && sameAddress(tx.txHash, seen.txHash) ? "relayer" : "external",
+            executedAt: new Date(),
+          });
+          if (res.recorded) {
+            executed++;
+            if (isOwnerChangeKind(tx.kind)) ownersChanged = true;
+          }
+        } catch (e) {
+          errors++;
+          console.error("[safe-sync] record execution failed", tx.id, e);
+        }
+        continue;
+      }
+      await prisma.fundSafeTransaction.updateMany({
+        where: { id: tx.id, safe: { fundId: a.fundId }, status: { in: ["PENDING", "EXECUTING", "FAILED"] } },
+        data: seen
+          ? {
+              // The Safe consumed the nonce but the inner call reverted.
+              status: "FAILED",
+              txHash: seen.txHash,
+              errorMessage: "tx_reverted: executed on chain but the call failed",
+            }
+          : { status: "SUPERSEDED" },
+      });
       continue;
     }
 
     if (tx.status === "FAILED") continue;
 
     if (tx.status === "EXECUTING") {
-      // Crash recovery: a relayer attempt that never resolved.
+      // Crash recovery: a relayer attempt that never resolved and whose nonce
+      // is still open on chain, i.e. nothing mined.
       if (Date.now() - tx.updatedAt.getTime() > STALE_EXECUTING_MS) {
         await prisma.fundSafeTransaction.updateMany({
           where: { id: tx.id, safe: { fundId: a.fundId }, status: "EXECUTING" },
@@ -148,66 +179,81 @@ export async function syncSafe(a: {
       continue;
     }
 
-    // (3) PENDING whose nonce another transaction consumed.
-    if (state.nonce > tx.nonce) {
-      await prisma.fundSafeTransaction.updateMany({
-        where: { id: tx.id, safe: { fundId: a.fundId }, status: "PENDING" },
-        data: { status: "SUPERSEDED" },
-      });
-      continue;
-    }
-
-    // (2a) import Safe{Wallet} confirmations we don't have yet.
-    if (remote) {
-      const have = new Set(tx.signatures.map((s) => lc(s.ownerAddress)));
-      const safeTx = buildSafeTx({
-        to: tx.to as Address,
-        value: BigInt(tx.value),
-        data: tx.data as Hex,
-        nonce: BigInt(tx.nonce),
-        operation: tx.operation === 1 ? 1 : 0,
-      });
-      for (const c of remote.confirmations ?? []) {
-        // Contract signatures / approved hashes carry no recoverable ECDSA sig.
-        if (!c.signature) continue;
-        const signature = c.signature;
-        let owner: Address;
-        try {
-          owner = getAddress(c.owner);
-        } catch {
-          continue;
+    if (serviceOn) {
+      const remote = remoteByHash.get(lc(tx.safeTxHash));
+      const safeTx = safeTxFromRow(tx);
+      const local = tx.signatures.filter((s) => s.source === "LACAISSE");
+      if (!remote) {
+        // (2c) Never reached the service (proposed before the Safe was
+        // indexed, or an outage): mirror it now with the signatures we hold,
+        // so external owners can see and sign it.
+        const [first, ...rest] = local;
+        if (first) {
+          try {
+            await proposeTransaction({
+              chainId: safe.chainId,
+              safeAddress,
+              tx: safeTx,
+              safeTxHash: tx.safeTxHash as Hex,
+              sender: getAddress(first.ownerAddress),
+              signature: first.signature as Hex,
+            });
+            for (const s of rest) {
+              await confirmTransaction({
+                chainId: safe.chainId,
+                safeTxHash: tx.safeTxHash as Hex,
+                signature: s.signature as Hex,
+              });
+            }
+          } catch (e) {
+            console.warn("[safe-sync] tx-service re-propose failed", tx.id, messageOf(e));
+          }
         }
-        if (have.has(lc(owner)) || !ownerSet.has(lc(owner))) continue;
-        let recovered: Address;
-        try {
-          recovered = await recoverSafeTxSigner({
-            chainId: safe.chainId,
-            safeAddress,
-            tx: safeTx,
-            signature,
-          });
-        } catch (e) {
-          console.warn("[safe-sync] unrecoverable confirmation skipped", tx.id, owner, messageOf(e));
-          continue;
-        }
-        if (lc(recovered) !== lc(owner)) {
-          console.warn("[safe-sync] confirmation signer mismatch skipped", tx.id, owner);
-          continue;
-        }
-        try {
-          await prisma.fundSafeSignature.create({
-            data: {
-              transactionId: tx.id,
-              ownerAddress: owner,
+      } else {
+        // (2a) import Safe{Wallet} confirmations we don't have yet.
+        const have = new Set(tx.signatures.map((s) => lc(s.ownerAddress)));
+        for (const c of remote.confirmations ?? []) {
+          // Contract signatures / approved hashes carry no recoverable ECDSA sig.
+          if (!c.signature) continue;
+          const signature = c.signature;
+          let owner: Address;
+          try {
+            owner = getAddress(c.owner);
+          } catch {
+            continue;
+          }
+          if (have.has(lc(owner)) || !ownerSet.has(lc(owner))) continue;
+          let recovered: Address;
+          try {
+            recovered = await recoverSafeTxSigner({
+              chainId: safe.chainId,
+              safeAddress,
+              tx: safeTx,
               signature,
-              source: "SAFE_WALLET",
-            },
-          });
-          have.add(lc(owner));
-        } catch (e) {
-          if ((e as { code?: string }).code !== "P2002") {
-            errors++;
-            console.error("[safe-sync] confirmation import failed", tx.id, e);
+            });
+          } catch (e) {
+            console.warn("[safe-sync] unrecoverable confirmation skipped", tx.id, owner, messageOf(e));
+            continue;
+          }
+          if (lc(recovered) !== lc(owner)) {
+            console.warn("[safe-sync] confirmation signer mismatch skipped", tx.id, owner);
+            continue;
+          }
+          try {
+            await prisma.fundSafeSignature.create({
+              data: {
+                transactionId: tx.id,
+                ownerAddress: owner,
+                signature,
+                source: "SAFE_WALLET",
+              },
+            });
+            have.add(lc(owner));
+          } catch (e) {
+            if ((e as { code?: string }).code !== "P2002") {
+              errors++;
+              console.error("[safe-sync] confirmation import failed", tx.id, e);
+            }
           }
         }
       }

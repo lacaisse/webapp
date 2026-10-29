@@ -16,6 +16,7 @@ import {
   deploySafe,
   errorTxHash,
   execSafeTransaction,
+  findSafeExecution,
   isRelayerConfigured,
   readSafeState,
 } from "./relayer";
@@ -24,10 +25,13 @@ import {
   buildSafeTx,
   changeThresholdData,
   erc20TransferData,
+  lc,
   packSignatures,
   randomSaltNonce,
   removeOwnerData,
+  safeTxFromRow,
   safeTxHash,
+  sameAddress,
   swapOwnerData,
 } from "./safe-tx";
 import type {
@@ -43,7 +47,6 @@ import {
   isSafeError,
   type Address,
   type Hex,
-  type SafeTx,
   type SafeTxSummary,
 } from "./types";
 
@@ -84,9 +87,6 @@ const OWNER_CHANGE_KINDS: FundSafeTxKind[] = [
 ];
 // A DEPLOYING row older than this is considered crashed and may be retried.
 const STALE_DEPLOYING_MS = 5 * 60 * 1000;
-
-const lc = (a: string) => a.toLowerCase();
-const sameAddress = (a: string, b: string) => lc(a) === lc(b);
 
 // Canonical owner order for deployment (ascending address). Deterministic so
 // a retry with the stored saltNonce predicts the same CREATE2 address and
@@ -247,9 +247,15 @@ async function deployAndActivate(a: {
     });
   } catch (e) {
     console.error("[safe] deployment failed", a.safeId, e);
+    // Keep the broadcast hash (receipt timeout) so the attempt stays traceable.
+    const sent = errorTxHash(e);
     await prisma.fundSafe.update({
       where: { id: a.safeId },
-      data: { status: "FAILED", errorMessage: errorMessageOf(e) },
+      data: {
+        status: "FAILED",
+        errorMessage: errorMessageOf(e),
+        ...(sent ? { deployTxHash: sent } : {}),
+      },
     });
     throw e;
   }
@@ -658,22 +664,6 @@ export async function proposeRejection(a: {
 // Signing + execution
 // ---------------------------------------------------------------------------
 
-function safeTxFromRow(row: {
-  to: string;
-  value: string;
-  data: string;
-  operation: number;
-  nonce: number;
-}): SafeTx {
-  return buildSafeTx({
-    to: row.to as Address,
-    value: BigInt(row.value),
-    data: row.data as Hex,
-    nonce: BigInt(row.nonce),
-    operation: row.operation === 1 ? 1 : 0,
-  });
-}
-
 export async function signTransaction(a: {
   fundId: string;
   transactionId: string;
@@ -762,15 +752,21 @@ export async function tryExecute(a: {
   if (tx.status !== "PENDING") return { executed: false, txHash: null, reason: "not_pending" };
 
   const { safe } = tx;
-  const owners = new Set(safe.owners.map((o) => lc(o.address)));
+  const safeAddress = getAddress(safe.address);
+  // Readiness comes from the chain, not the owner / threshold cache: a
+  // threshold or owner changed in Safe{Wallet} must not stall or revert us.
+  const state = await readSafeState({ chainId: safe.chainId, safeAddress });
+  const owners = new Set(
+    (state.deployed ? state.owners : safe.owners.map((o) => o.address)).map(lc),
+  );
+  const threshold = state.deployed ? state.threshold : safe.threshold;
   const valid = tx.signatures.filter((s) => owners.has(lc(s.ownerAddress)));
-  if (valid.length < safe.threshold) return { executed: false, txHash: null, reason: "threshold" };
+  if (threshold < 1 || valid.length < threshold) {
+    return { executed: false, txHash: null, reason: "threshold" };
+  }
   if (!isRelayerConfigured()) {
     return { executed: false, txHash: null, reason: "relayer_not_configured" };
   }
-
-  const safeAddress = getAddress(safe.address);
-  const state = await readSafeState({ chainId: safe.chainId, safeAddress });
   if (state.nonce !== tx.nonce) return { executed: false, txHash: null, reason: "nonce" };
 
   const claim = await prisma.fundSafeTransaction.updateMany({
@@ -783,7 +779,7 @@ export async function tryExecute(a: {
   // sorts; we pick the first `threshold` of that same order).
   const chosen = [...valid]
     .sort((x, y) => (lc(x.ownerAddress) < lc(y.ownerAddress) ? -1 : 1))
-    .slice(0, safe.threshold);
+    .slice(0, threshold);
 
   let txHash: Hex;
   try {
@@ -798,13 +794,16 @@ export async function tryExecute(a: {
     }));
   } catch (e) {
     console.error("[safe] execution failed", tx.id, errorMessageOf(e));
+    const sent = errorTxHash(e);
+    // Nothing reached the chain (relayer nonce race, RPC hiccup, estimate
+    // failure): the proposal is still perfectly executable, so hand it back
+    // to PENDING for the next attempt instead of parking it as FAILED.
+    const transient = !sent && isSafeError(e) && e.code === "relayer_failed";
     await prisma.fundSafeTransaction.updateMany({
       where: { id: tx.id, safe: { fundId: a.fundId }, status: "EXECUTING" },
-      data: {
-        status: "FAILED",
-        errorMessage: errorMessageOf(e),
-        txHash: errorTxHash(e) ?? null,
-      },
+      data: transient
+        ? { status: "PENDING", errorMessage: errorMessageOf(e) }
+        : { status: "FAILED", errorMessage: errorMessageOf(e), txHash: sent ?? null },
     });
     throw e;
   }
@@ -859,11 +858,29 @@ export async function retryExecution(a: {
   });
   if (!tx) throw new SafeError("not_found", "Transaction not found");
   if (tx.status !== "FAILED") throw new SafeError("invalid_state", "Transaction has not failed");
-  const state = await readSafeState({
-    chainId: tx.safe.chainId,
-    safeAddress: getAddress(tx.safe.address),
-  });
-  if (state.nonce > tx.nonce) throw new SafeError("nonce", "Nonce already used on chain");
+  const safeAddress = getAddress(tx.safe.address);
+  const state = await readSafeState({ chainId: tx.safe.chainId, safeAddress });
+  if (state.nonce > tx.nonce) {
+    // The nonce moved on. Maybe by this very transaction (a mined relayer tx
+    // whose receipt or bookkeeping was lost): the Safe's own execution event
+    // settles it without the Transaction Service.
+    const seen = await findSafeExecution({
+      chainId: tx.safe.chainId,
+      safeAddress,
+      safeTxHash: tx.safeTxHash as Hex,
+    });
+    if (seen?.success) {
+      await recordExecuted({
+        fundId: a.fundId,
+        transactionId: tx.id,
+        txHash: seen.txHash,
+        executedBy: tx.txHash && sameAddress(tx.txHash, seen.txHash) ? "relayer" : "external",
+        executedAt: new Date(),
+      });
+      return { executed: true, txHash: seen.txHash };
+    }
+    throw new SafeError("nonce", "Nonce already used on chain");
+  }
 
   const reset = await prisma.fundSafeTransaction.updateMany({
     where: { id: tx.id, safe: { fundId: a.fundId }, status: "FAILED" },

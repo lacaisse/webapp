@@ -27,6 +27,10 @@ import { SafeAddress } from "./safe-address";
 import { SafesHeaderSkeleton, SafesTableSkeleton } from "./skeleton";
 import { SafeStatusBadge } from "./status-badge";
 
+// Server actions invoked from this route broadcast a Safe transaction and wait
+// for its receipt (relayer.ts, up to 90 s); give them room on Vercel.
+export const maxDuration = 120;
+
 // Safes default to Gnosis; the fund token's chain wins when it's known.
 const DEFAULT_CHAIN_ID = 100;
 
