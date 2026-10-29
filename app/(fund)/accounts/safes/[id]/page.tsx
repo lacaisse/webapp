@@ -42,6 +42,7 @@ import {
   getSafe,
   getSafeBalance,
   getSafeTransfersFirstPage,
+  userHasPasskey,
 } from "../data";
 import { formatNative, isDeployedAddress, isLowGas, thresholdLabel } from "../format";
 import { RetryDeployButton } from "../retry-deploy-button";
@@ -109,13 +110,15 @@ async function SafeDetailView({
   const safe = await getSafe(fund.id, id);
   if (!safe) notFound();
 
-  const [signerAddress, members, recipients, relayer, fundAccounts] = await Promise.all([
-    getCurrentSignerAddress(fund.id, user.id),
-    getEligibleMembers(fund.id),
-    getRecipientOptions(fund.id),
-    getRelayerStatus(safe.chainId),
-    getAccountOptions(fund.id, ""),
-  ]);
+  const [signerAddress, members, recipients, relayer, fundAccounts, hasPasskey] =
+    await Promise.all([
+      getCurrentSignerAddress(fund.id, user.id),
+      getEligibleMembers(fund.id),
+      getRecipientOptions(fund.id),
+      getRelayerStatus(safe.chainId),
+      getAccountOptions(fund.id, ""),
+      userHasPasskey(user.id),
+    ]);
 
   const token = {
     tokenAddress: fund.tokenAddress,
@@ -327,6 +330,7 @@ async function SafeDetailView({
                 balances={balances}
                 fundSymbol={fund.tokenSymbol}
                 extraTokens={extraTokens}
+                hasPasskey={hasPasskey}
               />
             </Suspense>
           )}
@@ -364,6 +368,7 @@ async function SafeDetailView({
                 }
                 canAct={active}
                 rejectionProposed={tx.kind !== "REJECTION" && rejectedNonces.has(tx.nonce)}
+                hasPasskey={hasPasskey}
               />
             ))}
           </div>
@@ -415,6 +420,7 @@ async function SafeDetailView({
             }))}
             currentUserId={user.id}
             canPropose={active}
+            hasPasskey={hasPasskey}
           />
 
           <section className="space-y-3">
@@ -553,6 +559,7 @@ async function ProposeTransferSlot({
   chainId: number;
   threshold: number;
   options: { address: string; label: string; kind: "ACCOUNT" | "CARD" }[];
+  hasPasskey: boolean;
   address: string;
   balances: Promise<SafeBalances>;
   fundSymbol: string | null;

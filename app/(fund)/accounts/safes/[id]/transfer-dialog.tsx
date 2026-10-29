@@ -23,6 +23,7 @@ import { proposeTransferAction } from "@/services/safe/admin-actions";
 import { ProposeTransferSchema, type TransferToken } from "@/services/safe/schemas";
 
 import { sameAddress } from "../format";
+import { useStepUp } from "../reauth-dialog";
 import { ProposalResult } from "./proposal-result";
 
 type RecipientOption = {
@@ -54,12 +55,14 @@ export function ProposeTransferDialog({
   threshold,
   options,
   tokens,
+  hasPasskey,
 }: {
   safeId: string;
   chainId: number;
   threshold: number;
   options: RecipientOption[];
   tokens: TransferTokenOption[];
+  hasPasskey: boolean;
 }) {
   const t = useTranslations("fund.safes.transfer");
   const tRoot = useTranslations();
@@ -75,6 +78,7 @@ export function ProposeTransferDialog({
     executed: boolean;
     txHash: string | null;
   } | null>(null);
+  const stepUp = useStepUp(hasPasskey);
 
   const picked = options.find((o) => sameAddress(o.address, to.trim()));
   const token = tokens.find((tok) => tok.key === tokenKey) ?? tokens[0];
@@ -83,7 +87,7 @@ export function ProposeTransferDialog({
   const cards = options.filter((o) => o.kind === "CARD");
 
   function onOpenChange(next: boolean) {
-    if (pending) return;
+    if (pending || stepUp.pending) return;
     setOpen(next);
     if (!next) {
       setTo("");
@@ -112,6 +116,8 @@ export function ProposeTransferDialog({
     }
     startTransition(async () => {
       const res = await proposeTransferAction(parsed.data);
+      // Not fresh enough: confirm identity, then the same submit again.
+      if (stepUp.check(res, onSubmit)) return;
       // Refresh on errors too: the proposal may exist and be marked FAILED
       // (execution reverted), and should show up in the pending list.
       router.refresh();
@@ -279,6 +285,7 @@ export function ProposeTransferDialog({
             </>
           )}
         </DialogFooter>
+        {stepUp.dialog}
       </DialogContent>
     </Dialog>
   );

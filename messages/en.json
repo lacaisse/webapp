@@ -102,7 +102,11 @@
       "signInFailed": "Sign-in failed.",
       "sessionExpired": "Sign-in session expired. Try again.",
       "establishSessionFailed": "Could not establish session.",
-      "incorrectPassword": "Your current password is incorrect."
+      "incorrectPassword": "Your current password is incorrect.",
+      "tooManyAttempts": "Too many attempts. Wait a minute before trying again.",
+      "noPassword": "This account has no password. Use your passkey.",
+      "signupEmailMismatch": "The invitation was sent to another email address. Create the account with the invited address.",
+      "accountExists": "An account already exists for this email address. Sign in, or reset your password if that account isn't yours."
     },
     "emails": {
       "resetPassword": {
@@ -532,7 +536,18 @@
         "thresholdTooHigh": "The threshold cannot exceed the number of owners.",
         "noteTooLong": "The note is too long (200 characters max).",
         "ownerRequired": "Pick a member or enter an address.",
-        "duplicateOwner": "The same address is listed twice."
+        "duplicateOwner": "The same address is listed twice.",
+        "reauth_required": "Confirm it's you to continue."
+      },
+      "reauth": {
+        "title": "Confirm it's you",
+        "description": "Proposing or signing a Safe transaction needs a fresh confirmation that it's really you. It stays valid for 10 minutes.",
+        "password": "Password",
+        "confirm": "Confirm",
+        "confirming": "Checking…",
+        "passkeyButton": "Confirm with a passkey",
+        "passkeyWaiting": "Waiting for passkey…",
+        "passkeyFailed": "The passkey could not be verified."
       }
     },
     "team": {
@@ -2726,7 +2741,8 @@
       "lastOwner": "This is the only owner — promote someone else to owner first.",
       "inviteInvalid": "This invitation is invalid or has already been used.",
       "inviteExpired": "This invitation has expired. Ask an administrator to send a new one.",
-      "emailMismatch": "This invitation was sent to a different email address."
+      "emailMismatch": "This invitation was sent to a different email address.",
+      "unverifiedPreexisting": "This account existed before the invitation and its email address was never confirmed. Reset your password from the sign-in page to confirm it, then accept the invitation again."
     }
   },
   "joinTeam": {

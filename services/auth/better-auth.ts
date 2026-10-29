@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import "server-only";
 import { betterAuth } from "better-auth";
+import { createAuthMiddleware } from "better-auth/api";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
 import { jwt } from "better-auth/plugins";
@@ -10,6 +11,7 @@ import { getTranslations } from "next-intl/server";
 import { prisma } from "@/services/db/prisma";
 import { sendEmail } from "@/services/email/resend";
 import { MCP_SCOPES, mcpResourceForOrigin } from "@/services/mcp/resource";
+import { buildRecentAuthCookie } from "@/services/auth/recent-auth";
 
 // Better Auth replaces Supabase Auth as the identity layer. Postgres stays —
 // Supabase is only the host; queries still go through Prisma. Each host gets
@@ -51,6 +53,11 @@ const WILDCARD_ORIGIN = `${APP_SCHEME}://*.${APP_DOMAIN}${PORT_SUFFIX}`;
 // tokens are verified per host. `enforcePerClientResources` is therefore off:
 // any registered client may target any enabled resource row.
 const MCP_RESOURCE = mcpResourceForOrigin(APEX_ORIGIN);
+
+// Whether a session needs a verified email (Better Auth's
+// `requireEmailVerification`). Exported for the invite rule, which is moot
+// once this is on.
+export const REQUIRE_EMAIL_VERIFICATION = false;
 
 export const auth = betterAuth({
   baseURL: AUTH_HOST,
@@ -94,9 +101,35 @@ export const auth = betterAuth({
     enabled: true,
     // Verification gated off — flip to true and add `sendVerificationEmail`
     // when product wants it. Today's flow signs the user in immediately
-    // after sign-up.
-    requireEmailVerification: false,
+    // after sign-up. `requireEmailVerification` is also read by the invite
+    // rule in services/fund-team/invite-rules.ts; keep REQUIRE_EMAIL_
+    // VERIFICATION below in step.
+    requireEmailVerification: REQUIRE_EMAIL_VERIFICATION,
     minPasswordLength: 8,
+    // The public `/api/auth/sign-up/email` is closed on every host (review
+    // S5: anyone could register a colleague's address ahead of their invite
+    // and share the account). Accounts are created only by the sign-up
+    // server action, bound to a live invite for that exact email
+    // (services/auth/signup.ts). Sign-in is unaffected, and so is the MCP
+    // OAuth login resume, which rides on sign-in.
+    disableSignUp: true,
+    // A password reset signs the user out everywhere: the reset is the
+    // recovery path for a compromised or pre-registered account, and an
+    // attacker's live sessions must not outlive it.
+    revokeSessionsOnPasswordReset: true,
+    // The reset link reached the inbox, so the resetting user controls the
+    // email: mark it verified (that is what the invite rule asks of an
+    // account that predates its invite). If nobody had verified it before,
+    // any passkey on it is of unknown provenance — the account may have
+    // been registered by someone else — so those are dropped too; a
+    // verified account keeps its passkeys as a normal reset would.
+    onPasswordReset: async ({ user }) => {
+      if (user.emailVerified) return;
+      await prisma.$transaction([
+        prisma.passkey.deleteMany({ where: { userId: user.id } }),
+        prisma.user.update({ where: { id: user.id }, data: { emailVerified: true } }),
+      ]);
+    },
 
     sendResetPassword: async ({ user, url }) => {
       // url is `${AUTH_HOST}/reset-password?token=…` (callbackURL passed
@@ -111,6 +144,31 @@ export const auth = betterAuth({
         html: `<p>${text.replace(/\n/g, "</p><p>")}</p>`,
       });
     },
+  },
+
+  hooks: {
+    // Step-up by passkey (review S4). The plugin's assertion endpoint
+    // creates a new session for the passkey's user on this host; when it
+    // did, also record that authentication as a step-up proof bound to
+    // that new session — the Safe actions check it (services/auth/step-
+    // up.ts). A user who re-asserts their own passkey keeps working as
+    // themselves with a fresh proof; the password path has its own action.
+    after: createAuthMiddleware(async (ctx) => {
+      if (ctx.path !== "/passkey/verify-authentication") return;
+      const fresh = ctx.context.newSession;
+      if (!fresh) return;
+      const cookie = buildRecentAuthCookie(
+        {
+          userId: fresh.user.id,
+          sessionToken: fresh.session.token,
+          host: ctx.headers?.get("host") ?? "",
+          method: "passkey",
+        },
+        ctx.context.secret,
+        isProd,
+      );
+      ctx.setCookie(cookie.name, cookie.value, cookie.attributes);
+    }),
   },
 
   plugins: [

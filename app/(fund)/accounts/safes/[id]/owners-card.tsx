@@ -44,6 +44,7 @@ import {
 
 import { clampThreshold, sameAddress, shortAddress, thresholdLabel } from "../format";
 import { OwnerAvatar } from "../owner-avatar";
+import { useStepUp } from "../reauth-dialog";
 import { SafeAddress } from "../safe-address";
 import { ThresholdStepper } from "../threshold-stepper";
 import { ProposalResult } from "./proposal-result";
@@ -71,6 +72,7 @@ type Shared = {
   chainId: number;
   threshold: number;
   owners: OwnerRow[];
+  hasPasskey: boolean;
 };
 
 const SELECT_CLASS =
@@ -84,6 +86,7 @@ export function OwnersCard({
   chainId,
   threshold,
   owners,
+  hasPasskey,
   members,
   currentUserId,
   canPropose,
@@ -94,7 +97,7 @@ export function OwnersCard({
 }) {
   const t = useTranslations("fund.safes.owners");
   const tSafes = useTranslations("fund.safes");
-  const shared = { safeId, chainId, threshold, owners };
+  const shared = { safeId, chainId, threshold, owners, hasPasskey };
 
   // Staff not yet owning this Safe (by user or by their signer address).
   const addable = members.filter(
@@ -168,7 +171,7 @@ export function OwnersCard({
 }
 
 // One propose-owner-change round trip, shared by the three dialogs.
-function useOwnerChange(safeId: string) {
+function useOwnerChange(safeId: string, hasPasskey: boolean) {
   const tRoot = useTranslations();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -177,6 +180,7 @@ function useOwnerChange(safeId: string) {
     executed: boolean;
     txHash: string | null;
   } | null>(null);
+  const stepUp = useStepUp(hasPasskey);
 
   function submit(change: OwnerChangeInput) {
     setError(null);
@@ -187,6 +191,8 @@ function useOwnerChange(safeId: string) {
     }
     startTransition(async () => {
       const res = await proposeOwnerChangeAction(parsed.data);
+      // Not fresh enough: confirm identity, then the same change again.
+      if (stepUp.check(res, () => submit(change))) return;
       // Refresh on errors too: the proposal may exist and be marked FAILED.
       router.refresh();
       if ("error" in res) {
@@ -202,7 +208,7 @@ function useOwnerChange(safeId: string) {
     setResult(null);
   }
 
-  return { pending, error, result, submit, reset };
+  return { pending: pending || stepUp.pending, error, result, submit, reset, stepUp };
 }
 
 // Footer + body pieces every owner dialog shares.
@@ -240,6 +246,7 @@ function ChangeDialogBody({
           <AlertDescription>{flow.error}</AlertDescription>
         </Alert>
       )}
+      {flow.stepUp.dialog}
     </div>
   );
 }
@@ -291,10 +298,11 @@ function AddOwnerDialog({
   chainId,
   threshold,
   owners,
+  hasPasskey,
   members,
 }: Shared & { members: MemberOption[] }) {
   const t = useTranslations("fund.safes.ownerChange");
-  const flow = useOwnerChange(safeId);
+  const flow = useOwnerChange(safeId, hasPasskey);
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"member" | "external">(
     members.length > 0 ? "member" : "external",
@@ -443,11 +451,12 @@ function RemoveOwnerDialog({
   chainId,
   threshold,
   owners,
+  hasPasskey,
   owner,
   isYou,
 }: Shared & { owner: OwnerRow; isYou: boolean }) {
   const t = useTranslations("fund.safes.ownerChange");
-  const flow = useOwnerChange(safeId);
+  const flow = useOwnerChange(safeId, hasPasskey);
   const remaining = owners.length - 1;
   const initial = clampThreshold(threshold, remaining);
   const [open, setOpen] = useState(false);
@@ -523,9 +532,9 @@ function RemoveOwnerDialog({
   );
 }
 
-function ChangeThresholdDialog({ safeId, chainId, threshold, owners }: Shared) {
+function ChangeThresholdDialog({ safeId, chainId, threshold, owners, hasPasskey }: Shared) {
   const t = useTranslations("fund.safes.ownerChange");
-  const flow = useOwnerChange(safeId);
+  const flow = useOwnerChange(safeId, hasPasskey);
   const [open, setOpen] = useState(false);
   const [newThreshold, setNewThreshold] = useState(threshold);
   const value = clampThreshold(newThreshold, owners.length);
