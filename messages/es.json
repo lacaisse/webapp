@@ -90,7 +90,18 @@
       "tooManyAttempts": "Demasiados intentos. Espere un minuto antes de volver a intentarlo.",
       "noPassword": "Esta cuenta no tiene contraseña. Use su passkey.",
       "signupEmailMismatch": "La invitación se envió a otra dirección de correo. Cree la cuenta con la dirección invitada.",
-      "accountExists": "Ya existe una cuenta con esta dirección de correo. Inicie sesión o restablezca su contraseña si esa cuenta no es suya."
+      "accountExists": "Ya existe una cuenta con esta dirección de correo. Inicie sesión o restablezca su contraseña si esa cuenta no es suya.",
+      "reauthRequired": "Confirme su identidad para continuar."
+    },
+    "reauth": {
+      "title": "Confirme su identidad",
+      "description": "Esta acción necesita una confirmación reciente de que es usted. Sigue siendo válida durante 10 minutos.",
+      "password": "Contraseña",
+      "confirm": "Confirmar",
+      "confirming": "Comprobando…",
+      "passkeyButton": "Confirmar con una passkey",
+      "passkeyWaiting": "Esperando la passkey…",
+      "passkeyFailed": "No se pudo verificar la passkey."
     },
     "emails": {
       "resetPassword": {
@@ -530,20 +541,9 @@
         "noteTooLong": "La nota es demasiado larga (máx. 200 caracteres).",
         "ownerRequired": "Elige un miembro o introduce una dirección.",
         "duplicateOwner": "La misma dirección aparece dos veces.",
-        "reauth_required": "Confirme su identidad para continuar.",
         "addressChecksum": "La dirección tiene una mayúscula incorrecta (suma de verificación). Compruébela o péguela en minúsculas.",
         "queue_full": "Demasiadas transacciones abiertas en este Safe. Haga firmar, rechazar o retirar las propuestas abiertas primero.",
         "holds_value": "Este Safe aún contiene fondos que solo los miembros del equipo pueden mover. Vacíelo antes de archivarlo."
-      },
-      "reauth": {
-        "title": "Confirme su identidad",
-        "description": "Para proponer o firmar una transacción de un Safe hace falta una confirmación reciente de que es usted. Sigue siendo válida durante 10 minutos.",
-        "password": "Contraseña",
-        "confirm": "Confirmar",
-        "confirming": "Comprobando…",
-        "passkeyButton": "Confirmar con una passkey",
-        "passkeyWaiting": "Esperando la passkey…",
-        "passkeyFailed": "No se pudo verificar la passkey."
       },
       "archived": {
         "title": "Safes archivados",

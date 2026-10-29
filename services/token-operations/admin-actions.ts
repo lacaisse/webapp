@@ -5,12 +5,15 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireFundRole } from "@/services/auth/dal";
+import { hasRecentAuth } from "@/services/auth/step-up";
+import { REAUTH_REQUIRED, type ReauthRequiredError } from "@/services/auth/step-up-types";
 import { getCitizenPayClient } from "@/services/citizenpay/client";
 import { prisma } from "@/services/db/prisma";
 import { ANNOTATION_TRIGGERS } from "@/services/transaction-annotation/annotate";
 import { resolveOrEnqueueAnnotation } from "@/services/transaction-annotation/pending";
 
-import { burnDirect, mintDirect, type DirectAudit } from "./direct";
+import { burnDirect, mintDirect } from "./direct";
+import { ManualBurnFormSchema, ManualMintFormSchema } from "./schemas";
 
 export type ManualMintResult =
   | { ok: true }
@@ -123,58 +126,96 @@ export async function manualMintAction(input: {
 // (services/token/userop.ts), NOT CP's REST submitMint, because the
 // recipient may not be a CP-registered card. Creates a TokenOperation
 // row for audit regardless of outcome.
+//
+// These two are the operator-facing doors only. Internal flows that mint or
+// burn with their own audit trigger (fund account moves in
+// services/token-account/admin-actions.ts, payout settlement and order
+// reconcile in services/payout/operations.ts) call `mintDirect` / `burnDirect`
+// (services/token-operations/direct.ts) themselves, so the step-up gate below
+// and the required note never apply to them.
 
 export type ManualMintDirectResult =
   | { ok: true; txHash: string; userOpHash: string }
-  | { error: string; field?: "to" | "amount" | "note" };
+  | { error: string; field?: "to" | "amount" | "note" }
+  | ReauthRequiredError;
+
+export type ManualBurnDirectResult =
+  | { ok: true; txHash: string; userOpHash: string }
+  | { error: string; field?: "from" | "amount" | "note" }
+  | ReauthRequiredError;
+
+// Step-up (review S4): a manual mint or burn moves real tokens, so a session
+// cookie alone is not enough — the operator must have re-entered their
+// password or asserted a passkey within the last 10 minutes
+// (services/auth/step-up.ts). Checked after the role and input checks,
+// before anything is written; the /token dialogs understand the code.
+async function requireStepUp(
+  t: Awaited<ReturnType<typeof getTranslations>>,
+): Promise<ReauthRequiredError | null> {
+  if (await hasRecentAuth()) return null;
+  return { error: t("auth.errors.reauthRequired" as never), code: REAUTH_REQUIRED };
+}
 
 // Host-scoped wrapper around `mintDirect` (services/token-operations/direct.ts),
 // which holds the actual implementation so MCP tools — where the fund is a
-// parameter, not the request host — run the exact same code path. `audit`
-// carries the caller's ANNOTATION_TRIGGERS entry; a raw /token call has none
-// and must supply a note instead.
-export async function manualMintDirectAction(
-  input: {
-    to: string;
-    amount: string;
-    note?: string;
-  },
-  audit?: DirectAudit,
-): Promise<ManualMintDirectResult> {
+// parameter, not the request host — run the exact same code path. A raw
+// /token call carries no audit trigger and must supply a note instead.
+export async function manualMintDirectAction(input: {
+  to: string;
+  amount: string;
+  note?: string;
+}): Promise<ManualMintDirectResult> {
   const t = await getTranslations();
   const { fund, user } = await requireFundRole("ADMIN");
+
+  const parsed = ManualMintFormSchema.safeParse(input);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return {
+      error: t(issue.message as never),
+      field: issue.path[0] as "to" | "amount" | "note" | undefined,
+    };
+  }
+
+  const stepUp = await requireStepUp(t);
+  if (stepUp) return stepUp;
+
   return mintDirect(
     {
       fund,
       userId: user.id,
       t: (key, values) => t(key as never, values as never),
     },
-    input,
-    audit,
+    parsed.data,
   );
 }
 
-export type ManualBurnDirectResult =
-  | { ok: true; txHash: string; userOpHash: string }
-  | { error: string; field?: "from" | "amount" | "note" };
-
-export async function manualBurnDirectAction(
-  input: {
-    from: string;
-    amount: string;
-    note?: string;
-  },
-  audit?: DirectAudit,
-): Promise<ManualBurnDirectResult> {
+export async function manualBurnDirectAction(input: {
+  from: string;
+  amount: string;
+  note?: string;
+}): Promise<ManualBurnDirectResult> {
   const t = await getTranslations();
   const { fund, user } = await requireFundRole("ADMIN");
+
+  const parsed = ManualBurnFormSchema.safeParse(input);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return {
+      error: t(issue.message as never),
+      field: issue.path[0] as "from" | "amount" | "note" | undefined,
+    };
+  }
+
+  const stepUp = await requireStepUp(t);
+  if (stepUp) return stepUp;
+
   return burnDirect(
     {
       fund,
       userId: user.id,
       t: (key, values) => t(key as never, values as never),
     },
-    input,
-    audit,
+    parsed.data,
   );
 }

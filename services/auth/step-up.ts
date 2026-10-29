@@ -12,10 +12,11 @@ import {
 } from "./recent-auth";
 
 // Step-up authentication, request side (the pure proof lives in
-// ./recent-auth.ts). Sensitive server actions — today the Safe proposals and
-// signatures — call `hasRecentAuth()` after their role check and answer
-// `reauth_required` when it is false; the client then opens the re-auth
-// dialog (app/(fund)/accounts/safes/reauth-dialog.tsx) and retries.
+// ./recent-auth.ts). Sensitive server actions — the Safe proposals and
+// signatures, the manual mint/burn on /token — call `hasRecentAuth()` after
+// their role and input checks and answer `reauth_required` when it is false
+// (services/auth/step-up-types.ts); the client then opens the re-auth dialog
+// (components/reauth-dialog.tsx) and retries.
 
 const isProd = process.env.NODE_ENV === "production";
 

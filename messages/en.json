@@ -106,7 +106,18 @@
       "tooManyAttempts": "Too many attempts. Wait a minute before trying again.",
       "noPassword": "This account has no password. Use your passkey.",
       "signupEmailMismatch": "The invitation was sent to another email address. Create the account with the invited address.",
-      "accountExists": "An account already exists for this email address. Sign in, or reset your password if that account isn't yours."
+      "accountExists": "An account already exists for this email address. Sign in, or reset your password if that account isn't yours.",
+      "reauthRequired": "Confirm it's you to continue."
+    },
+    "reauth": {
+      "title": "Confirm it's you",
+      "description": "This action needs a fresh confirmation that it's really you. It stays valid for 10 minutes.",
+      "password": "Password",
+      "confirm": "Confirm",
+      "confirming": "Checking…",
+      "passkeyButton": "Confirm with a passkey",
+      "passkeyWaiting": "Waiting for passkey…",
+      "passkeyFailed": "The passkey could not be verified."
     },
     "emails": {
       "resetPassword": {
@@ -547,20 +558,9 @@
         "noteTooLong": "The note is too long (200 characters max).",
         "ownerRequired": "Pick a member or enter an address.",
         "duplicateOwner": "The same address is listed twice.",
-        "reauth_required": "Confirm it's you to continue.",
         "addressChecksum": "The address has a wrong capital letter (checksum). Check it, or paste it in lowercase.",
         "queue_full": "Too many open transactions on this Safe. Have the open proposals signed, rejected or withdrawn first.",
         "holds_value": "This Safe still holds funds that only team members can move. Empty it before archiving."
-      },
-      "reauth": {
-        "title": "Confirm it's you",
-        "description": "Proposing or signing a Safe transaction needs a fresh confirmation that it's really you. It stays valid for 10 minutes.",
-        "password": "Password",
-        "confirm": "Confirm",
-        "confirming": "Checking…",
-        "passkeyButton": "Confirm with a passkey",
-        "passkeyWaiting": "Waiting for passkey…",
-        "passkeyFailed": "The passkey could not be verified."
       },
       "archived": {
         "title": "Archived Safes",

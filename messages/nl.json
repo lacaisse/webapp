@@ -90,7 +90,18 @@
       "tooManyAttempts": "Te veel pogingen. Wacht een minuut voordat u het opnieuw probeert.",
       "noPassword": "Dit account heeft geen wachtwoord. Gebruik uw passkey.",
       "signupEmailMismatch": "De uitnodiging is naar een ander e-mailadres gestuurd. Maak het account aan met het uitgenodigde adres.",
-      "accountExists": "Er bestaat al een account voor dit e-mailadres. Meld u aan, of stel uw wachtwoord opnieuw in als dat account niet van u is."
+      "accountExists": "Er bestaat al een account voor dit e-mailadres. Meld u aan, of stel uw wachtwoord opnieuw in als dat account niet van u is.",
+      "reauthRequired": "Bevestig uw identiteit om door te gaan."
+    },
+    "reauth": {
+      "title": "Bevestig uw identiteit",
+      "description": "Voor deze actie is een recente bevestiging nodig dat u het echt bent. Die blijft 10 minuten geldig.",
+      "password": "Wachtwoord",
+      "confirm": "Bevestigen",
+      "confirming": "Controleren…",
+      "passkeyButton": "Bevestigen met een passkey",
+      "passkeyWaiting": "Wachten op passkey…",
+      "passkeyFailed": "De passkey kon niet worden geverifieerd."
     },
     "emails": {
       "resetPassword": {
@@ -530,20 +541,9 @@
         "noteTooLong": "De notitie is te lang (max. 200 tekens).",
         "ownerRequired": "Kies een teamlid of voer een adres in.",
         "duplicateOwner": "Hetzelfde adres staat er twee keer in.",
-        "reauth_required": "Bevestig uw identiteit om door te gaan.",
         "addressChecksum": "Het adres bevat een verkeerde hoofdletter (controlesom). Controleer het of plak het in kleine letters.",
         "queue_full": "Te veel openstaande transacties op deze Safe. Laat de open voorstellen eerst ondertekenen, afwijzen of intrekken.",
         "holds_value": "Deze Safe bevat nog tegoeden die alleen teamleden kunnen verplaatsen. Maak hem leeg voordat u archiveert."
-      },
-      "reauth": {
-        "title": "Bevestig uw identiteit",
-        "description": "Om een Safe-transactie voor te stellen of te ondertekenen is een recente bevestiging nodig dat u het echt bent. Die blijft 10 minuten geldig.",
-        "password": "Wachtwoord",
-        "confirm": "Bevestigen",
-        "confirming": "Controleren…",
-        "passkeyButton": "Bevestigen met een passkey",
-        "passkeyWaiting": "Wachten op passkey…",
-        "passkeyFailed": "De passkey kon niet worden geverifieerd."
       },
       "archived": {
         "title": "Gearchiveerde Safes",

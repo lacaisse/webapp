@@ -81,7 +81,7 @@ function errorFor(t: T, e: unknown, context: string): string {
 // checks, before anything is written; the dialogs understand the code.
 async function requireStepUp(t: T): Promise<ActionError | null> {
   if (await hasRecentAuth()) return null;
-  return { error: t("fund.safes.errors.reauth_required" as never), code: REAUTH_REQUIRED };
+  return { error: t("auth.errors.reauthRequired" as never), code: REAUTH_REQUIRED };
 }
 
 function revalidateSafe(safeId?: string) {

@@ -6,6 +6,7 @@ import { getTranslations } from "next-intl/server";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, resolveActiveTab } from "@/components/ui/tabs";
 import { requireFundRole } from "@/services/auth/dal";
+import { userHasPasskey } from "@/services/auth/passkeys";
 import { requireCurrentFund } from "@/services/fund/server";
 
 import { HoldersTable } from "./holders-table";
@@ -42,9 +43,12 @@ export default async function TokenExplorerPage({
 }: {
   searchParams: Promise<{ tab?: string; cursor?: string; page?: string }>;
 }) {
-  await requireFundRole("ADMIN");
+  const { user } = await requireFundRole("ADMIN");
   const t = await getTranslations("fund.token");
   const fund = await requireCurrentFund();
+  // The mint/burn actions ask for a step-up (services/auth/step-up.ts); the
+  // re-auth dialog offers the passkey only to users who registered one.
+  const hasPasskey = await userHasPasskey(user.id);
   const sp = await searchParams;
   const active = resolveActiveTab(sp.tab, TABS);
   const pageNum = Math.max(1, Number.parseInt(sp.page ?? "1", 10) || 1);
@@ -76,8 +80,8 @@ export default async function TokenExplorerPage({
           </div>
           {hasToken && (
             <div className="flex shrink-0 items-center gap-2">
-              <ManualMintButton symbol={fund.tokenSymbol} />
-              <ManualBurnButton symbol={fund.tokenSymbol} />
+              <ManualMintButton symbol={fund.tokenSymbol} hasPasskey={hasPasskey} />
+              <ManualBurnButton symbol={fund.tokenSymbol} hasPasskey={hasPasskey} />
             </div>
           )}
         </div>

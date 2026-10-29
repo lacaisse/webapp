@@ -44,7 +44,7 @@ import {
 
 import { clampThreshold, sameAddress, shortAddress, thresholdLabel } from "../format";
 import { OwnerAvatar } from "../owner-avatar";
-import { useStepUp } from "../reauth-dialog";
+import { useStepUp } from "@/components/reauth-dialog";
 import { SafeAddress } from "../safe-address";
 import { ThresholdStepper } from "../threshold-stepper";
 import { CustodyNote } from "../safe-create-form";

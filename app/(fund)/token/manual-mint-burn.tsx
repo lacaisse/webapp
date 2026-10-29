@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useStepUp } from "@/components/reauth-dialog";
 import {
   manualBurnDirectAction,
   manualMintDirectAction,
@@ -46,22 +47,31 @@ import {
 // services/token-operations/admin-actions.ts → services/token/userop.ts.
 // The dialog itself doubles as the confirmation step for burn — the
 // destructive button is only inside, not on the page surface.
+//
+// Both actions ask for a step-up (review S4): without a re-authentication in
+// the last 10 minutes they answer `reauth_required`, `useStepUp` opens the
+// re-auth dialog on top of this one and runs the same submit again once the
+// operator confirmed. `hasPasskey` is loaded by the page (server-side) and
+// only decides whether the dialog offers the passkey next to the password.
 
-export function ManualMintButton({ symbol }: { symbol: string | null }) {
-  return <MintDialog symbol={symbol} />;
+type ManualButtonProps = { symbol: string | null; hasPasskey: boolean };
+
+export function ManualMintButton(props: ManualButtonProps) {
+  return <MintDialog {...props} />;
 }
 
-export function ManualBurnButton({ symbol }: { symbol: string | null }) {
-  return <BurnDialog symbol={symbol} />;
+export function ManualBurnButton(props: ManualButtonProps) {
+  return <BurnDialog {...props} />;
 }
 
-function MintDialog({ symbol }: { symbol: string | null }) {
+function MintDialog({ symbol, hasPasskey }: ManualButtonProps) {
   const t = useTranslations("fund.token.manual.mint");
   const tRoot = useTranslations();
   const pickerLabels = useRecipientPickerLabels("to");
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [txHash, setTxHash] = useState<string | null>(null);
+  const stepUp = useStepUp(hasPasskey);
 
   const form = useForm<ManualMintDirectInput>({
     resolver: zodResolver(ManualMintFormSchema),
@@ -80,6 +90,8 @@ function MintDialog({ symbol }: { symbol: string | null }) {
   const onSubmit = (data: ManualMintDirectInput) =>
     startTransition(async () => {
       const result = await manualMintDirectAction(data);
+      // Not fresh enough: confirm identity, then the same submit again.
+      if (stepUp.check(result, () => onSubmit(data))) return;
       if ("error" in result) {
         if (result.field) {
           form.setError(result.field, { message: result.error });
@@ -163,18 +175,20 @@ function MintDialog({ symbol }: { symbol: string | null }) {
             </DialogFooter>
           </form>
         )}
+        {stepUp.dialog}
       </DialogContent>
     </Dialog>
   );
 }
 
-function BurnDialog({ symbol }: { symbol: string | null }) {
+function BurnDialog({ symbol, hasPasskey }: ManualButtonProps) {
   const t = useTranslations("fund.token.manual.burn");
   const tRoot = useTranslations();
   const pickerLabels = useRecipientPickerLabels("from");
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [txHash, setTxHash] = useState<string | null>(null);
+  const stepUp = useStepUp(hasPasskey);
 
   const form = useForm<ManualBurnDirectInput>({
     resolver: zodResolver(ManualBurnFormSchema),
@@ -193,6 +207,7 @@ function BurnDialog({ symbol }: { symbol: string | null }) {
   const onSubmit = (data: ManualBurnDirectInput) =>
     startTransition(async () => {
       const result = await manualBurnDirectAction(data);
+      if (stepUp.check(result, () => onSubmit(data))) return;
       if ("error" in result) {
         if (result.field) {
           form.setError(result.field, { message: result.error });
@@ -280,6 +295,7 @@ function BurnDialog({ symbol }: { symbol: string | null }) {
             </DialogFooter>
           </form>
         )}
+        {stepUp.dialog}
       </DialogContent>
     </Dialog>
   );

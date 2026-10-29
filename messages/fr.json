@@ -106,7 +106,18 @@
       "tooManyAttempts": "Trop de tentatives. Patientez une minute avant de réessayer.",
       "noPassword": "Ce compte n'a pas de mot de passe. Utilisez votre passkey.",
       "signupEmailMismatch": "L'invitation a été envoyée à une autre adresse email. Créez le compte avec l'adresse invitée.",
-      "accountExists": "Un compte existe déjà pour cette adresse email. Connectez-vous, ou réinitialisez votre mot de passe si ce compte n'est pas le vôtre."
+      "accountExists": "Un compte existe déjà pour cette adresse email. Connectez-vous, ou réinitialisez votre mot de passe si ce compte n'est pas le vôtre.",
+      "reauthRequired": "Confirmez votre identité pour continuer."
+    },
+    "reauth": {
+      "title": "Confirmez votre identité",
+      "description": "Pour continuer, confirmez que c'est bien vous. Cette confirmation reste valable 10 minutes.",
+      "password": "Mot de passe",
+      "confirm": "Confirmer",
+      "confirming": "Vérification…",
+      "passkeyButton": "Confirmer avec une passkey",
+      "passkeyWaiting": "En attente de la passkey…",
+      "passkeyFailed": "La passkey n'a pas pu être vérifiée."
     },
     "emails": {
       "resetPassword": {
@@ -547,20 +558,9 @@
         "noteTooLong": "La note est trop longue (200 caractères max.).",
         "ownerRequired": "Choisissez un membre ou saisissez une adresse.",
         "duplicateOwner": "La même adresse figure deux fois.",
-        "reauth_required": "Confirmez votre identité pour continuer.",
         "addressChecksum": "L'adresse contient une majuscule incorrecte (somme de contrôle). Vérifiez-la ou collez-la en minuscules.",
         "queue_full": "Trop de transactions en attente sur ce Safe. Faites signer, rejeter ou retirer les propositions ouvertes d'abord.",
         "holds_value": "Ce Safe détient encore des fonds que seuls les membres de l'équipe peuvent déplacer. Videz-le avant de l'archiver."
-      },
-      "reauth": {
-        "title": "Confirmez votre identité",
-        "description": "Pour proposer ou signer une transaction d'un Safe, confirmez que c'est bien vous. Cette confirmation reste valable 10 minutes.",
-        "password": "Mot de passe",
-        "confirm": "Confirmer",
-        "confirming": "Vérification…",
-        "passkeyButton": "Confirmer avec une passkey",
-        "passkeyWaiting": "En attente de la passkey…",
-        "passkeyFailed": "La passkey n'a pas pu être vérifiée."
       },
       "archived": {
         "title": "Safes archivés",

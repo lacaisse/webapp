@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, resolveActiveTab } from "@/components/ui/tabs";
 import { requireFundRole } from "@/services/auth/dal";
+import { userHasPasskey } from "@/services/auth/passkeys";
 import { syncSafe } from "@/services/safe/sync";
 import {
   explorerAddressUrl,
@@ -42,7 +43,6 @@ import {
   getSafe,
   getSafeBalance,
   getSafeTransfersFirstPage,
-  userHasPasskey,
 } from "../data";
 import { formatNative, isDeployedAddress, isLowGas, thresholdLabel } from "../format";
 import { RetryDeployButton } from "../retry-deploy-button";
