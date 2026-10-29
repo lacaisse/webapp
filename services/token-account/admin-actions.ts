@@ -27,6 +27,7 @@ import {
   RenameTokenAccountSchema,
   TransferTokensSchema,
 } from "./schemas";
+import { scheduleAccountNamePublish } from "./publish-name";
 import { fundAccountSerial } from "./serial";
 import {
   loadAccountTransfers,
@@ -124,6 +125,14 @@ export async function createTokenAccountAction(input: {
     return { error: t("fund.accounts.errors.createFailed" as never) };
   }
 
+  // A SOURCE account's name is what the public card wallet shows for the cards
+  // it backs ("Covered by <name>"). registerCard doesn't set it, so publish it
+  // to CP's account profile — deferred with after() and best-effort: our row
+  // is the record, and a CP failure is logged and never fails the create.
+  if (serial) {
+    scheduleAccountNamePublish(fund, { serial, name: parsed.data.name });
+  }
+
   revalidatePath("/accounts");
   refresh();
   return { ok: true };
@@ -141,13 +150,27 @@ export async function renameTokenAccountAction(input: {
     return { error: t(parsed.error.issues[0].message as never) };
   }
 
-  // Scope the write to this fund so an admin can't touch another fund's row.
-  const res = await prisma.fundTokenAccount.updateMany({
+  // Scope the lookup to this fund so an admin can't touch another fund's row.
+  const account = await prisma.fundTokenAccount.findFirst({
     where: { id: parsed.data.id, fundId: fund.id, archivedAt: null },
+    select: { id: true, serial: true },
+  });
+  if (!account) {
+    return { error: t("fund.accounts.errors.notFound" as never) };
+  }
+  await prisma.fundTokenAccount.update({
+    where: { id: account.id },
     data: { name: parsed.data.name },
   });
-  if (res.count === 0) {
-    return { error: t("fund.accounts.errors.notFound" as never) };
+
+  // A SOURCE account (it has a serial) carries its new name onto CP's account
+  // profile, which the card wallet shows. Deferred with after() and
+  // best-effort: our row is the record; a CP failure never fails the rename.
+  if (account.serial) {
+    scheduleAccountNamePublish(fund, {
+      serial: account.serial,
+      name: parsed.data.name,
+    });
   }
 
   revalidatePath("/accounts");
