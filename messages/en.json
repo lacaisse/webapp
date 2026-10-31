@@ -1801,9 +1801,9 @@
           },
           "attempt": {
             "running": "An attempt from this page is still marked as running. Wait for it to finish before acting.",
-            "notSent": "The recorded attempt failed before it was sent, so it burned nothing. Releasing is safe once the timer allows.",
+            "notSent": "The recorded attempt failed before it was sent, so it burned nothing. Releasing is safe, and available now.",
             "success": "The attempt's burn confirmed on chain. Record it below (the hash is prefilled).",
-            "reverted": "The attempt's userOp reverted on chain, so it burned nothing. Releasing is safe once the timer allows.",
+            "reverted": "The attempt's userOp reverted on chain, so it burned nothing. Releasing is safe, and available now.",
             "pending": "The attempt's userOp is still pending at the bundler. Wait, then check again.",
             "unknown": "The attempt's outcome couldn't be determined. Check the userOp on chain before acting.",
             "userOp": "UserOp:",

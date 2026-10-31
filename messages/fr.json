@@ -1801,9 +1801,9 @@
           },
           "attempt": {
             "running": "Une tentative depuis cette page est encore marquée comme en cours. Attendez qu’elle se termine avant d’agir.",
-            "notSent": "La tentative enregistrée a échoué avant d’être envoyée, elle n’a donc rien brûlé. La libération est sans risque dès que le délai le permet.",
+            "notSent": "La tentative enregistrée a échoué avant d’être envoyée, elle n’a donc rien brûlé. La libération est sans risque et possible dès maintenant.",
             "success": "Le brûlage de la tentative est confirmé on-chain. Enregistrez-le ci-dessous (le hash est prérempli).",
-            "reverted": "La userOp de la tentative a été annulée on-chain, elle n’a donc rien brûlé. La libération est sans risque dès que le délai le permet.",
+            "reverted": "La userOp de la tentative a été annulée on-chain, elle n’a donc rien brûlé. La libération est sans risque et possible dès maintenant.",
             "pending": "La userOp de la tentative est encore en attente chez le bundler. Patientez, puis vérifiez à nouveau.",
             "unknown": "L’issue de la tentative n’a pas pu être déterminée. Vérifiez la userOp on-chain avant d’agir.",
             "userOp": "UserOp :",

@@ -32,6 +32,8 @@ import { resolveOrEnqueueAnnotation } from "@/services/transaction-annotation/pe
 import { burnDirect, mintDirect, type Translate } from "@/services/token-operations/direct";
 
 
+import { findBurnAttempt } from "./burn-attempt";
+import { attemptBurnedNothing } from "./burn-claim-config";
 import { verifyPayoutBurn } from "./burn-verify";
 import {
   buildPayoutExportCsv,
@@ -1849,15 +1851,22 @@ export type ReleaseBurnClaimResult =
   | { ok: true };
 
 /**
- * Force-release an in-flight burn claim, allowing a new burn. Only for an
- * attempt an admin has confirmed ON CHAIN never burned anything — releasing
- * after a burn that did go out invites a second one.
+ * Release an in-flight burn claim, allowing a new burn. Only for an attempt
+ * that never burned anything — releasing after a burn that did go out invites
+ * a second one.
  *
  * Pinned: the `claimId` the page was rendered with goes along, so a claim
- * taken by a NEW attempt meanwhile is never released by mistake. CP refuses a
- * forced release until the claim is 10 minutes old (a live burn can take a
- * few minutes to reach the chain), never releases its own api-side claim, and
- * does nothing once the payout is burned.
+ * taken by a NEW attempt meanwhile is never released by mistake.
+ *
+ * Two doors on CP, chosen here by what the chain says about the attempt
+ * (re-derived server-side — the page's view is never trusted for this):
+ * - the attempt provably burned nothing (`attemptBurnedNothing`: its userOp
+ *   reverted, or it never reached the bundler) → release by `claimId` alone,
+ *   which CP accepts immediately: there is nothing in flight to wait for;
+ * - otherwise → `force: true`, which CP refuses until the claim is 10 minutes
+ *   old (a live burn can take a few minutes to reach the chain).
+ * CP never releases its own api-side claim and does nothing once the payout
+ * is burned.
  */
 export async function releasePayoutBurnClaim(
   ctx: PayoutContext,
@@ -1865,12 +1874,16 @@ export async function releasePayoutBurnClaim(
   claimId?: string | null,
 ): Promise<ReleaseBurnClaimResult> {
   try {
-    await client(ctx).releasePayoutBurn(payoutId, {
+    const c = client(ctx);
+    const proven = claimId ? await attemptProvablyBurnedNothing(ctx, c, payoutId, claimId) : false;
+    await c.releasePayoutBurn(payoutId, {
       ...(claimId ? { claimId } : {}),
-      force: true,
+      ...(proven ? {} : { force: true }),
     });
     console.warn(
-      "[payout] burn claim force-released",
+      proven
+        ? "[payout] burn claim released (attempt proven dead on chain)"
+        : "[payout] burn claim force-released",
       logSafe({ payoutId, claimId: claimId ?? null, by: ctx.userId }),
     );
     revalidatePath(`/payments/payouts/${payoutId}`);
@@ -1891,6 +1904,40 @@ export async function releasePayoutBurnClaim(
     }
     console.error("[payout] releasePayoutBurnClaim failed", logSafe(payoutId), e);
     return { error: toMessage(e, err(ctx, "releaseClaimFailed")) };
+  }
+}
+
+/**
+ * Whether the attempt behind `claimId` provably burned nothing (see
+ * `attemptBurnedNothing`), re-read from CP and the chain right now. False on
+ * any doubt — a claim that isn't the one given, a payout no longer pending, a
+ * lookup that fails — so the caller falls back to the timed forced release.
+ */
+async function attemptProvablyBurnedNothing(
+  ctx: PayoutContext,
+  c: CitizenPayClient,
+  payoutId: string,
+  claimId: string,
+): Promise<boolean> {
+  try {
+    const live = await c.getPayoutStatus(payoutId);
+    if (live.status !== "pending" || live.burnClaim?.claimId !== claimId) return false;
+    const [payout, { placeAccountAddress }] = await Promise.all([
+      c.getPayout(payoutId),
+      c.getPayoutOrders(payoutId, { limit: 1 }),
+    ]);
+    if (!placeAccountAddress) return false;
+    const attempt = await findBurnAttempt({
+      fundId: ctx.fund.id,
+      chainId: ctx.fund.tokenChainId,
+      placeAccount: placeAccountAddress,
+      net: payout.net,
+      claimedAt: live.burnClaim.claimedAt,
+    });
+    return attemptBurnedNothing(attempt);
+  } catch (e) {
+    console.warn("[payout] burn attempt check failed, keeping the timed release", logSafe(payoutId), e);
+    return false;
   }
 }
 

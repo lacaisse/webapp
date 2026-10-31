@@ -19,7 +19,10 @@ import {
 import type { Payout, PayoutStatus } from "@/services/citizenpay/types";
 import { requireFundRole } from "@/services/auth/dal";
 import { requireCurrentFund } from "@/services/fund/server";
-import { FORCED_RELEASE_MIN_AGE_MS } from "@/services/payout/burn-claim-config";
+import {
+  attemptBurnedNothing,
+  FORCED_RELEASE_MIN_AGE_MS,
+} from "@/services/payout/burn-claim-config";
 import { orderWalletCredit } from "@/services/payout/money";
 import { cn } from "@/lib/utils";
 
@@ -127,12 +130,18 @@ export default async function PayoutDetailPage({
             burnClaim.claimedAt,
           )
         : null;
+    // The 10-minute wait is for a FORCED release. When the chain already shows
+    // the attempt burned nothing (userOp reverted, or never sent), the release
+    // goes by claim id and is immediate — no timer to show. The server action
+    // re-derives the same proof before choosing that door.
+    const immediate = attemptBurnedNothing(attempt);
     burnClaimView = {
       claimId: burnClaim.claimId,
       startedAt: known ? when(claimedAtMs) : burnClaim.claimedAt,
-      // Unknown claim time: let the server's own 10-minute check decide.
-      releasableAtMs,
-      releasableAtLabel: known ? when(releasableAtMs) : "",
+      // 0 = no wait on the page (proven dead, or unknown claim time: let the
+      // server's own check decide).
+      releasableAtMs: immediate ? 0 : releasableAtMs,
+      releasableAtLabel: known && !immediate ? when(releasableAtMs) : "",
       attempt,
     };
   }
