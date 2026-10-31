@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { parseUnits } from "viem";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CitizenPayApiError } from "@/services/citizenpay/api";
@@ -43,8 +44,12 @@ vi.mock("@/services/transaction-annotation/annotate", () => ({
   },
 }));
 vi.mock("@/services/alchemy/transfers", () => ({}));
+const getBalances = vi.hoisted(() => vi.fn());
+vi.mock("@/services/alchemy/balances", () => ({ getBalances }));
 const verifyPayoutBurn = vi.hoisted(() => vi.fn());
 vi.mock("./burn-verify", () => ({ verifyPayoutBurn }));
+const findBurnAttempt = vi.hoisted(() => vi.fn());
+vi.mock("./burn-attempt", () => ({ findBurnAttempt }));
 vi.mock("./receipts", () => ({ resolveOrderReceipts: vi.fn() }));
 
 import {
@@ -73,12 +78,16 @@ const ctx = {
     tokenMinterSmartAccountAddress: MINTER,
     tokenAddress: TOKEN,
     tokenDecimals: 6,
+    tokenSymbol: "EUR",
   },
   userId: "user-1",
   t,
 } as unknown as PayoutContext;
 
 const E = "fund.payments.settlement.errors";
+
+// A 6-decimal token amount as the hex balance Alchemy returns.
+const units = (decimal: string) => `0x${parseUnits(decimal, 6).toString(16)}`;
 
 function report(over: Record<string, unknown> = {}) {
   return {
@@ -96,9 +105,19 @@ beforeEach(() => {
   cp.getPayoutStatus.mockResolvedValue({ status: "pending", burnClaim: null });
   cp.claimPayoutBurn.mockResolvedValue(CLAIM);
   cp.releasePayoutBurn.mockResolvedValue(undefined);
-  cp.getPayout.mockResolvedValue({ id: PAYOUT, net: "48.75" } as Payout);
+  // Orders credited the wallet total − fees = 50.00; the burn takes the net
+  // (48.75) and the sweep the retained cut (1.25).
+  cp.getPayout.mockResolvedValue({
+    id: PAYOUT,
+    net: "48.75",
+    totalAmount: "52.00",
+    totalFees: "2.00",
+    totalPayoutFees: "1.25",
+    manualDeduction: "0.00",
+  } as Payout);
   cp.getPayoutOrders.mockResolvedValue({ placeAccountAddress: PLACE });
   cp.burnPayout.mockResolvedValue(report());
+  getBalances.mockResolvedValue([{ address: PLACE.toLowerCase(), rawBalance: units("50.00") }]);
   burnDirect.mockResolvedValue({ ok: true, txHash: TX, userOpHash: "0xuserop" });
 });
 
@@ -191,6 +210,62 @@ describe("burnPayout — claim before burning", () => {
     expect(await burnPayout(ctx, PAYOUT)).toEqual({ error: `${E}.payoutNotFound` });
     expect(cp.releasePayoutBurn).toHaveBeenCalledWith(PAYOUT, { claimId: CLAIM.claimId });
     expect(burnDirect).not.toHaveBeenCalled();
+  });
+
+  it("refuses, releasing the claim, when the wallet holds less than settlement removes", async () => {
+    // The screenshot case: 194 in the wallet, a 195 burn would revert.
+    cp.getPayout.mockResolvedValueOnce({
+      id: PAYOUT,
+      net: "195.00",
+      totalAmount: "195.00",
+      totalFees: "0.00",
+      totalPayoutFees: "0.00",
+      manualDeduction: "0.00",
+    } as Payout);
+    getBalances.mockResolvedValueOnce([{ address: PLACE.toLowerCase(), rawBalance: units("194") }]);
+    expect(await burnPayout(ctx, PAYOUT)).toEqual({
+      error: `${E}.burnInsufficientBalance ${JSON.stringify({
+        balance: "194 EUR",
+        required: "195.00 EUR",
+        net: "195.00 EUR",
+        cut: "0.00 EUR",
+      })}`,
+    });
+    expect(getBalances).toHaveBeenCalledWith({
+      chainId: 100,
+      contractAddress: TOKEN,
+      addresses: [PLACE],
+    });
+    expect(burnDirect).not.toHaveBeenCalled();
+    expect(cp.releasePayoutBurn).toHaveBeenCalledWith(PAYOUT, { claimId: CLAIM.claimId });
+  });
+
+  it("refuses too when the wallet covers the burn but not the sweep", async () => {
+    // 49.00 ≥ net 48.75, but < the 50.00 settlement removes: the sweep would 402.
+    getBalances.mockResolvedValueOnce([{ address: PLACE.toLowerCase(), rawBalance: units("49.00") }]);
+    const res = await burnPayout(ctx, PAYOUT);
+    expect(res).toMatchObject({ error: expect.stringContaining(`${E}.burnInsufficientBalance`) });
+    expect(res).toMatchObject({
+      error: expect.stringContaining(JSON.stringify({
+        balance: "49 EUR",
+        required: "50.00 EUR",
+        net: "48.75 EUR",
+        cut: "1.25 EUR",
+      })),
+    });
+    expect(burnDirect).not.toHaveBeenCalled();
+  });
+
+  it("burns when the wallet holds exactly what settlement removes", async () => {
+    getBalances.mockResolvedValueOnce([{ address: PLACE.toLowerCase(), rawBalance: units("50.00") }]);
+    expect(await burnPayout(ctx, PAYOUT)).toMatchObject({ ok: true, txHash: TX });
+    expect(burnDirect).toHaveBeenCalled();
+  });
+
+  it("burns anyway when the balance can't be read (preflight is best-effort)", async () => {
+    getBalances.mockRejectedValueOnce(new Error("ALCHEMY_API_KEY is not set"));
+    expect(await burnPayout(ctx, PAYOUT)).toMatchObject({ ok: true, txHash: TX });
+    expect(burnDirect).toHaveBeenCalled();
   });
 
   it("releases the claim when the place has no account", async () => {
@@ -389,12 +464,86 @@ describe("recordPayoutBurn", () => {
 });
 
 describe("releasePayoutBurnClaim", () => {
-  it("force-releases, pinned to the claim the page showed", async () => {
+  beforeEach(() => {
+    cp.getPayoutStatus.mockResolvedValue({ status: "pending", burnClaim: CLAIM });
+    findBurnAttempt.mockResolvedValue({ kind: "none" });
+  });
+
+  it("force-releases, pinned to the claim the page showed, when nothing proves the attempt dead", async () => {
     expect(await releasePayoutBurnClaim(ctx, PAYOUT, CLAIM.claimId)).toEqual({ ok: true });
     expect(cp.releasePayoutBurn).toHaveBeenCalledWith(PAYOUT, {
       claimId: CLAIM.claimId,
       force: true,
     });
+  });
+
+  it("releases by claim id alone — no timed force — when the attempt's userOp reverted", async () => {
+    findBurnAttempt.mockResolvedValue({
+      kind: "sent",
+      userOpHash: "0xuserop",
+      txHash: TX,
+      status: "reverted",
+    });
+    expect(await releasePayoutBurnClaim(ctx, PAYOUT, CLAIM.claimId)).toEqual({ ok: true });
+    expect(findBurnAttempt).toHaveBeenCalledWith({
+      fundId: "fund-1",
+      chainId: 100,
+      placeAccount: PLACE,
+      net: "48.75",
+      claimedAt: CLAIM.claimedAt,
+    });
+    expect(cp.releasePayoutBurn).toHaveBeenCalledWith(PAYOUT, { claimId: CLAIM.claimId });
+  });
+
+  it("releases immediately too when the attempt never reached the bundler", async () => {
+    findBurnAttempt.mockResolvedValue({ kind: "notSent" });
+    expect(await releasePayoutBurnClaim(ctx, PAYOUT, CLAIM.claimId)).toEqual({ ok: true });
+    expect(cp.releasePayoutBurn).toHaveBeenCalledWith(PAYOUT, { claimId: CLAIM.claimId });
+  });
+
+  it.each([
+    ["still running", { kind: "running", startedAt: CLAIM.claimedAt }],
+    ["pending at the bundler", { kind: "sent", userOpHash: "0x1", txHash: null, status: "pending" }],
+    ["timed out", { kind: "sent", userOpHash: "0x1", txHash: null, status: "timeout" }],
+    ["unknown", { kind: "sent", userOpHash: "0x1", txHash: null, status: "unknown" }],
+    ["confirmed", { kind: "sent", userOpHash: "0x1", txHash: TX, status: "success" }],
+  ])("keeps the timed force when the attempt is %s", async (_label, attempt) => {
+    findBurnAttempt.mockResolvedValue(attempt);
+    await releasePayoutBurnClaim(ctx, PAYOUT, CLAIM.claimId);
+    expect(cp.releasePayoutBurn).toHaveBeenCalledWith(PAYOUT, {
+      claimId: CLAIM.claimId,
+      force: true,
+    });
+  });
+
+  it("keeps the timed force when the live claim isn't the one the page showed", async () => {
+    findBurnAttempt.mockResolvedValue({ kind: "notSent" });
+    cp.getPayoutStatus.mockResolvedValue({
+      status: "pending",
+      burnClaim: { claimId: "claim-2", claimedAt: CLAIM.claimedAt },
+    });
+    await releasePayoutBurnClaim(ctx, PAYOUT, CLAIM.claimId);
+    expect(findBurnAttempt).not.toHaveBeenCalled();
+    expect(cp.releasePayoutBurn).toHaveBeenCalledWith(PAYOUT, {
+      claimId: CLAIM.claimId,
+      force: true,
+    });
+  });
+
+  it("keeps the timed force when the proof lookup itself fails", async () => {
+    findBurnAttempt.mockRejectedValue(new Error("rpc down"));
+    expect(await releasePayoutBurnClaim(ctx, PAYOUT, CLAIM.claimId)).toEqual({ ok: true });
+    expect(cp.releasePayoutBurn).toHaveBeenCalledWith(PAYOUT, {
+      claimId: CLAIM.claimId,
+      force: true,
+    });
+  });
+
+  it("never takes the immediate door without a pinned claim id", async () => {
+    findBurnAttempt.mockResolvedValue({ kind: "notSent" });
+    expect(await releasePayoutBurnClaim(ctx, PAYOUT, null)).toEqual({ ok: true });
+    expect(findBurnAttempt).not.toHaveBeenCalled();
+    expect(cp.releasePayoutBurn).toHaveBeenCalledWith(PAYOUT, { force: true });
   });
 
   it("explains when the claim is too recent to force-release", async () => {

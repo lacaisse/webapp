@@ -62,11 +62,12 @@ const STEPS: { status: PayoutStatus; key: string }[] = [
 // An in-flight burn claim as the page hands it down: the start time is
 // pre-formatted server-side so server and client render the same string.
 export type BurnClaimView = {
-  // Pins the forced release to the claim this page showed.
+  // Pins the release to the claim this page showed.
   claimId: string | null;
   startedAt: string;
-  // When CP will accept a forced release (claim + 10 min); 0 = unknown, let
-  // the server decide.
+  // When CP will accept a forced release (claim + 10 min); 0 = no wait on the
+  // page: the attempt is proven dead on chain (release by claim id, immediate)
+  // or the claim time is unknown and the server decides.
   releasableAtMs: number;
   releasableAtLabel: string;
   // What we know locally about the attempt behind the claim (null: nothing
@@ -712,7 +713,7 @@ function BurnClaimPanel({
       {attempt && attempt.kind !== "none" && <BurnAttemptInfo attempt={attempt} />}
       <div className="flex flex-wrap items-center gap-2">
         <RecordBurnDialog payoutId={payoutId} prefill={confirmedHash} />
-        {/* Keyed by claim: a new claim restarts its own 10-minute wait. */}
+        {/* Keyed by claim: a new claim restarts its own wait (if any). */}
         <ReleaseBurnClaimDialog
           key={claim.claimId ?? claim.startedAt}
           payoutId={payoutId}

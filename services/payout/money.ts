@@ -77,6 +77,21 @@ export function orderWalletCredit(order: {
 }
 
 /**
+ * What settling a payout takes out of the place's wallet: the burn (`net`)
+ * plus the sweep (`payoutFees + manualDeduction`) — which is `total − fees`,
+ * the sum every order credited the wallet in the first place. The processor's
+ * commission (`fees`) was withheld at source, so no token was ever minted for
+ * it; the wallet never has to hold it. The payout page's balance stat and the
+ * burn's balance preflight both measure against this figure.
+ */
+export function payoutWalletOutflow(p: {
+  totalAmount: string;
+  totalFees: string;
+}): string {
+  return orderWalletCredit({ total: p.totalAmount, fees: p.totalFees });
+}
+
+/**
  * The platform fee a fund's configured rate implies for a gross amount —
  * the editable suggestion the manual-order dialog prefills. `percent` is a
  * decimal-percent string ("2.5" = 2.5%); a missing/invalid rate suggests 0.

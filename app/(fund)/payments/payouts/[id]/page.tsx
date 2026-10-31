@@ -19,8 +19,11 @@ import {
 import type { Payout, PayoutStatus } from "@/services/citizenpay/types";
 import { requireFundRole } from "@/services/auth/dal";
 import { requireCurrentFund } from "@/services/fund/server";
-import { FORCED_RELEASE_MIN_AGE_MS } from "@/services/payout/burn-claim-config";
-import { orderWalletCredit } from "@/services/payout/money";
+import {
+  attemptBurnedNothing,
+  FORCED_RELEASE_MIN_AGE_MS,
+} from "@/services/payout/burn-claim-config";
+import { payoutWalletOutflow } from "@/services/payout/money";
 import { cn } from "@/lib/utils";
 
 import { AddOrdersDialog } from "./add-orders-dialog";
@@ -127,12 +130,18 @@ export default async function PayoutDetailPage({
             burnClaim.claimedAt,
           )
         : null;
+    // The 10-minute wait is for a FORCED release. When the chain already shows
+    // the attempt burned nothing (userOp reverted, or never sent), the release
+    // goes by claim id and is immediate — no timer to show. The server action
+    // re-derives the same proof before choosing that door.
+    const immediate = attemptBurnedNothing(attempt);
     burnClaimView = {
       claimId: burnClaim.claimId,
       startedAt: known ? when(claimedAtMs) : burnClaim.claimedAt,
-      // Unknown claim time: let the server's own 10-minute check decide.
-      releasableAtMs,
-      releasableAtLabel: known ? when(releasableAtMs) : "",
+      // 0 = no wait on the page (proven dead, or unknown claim time: let the
+      // server's own check decide).
+      releasableAtMs: immediate ? 0 : releasableAtMs,
+      releasableAtLabel: known && !immediate ? when(releasableAtMs) : "",
       attempt,
     };
   }
@@ -207,7 +216,7 @@ export default async function PayoutDetailPage({
               citizenPayApiKeyId={fund.citizenPayApiKeyId}
               citizenPayApiKeyEnc={fund.citizenPayApiKeyEnc}
               placeId={payout.placeId}
-              required={walletOutflow(payout)}
+              required={payoutWalletOutflow(payout)}
               symbol={fund.tokenSymbol}
               tokenAddress={fund.tokenAddress}
               tokenChainId={fund.tokenChainId}
@@ -379,7 +388,7 @@ function Stat({
 // The place's live on-chain balance vs what settling this payout takes out of
 // that account — green when it holds enough, amber when it's short.
 //
-// `required` is `total − fees` (see walletOutflow): settlement removes the net
+// `required` is `total − fees` (payoutWalletOutflow): settlement removes the net
 // (the burn) *and* the retained cut (the sweep of payoutFees + manualDeduction),
 // which together are exactly what the place's wallet was credited for these
 // orders. It is NOT the payout total — the processor's commission was withheld
@@ -514,11 +523,3 @@ function euro(
   return format.number(Number(decimal), { style: "currency", currency: "EUR" });
 }
 
-/**
- * What settling this payout takes out of the place's wallet: the burn (`net`)
- * plus the sweep (`payoutFees + manualDeduction`) — which is `total − fees`,
- * the sum every order credited the wallet in the first place.
- */
-function walletOutflow(p: Payout): string {
-  return orderWalletCredit({ total: p.totalAmount, fees: p.totalFees });
-}
