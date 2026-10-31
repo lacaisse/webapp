@@ -4,6 +4,7 @@ import "server-only";
 import { revalidatePath } from "next/cache";
 import { parseUnits } from "viem";
 
+import { getBalances } from "@/services/alchemy/balances";
 import { formatTokenAmount } from "@/services/alchemy/format";
 import {
   estimateBlockRange,
@@ -46,7 +47,7 @@ import {
   type PayoutOrderExportEntry,
   type PayoutOrderExportFile,
 } from "./order-export";
-import { maxManualDeductionCents, toCents } from "./money";
+import { fromCents, maxManualDeductionCents, payoutWalletOutflow, toCents } from "./money";
 import {
   assignPlaceBurns,
   assignPlaceMints,
@@ -1621,6 +1622,19 @@ export async function burnPayout(
       return { error: err(ctx, "noPlaceAccount") };
     }
 
+    // Preflight: the wallet must hold what settlement removes. A burn of more
+    // than the balance reverts on chain (the token's burnFrom underflows), and
+    // a wallet that covers the burn but not the sweep leaves the platform's
+    // cut stranded behind a 402 — the payout page's balance stat measures the
+    // same figure. Refuse with both numbers rather than let the admin find
+    // out from a reverted userOp and a burn claim to clean up. Nothing is on
+    // chain yet, so the claim goes back.
+    const shortfall = await walletShortfall(ctx, placeAccount, payout);
+    if (shortfall) {
+      await releaseOwnClaim(c, payoutId, claimId);
+      return { error: err(ctx, "burnInsufficientBalance", shortfall) };
+    }
+
     // Burn only the `net` on-chain with our minter (records a TokenOperation).
     //
     // The place's wallet holds more than the net: every order was credited
@@ -1905,6 +1919,56 @@ export async function releasePayoutBurnClaim(
     console.error("[payout] releasePayoutBurnClaim failed", logSafe(payoutId), e);
     return { error: toMessage(e, err(ctx, "releaseClaimFailed")) };
   }
+}
+
+/**
+ * What the place's wallet lacks to settle `payout`, for the burn preflight —
+ * null when it holds enough. The balance is read live from the chain and
+ * compared, in token units, to `payoutWalletOutflow` (net + retained cut).
+ *
+ * Best-effort on the READ: when the balance can't be read (no Alchemy key, an
+ * RPC error, an unsupported chain) the burn goes ahead as it always did — the
+ * worst case is the revert the preflight exists to prevent, which costs
+ * nothing and is recoverable from the payout page. A read that succeeds and
+ * says "too low" is final. Returns the figures the error message shows, in
+ * token units with the fund's symbol.
+ */
+async function walletShortfall(
+  ctx: PayoutContext,
+  placeAccount: string,
+  payout: Payout,
+): Promise<Record<string, string> | null> {
+  const { fund } = ctx;
+  if (!fund.tokenAddress || fund.tokenDecimals == null || fund.tokenChainId == null) {
+    return null;
+  }
+  const required = payoutWalletOutflow(payout);
+  let requiredUnits: bigint;
+  let balanceUnits: bigint;
+  let balance: string;
+  try {
+    requiredUnits = parseUnits(required, fund.tokenDecimals);
+    const [row] = await getBalances({
+      chainId: fund.tokenChainId,
+      contractAddress: fund.tokenAddress,
+      addresses: [placeAccount],
+    });
+    if (!row) return null;
+    balanceUnits = BigInt(row.rawBalance);
+    balance = formatTokenAmount(row.rawBalance, fund.tokenDecimals);
+  } catch (e) {
+    console.warn("[payout] balance preflight unavailable, burning anyway", logSafe(payout.id), e);
+    return null;
+  }
+  if (balanceUnits >= requiredUnits) return null;
+  const symbol = fund.tokenSymbol ?? "";
+  const label = (v: string) => (symbol ? `${v} ${symbol}` : v);
+  return {
+    balance: label(balance),
+    required: label(required),
+    net: label(payout.net),
+    cut: label(fromCents(toCents(required) - toCents(payout.net))),
+  };
 }
 
 /**

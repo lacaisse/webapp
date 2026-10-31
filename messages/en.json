@@ -1946,6 +1946,7 @@
           "exportOrdersFailed": "Could not load the transactions of one of the payouts. The export was not generated — try again shortly.",
           "exportOrdersTruncated": "One of the payouts holds too many transactions to export in one go. Narrow the period and try again.",
           "burnInProgress": "Another burn attempt for this payout started at {claimedAt} and is still running or was interrupted. Nothing was burned now. Use the panel on the payout page to record its transaction or release it.",
+          "burnInsufficientBalance": "The place's wallet holds {balance}, but settling this payout removes {required} ({net} burned for the merchant + {cut} swept as the retained cut). Nothing was burned. Top up the place's balance or adjust the deduction, then burn again.",
           "burnClaimFailed": "The burn couldn't be secured with Citizen Pay, so nothing was burned. Try again shortly.",
           "burnMayHaveBeenSent": "The burn may have been sent on chain, but its outcome is unknown. Don't retry: check the chain (the userOp hash below, if shown), then record the burn's transaction hash or release the claim from the payout page.",
           "duplicateBurn": "This payout has been burned TWICE: transaction {txHash} was recorded on top of an earlier burn. Citizen Pay has been alerted. Don't burn again — contact Citizen Pay to reconcile.",

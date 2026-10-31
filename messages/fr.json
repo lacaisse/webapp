@@ -1946,6 +1946,7 @@
           "exportOrdersFailed": "Impossible de charger les transactions d'un des virements. L'export n'a pas été généré — réessayez bientôt.",
           "exportOrdersTruncated": "Un des virements contient trop de transactions pour être exporté d'un seul bloc. Réduisez la période et réessayez.",
           "burnInProgress": "Une autre tentative de brûlage de ce virement a commencé le {claimedAt} et est toujours en cours ou a été interrompue. Rien n’a été brûlé cette fois. Utilisez le panneau de la page du virement pour enregistrer sa transaction ou la libérer.",
+          "burnInsufficientBalance": "Le portefeuille du lieu détient {balance}, mais le règlement de ce virement prélève {required} ({net} brûlés pour le commerçant + {cut} transférés comme part retenue). Rien n’a été brûlé. Rechargez le solde du lieu ou ajustez la déduction, puis brûlez à nouveau.",
           "burnClaimFailed": "Le brûlage n’a pas pu être sécurisé auprès de Citizen Pay, rien n’a donc été brûlé. Réessayez bientôt.",
           "burnMayHaveBeenSent": "Le brûlage a peut-être été envoyé on-chain, mais son issue est inconnue. Ne réessayez pas : vérifiez la chaîne (avec le hash userOp ci-dessous, s’il est indiqué), puis enregistrez le hash de transaction du brûlage ou libérez la réservation depuis la page du virement.",
           "duplicateBurn": "Ce virement a été brûlé DEUX FOIS : la transaction {txHash} a été enregistrée en plus d’un brûlage antérieur. Citizen Pay a été alerté. Ne brûlez plus — contactez Citizen Pay pour réconcilier.",

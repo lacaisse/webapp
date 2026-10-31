@@ -23,7 +23,7 @@ import {
   attemptBurnedNothing,
   FORCED_RELEASE_MIN_AGE_MS,
 } from "@/services/payout/burn-claim-config";
-import { orderWalletCredit } from "@/services/payout/money";
+import { payoutWalletOutflow } from "@/services/payout/money";
 import { cn } from "@/lib/utils";
 
 import { AddOrdersDialog } from "./add-orders-dialog";
@@ -216,7 +216,7 @@ export default async function PayoutDetailPage({
               citizenPayApiKeyId={fund.citizenPayApiKeyId}
               citizenPayApiKeyEnc={fund.citizenPayApiKeyEnc}
               placeId={payout.placeId}
-              required={walletOutflow(payout)}
+              required={payoutWalletOutflow(payout)}
               symbol={fund.tokenSymbol}
               tokenAddress={fund.tokenAddress}
               tokenChainId={fund.tokenChainId}
@@ -388,7 +388,7 @@ function Stat({
 // The place's live on-chain balance vs what settling this payout takes out of
 // that account — green when it holds enough, amber when it's short.
 //
-// `required` is `total − fees` (see walletOutflow): settlement removes the net
+// `required` is `total − fees` (payoutWalletOutflow): settlement removes the net
 // (the burn) *and* the retained cut (the sweep of payoutFees + manualDeduction),
 // which together are exactly what the place's wallet was credited for these
 // orders. It is NOT the payout total — the processor's commission was withheld
@@ -523,11 +523,3 @@ function euro(
   return format.number(Number(decimal), { style: "currency", currency: "EUR" });
 }
 
-/**
- * What settling this payout takes out of the place's wallet: the burn (`net`)
- * plus the sweep (`payoutFees + manualDeduction`) — which is `total − fees`,
- * the sum every order credited the wallet in the first place.
- */
-function walletOutflow(p: Payout): string {
-  return orderWalletCredit({ total: p.totalAmount, fees: p.totalFees });
-}
