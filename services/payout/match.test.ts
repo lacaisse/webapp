@@ -5,6 +5,8 @@ import {
   assignPlaceBurns,
   assignPlaceMints,
   autoMatchRoute,
+  initialVerification,
+  isAdjustmentLeg,
   isConfirmableOrderStatus,
   matchPayerTransfer,
   utcDay,
@@ -371,16 +373,55 @@ describe("assignPlaceBurns", () => {
 });
 
 describe("isConfirmableOrderStatus", () => {
-  it("accepts the statuses that settle as a real on-chain transfer", () => {
+  it("accepts the statuses whose hash a receipt can prove", () => {
     expect(isConfirmableOrderStatus("paid")).toBe(true);
     expect(isConfirmableOrderStatus("refund")).toBe(true);
     expect(isConfirmableOrderStatus("refunded")).toBe(true);
+    expect(isConfirmableOrderStatus("correction")).toBe(true);
+    expect(isConfirmableOrderStatus("topup")).toBe(true);
   });
 
   it("rejects anything else — those stay in Issues until reconciled by hand", () => {
-    expect(isConfirmableOrderStatus("correction")).toBe(false);
     expect(isConfirmableOrderStatus("pending")).toBe(false);
+    expect(isConfirmableOrderStatus("archived")).toBe(false);
     expect(isConfirmableOrderStatus("")).toBe(false);
+  });
+});
+
+describe("isAdjustmentLeg", () => {
+  it("is the subtract side of the payout math only", () => {
+    expect(isAdjustmentLeg("refund")).toBe(true);
+    expect(isAdjustmentLeg("correction")).toBe(true);
+    expect(isAdjustmentLeg("topup")).toBe(true);
+    expect(isAdjustmentLeg("refunded")).toBe(false);
+    expect(isAdjustmentLeg("paid")).toBe(false);
+  });
+});
+
+describe("initialVerification", () => {
+  const HASH = "0x" + "ab".repeat(32);
+
+  it("checks the receipt of anything confirmable that carries a hash", () => {
+    expect(initialVerification({ status: "paid", txHash: HASH })).toBe("check");
+    expect(initialVerification({ status: "refunded", txHash: HASH })).toBe("check");
+    expect(initialVerification({ status: "topup", txHash: HASH })).toBe("check");
+    expect(initialVerification({ status: "refund", txHash: HASH })).toBe("check");
+  });
+
+  it("keeps an adjustment leg without a hash as a ledger entry, not an issue", () => {
+    // The api books a refund leg with no hash of its own (the refund transfer
+    // hash is on the refunded sale). Treating it as an issue invited the
+    // operator to archive it, which silently inflated the payout.
+    expect(initialVerification({ status: "refund", txHash: null })).toBe("ledger");
+    expect(initialVerification({ status: "refund", txHash: "" })).toBe("ledger");
+    expect(initialVerification({ status: "correction", txHash: null })).toBe("ledger");
+    expect(initialVerification({ status: "topup", txHash: null })).toBe("ledger");
+  });
+
+  it("leaves a sale without a hash, or a non-settling status, unconfirmed", () => {
+    expect(initialVerification({ status: "paid", txHash: null })).toBe("unconfirmed");
+    expect(initialVerification({ status: "refunded", txHash: null })).toBe("unconfirmed");
+    expect(initialVerification({ status: "pending", txHash: HASH })).toBe("unconfirmed");
   });
 });
 

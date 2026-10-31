@@ -1840,7 +1840,8 @@
             "success": "Confirmed",
             "reverted": "Reverted",
             "pending": "Unconfirmed"
-          }
+          },
+          "ledgerLeg": "Bookkeeping leg: it has no settlement transaction of its own (the money moved with the sale it mirrors) and it subtracts from the payout."
         },
         "statusCheck": {
           "button": "Status",
@@ -1960,7 +1961,9 @@
           "burnHashNotBurn": "That transaction isn't a burn of this place's tokens. Nothing was recorded.",
           "burnHashWrongAmount": "That transaction burned {found}, but this payout's net is {expected}. Nothing was recorded.",
           "releaseTooRecent": "This burn claim can't be released yet: a burn in progress can take a few minutes to reach the chain. Release becomes available at {releasableAt}.",
-          "releaseClaimChanged": "The burn claim changed since this page loaded (another attempt took it, or it was resolved). The page has been reloaded — check again before acting."
+          "releaseClaimChanged": "The burn claim changed since this page loaded (another attempt took it, or it was resolved). The page has been reloaded — check again before acting.",
+          "archiveAdjustmentLeg": "This is a refund, correction or top-up leg: it subtracts from the payout, so archiving it would overpay the merchant. Leave it in place.",
+          "archiveUnknownOrder": "Couldn't check this order before archiving it. Try again shortly."
         }
       },
       "export": {

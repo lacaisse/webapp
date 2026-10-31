@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/table";
 import type { PayoutOrder } from "@/services/citizenpay/types";
 import { checkPayoutReceiptsAction } from "@/services/payout/admin-actions";
-import { isConfirmableOrderStatus } from "@/services/payout/match";
+import { initialVerification } from "@/services/payout/match";
 import { cn } from "@/lib/utils";
 
 import { BulkIssueActions } from "./bulk-issue-actions";
@@ -61,14 +61,14 @@ export function OrdersExplorer({
   const [tab, setTab] = useState<"orders" | "issues">("orders");
 
   // Hashes we need to verify on-chain. Once the payout leaves `pending`
-  // (settlement started), the orders are locked in — nothing to re-check.
+  // (settlement started), the orders are locked in — nothing to re-check. An
+  // adjustment leg without a hash (a refund booked by the api) is a ledger
+  // entry: confirmed as is, never an issue (see initialVerification).
   const toCheck = useMemo(
     () =>
       settled
         ? []
-        : orders.filter(
-            (o) => isConfirmableOrderStatus(o.status) && !!o.txHash,
-          ),
+        : orders.filter((o) => initialVerification(o) === "check"),
     [orders, settled],
   );
 
@@ -101,11 +101,13 @@ export function OrdersExplorer({
   const [statuses, setStatuses] = useState<Record<number, OrderStatus>>(() => {
     const initial: Record<number, OrderStatus> = {};
     for (const o of orders) {
-      initial[o.id] = settled
-        ? "confirmed"
-        : isConfirmableOrderStatus(o.status) && o.txHash
-          ? "checking"
-          : "unconfirmed";
+      const kind = initialVerification(o);
+      initial[o.id] =
+        settled || kind === "ledger"
+          ? "confirmed"
+          : kind === "check"
+            ? "checking"
+            : "unconfirmed";
     }
     return initial;
   });
@@ -284,6 +286,11 @@ export function OrdersExplorer({
                       <Badge
                         variant={orderStatusVariant(o.status)}
                         className="capitalize"
+                        title={
+                          initialVerification(o) === "ledger"
+                            ? t("orders.ledgerLeg")
+                            : undefined
+                        }
                       >
                         {o.status}
                       </Badge>

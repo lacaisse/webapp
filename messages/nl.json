@@ -1784,7 +1784,8 @@
             "success": "Bevestigd",
             "reverted": "Teruggedraaid",
             "pending": "Niet bevestigd"
-          }
+          },
+          "ledgerLeg": "Boekingsregel: ze heeft geen eigen transactie (het geld bewoog met de verkoop die ze spiegelt) en wordt van de uitbetaling afgetrokken."
         },
         "statusCheck": {
           "button": "Status",
@@ -1903,7 +1904,9 @@
           "burnHashNotBurn": "Die transactie is geen verbranding van de tokens van deze locatie. Er is niets geregistreerd.",
           "burnHashWrongAmount": "Die transactie verbrandde {found}, maar het netto van deze uitbetaling is {expected}. Er is niets geregistreerd.",
           "releaseTooRecent": "Deze verbrandclaim kan nog niet worden vrijgegeven: een lopende verbranding kan enkele minuten nodig hebben om de chain te bereiken. Vrijgeven kan vanaf {releasableAt}.",
-          "releaseClaimChanged": "De verbrandclaim is gewijzigd sinds de pagina werd geladen (een andere poging nam ze over, of ze werd afgehandeld). De pagina is opnieuw geladen — controleer opnieuw voor je iets doet."
+          "releaseClaimChanged": "De verbrandclaim is gewijzigd sinds de pagina werd geladen (een andere poging nam ze over, of ze werd afgehandeld). De pagina is opnieuw geladen — controleer opnieuw voor je iets doet.",
+          "archiveAdjustmentLeg": "Dit is een terugbetalings-, correctie- of opwaardeerregel: ze wordt van de uitbetaling afgetrokken, archiveren zou de handelaar te veel betalen. Laat ze staan.",
+          "archiveUnknownOrder": "Kon deze bestelling niet controleren voor het archiveren. Probeer het zo opnieuw."
         }
       },
       "export": {
