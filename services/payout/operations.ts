@@ -49,7 +49,8 @@ import {
   assignPlaceBurns,
   assignPlaceMints,
   autoMatchRoute,
-  isConfirmableOrderStatus,
+  initialVerification,
+  isAdjustmentLeg,
   matchPayerTransfer,
   type ArchiveOrdersItemResult,
   type AutoMatchResult,
@@ -537,9 +538,11 @@ export type ClassifyOrdersResult =
 /**
  * The dashboard's Confirmed / Issues split, server-side. An order is confirmed
  * when its status is settleable on-chain, it carries a settlement hash, and
- * that hash has a successful receipt. Everything else is an issue to fix.
- * Once the payout leaves `pending` the orders are locked in — no verification
- * runs and they all read as confirmed, same as the detail page.
+ * that hash has a successful receipt — or when it is an adjustment leg with no
+ * hash (a refund the api booked against a refunded sale: a ledger entry, see
+ * initialVerification). Everything else is an issue to fix. Once the payout
+ * leaves `pending` the orders are locked in — no verification runs and they
+ * all read as confirmed, same as the detail page.
  */
 export async function classifyPayoutOrders(
   ctx: PayoutContext,
@@ -558,7 +561,7 @@ export async function classifyPayoutOrders(
   const chainId = ctx.fund.tokenChainId;
   const checkable = settled
     ? []
-    : loaded.orders.filter((o) => isConfirmableOrderStatus(o.status) && !!o.txHash);
+    : loaded.orders.filter((o) => initialVerification(o) === "check");
 
   let receipts = new Map<string, TxReceipt>();
   if (checkable.length > 0) {
@@ -577,11 +580,12 @@ export async function classifyPayoutOrders(
   const confirmed: ClassifiedOrder[] = [];
   const issues: ClassifiedOrder[] = [];
   for (const order of loaded.orders) {
+    const kind = initialVerification(order);
     const ok =
       settled ||
-      (isConfirmableOrderStatus(order.status) &&
-        !!order.txHash &&
-        receipts.get(order.txHash)?.status === "success");
+      kind === "ledger" ||
+      (kind === "check" &&
+        receipts.get(order.txHash as string)?.status === "success");
     const classified: ClassifiedOrder = {
       ...order,
       verification: ok ? "confirmed" : "unconfirmed",
@@ -707,11 +711,45 @@ export type ArchiveOrderResult =
   | { error: string }
   | { ok: true; payout: ArchivedPayout };
 
+// Why an order must not be archived, as an error key under ERR, or null when
+// it may be. Archiving sets the order `archived` on CP's side and recomputes
+// the payout from what is left, so an adjustment leg (refund / correction /
+// topup — the subtract side of the payout math) must never go: the payout
+// would then pay the merchant for a sale the customer got refunded, and the
+// place's balance would no longer cover the burn. Fails closed: an order we
+// could not see (the list is capped at MAX_ORDER_PAGES) is not archived either.
+type ArchiveBlockers = Map<number, "archiveAdjustmentLeg" | "archiveUnknownOrder">;
+
+async function archiveBlockers(
+  c: CitizenPayClient,
+  payoutId: string,
+  orderIds: number[],
+): Promise<ArchiveBlockers> {
+  const loaded = await loadAllPayoutOrders(c, payoutId);
+  const byId = new Map(loaded.orders.map((o) => [o.id, o]));
+  const out: ArchiveBlockers = new Map();
+  for (const id of orderIds) {
+    const order = byId.get(id);
+    if (!order) {
+      // Not in the pages we read: let CP answer ("not in payout") unless the
+      // list was cut short, in which case we genuinely don't know what it is.
+      if (loaded.truncated) out.set(id, "archiveUnknownOrder");
+    } else if (isAdjustmentLeg(order.status)) {
+      out.set(id, "archiveAdjustmentLeg");
+    }
+  }
+  return out;
+}
+
 export async function archiveOrder(
   ctx: PayoutContext,
   input: { payoutId: string; orderId: number },
 ): Promise<ArchiveOrderResult> {
   try {
+    const blocked = (
+      await archiveBlockers(client(ctx), input.payoutId, [input.orderId])
+    ).get(input.orderId);
+    if (blocked) return { error: err(ctx, blocked) };
     const payout = await client(ctx).archiveOrder(input.payoutId, input.orderId);
     revalidatePath(`/payments/payouts/${input.payoutId}`);
     return { ok: true, payout };
@@ -729,7 +767,21 @@ export async function archiveOrders(
 ): Promise<ArchiveOrdersItemResult[]> {
   const c = client(ctx);
   const results: ArchiveOrdersItemResult[] = [];
+  let blockers: ArchiveBlockers;
+  try {
+    blockers = await archiveBlockers(c, input.payoutId, input.orderIds);
+  } catch (e) {
+    // Can't tell a leg from a sale: archive nothing rather than guess.
+    console.error("[payout] archiveOrders: order check failed", logSafe(input.payoutId), e);
+    const error = toMessage(e, err(ctx, "ordersFailed"));
+    return input.orderIds.map((orderId) => ({ orderId, ok: false, error }));
+  }
   for (const orderId of input.orderIds) {
+    const blocked = blockers.get(orderId);
+    if (blocked) {
+      results.push({ orderId, ok: false, error: err(ctx, blocked) });
+      continue;
+    }
     try {
       await c.archiveOrder(input.payoutId, orderId);
       results.push({ orderId, ok: true });

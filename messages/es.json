@@ -1784,7 +1784,8 @@
             "success": "Confirmado",
             "reverted": "Revertido",
             "pending": "Sin confirmar"
-          }
+          },
+          "ledgerLeg": "Apunte contable: no tiene transacción propia (el dinero se movió con la venta que refleja) y se descuenta del pago."
         },
         "statusCheck": {
           "button": "Estado",
@@ -1903,7 +1904,9 @@
           "burnHashNotBurn": "Esa transacción no es una quema de los tokens de este local. No se registró nada.",
           "burnHashWrongAmount": "Esa transacción quemó {found}, pero el neto de este pago es {expected}. No se registró nada.",
           "releaseTooRecent": "Esta reserva de quema aún no se puede liberar: una quema en curso puede tardar unos minutos en llegar a la cadena. Se podrá liberar a partir del {releasableAt}.",
-          "releaseClaimChanged": "La reserva de quema cambió desde que se cargó la página (otro intento la tomó o se resolvió). La página se ha recargado: compruébalo de nuevo antes de actuar."
+          "releaseClaimChanged": "La reserva de quema cambió desde que se cargó la página (otro intento la tomó o se resolvió). La página se ha recargado: compruébalo de nuevo antes de actuar.",
+          "archiveAdjustmentLeg": "Es un apunte de reembolso, corrección o recarga: se descuenta del pago, archivarlo pagaría de más al comercio. Déjalo donde está.",
+          "archiveUnknownOrder": "No se pudo comprobar este pedido antes de archivarlo. Inténtalo de nuevo en un momento."
         }
       },
       "export": {

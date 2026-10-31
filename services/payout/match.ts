@@ -34,12 +34,50 @@ export type ArchiveOrdersItemResult = {
 
 // Order statuses whose settlement is a real on-chain tx we can verify against a
 // receipt and auto-match: `paid` (payment or mint), `refunded` (the original
-// order — still an incoming mint), `refund` (a burn from the place). Anything
-// else has no hash to check and stays in Issues until reconciled by hand.
-const CONFIRMABLE_STATUSES = new Set(["paid", "refund", "refunded"]);
+// order — still an incoming mint), and the adjustment legs below when they
+// carry a hash (`topup` always does; a `refund` / `correction` only once an
+// operator recorded one). Anything else stays in Issues until reconciled by
+// hand.
+const CONFIRMABLE_STATUSES = new Set([
+  "paid",
+  "refunded",
+  "refund",
+  "correction",
+  "topup",
+]);
 
 export function isConfirmableOrderStatus(status: string): boolean {
   return CONFIRMABLE_STATUSES.has(status);
+}
+
+// Adjustment legs: the subtract side of Citizen Pay's payout math. A `refund`
+// leg is booked by the api in the same transaction that flips a sale to
+// `refunded` — the money went back with the sale's own refund transfer, whose
+// hash lives on the sale, so the leg carries none; `correction` is a human's
+// entry; `topup` is a place-funded card top-up. A leg is what keeps a payout
+// from paying the merchant for money the customer got back, so one without a
+// hash is a ledger entry to keep, never an issue to fix or archive away: the
+// Tricoterie payout of 2026-10-27 lost its €1 refund leg that way and could no
+// longer be burned (the place held €1 less than the payout said).
+const ADJUSTMENT_LEG_STATUSES = new Set(["refund", "correction", "topup"]);
+
+export function isAdjustmentLeg(status: string): boolean {
+  return ADJUSTMENT_LEG_STATUSES.has(status);
+}
+
+// How an order enters verification, before any receipt is looked up:
+//   check        — it has a hash to resolve; confirmed iff the receipt succeeded.
+//   ledger       — an adjustment leg with no hash: confirmed by construction.
+//   unconfirmed  — a sale with no hash, or a status that never settles: an issue.
+export type InitialVerification = "check" | "ledger" | "unconfirmed";
+
+export function initialVerification(order: {
+  status: string;
+  txHash: string | null | undefined;
+}): InitialVerification {
+  if (isConfirmableOrderStatus(order.status) && order.txHash) return "check";
+  if (isAdjustmentLeg(order.status)) return "ledger";
+  return "unconfirmed";
 }
 
 // Which on-chain side an order settles against, and therefore which matcher

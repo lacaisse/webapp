@@ -1840,7 +1840,8 @@
             "success": "Confirmé",
             "reverted": "Échec",
             "pending": "Non confirmé"
-          }
+          },
+          "ledgerLeg": "Ligne d’écriture : elle n’a pas de transaction propre (l’argent a bougé avec la vente qu’elle reflète) et elle se déduit du versement."
         },
         "statusCheck": {
           "button": "Statut",
@@ -1959,7 +1960,9 @@
           "burnHashNotBurn": "Cette transaction n’est pas un brûlage des jetons de ce lieu. Rien n’a été enregistré.",
           "burnHashWrongAmount": "Cette transaction a brûlé {found}, mais le net de ce virement est de {expected}. Rien n’a été enregistré.",
           "releaseTooRecent": "Cette réservation de brûlage ne peut pas encore être libérée : un brûlage en cours peut mettre quelques minutes à atteindre la chaîne. La libération sera possible à partir du {releasableAt}.",
-          "releaseClaimChanged": "La réservation de brûlage a changé depuis le chargement de la page (une autre tentative l’a prise, ou elle a été résolue). La page a été rechargée — vérifiez à nouveau avant d’agir."
+          "releaseClaimChanged": "La réservation de brûlage a changé depuis le chargement de la page (une autre tentative l’a prise, ou elle a été résolue). La page a été rechargée — vérifiez à nouveau avant d’agir.",
+          "archiveAdjustmentLeg": "C’est une ligne de remboursement, de correction ou de rechargement : elle se déduit du versement, l’archiver ferait trop payer le commerçant. Laissez-la en place.",
+          "archiveUnknownOrder": "Impossible de vérifier cette commande avant de l’archiver. Réessayez dans un instant."
         }
       },
       "export": {

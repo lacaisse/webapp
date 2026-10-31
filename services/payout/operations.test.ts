@@ -19,6 +19,7 @@ const cp = vi.hoisted(() => ({
   getPayout: vi.fn(),
   getPayoutOrders: vi.fn(),
   burnPayout: vi.fn(),
+  archiveOrder: vi.fn(),
 }));
 vi.mock("@/services/citizenpay/client", () => ({
   getCitizenPayClient: () => cp,
@@ -48,11 +49,16 @@ vi.mock("./burn-verify", () => ({ verifyPayoutBurn }));
 vi.mock("./receipts", () => ({ resolveOrderReceipts: vi.fn() }));
 
 import {
+  archiveOrder,
+  archiveOrders,
   burnPayout,
+  classifyPayoutOrders,
   recordPayoutBurn,
   releasePayoutBurnClaim,
   type PayoutContext,
 } from "./operations";
+import { resolveOrderReceipts } from "./receipts";
+import type { PayoutOrder } from "@/services/citizenpay/types";
 
 const PAYOUT = "payout-1";
 const CLAIM = { claimId: "claim-1", claimedAt: "2026-10-05T09:30:00Z" };
@@ -427,5 +433,109 @@ describe("releasePayoutBurnClaim", () => {
     expect(await releasePayoutBurnClaim(ctx, PAYOUT, CLAIM.claimId)).toEqual({
       error: "internal error",
     });
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+// Confirmed / Issues split and the archive guard
+// ---------------------------------------------------------------------------
+// A payout's refund / correction / topup legs are the subtract side of CP's
+// payout math. The api books a refund leg with no hash of its own, so until
+// this split learned to keep them, every refund leg sat in Issues and the only
+// button left was Archive — which drops the −total and silently overpays
+// (Tricoterie, 2026-10-27: a €1 refund leg archived, the payout said 195, the
+// place held 194).
+
+const SALE_TX = `0x${"11".repeat(32)}`;
+const BAD_TX = `0x${"22".repeat(32)}`;
+
+function order(over: Partial<PayoutOrder> & { id: number; status: string }): PayoutOrder {
+  return {
+    txHash: null,
+    account: null,
+    total: "10.00",
+    net: "10.00",
+    fees: "0.00",
+    completedAt: "2026-10-23T06:46:40Z",
+    createdAt: "2026-10-23T06:46:40Z",
+    description: null,
+    items: [],
+    ...over,
+  } as unknown as PayoutOrder;
+}
+
+const SALE = order({ id: 1, status: "paid", txHash: SALE_TX, account: "0xpayer" });
+const REFUNDED_SALE = order({ id: 2, status: "refunded", txHash: SALE_TX, total: "1.00", net: "1.00" });
+const REFUND_LEG = order({ id: 3, status: "refund", total: "1.00", net: "1.00" });
+const CORRECTION_LEG = order({ id: 4, status: "correction" });
+const SALE_NO_HASH = order({ id: 5, status: "paid" });
+const LEG_BAD_HASH = order({ id: 6, status: "refund", txHash: BAD_TX });
+
+function pageOf(orders: PayoutOrder[]) {
+  cp.getPayoutOrders.mockResolvedValue({ orders, placeAccountAddress: PLACE });
+}
+
+describe("classifyPayoutOrders — adjustment legs", () => {
+  beforeEach(() => {
+    vi.mocked(resolveOrderReceipts).mockResolvedValue(
+      new Map([
+        [SALE_TX, { txHash: SALE_TX, status: "success", blockNumber: 1 }],
+        [BAD_TX, { txHash: BAD_TX, status: "reverted", blockNumber: 2 }],
+      ]),
+    );
+  });
+
+  it("keeps a hashless refund / correction leg confirmed instead of filing it under Issues", async () => {
+    pageOf([SALE, REFUNDED_SALE, REFUND_LEG, CORRECTION_LEG, SALE_NO_HASH, LEG_BAD_HASH]);
+    const res = await classifyPayoutOrders(ctx, PAYOUT);
+    if (!("ok" in res)) throw new Error(res.error);
+    expect(res.confirmed.map((o) => o.id)).toEqual([1, 2, 3, 4]);
+    expect(res.issues.map((o) => o.id)).toEqual([5, 6]);
+    // Only the hashes are looked up: the legs without one cost no receipt call.
+    expect(vi.mocked(resolveOrderReceipts)).toHaveBeenCalledWith({
+      chainId: 100,
+      hashes: [SALE_TX, SALE_TX, BAD_TX],
+    });
+  });
+
+  it("still files a sale without a hash under Issues", async () => {
+    pageOf([SALE_NO_HASH]);
+    const res = await classifyPayoutOrders(ctx, PAYOUT);
+    if (!("ok" in res)) throw new Error(res.error);
+    expect(res.issues.map((o) => o.id)).toEqual([5]);
+    expect(vi.mocked(resolveOrderReceipts)).not.toHaveBeenCalled();
+  });
+});
+
+describe("archiveOrders — never an adjustment leg", () => {
+  beforeEach(() => {
+    cp.archiveOrder.mockResolvedValue({ id: PAYOUT });
+  });
+
+  it("archives the sales and refuses the legs, per order", async () => {
+    pageOf([SALE_NO_HASH, REFUND_LEG, CORRECTION_LEG]);
+    const res = await archiveOrders(ctx, { payoutId: PAYOUT, orderIds: [5, 3, 4] });
+    expect(res).toEqual([
+      { orderId: 5, ok: true },
+      { orderId: 3, ok: false, error: `${E}.archiveAdjustmentLeg` },
+      { orderId: 4, ok: false, error: `${E}.archiveAdjustmentLeg` },
+    ]);
+    expect(cp.archiveOrder).toHaveBeenCalledTimes(1);
+    expect(cp.archiveOrder).toHaveBeenCalledWith(PAYOUT, 5);
+  });
+
+  it("refuses a single leg before touching CP", async () => {
+    pageOf([REFUND_LEG]);
+    const res = await archiveOrder(ctx, { payoutId: PAYOUT, orderId: 3 });
+    expect(res).toEqual({ error: `${E}.archiveAdjustmentLeg` });
+    expect(cp.archiveOrder).not.toHaveBeenCalled();
+  });
+
+  it("archives nothing when the orders cannot be read", async () => {
+    cp.getPayoutOrders.mockRejectedValue(new Error("cp down"));
+    const res = await archiveOrders(ctx, { payoutId: PAYOUT, orderIds: [5] });
+    expect(res).toEqual([{ orderId: 5, ok: false, error: `${E}.ordersFailed` }]);
+    expect(cp.archiveOrder).not.toHaveBeenCalled();
   });
 });

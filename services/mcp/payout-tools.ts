@@ -331,7 +331,7 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
     "list_payout_orders",
     {
       description:
-        "The orders inside a payout, each with its on-chain verification verdict. `filter: \"issues\"` returns exactly the orders that failed verification — no settlement hash, or a hash that never mined / reverted — which is what fix_payout_orders acts on. Read-only. Requires ADMIN.",
+        "The orders inside a payout, each with its on-chain verification verdict. `filter: \"issues\"` returns exactly the orders that failed verification — a sale with no settlement hash, or a hash that never mined / reverted — which is what fix_payout_orders acts on. A refund / correction / topup leg is the subtract side of the payout (it nets a refunded sale out); one without a hash is a ledger entry and counts as confirmed, never an issue. Read-only. Requires ADMIN.",
       inputSchema: {
         fund: FUND_PARAM,
         payoutId: PAYOUT_ID,
@@ -381,7 +381,7 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
         '• "automatch" (default, safe) — find each order\'s real settlement transfer already on-chain and record its hash. Nothing is minted or burned. Try this first; it clears most issues.\n' +
         '• "record" — record one operator-supplied `txHash` on one order. Nothing moves on-chain.\n' +
         '• "settle" — MOVES TOKENS: burns the order total from the payer (when it has one) and mints the net to the place, then records the mint. Use only for orders that genuinely never settled, e.g. a bank-paid order whose transfer you have verified landed. Requires `confirm: true`.\n' +
-        '• "archive" — drop the orders out of the payout and recompute its totals. Use when an order should not be paid at all.\n' +
+        '• "archive" — drop the orders out of the payout and recompute its totals. Use when an order should not be paid at all. Refused for a refund / correction / topup leg: dropping one overpays the merchant.\n' +
         "Only works while the payout is pending. Requires ADMIN.",
       inputSchema: {
         fund: FUND_PARAM,
