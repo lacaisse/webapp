@@ -60,6 +60,57 @@ export function ownerRuleViolation(
   return null;
 }
 
+/**
+ * How far an owner set is from the rules: the missing threshold steps above
+ * one person's keys (`onePerson`, the custody rule) and the missing spare
+ * owners (`spare`, the recovery rule); both 0 when compliant. Lets a Safe
+ * that already breaks the rules (a legacy 1-of-1, a 2-of-2) still be
+ * changed, as long as the change does not make things worse — otherwise its
+ * server key could never be swapped for a passkey or retired.
+ */
+export function ownerRuleDeficits(
+  owners: RuleOwner[],
+  threshold: number,
+): { onePerson: number; spare: number } {
+  if (!hasTeamOwner(owners)) return { onePerson: 0, spare: 0 };
+  return {
+    onePerson: Math.max(0, maxOwnersPerPerson(owners) + 1 - threshold),
+    spare: Math.max(0, threshold + 1 - owners.length),
+  };
+}
+
+/**
+ * The deficits as one ordered score: the custody rule outranks the recovery
+ * rule, so trading a spare owner for a threshold one person can meet is
+ * always worse. Owners never number anywhere near 1000.
+ */
+export function ownerRuleDistance(owners: RuleOwner[], threshold: number): number {
+  const d = ownerRuleDeficits(owners, threshold);
+  return d.onePerson * 1000 + d.spare;
+}
+
+export type OwnerRuleCheck =
+  | { ok: true }
+  | { ok: false; violation: OwnerRuleViolation; worsens: boolean };
+
+/**
+ * Judge an owner change by its result: compliant → ok; non-compliant but no
+ * further from the rules than the current set (a legacy Safe migrating or
+ * repairing itself) → ok; otherwise the violation the change introduces or
+ * deepens.
+ */
+export function checkOwnerChange(
+  before: { owners: RuleOwner[]; threshold: number },
+  after: { owners: RuleOwner[]; threshold: number },
+): OwnerRuleCheck {
+  const violation = ownerRuleViolation(after.owners, after.threshold);
+  if (!violation) return { ok: true };
+  const worsens =
+    ownerRuleDistance(after.owners, after.threshold) >
+    ownerRuleDistance(before.owners, before.threshold);
+  return worsens ? { ok: false, violation, worsens } : { ok: true };
+}
+
 /** The smallest threshold the rules allow for this owner set (or null when none fits). */
 export function minimumThreshold(owners: RuleOwner[]): number | null {
   if (!hasTeamOwner(owners)) return 1;

@@ -182,7 +182,7 @@ describe("passkey owners in sync", () => {
     expect(stored).toMatchObject({ ownerAddress: P, source: "SAFE_WALLET", signature: sig });
   });
 
-  it("retires a legacy key once its migration swap executed, and erases it when no unarchived Safe lists it", async () => {
+  it("retires a legacy key once its migration swap executed, and erases it once no Safe at all lists it", async () => {
     db.fundPasskeySigner.push(passkeyOf("u-a", P));
     addTx({
       kind: "SWAP_OWNER",
@@ -190,8 +190,8 @@ describe("passkey owners in sync", () => {
       nonce: 0,
       summary: { kind: "SWAP_OWNER", oldOwner: A, oldOwnerLabel: null, newOwner: P, newOwnerLabel: null, migration: "server_key" },
     });
-    // Another unarchived Safe still lists A: retired, ciphertext kept.
-    db.fundSafe.push({ ...db.fundSafe[0]!, id: "safe-2", address: Y, archivedAt: null });
+    // An ARCHIVED Safe still lists A (it could be unarchived): retired, ciphertext kept.
+    db.fundSafe.push({ ...db.fundSafe[0]!, id: "safe-2", address: Y, archivedAt: new Date() });
     db.fundSafeOwner.push({ id: "o-a2", safeId: "safe-2", address: A, kind: "MEMBER", signerId: "signer-a", label: null, removedAt: null });
     chain([P, X], 2, 1);
     await syncSafe({ fundId: FUND_ID, safeId: SAFE_ID, force: true });
@@ -200,11 +200,15 @@ describe("passkey owners in sync", () => {
     expect(signer.privateKeyEnc).toBe("enc");
     expect(db.fundSafeOwner.find((o) => o.id === "o-a")!.removedAt).toBeInstanceOf(Date);
 
-    // The other Safe is archived: nothing unarchived lists A any more → erased.
-    db.fundSafe.find((s) => s.id === "safe-2")!.archivedAt = new Date();
+    // A key that never migrated is never erased, even when nothing lists it.
+    db.fundSigner.push({ id: "signer-z", fundId: FUND_ID, userId: "u-z", address: Y, privateKeyEnc: "enc-z", retiredAt: null });
+
+    // The other Safe dropped A on chain: nothing lists A any more → erased.
+    db.fundSafeOwner.find((o) => o.id === "o-a2")!.removedAt = new Date();
     await syncSafe({ fundId: FUND_ID, safeId: SAFE_ID, force: true });
     expect(signer.privateKeyEnc).toBeNull();
     expect(signer.keyDeletedAt).toBeInstanceOf(Date);
+    expect(db.fundSigner.find((s) => s.id === "signer-z")!.privateKeyEnc).toBe("enc-z");
   });
 });
 

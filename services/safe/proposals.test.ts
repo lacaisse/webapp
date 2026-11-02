@@ -48,7 +48,7 @@ const annotate = vi.hoisted(() => ({
 }));
 vi.mock("@/services/transaction-annotation/annotate", () => annotate);
 
-import { contractSignature, parseContractSignature } from "./passkey-signature";
+import { parseContractSignature } from "./passkey-signature";
 import { fake, resetFake } from "./test-fake-prisma";
 import {
   MAX_OPEN_PROPOSALS_PER_PROPOSER,
@@ -378,6 +378,60 @@ describe("passkey owners", () => {
     expect(tx.summary).toMatchObject({ kind: "SWAP_OWNER", oldOwner: A, newOwner: PA, migration: "server_key", newOwnerLabel: "User u-a" });
     // Proposed by the legacy key of u-b; u-a's own server key may co-sign.
     expect(db.fundSafeSignature.map((s) => s.ownerAddress)).toEqual([B]);
+  });
+
+  it("a legacy Safe that already breaks the rules can still migrate, add an owner or raise its threshold", async () => {
+    // 1-of-1 server key: the worst legacy shape.
+    seed({ threshold: 1, owners: [OWNERS_3[0]] });
+    db.fundPasskeySigner.push(passkeyRow("u-a", PA));
+    const change = (c: Record<string, unknown>) =>
+      proposeOwnerChange({ fund: FUND, safeId, userId: "u-a", input: { safeId, change: c as never } });
+    // Swap the server key for the passkey (the migration itself).
+    const swap = await change({ kind: "SWAP_OWNER", oldOwner: A, memberUserId: "u-a" });
+    expect(db.fundSafeTransaction.find((t) => t.id === swap.transactionId)!.summary).toMatchObject({ migration: "server_key" });
+    // Add an external owner, keeping 1 or going to 2: both closer to the rules.
+    await expect(change({ kind: "ADD_OWNER", threshold: 1, address: D, label: "HW" })).resolves.toBeTruthy();
+    await expect(change({ kind: "ADD_OWNER", threshold: 2, address: C, label: "HW2" })).resolves.toBeTruthy();
+
+    // 2-of-2 member + external may swap its member key too…
+    resetFake();
+    relayer.isRelayerConfigured.mockReturnValue(true);
+    seed({ threshold: 2, owners: [OWNERS_3[0]], external: [{ address: D, label: "HW" }] });
+    db.fundPasskeySigner.push(passkeyRow("u-a", PA));
+    await expect(change({ kind: "SWAP_OWNER", oldOwner: A, memberUserId: "u-a" })).resolves.toBeTruthy();
+    // …but not drop to 1-of-2, which lets one person act alone.
+    await expect(change({ kind: "CHANGE_THRESHOLD", threshold: 1 })).rejects.toMatchObject({ code: "rules_one_person" });
+  });
+
+  it("a replaced passkey cannot sign until its swap executed (passkey_replaced)", async () => {
+    seed({ threshold: 2, owners: [OWNERS_3[0]], passkeys: [{ userId: "u-p", address: PA }, { userId: "u-q", address: PB }] });
+    const res = await transfer("u-a");
+    // u-p replaced their passkey (lost device): the owner row still points at the old one.
+    db.fundPasskeySigner.find((p) => p.id === "pk-u-p")!.replacedAt = new Date();
+    db.fundPasskeySigner.push(passkeyRow("u-p", PC, { id: "pk-u-p-2", credentialId: "cred-u-p-2" }));
+    await expect(
+      signTransactionWithPasskey({ fundId: FUND.id, transactionId: res.transactionId, userId: "u-p", dynamicPart: DYN }),
+    ).rejects.toMatchObject({ code: "passkey_replaced" });
+    expect(relayer.verifyContractSignature).not.toHaveBeenCalled();
+    // Once the swap put the new signer on the Safe, the new row is the one that signs.
+    db.fundSafeOwner.push({ id: "owner-pk-u-p-2", safeId, address: PC, kind: "PASSKEY", signerId: null, passkeyId: "pk-u-p-2", label: null, removedAt: null });
+    relayer.readSafeState.mockResolvedValue({ deployed: true, owners: [A, PA, PB, PC], threshold: 2, nonce: 0 });
+    const signed = await signTransactionWithPasskey({ fundId: FUND.id, transactionId: res.transactionId, userId: "u-p", dynamicPart: DYN });
+    expect(signed.ownerAddress).toBe(PC);
+  });
+
+  it("keeps a Transaction Service failure on the row and clears it once mirrored", async () => {
+    seed({ threshold: 2, owners: OWNERS_3, external: [{ address: D, label: "HW" }] });
+    txService.isTxServiceEnabled.mockReturnValue(true);
+    txService.proposeTransaction.mockRejectedValueOnce(new SafeError("tx_service", "HTTP 503"));
+    const res = await transfer("u-a");
+    const row = db.fundSafeTransaction.find((t) => t.id === res.transactionId)!;
+    expect(row.status).toBe("PENDING");
+    expect(String(row.errorMessage)).toMatch(/^tx_service: /);
+    // The next signature confirms on the service: the note goes away.
+    txService.confirmTransaction.mockResolvedValueOnce(undefined);
+    await signTransaction({ fundId: FUND.id, transactionId: res.transactionId, userId: "u-b" });
+    expect(row.errorMessage).toBeNull();
   });
 
   it("owner changes respect the recovery rules", async () => {

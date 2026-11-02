@@ -7,7 +7,13 @@ import { prisma } from "@/services/db/prisma";
 
 import { retireServerKeys } from "./migration";
 import { parseContractSignature } from "./passkey-signature";
-import { isOwnerChangeKind, recordExecuted, tryExecute } from "./proposals";
+import {
+  clearMirrorFailure,
+  isOwnerChangeKind,
+  noteMirrorFailure,
+  recordExecuted,
+  tryExecute,
+} from "./proposals";
 import { redactRpcKey } from "./redact";
 import {
   describeSafeConfigDrift,
@@ -266,8 +272,9 @@ export async function syncSafe(a: {
                 signature: s.signature as Hex,
               });
             }
+            await clearMirrorFailure(a.fundId, tx.id);
           } catch (e) {
-            console.warn("[safe-sync] tx-service re-propose failed", tx.id, messageOf(e));
+            await noteMirrorFailure(a.fundId, tx.id, e);
           }
         }
       } else {

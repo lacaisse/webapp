@@ -27,6 +27,13 @@ function matchValue(v: unknown, cond: unknown): boolean {
       return a < b;
     }
     if ("equals" in c) return v === c.equals;
+    if ("startsWith" in c) return typeof v === "string" && v.startsWith(c.startsWith as string);
+    if ("gt" in c) {
+      if (v === null || v === undefined) return false;
+      const a = v instanceof Date ? v.getTime() : (v as number);
+      const b = c.gt instanceof Date ? c.gt.getTime() : (c.gt as number);
+      return a > b;
+    }
     return false;
   }
   return v === cond;

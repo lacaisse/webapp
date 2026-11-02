@@ -109,10 +109,11 @@ export function PendingTxCard({
   // The owner row the viewer signs as: their passkey first, else their
   // legacy server key (both may be owners mid-migration).
   const mine = owners.filter((o) => viewer.addresses.some((a) => sameAddress(a, o.address)));
-  const me =
-    mine.find((o) => o.kind === "PASSKEY" && !o.passkeyReplaced && !signatureFor(o.address)) ??
-    mine.find((o) => !signatureFor(o.address)) ??
-    mine[0];
+  // A replaced passkey can't sign any more (the browser only asserts with
+  // the active one): that owner waits for its swap.
+  const usable = mine.filter((o) => !(o.kind === "PASSKEY" && o.passkeyReplaced));
+  const me = usable.find((o) => !signatureFor(o.address)) ?? usable[0];
+  const replacedOnly = mine.length > 0 && usable.length === 0;
   const canSign =
     canAct && tx.status === "PENDING" && Boolean(me) && !signatureFor(me!.address);
   // Withdraw deletes a proposal nobody ran: the proposer's own, or any for a
@@ -273,6 +274,13 @@ export function PendingTxCard({
             <AlertDescription className="break-words">{tx.errorMessage}</AlertDescription>
           </Alert>
         )}
+        {tx.status === "PENDING" && tx.errorMessage?.startsWith("tx_service:") && (
+          <Alert variant="warning">
+            <AlertDescription className="break-words">
+              {t("tx.mirrorFailed", { error: tx.errorMessage.slice("tx_service:".length).trim() })}
+            </AlertDescription>
+          </Alert>
+        )}
         {error && (
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
@@ -330,6 +338,9 @@ export function PendingTxCard({
             <span className="text-xs text-muted-foreground">
               {t("tx.youSigned")}
             </span>
+          )}
+          {replacedOnly && tx.status === "PENDING" && (
+            <span className="text-xs text-warning">{t("tx.passkeyReplaced")}</span>
           )}
         </div>
         {stepUp.dialog}

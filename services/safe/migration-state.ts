@@ -93,10 +93,27 @@ export function migrationRows(
 }
 
 /**
- * Whether a legacy signer's ciphertext may be erased: no unarchived Safe of
- * the fund lists its address as a current owner. Pure counterpart of the
- * sweep in migration.ts.
+ * Whether a legacy signer's ciphertext may be erased: a migration swap away
+ * from it executed (`retired`) and no Safe of the fund — archived ones
+ * included, they can come back — lists its address as a current owner.
+ * Pure counterpart of the sweep in migration.ts.
  */
-export function serverKeyErasable(listedOnUnarchivedSafes: number): boolean {
-  return listedOnUnarchivedSafes === 0;
+export function serverKeyErasable(retired: boolean, listedOnAnySafe: number): boolean {
+  return retired && listedOnAnySafe === 0;
+}
+
+/**
+ * Why a passkey replacement is refused right now: a previous replacement
+ * still owns a Safe (its swap is pending — `pendingSwapOwners` > 0), or the
+ * member registered `maxPerDay` or more credentials in the last day. Each
+ * registration deploys a contract on the shared relayer's gas.
+ */
+export function replacementRefusal(
+  pendingSwapOwners: number,
+  registrationsLastDay: number,
+  maxPerDay: number,
+): "passkey_replace_pending" | "passkey_rate_limited" | null {
+  if (pendingSwapOwners > 0) return "passkey_replace_pending";
+  if (registrationsLastDay >= maxPerDay) return "passkey_rate_limited";
+  return null;
 }

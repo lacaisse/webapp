@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   migrationRows,
+  replacementRefusal,
   serverKeyErasable,
   type MigrationOwnerInput,
   type MigrationSwapInput,
@@ -84,8 +85,17 @@ describe("migration state machine", () => {
     ]);
   });
 
-  it("a legacy ciphertext may be erased only when no unarchived Safe lists it", () => {
-    expect(serverKeyErasable(0)).toBe(true);
-    expect(serverKeyErasable(1)).toBe(false);
+  it("a legacy ciphertext may be erased only once migrated and listed by no Safe at all", () => {
+    expect(serverKeyErasable(true, 0)).toBe(true);
+    expect(serverKeyErasable(true, 1)).toBe(false); // still an owner somewhere (archived counts)
+    expect(serverKeyErasable(false, 0)).toBe(false); // never migrated: keep the key
+  });
+
+  it("refuses a replacement while a previous one still owns a Safe, or past the daily cap", () => {
+    expect(replacementRefusal(0, 0, 3)).toBeNull();
+    expect(replacementRefusal(1, 0, 3)).toBe("passkey_replace_pending");
+    expect(replacementRefusal(0, 3, 3)).toBe("passkey_rate_limited");
+    expect(replacementRefusal(0, 2, 3)).toBeNull();
+    expect(replacementRefusal(2, 5, 3)).toBe("passkey_replace_pending");
   });
 });

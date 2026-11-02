@@ -511,7 +511,9 @@
         "withdrawConfirm": "Voorstel intrekken",
         "formerMember": "Geen teamlid meer",
         "configBlocked": "Uitvoering gepauzeerd: de configuratie van de Safe is niet standaard.",
-        "signWithPasskey": "Tekenen met passkey"
+        "signWithPasskey": "Tekenen met passkey",
+        "mirrorFailed": "Safe'{Wallet}' heeft deze transactie nog niet ({error}). Wordt bij elke synchronisatie opnieuw geprobeerd.",
+        "passkeyReplaced": "Je passkey op deze Safe is vervangen: rond de eigenaarswissel af om weer te tekenen."
       },
       "history": {
         "title": "Geschiedenis",
@@ -556,7 +558,10 @@
         "passkey_exists": "Je hebt al een handtekening-passkey voor dit fonds. Gebruik “Vervangen” bij een verloren toestel.",
         "rules_spare_owner": "Houd minstens één eigenaar meer dan de drempel (herstel na een verloren toestel).",
         "rules_one_person": "De sleutels van één persoon mogen niet volstaan om de drempel te halen.",
-        "server_key_retired": "Deze serversleutel is ingetrokken. Teken met je passkey."
+        "server_key_retired": "Deze serversleutel is ingetrokken. Teken met je passkey.",
+        "passkey_replaced": "Je passkey op deze Safe is vervangen. Rond eerst de eigenaarswissel naar de nieuwe af.",
+        "passkey_replace_pending": "Een vorige passkey van jou bezit nog een Safe. Rond die wissel af voor je opnieuw vervangt.",
+        "passkey_rate_limited": "Te veel handtekening-passkeys vandaag geregistreerd. Probeer het morgen opnieuw."
       },
       "archived": {
         "title": "Gearchiveerde Safes",

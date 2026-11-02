@@ -528,7 +528,9 @@
         "withdrawConfirm": "Retirer la proposition",
         "formerMember": "N'est plus membre de l'équipe",
         "configBlocked": "Exécution suspendue : la configuration du Safe n'est pas standard.",
-        "signWithPasskey": "Signer avec la passkey"
+        "signWithPasskey": "Signer avec la passkey",
+        "mirrorFailed": "Safe'{Wallet}' n'a pas encore cette transaction ({error}). Nouvel essai à chaque synchronisation.",
+        "passkeyReplaced": "Votre passkey sur ce Safe a été remplacée : terminez le remplacement de propriétaire pour signer à nouveau."
       },
       "history": {
         "title": "Historique",
@@ -573,7 +575,10 @@
         "passkey_exists": "Vous avez déjà une passkey de signature pour cette caisse. Utilisez « Remplacer » pour un appareil perdu.",
         "rules_spare_owner": "Gardez au moins un propriétaire de plus que le seuil (récupération après appareil perdu).",
         "rules_one_person": "Les clés d'une seule personne ne doivent pas suffire à atteindre le seuil.",
-        "server_key_retired": "Cette clé serveur a été retirée. Signez plutôt avec votre passkey."
+        "server_key_retired": "Cette clé serveur a été retirée. Signez plutôt avec votre passkey.",
+        "passkey_replaced": "Votre passkey sur ce Safe a été remplacée. Terminez d'abord le remplacement de propriétaire vers la nouvelle.",
+        "passkey_replace_pending": "Une de vos anciennes passkeys possède encore un Safe. Terminez son remplacement avant d'en créer une autre.",
+        "passkey_rate_limited": "Trop de passkeys de signature créées aujourd'hui. Réessayez demain."
       },
       "archived": {
         "title": "Safes archivés",

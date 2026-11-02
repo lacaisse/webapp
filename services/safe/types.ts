@@ -102,6 +102,9 @@ export type SafeErrorCode =
   | "holds_value" // archive refused: the Safe still holds funds (review S7)
   | "passkey_missing" // a team owner has no (deployed) signing passkey for this fund
   | "passkey_exists" // the member already has an active signing passkey here
+  | "passkey_replaced" // the member's owner on this Safe is a replaced passkey: swap it first
+  | "passkey_replace_pending" // a previous replacement still owns a Safe: no new one until swapped
+  | "passkey_rate_limited" // too many signing passkeys registered recently
   | "rules_spare_owner" // owner rules: owners must be ≥ threshold + 1 (lost-key recovery)
   | "rules_one_person" // owner rules: one person's keys alone must not meet the threshold
   | "server_key_retired" // LEGACY key no longer signs (migrated / erased)

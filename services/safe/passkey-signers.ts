@@ -7,6 +7,7 @@ import { getAddress, toHex } from "viem";
 
 import { prisma } from "@/services/db/prisma";
 import { passkeyVerifiersFor } from "@/services/safe/config";
+import { replacementRefusal } from "@/services/safe/migration-state";
 import { challengeForHash } from "@/services/safe/passkey-signature";
 import {
   signingPasskeyRegistrationOptions,
@@ -37,6 +38,11 @@ import { SafeError, isSafeError, type Address, type Hex } from "@/services/safe/
 
 const CHALLENGE_TTL_MS = 5 * 60 * 1000;
 const CHALLENGE_PREFIX = "safe-signing-passkey:";
+// Every registration deploys a signer contract on the relayer's gas, so a
+// replacement is refused while a previous one still owns a Safe (its swap is
+// pending) and beyond a few registrations a day (migration-state.ts
+// replacementRefusal).
+export const MAX_REGISTRATIONS_PER_DAY = 3;
 
 export const passkeySignerSelect = {
   id: true,
@@ -188,6 +194,30 @@ type ChallengeRecord = {
   replace: boolean;
 };
 
+// Refuse a replacement that would pile up: a previous replacement still
+// owning an unarchived Safe (swap pending), or too many registrations today.
+async function assertReplacementAllowed(fundId: string, userId: string): Promise<void> {
+  const [pendingSwaps, recent] = await Promise.all([
+    prisma.fundSafeOwner.count({
+      where: {
+        removedAt: null,
+        safe: { fundId, archivedAt: null },
+        passkey: { is: { fundId, userId, replacedAt: { not: null } } },
+      },
+    }),
+    prisma.fundPasskeySigner.count({
+      where: { fundId, userId, createdAt: { gt: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
+    }),
+  ]);
+  const refusal = replacementRefusal(pendingSwaps, recent, MAX_REGISTRATIONS_PER_DAY);
+  if (refusal === "passkey_replace_pending") {
+    throw new SafeError(refusal, "A previous passkey of yours still owns a Safe: finish its swap first");
+  }
+  if (refusal === "passkey_rate_limited") {
+    throw new SafeError(refusal, "Too many signing passkeys registered today");
+  }
+}
+
 export async function beginSigningPasskeyRegistration(a: {
   fund: { id: string; name: string };
   user: { id: string; email: string };
@@ -198,6 +228,7 @@ export async function beginSigningPasskeyRegistration(a: {
   if (active && !a.replace) {
     throw new SafeError("passkey_exists", "You already have a signing passkey for this fund");
   }
+  if (a.replace) await assertReplacementAllowed(a.fund.id, a.user.id);
   const challenge = randomBytes(32);
   const challengeId = toHex(randomBytes(16)).slice(2);
   const record: ChallengeRecord = {
@@ -213,9 +244,9 @@ export async function beginSigningPasskeyRegistration(a: {
       expiresAt: new Date(Date.now() + CHALLENGE_TTL_MS),
     },
   });
-  // The old credential of a replacement is NOT excluded: a lost device can't
-  // answer anyway, and excluding it would stop a member from re-registering
-  // on the very device they still have.
+  // Nothing is excluded: without `replace` an active credential already
+  // refused above, and a replacement must stay possible on the very device
+  // that still holds the old credential (a lost device can't answer anyway).
   const options = signingPasskeyRegistrationOptions({
     rpID: a.rpID,
     fundId: a.fund.id,
@@ -223,7 +254,7 @@ export async function beginSigningPasskeyRegistration(a: {
     userId: a.user.id,
     email: a.user.email,
     challenge,
-    excludeCredentialIds: active && !a.replace ? [active.credentialId] : [],
+    excludeCredentialIds: [],
   });
   return { challengeId, options };
 }
@@ -272,6 +303,7 @@ export async function finishSigningPasskeyRegistration(a: {
   if (record.fundId !== a.fundId || record.userId !== a.userId) {
     throw new SafeError("invalid_state", "Registration challenge belongs to someone else");
   }
+  if (record.replace) await assertReplacementAllowed(a.fundId, a.userId);
   const verified = await verifySigningRegistration({
     response: a.response,
     expectedChallenge: record.challenge,

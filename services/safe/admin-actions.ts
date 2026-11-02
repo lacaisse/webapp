@@ -28,6 +28,7 @@ import {
   renameSafe,
   retryExecution,
   retrySafeDeployment,
+  actingOwnerKind,
   signTransaction,
   unarchiveSafe,
   withdrawProposal,
@@ -87,6 +88,18 @@ function errorFor(t: T, e: unknown, context: string): string {
 async function requireStepUp(t: T): Promise<ActionError | null> {
   if (await hasRecentAuth()) return null;
   return { error: t("auth.errors.reauthRequired" as never), code: REAUTH_REQUIRED };
+}
+
+// A passkey owner's proposal is stored unsigned (withdrawable, moving
+// nothing) and the signing ceremony that follows is itself the step-up, so
+// the re-authentication before the proposal is only asked of legacy
+// server-key proposers.
+async function requireProposerStepUp(
+  t: T,
+  a: { fundId: string; safeId: string; userId: string },
+): Promise<ActionError | null> {
+  if ((await actingOwnerKind(a)) === "PASSKEY") return null;
+  return requireStepUp(t);
 }
 
 function proposed(res: ProposeResult): ProposeActionResult {
@@ -260,7 +273,7 @@ export async function proposeTransferAction(
     return { error: t("fund.safes.errors.tokenNotEnabled" as never) };
   }
 
-  const stepUp = await requireStepUp(t);
+  const stepUp = await requireProposerStepUp(t, { fundId: fund.id, safeId: parsed.data.safeId, userId: user.id });
   if (stepUp) return stepUp;
 
   try {
@@ -287,7 +300,7 @@ export async function proposeOwnerChangeAction(
   const parsed = ProposeOwnerChangeSchema.safeParse(input);
   if (!parsed.success) return { error: t(parsed.error.issues[0].message as never) };
 
-  const stepUp = await requireStepUp(t);
+  const stepUp = await requireProposerStepUp(t, { fundId: fund.id, safeId: parsed.data.safeId, userId: user.id });
   if (stepUp) return stepUp;
 
   try {
@@ -315,7 +328,7 @@ export async function proposeRejectionAction(input: {
   const parsed = SafeTxIdSchema.safeParse(input);
   if (!parsed.success) return { error: t(parsed.error.issues[0].message as never) };
 
-  const stepUp = await requireStepUp(t);
+  const stepUp = await requireProposerStepUp(t, { fundId: fund.id, safeId: parsed.data.safeId, userId: user.id });
   if (stepUp) return stepUp;
 
   try {

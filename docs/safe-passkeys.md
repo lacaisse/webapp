@@ -123,10 +123,15 @@ server key):
 - **one person**: threshold > the number of owners one person holds (their passkey plus any
   legacy key mid-migration) — one person's keys alone never meet the threshold.
 
-So the smallest passkey-only Safe is 2-of-3. Enforced in `createSafe` and every owner /
-threshold change (`rules_spare_owner` / `rules_one_person`), and shown live in the dialogs.
-All-external Safes are left to their owners' judgement. Owner chips show **Backed up** /
-**Device-only** from the credential's BS flag.
+So the smallest passkey-only Safe is 2-of-3. A new Safe must comply (`createSafe`). An owner /
+threshold change on an existing Safe is judged by its result **against the current set**
+(`checkOwnerChange`): a compliant result passes; a non-compliant one passes only when it is no
+further from the rules than today — the custody rule (one person's keys meet the threshold)
+outranks the recovery rule (no spare owner). So a legacy 1-of-1 server-key Safe may still swap
+its key for a passkey, add an owner, or raise its threshold, and a 2-of-2 may migrate; dropping
+a 2-of-2 to 1-of-2 is refused (`rules_spare_owner` / `rules_one_person`). The dialogs show the
+rule live. All-external Safes are left to their owners' judgement. Owner chips show **Backed
+up** / **Device-only** from the credential's BS flag.
 
 ## Migration of server-held owners (`migration.ts`, `migration-state.ts`)
 
@@ -147,14 +152,25 @@ own: it only proposes.
 
 After the swap executes and sync confirms the new owner set, `retireServerKeys` (run by
 every sync of the fund) sets `FundSigner.retiredAt` for a key a migration swap moved away,
-and **erases the ciphertext** (`privateKeyEnc` null, `keyDeletedAt`) once no unarchived Safe
-of the fund lists the address as a current owner. The row stays so signature history keeps
-pointing at a person; `signSafeTxWithSigner` refuses an erased key (`server_key_retired`).
+and **erases the ciphertext** (`privateKeyEnc` null, `keyDeletedAt`) once that retired key is
+listed as a current owner by no Safe of the fund at all — archived Safes included, since an
+unarchived Safe would need it again (and shows the banner when it comes back). A key that was
+never migrated keeps its ciphertext. The row stays so signature history keeps pointing at a
+person; `signSafeTxWithSigner` refuses an erased key (`server_key_retired`).
 
 **Lost device**: "Replace (lost device)" on the signing-passkey card registers a successor and
 marks the old row `replacedAt`; every Safe the old address owns shows the banner with a
-`replaced_passkey` row, swapped like a migration. The recovery rules guarantee the other
-owners can do it.
+`replaced_passkey` row, swapped like a migration. Until that swap executes the member cannot
+sign on that Safe (`passkey_replaced`: the browser only asserts with the active credential, and
+the pending card hides Sign). A further replacement is refused while a previous one still owns
+an unarchived Safe (`passkey_replace_pending`) and beyond three registrations a day
+(`passkey_rate_limited`) — every registration deploys a contract on the relayer's gas.
+
+**Step-up**: a passkey owner is not asked to re-authenticate before proposing (the proposal is
+unsigned and withdrawable until the ceremony, which mints the proof); legacy server-key
+proposers still are. **Mirror failures**: when the Transaction Service refuses a proposal or a
+confirmation, the note is kept on the row (`errorMessage` with prefix `tx_service:`) and shown
+on the pending card; sync's re-propose clears it.
 
 ## Tests
 
@@ -186,6 +202,7 @@ Exercised on chain:
 | Migration swap of a server key to its member's passkey (proposed + co-signed with server keys) | `0xf7e7aa1c…c5b0` (nonce 4, `migration: server_key`); sync turned the owner row into `PASSKEY`, the `FundSigner` got `retiredAt` and its ciphertext erased |
 | Second migration swap proposed with a server key and co-signed by the migrated member's **passkey** (mixed ECDSA + contract set in one `execTransaction`) | `0x08d15701…764f` (nonce 5); second `FundSigner` retired + erased |
 | Known-answer vector (unit test) | `isValidSignatureForSigner` on the factory answered `0x1626ba7e` at block 49068533 |
+| Transaction Service mirror with a contract signature (review follow-up, `--mirror`): threshold change 2 → 3 proposed by a passkey owner on the Safe that now has an external owner, confirmed by a second passkey | the service listed the proposal with sender = the signer contract and a `CONTRACT_SIGNATURE` confirmation (417 bytes), then the second one; executed `0x8ade302b…7a69` (safeTxHash `0x3a8e3921…5970`), shown executed on the service with both confirmations |
 
 Earlier attempts of the same run left two discarded artefacts on chain (signer proxies
 `0xc704…df5a`, `0xCe7d…5B5d`, `0x5239…2FcE` and Safe `0xC4F1…40Ae`, deploy `0x3144e275…ac04`):
@@ -194,9 +211,8 @@ answer. The script now exports / re-imports the authenticator state.
 
 Not exercised:
 
-- Transaction Service mirroring of a contract signature and the import of a contract
-  confirmation from Safe{Wallet} (unit-tested only — the bench Safes had no external owner
-  until the end).
+- The import of a contract confirmation made in Safe{Wallet} (unit-tested only; mirroring
+  our own contract signatures to the service is covered above).
 - A synced ("backed up") passkey: the virtual authenticator reports device-only, so the
   "Backed up" chip was only seen in its device-only state.
 - The lost-device replacement flow end to end (state machine and rules unit-tested; the

@@ -27,7 +27,7 @@ import {
   verifyContractSignature,
 } from "./relayer";
 import { safeHoldsValue } from "./holdings";
-import { ownerRuleViolation, type RuleOwner } from "./owner-rules";
+import { checkOwnerChange, ownerRuleViolation, type RuleOwner } from "./owner-rules";
 import { contractSignature } from "./passkey-signature";
 import {
   activePasskeySignersByUser,
@@ -84,7 +84,9 @@ import {
 // layer revalidates.
 //
 // Tx-service calls (Safe{Wallet} mirror) are best-effort everywhere: a
-// failure is logged and never fails a proposal / signature.
+// failure never fails a proposal / signature, but it is kept on the row
+// (`errorMessage`, prefix `tx_service:`) so the card says the external
+// owners can't see it yet; sync's re-propose clears it.
 
 export type ProposeResult = {
   transactionId: string;
@@ -179,17 +181,30 @@ async function requireAdminMembers(fundId: string, userIds: string[]): Promise<v
   }
 }
 
-// Recovery rules (owner-rules.ts) for any Safe with team owners.
+// Recovery rules (owner-rules.ts) for any Safe with team owners. A new Safe
+// must comply; a change to an existing Safe must not move it further from
+// the rules (a legacy 1-of-1 may still swap its server key for a passkey,
+// add an owner, or raise its threshold — anything that repairs it).
+function ruleError(violation: NonNullable<ReturnType<typeof ownerRuleViolation>>): SafeError {
+  return new SafeError(
+    violation,
+    violation === "rules_spare_owner"
+      ? "Keep at least one owner more than the threshold"
+      : "One person's keys alone must not meet the threshold",
+  );
+}
+
 function requireOwnerRules(owners: RuleOwner[], threshold: number): void {
   const violation = ownerRuleViolation(owners, threshold);
-  if (violation) {
-    throw new SafeError(
-      violation,
-      violation === "rules_spare_owner"
-        ? "Keep at least one owner more than the threshold"
-        : "One person's keys alone must not meet the threshold",
-    );
-  }
+  if (violation) throw ruleError(violation);
+}
+
+function requireOwnerChangeRules(
+  before: { owners: RuleOwner[]; threshold: number },
+  after: { owners: RuleOwner[]; threshold: number },
+): void {
+  const check = checkOwnerChange(before, after);
+  if (!check.ok) throw ruleError(check.violation);
 }
 
 // ---------------------------------------------------------------------------
@@ -536,7 +551,7 @@ type OwnerRowLike = {
   address: string;
   kind: "MEMBER" | "EXTERNAL" | "PASSKEY";
   passkeyId?: string | null;
-  passkey?: { userId: string } | null;
+  passkey?: { userId: string; replacedAt: Date | null } | null;
 };
 
 async function requireActingOwner(
@@ -544,17 +559,46 @@ async function requireActingOwner(
   userId: string,
   owners: OwnerRowLike[],
 ): Promise<ActingOwner> {
-  const passkeyOwner = owners.find(
-    (o) => o.kind === "PASSKEY" && o.passkey?.userId === userId && o.passkeyId,
-  );
-  if (passkeyOwner) {
-    return { kind: "PASSKEY", address: getAddress(passkeyOwner.address), passkeyId: passkeyOwner.passkeyId! };
+  const mine = owners.filter((o) => o.kind === "PASSKEY" && o.passkey?.userId === userId && o.passkeyId);
+  // Only the ACTIVE credential signs (the browser asserts with it); a row
+  // whose passkey was replaced is an owner the swap has not reached yet.
+  const active = mine.find((o) => !o.passkey?.replacedAt);
+  if (active) {
+    return { kind: "PASSKEY", address: getAddress(active.address), passkeyId: active.passkeyId! };
   }
   const signer = await findFundSigner(fundId, userId);
   if (signer && owners.some((o) => o.kind === "MEMBER" && sameAddress(o.address, signer.address))) {
     return { kind: "MEMBER", address: signer.address, signer };
   }
+  if (mine.length > 0) {
+    throw new SafeError(
+      "passkey_replaced",
+      "Your passkey on this Safe was replaced: finish the owner swap first",
+    );
+  }
   throw new SafeError("not_owner", "You are not an owner of this Safe");
+}
+
+/**
+ * How `userId` would act on this Safe: with a passkey, a legacy server key,
+ * or not at all (null, including a replaced passkey awaiting its swap). For
+ * the actions, which skip the pre-proposal step-up for passkey owners.
+ */
+export async function actingOwnerKind(a: {
+  fundId: string;
+  safeId: string;
+  userId: string;
+}): Promise<"PASSKEY" | "MEMBER" | null> {
+  const safe = await prisma.fundSafe.findFirst({
+    where: { id: a.safeId, fundId: a.fundId, archivedAt: null },
+    include: ownerInclude,
+  });
+  if (!safe) return null;
+  try {
+    return (await requireActingOwner(a.fundId, a.userId, safe.owners)).kind;
+  } catch {
+    return null;
+  }
 }
 
 function ownerLabel(safe: LoadedSafe, address: string): string | null {
@@ -707,7 +751,7 @@ async function propose(a: {
         origin: "La Caisse",
       });
     } catch (e) {
-      console.warn("[safe] tx-service propose failed", created.id, errorMessageOf(e));
+      await noteMirrorFailure(a.fundId, created.id, e);
     }
   }
 
@@ -883,6 +927,7 @@ export async function proposeOwnerChange(a: {
     return row ? ruleOwnerOf(row) : { kind: "EXTERNAL", personId: null };
   };
   const currentRules = chainOwners.map(ruleOwnerAt);
+  const before = { owners: currentRules, threshold: state.threshold };
 
   let kind: FundSafeTxKind;
   let data: Hex;
@@ -895,7 +940,7 @@ export async function proposeOwnerChange(a: {
       if (change.threshold < 1 || change.threshold > chainOwners.length + 1) {
         throw new SafeError("invalid_state", "Invalid threshold");
       }
-      requireOwnerRules([...currentRules, owner.rule], change.threshold);
+      requireOwnerChangeRules(before, { owners: [...currentRules, owner.rule], threshold: change.threshold });
       kind = "ADD_OWNER";
       data = addOwnerWithThresholdData(owner.address, BigInt(change.threshold));
       summary = {
@@ -914,10 +959,10 @@ export async function proposeOwnerChange(a: {
       if (change.threshold < 1 || change.threshold > chainOwners.length - 1) {
         throw new SafeError("invalid_state", "Invalid threshold");
       }
-      requireOwnerRules(
-        chainOwners.filter((o) => !sameAddress(o, owner)).map(ruleOwnerAt),
-        change.threshold,
-      );
+      requireOwnerChangeRules(before, {
+        owners: chainOwners.filter((o) => !sameAddress(o, owner)).map(ruleOwnerAt),
+        threshold: change.threshold,
+      });
       kind = "REMOVE_OWNER";
       data = removeOwnerData(chainOwners, owner, BigInt(change.threshold));
       summary = {
@@ -934,10 +979,10 @@ export async function proposeOwnerChange(a: {
       if (!isOwner(oldOwner)) throw new SafeError("invalid_state", "Not an owner");
       const next = await resolveNewOwner(fund.id, safe.chainId, change);
       if (isOwner(next.address)) throw new SafeError("invalid_state", "Already an owner");
-      requireOwnerRules(
-        chainOwners.map((o) => (sameAddress(o, oldOwner) ? next.rule : ruleOwnerAt(o))),
-        state.threshold,
-      );
+      requireOwnerChangeRules(before, {
+        owners: chainOwners.map((o) => (sameAddress(o, oldOwner) ? next.rule : ruleOwnerAt(o))),
+        threshold: state.threshold,
+      });
       kind = "SWAP_OWNER";
       data = swapOwnerData(chainOwners, oldOwner, next.address);
       const migration = migrationReasonFor(safe, oldOwner, next);
@@ -958,7 +1003,7 @@ export async function proposeOwnerChange(a: {
       if (change.threshold === state.threshold) {
         throw new SafeError("invalid_state", "Threshold unchanged");
       }
-      requireOwnerRules(currentRules, change.threshold);
+      requireOwnerChangeRules(before, { owners: currentRules, threshold: change.threshold });
       kind = "CHANGE_THRESHOLD";
       data = changeThresholdData(BigInt(change.threshold));
       summary = { kind, threshold: change.threshold, previousThreshold: state.threshold };
@@ -1232,13 +1277,42 @@ async function storeSignatureAndExecute(a: {
           signature: a.signature,
         });
       }
+      await clearMirrorFailure(a.fundId, tx.id);
     } catch (e) {
-      console.warn("[safe] tx-service confirm failed", tx.id, errorMessageOf(e));
+      await noteMirrorFailure(a.fundId, tx.id, e);
     }
   }
 
   const exec = await tryExecute({ fundId: a.fundId, transactionId: tx.id });
   return { executed: exec.executed, txHash: exec.txHash };
+}
+
+export const MIRROR_ERROR_PREFIX = "tx_service:";
+
+/** Keep a Transaction Service failure on the (still PENDING) row. Never throws. */
+export async function noteMirrorFailure(fundId: string, transactionId: string, e: unknown): Promise<void> {
+  const message = `${MIRROR_ERROR_PREFIX} ${errorMessageOf(e).replace(/^tx_service: /, "")}`.slice(0, 400);
+  console.warn("[safe] tx-service mirror failed", transactionId, message);
+  try {
+    await prisma.fundSafeTransaction.updateMany({
+      where: { id: transactionId, safe: { fundId }, status: "PENDING" },
+      data: { errorMessage: message },
+    });
+  } catch (err) {
+    console.warn("[safe] could not record mirror failure", transactionId, errorMessageOf(err));
+  }
+}
+
+/** Drop a recorded mirror failure once the service has the transaction. */
+export async function clearMirrorFailure(fundId: string, transactionId: string): Promise<void> {
+  try {
+    await prisma.fundSafeTransaction.updateMany({
+      where: { id: transactionId, safe: { fundId }, errorMessage: { startsWith: MIRROR_ERROR_PREFIX } },
+      data: { errorMessage: null },
+    });
+  } catch (err) {
+    console.warn("[safe] could not clear mirror failure", transactionId, errorMessageOf(err));
+  }
 }
 
 // Execute when the threshold is met. Returns a reason (not an error) for the

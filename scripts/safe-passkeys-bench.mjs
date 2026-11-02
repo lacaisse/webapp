@@ -24,9 +24,9 @@
 // signed by the first member's PASSKEY → a mixed ECDSA + contract set on
 // chain. Prints what happened; exits non-zero on the first failure.
 
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { chromium } from "playwright-core";
 
@@ -38,13 +38,22 @@ const LEGACY_SAFE = process.env.BENCH_LEGACY_SAFE ?? "Bench";
 const HEADED = process.argv.includes("--headed");
 const SKIP_CREATE = process.argv.includes("--skip-create");
 const SKIP_MIGRATE = process.argv.includes("--skip-migrate");
+// --mirror: on BENCH_SAFE_ID (a Safe with an EXTERNAL owner), propose a
+// threshold change with a passkey, check the Safe Transaction Service got the
+// proposal with its contract signature, have a second passkey confirm it.
+const MIRROR = process.argv.includes("--mirror");
+const MIRROR_SAFE_ID = process.env.BENCH_SAFE_ID ?? null;
+const TX_SERVICE = process.env.SAFE_TX_SERVICE_URL ?? "https://api.safe.global/tx-service/gno/api";
 const EXTERNAL_OWNER = process.env.BENCH_EXTERNAL_OWNER ?? "0x308bCBa768Ad9a1d95f4a64F7ee309fABB9963a4";
 // Display names of the users (the migration banner shows names, not emails).
 const NAMES = (process.env.BENCH_NAMES ?? "").split(",").map((s) => s.trim());
 // The virtual authenticators' credentials, exported after every run and
 // re-imported at the start of the next, so a passkey registered in one run
 // still answers in a later one (a fresh authenticator knows nothing).
-const STATE_FILE = process.env.BENCH_STATE ?? join(tmpdir(), "lacaisse-safe-passkeys-bench.json");
+// Kept under the project's git-ignored `.bench/` folder (not a shared tmp dir).
+const STATE_FILE =
+  process.env.BENCH_STATE ??
+  join(dirname(fileURLToPath(import.meta.url)), "..", ".bench", "safe-passkeys-state.json");
 
 if (!PASSWORD || USERS.length < 3) {
   console.error("Set BENCH_PASSWORD and BENCH_USERS (three admins of the bench fund).");
@@ -73,7 +82,8 @@ async function saveState() {
       log("could not export credentials for", email, String(e).slice(0, 80));
     }
   }
-  writeFileSync(STATE_FILE, JSON.stringify(state, null, 1));
+  mkdirSync(dirname(STATE_FILE), { recursive: true });
+  writeFileSync(STATE_FILE, JSON.stringify(state, null, 1), { mode: 0o600 });
   log("authenticator state saved to", STATE_FILE);
 }
 
@@ -223,6 +233,42 @@ async function proposeMigrationSwap(page, safeId, forName) {
   log("migration swap proposed for", forName);
 }
 
+async function proposeThreshold(page, safeId, threshold) {
+  await page.goto(`${BASE}/accounts/safes/${safeId}?tab=signers`);
+  await page.getByRole("button", { name: /^change threshold$/i }).click();
+  const dialog = page.locator("[role=dialog]");
+  // Step up to the wanted threshold with the stepper's "More signatures".
+  for (let i = 0; i < 6; i++) {
+    const current = Number((await dialog.locator("[data-slot=threshold-value], output, [aria-live]").first().textContent().catch(() => "")) || NaN);
+    if (current === threshold) break;
+    await dialog.getByRole("button", { name: /more signatures/i }).click();
+  }
+  await dialog.getByRole("button", { name: /^propose$/i }).click();
+  await answerStepUp(page);
+  await page.getByText(/Proposed\. It runs once|Signed and executed|Proposed, but not signed/).waitFor({ timeout: 120_000 });
+  const text = (await dialog.allTextContents()).join(" | ");
+  log("threshold change proposed:", text.replace(/\s+/g, " ").slice(0, 200));
+  await page.getByRole("button", { name: /^close$/i }).last().click();
+}
+
+async function txServicePending(safeAddress) {
+  const res = await fetch(`${TX_SERVICE}/v2/safes/${safeAddress}/multisig-transactions/?executed=false&limit=20`, {
+    headers: { accept: "application/json" },
+  });
+  if (!res.ok) throw new Error(`tx-service HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  const json = await res.json();
+  return (json.results ?? []).map((t) => ({
+    safeTxHash: t.safeTxHash,
+    nonce: t.nonce,
+    confirmations: (t.confirmations ?? []).map((c) => ({ owner: c.owner, signatureType: c.signatureType, bytes: c.signature ? (c.signature.length - 2) / 2 : 0 })),
+  }));
+}
+
+async function safeAddressOf(page, safeId) {
+  await page.goto(`${BASE}/accounts/safes/${safeId}`);
+  return page.locator("header").getByText(/^0x[0-9a-fA-F]{40}$/).first().textContent();
+}
+
 async function findSafeIdByName(page, name) {
   await page.goto(`${BASE}/accounts`);
   const link = page.locator(`a[href^="/accounts/safes/"]`, { hasText: name }).first();
@@ -263,6 +309,23 @@ try {
     await proposeAddExternal(pages[first], safeId);
     await signPending(pages[second], safeId, true);
     log("pending after two passkey signatures:", await pendingCount(pages[first], safeId));
+  }
+
+  if (MIRROR && MIRROR_SAFE_ID) {
+    const address = await safeAddressOf(pages[first], MIRROR_SAFE_ID);
+    log("mirror bench on", MIRROR_SAFE_ID, address);
+    await proposeThreshold(pages[first], MIRROR_SAFE_ID, 3);
+    let seen = [];
+    for (let i = 0; i < 6 && seen.length === 0; i++) {
+      seen = await txServicePending(address);
+      if (seen.length === 0) await new Promise((r) => setTimeout(r, 5_000));
+    }
+    log("tx-service pending after the passkey proposal:", JSON.stringify(seen));
+    await signPending(pages[second], MIRROR_SAFE_ID, true);
+    await new Promise((r) => setTimeout(r, 5_000));
+    log("tx-service pending after the second passkey signature:", JSON.stringify(await txServicePending(address)));
+    log("pending in La Caisse:", await pendingCount(pages[first], MIRROR_SAFE_ID));
+    report.mirror = { safeId: MIRROR_SAFE_ID, address, seen };
   }
 
   if (!SKIP_MIGRATE) {

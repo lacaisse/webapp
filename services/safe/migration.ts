@@ -5,7 +5,12 @@ import { getAddress } from "viem";
 
 import { prisma } from "@/services/db/prisma";
 
-import { migrationRows, type MigrationRow, type MigrationSwapInput } from "./migration-state";
+import {
+  migrationRows,
+  serverKeyErasable,
+  type MigrationRow,
+  type MigrationSwapInput,
+} from "./migration-state";
 import { lc } from "./safe-tx";
 import type { SafeTxSummary } from "./types";
 
@@ -106,9 +111,11 @@ function shortAddress(address: string): string {
 
 /**
  * Retire legacy server keys of a fund: a signer whose address a migration
- * swap moved off a Safe gets `retiredAt`; a signer no unarchived Safe lists
- * as a current owner any more gets its ciphertext erased (`privateKeyEnc`
- * null, `keyDeletedAt`). Idempotent; run by sync after the owner refresh.
+ * swap moved off a Safe gets `retiredAt`; a retired signer that no Safe of
+ * the fund — archived ones included, since an unarchived Safe would need
+ * it again — lists as a current owner any more gets its ciphertext erased
+ * (`privateKeyEnc` null, `keyDeletedAt`). A key that was never migrated
+ * keeps its ciphertext. Idempotent; run by sync after the owner refresh.
  * Returns what changed, for logging.
  */
 export async function retireServerKeys(fundId: string): Promise<{ retired: number; erased: number }> {
@@ -138,23 +145,22 @@ export async function retireServerKeys(fundId: string): Promise<{ retired: numbe
 
   for (const signer of signers) {
     const address = getAddress(signer.address);
-    if (!signer.retiredAt && migratedAway.has(lc(address))) {
+    let isRetired = Boolean(signer.retiredAt);
+    if (!isRetired && migratedAway.has(lc(address))) {
       const res = await prisma.fundSigner.updateMany({
         where: { id: signer.id, fundId, retiredAt: null },
         data: { retiredAt: now },
       });
       retired += res.count;
+      isRetired = true;
     }
     if (signer.privateKeyEnc) {
-      // (b) erase: no unarchived Safe of the fund lists it as a current owner.
+      // (b) erase: migrated, and no Safe of the fund (archived included)
+      // lists it as a current owner.
       const listed = await prisma.fundSafeOwner.count({
-        where: {
-          signerId: signer.id,
-          removedAt: null,
-          safe: { fundId, archivedAt: null },
-        },
+        where: { signerId: signer.id, removedAt: null, safe: { fundId } },
       });
-      if (listed === 0) {
+      if (serverKeyErasable(isRetired, listed)) {
         const res = await prisma.fundSigner.updateMany({
           where: { id: signer.id, fundId, privateKeyEnc: { not: null } },
           data: { privateKeyEnc: null, keyDeletedAt: now },

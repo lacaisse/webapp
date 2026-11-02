@@ -528,7 +528,9 @@
         "withdrawConfirm": "Withdraw proposal",
         "formerMember": "No longer a team member",
         "configBlocked": "Execution paused: the Safe's configuration is not standard.",
-        "signWithPasskey": "Sign with passkey"
+        "signWithPasskey": "Sign with passkey",
+        "mirrorFailed": "Safe'{Wallet}' does not have this transaction yet ({error}). It is retried on every sync.",
+        "passkeyReplaced": "Your passkey on this Safe was replaced: finish the owner swap to sign again."
       },
       "history": {
         "title": "History",
@@ -573,7 +575,10 @@
         "passkey_exists": "You already have a signing passkey for this fund. Use “Replace” for a lost device.",
         "rules_spare_owner": "Keep at least one owner more than the threshold (lost-device recovery).",
         "rules_one_person": "One person's keys alone must not meet the threshold.",
-        "server_key_retired": "This server-held key was retired. Sign with your passkey instead."
+        "server_key_retired": "This server-held key was retired. Sign with your passkey instead.",
+        "passkey_replaced": "Your passkey on this Safe was replaced. Finish the owner swap to the new one first.",
+        "passkey_replace_pending": "A previous passkey of yours still owns a Safe. Finish its swap before replacing again.",
+        "passkey_rate_limited": "Too many signing passkeys registered today. Try again tomorrow."
       },
       "archived": {
         "title": "Archived Safes",

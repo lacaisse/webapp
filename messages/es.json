@@ -511,7 +511,9 @@
         "withdrawConfirm": "Retirar la propuesta",
         "formerMember": "Ya no es miembro del equipo",
         "configBlocked": "Ejecución en pausa: la configuración del Safe no es estándar.",
-        "signWithPasskey": "Firmar con passkey"
+        "signWithPasskey": "Firmar con passkey",
+        "mirrorFailed": "Safe'{Wallet}' aún no tiene esta transacción ({error}). Se reintenta en cada sincronización.",
+        "passkeyReplaced": "Tu passkey en este Safe fue reemplazada: termina el cambio de propietario para volver a firmar."
       },
       "history": {
         "title": "Historial",
@@ -556,7 +558,10 @@
         "passkey_exists": "Ya tienes una passkey de firma para este fondo. Usa «Reemplazar» si perdiste el dispositivo.",
         "rules_spare_owner": "Mantén al menos un propietario más que el umbral (recuperación tras perder un dispositivo).",
         "rules_one_person": "Las claves de una sola persona no deben bastar para alcanzar el umbral.",
-        "server_key_retired": "Esta clave del servidor fue retirada. Firma con tu passkey."
+        "server_key_retired": "Esta clave del servidor fue retirada. Firma con tu passkey.",
+        "passkey_replaced": "Tu passkey en este Safe fue reemplazada. Termina primero el cambio de propietario a la nueva.",
+        "passkey_replace_pending": "Una passkey anterior tuya todavía posee un Safe. Termina su reemplazo antes de crear otra.",
+        "passkey_rate_limited": "Demasiadas passkeys de firma creadas hoy. Inténtalo de nuevo mañana."
       },
       "archived": {
         "title": "Safes archivados",
