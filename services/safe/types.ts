@@ -17,7 +17,9 @@ export type SafeTx = {
   to: Address;
   value: bigint;
   data: Hex;
-  operation: 0 | 1; // 0 = Call, 1 = DelegateCall (never used by us)
+  // 0 = Call. 1 = DelegateCall, allowed to the chain's MultiSendCallOnly only
+  // (a batch of plain calls) — safe-tx.ts::assertAllowedOperation.
+  operation: 0 | 1;
   safeTxGas: bigint;
   baseGas: bigint;
   gasPrice: bigint;
@@ -108,6 +110,7 @@ export type SafeErrorCode =
   | "rules_spare_owner" // owner rules: owners must be ≥ threshold + 1 (lost-key recovery)
   | "rules_one_person" // owner rules: one person's keys alone must not meet the threshold
   | "server_key_retired" // LEGACY key no longer signs (migrated / erased)
+  | "operation_refused" // DelegateCall to anything but MultiSendCallOnly
   | "invalid_state"; // e.g. acting on a non-ACTIVE safe or non-PENDING tx
 
 export class SafeError extends Error {

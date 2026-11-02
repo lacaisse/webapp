@@ -48,7 +48,9 @@ const annotate = vi.hoisted(() => ({
 }));
 vi.mock("@/services/transaction-annotation/annotate", () => annotate);
 
+import { MULTISEND_CALL_ONLY_BY_CHAIN } from "./config";
 import { parseContractSignature } from "./passkey-signature";
+import { safeTxFromRow, safeTxHash } from "./safe-tx";
 import { fake, resetFake } from "./test-fake-prisma";
 import {
   MAX_OPEN_PROPOSALS_PER_PROPOSER,
@@ -1091,5 +1093,68 @@ describe("execution bookkeeping (S6, S15)", () => {
     expect(res.executed).toBe(false);
     expect(relayer.execSafeTransaction).not.toHaveBeenCalled();
     expect(db.fundSafeTransaction[0]!.status).toBe("PENDING");
+  });
+});
+
+describe("operation rule (DelegateCall)", () => {
+  // A stored row is trusted only as far as its hash and its operation: a row
+  // rewritten into a DelegateCall to anything but MultiSendCallOnly — even
+  // with a consistent hash — is neither signed nor executed.
+  function tamper(to: string, operation: 0 | 1) {
+    const row = db.fundSafeTransaction[0];
+    row.to = to;
+    row.operation = operation;
+    row.safeTxHash = safeTxHash({
+      chainId: 100,
+      safeAddress: SAFE,
+      tx: safeTxFromRow(row as Parameters<typeof safeTxFromRow>[0]),
+    });
+    return row;
+  }
+
+  it("signing refuses a row turned into a DelegateCall to an arbitrary contract", async () => {
+    seed({ threshold: 2, owners: OWNERS_3 });
+    const res = await transfer("u-a");
+    const row = tamper(RECIPIENT, 1);
+    await expect(
+      signTransaction({ fundId: FUND.id, transactionId: res.transactionId, userId: "u-b" }),
+    ).rejects.toMatchObject({ code: "operation_refused" });
+    expect(row.status).toBe("PENDING");
+    expect(relayer.execSafeTransaction).not.toHaveBeenCalled();
+  });
+
+  it("execution refuses it too, whatever signatures the row gathered", async () => {
+    seed({ threshold: 2, owners: OWNERS_3 });
+    const res = await transfer("u-a");
+    const row = tamper(RECIPIENT, 1);
+    db.fundSafeSignature.push({
+      id: "sig-tampered",
+      transactionId: row.id,
+      ownerAddress: B,
+      signature: sigFor("1b"),
+      source: "LACAISSE",
+      signerId: "signer-u-b",
+      userId: "u-b",
+    });
+    await expect(tryExecute({ fundId: FUND.id, transactionId: res.transactionId })).rejects.toMatchObject({
+      code: "operation_refused",
+    });
+    expect(relayer.execSafeTransaction).not.toHaveBeenCalled();
+    expect(row.status).toBe("PENDING");
+  });
+
+  it("a DelegateCall to MultiSendCallOnly is signed and executed like any transaction", async () => {
+    seed({ threshold: 2, owners: OWNERS_3 });
+    const res = await transfer("u-a");
+    tamper(MULTISEND_CALL_ONLY_BY_CHAIN[100], 1);
+    const signed = await signTransaction({
+      fundId: FUND.id,
+      transactionId: res.transactionId,
+      userId: "u-b",
+    });
+    expect(signed.executed).toBe(true);
+    const exec = relayer.execSafeTransaction.mock.calls[0][0];
+    expect(exec.tx.operation).toBe(1);
+    expect(exec.tx.to).toBe(MULTISEND_CALL_ONLY_BY_CHAIN[100]);
   });
 });

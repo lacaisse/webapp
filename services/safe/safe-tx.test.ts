@@ -16,13 +16,17 @@ import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { describe, expect, it } from "vitest";
 
 import { SAFE_ABI } from "@/services/safe/abi";
-import { SAFE_CONTRACTS_BY_CHAIN } from "@/services/safe/config";
+import { MULTISEND_CALL_ONLY_BY_CHAIN, SAFE_CONTRACTS_BY_CHAIN } from "@/services/safe/config";
 import {
   SENTINEL_OWNERS,
   ZERO_ADDRESS,
   addOwnerWithThresholdData,
+  assertAllowedOperation,
+  batchCall,
   buildSafeTx,
   changeThresholdData,
+  decodeMultiSendCallOnly,
+  encodeMultiSendCallOnly,
   erc20TransferData,
   packSignatures,
   predictSafeAddress,
@@ -460,5 +464,127 @@ describe("deployment", () => {
     const b = randomSaltNonce();
     expect(a).not.toBe(b);
     expect(a >= BigInt(0) && a < BigInt(2) ** BigInt(256)).toBe(true);
+  });
+});
+
+// Offline vector captured from Gnosis on 2026-11-02: GnosisDAO Safe tx nonce
+// 2244, a Safe{Wallet} CoW swap batch — USDC.approve(VaultRelayer) +
+// GPv2Settlement.setPreSignature(uid, true) — executed through the canonical
+// MultiSendCallOnly 1.4.1 as a DelegateCall (tx 0x77c05337…6a7e). Both the
+// multiSend calldata and the Safe tx hash the owners signed are recorded.
+const MSCO = MULTISEND_CALL_ONLY_BY_CHAIN[100];
+const COW_BATCH_SAFE_TX_HASH: Hex =
+  "0x00baf49fe88fee6a4bf0ec2e59039551fa0f43c0bc2b9409b4ead0d5ae7ba912";
+const COW_BATCH_CALLS = [
+  {
+    operation: 0,
+    to: getAddress("0xDDAfbb505ad214D7b80b1f830fcCc89B60fb7A83"),
+    value: BigInt(0),
+    data: ("0x095ea7b3000000000000000000000000c92e8bdf79f0507f65a392b0ab4667716bfe0110" +
+      "0000000000000000000000000000000000000000000000000000000773594000") as Hex,
+  },
+  {
+    operation: 0,
+    to: getAddress("0x9008D19f58AAbD9eD0D60971565AA8510560ab41"),
+    value: BigInt(0),
+    data: ("0xec6cb13f0000000000000000000000000000000000000000000000000000000000000040" +
+      "0000000000000000000000000000000000000000000000000000000000000001" +
+      "0000000000000000000000000000000000000000000000000000000000000038" +
+      "0ebc355394854ff1026510549fe9cc1edc621ed5bd9bef6acf0bb59f8eb947fc" +
+      "458cd345b4c05e8df39d0a07220feb4ec19f5e6f6a7457780000000000000000") as Hex,
+  },
+];
+const COW_BATCH_DATA: Hex =
+  ("0x8d80ff0a0000000000000000000000000000000000000000000000000000000000000020" +
+    "0000000000000000000000000000000000000000000000000000000000000192" +
+    "00ddafbb505ad214d7b80b1f830fccc89b60fb7a83" +
+    "0000000000000000000000000000000000000000000000000000000000000000" +
+    "0000000000000000000000000000000000000000000000000000000000000044" +
+    "095ea7b3000000000000000000000000c92e8bdf79f0507f65a392b0ab4667716bfe0110" +
+    "0000000000000000000000000000000000000000000000000000000773594000" +
+    "009008d19f58aabd9ed0d60971565aa8510560ab41" +
+    "0000000000000000000000000000000000000000000000000000000000000000" +
+    "00000000000000000000000000000000000000000000000000000000000000a4" +
+    "ec6cb13f0000000000000000000000000000000000000000000000000000000000000040" +
+    "0000000000000000000000000000000000000000000000000000000000000001" +
+    "0000000000000000000000000000000000000000000000000000000000000038" +
+    "0ebc355394854ff1026510549fe9cc1edc621ed5bd9bef6acf0bb59f8eb947fc" +
+    // the inner data's last 8 bytes, then the ABI padding of the bytes arg
+    "458cd345b4c05e8df39d0a07220feb4ec19f5e6f6a745778" +
+    "00000000000000000000000000000000000000000000") as Hex;
+
+describe("MultiSendCallOnly batches", () => {
+  it("encodes a live Safe{Wallet} CoW batch byte for byte", () => {
+    expect(encodeMultiSendCallOnly(COW_BATCH_CALLS)).toBe(COW_BATCH_DATA);
+  });
+
+  it("decodes it back to the two inner calls", () => {
+    expect(decodeMultiSendCallOnly(COW_BATCH_DATA)).toEqual(COW_BATCH_CALLS);
+  });
+
+  it("the batched SafeTx hashes to what the GnosisDAO owners signed (operation 1)", () => {
+    const batch = batchCall(100, COW_BATCH_CALLS);
+    expect(batch).toEqual({ to: MSCO, value: BigInt(0), data: COW_BATCH_DATA, operation: 1 });
+    const tx = buildSafeTx({ ...batch, nonce: BigInt(2244) });
+    expect(safeTxHash({ chainId: 100, safeAddress: GNOSIS_DAO_SAFE, tx })).toBe(
+      COW_BATCH_SAFE_TX_HASH,
+    );
+    // The same calls as plain Calls would be another transaction entirely.
+    expect(
+      safeTxHash({ chainId: 100, safeAddress: GNOSIS_DAO_SAFE, tx: { ...tx, operation: 0 } }),
+    ).not.toBe(COW_BATCH_SAFE_TX_HASH);
+  });
+
+  it("round-trips value transfers and empty data, and refuses an empty batch", () => {
+    const calls = [
+      { to: A, value: BigInt("1500000000000000000"), data: "0x" as Hex },
+      { to: B, value: BigInt(0), data: erc20TransferData(C, BigInt(5)) },
+      { to: C, value: BigInt(7), data: "0xdeadbeef" as Hex },
+    ];
+    const decoded = decodeMultiSendCallOnly(encodeMultiSendCallOnly(calls));
+    expect(decoded).toEqual(calls.map((c) => ({ operation: 0, ...c })));
+    expect(() => encodeMultiSendCallOnly([])).toThrow(SafeError);
+    expect(() => batchCall(100, [])).toThrow(SafeError);
+  });
+
+  it("a single call is not batched", () => {
+    const data = erc20TransferData(C, BigInt(5));
+    expect(batchCall(100, [{ to: B, data }])).toEqual({
+      to: B,
+      value: BigInt(0),
+      data,
+      operation: 0,
+    });
+    expect(batchCall(100, [{ to: A, value: BigInt(9) }])).toEqual({
+      to: A,
+      value: BigInt(9),
+      data: "0x",
+      operation: 0,
+    });
+  });
+
+  it("batchCall needs a MultiSendCallOnly for the chain", () => {
+    expect(() => batchCall(1, [{ to: A }, { to: B }])).toThrow(
+      expect.objectContaining({ code: "unsupported_chain" }),
+    );
+  });
+
+  it("assertAllowedOperation: Call anywhere, DelegateCall to MultiSendCallOnly only", () => {
+    expect(() => assertAllowedOperation(100, { to: A, operation: 0 })).not.toThrow();
+    expect(() => assertAllowedOperation(1, { to: A, operation: 0 })).not.toThrow();
+    expect(() => assertAllowedOperation(100, { to: MSCO, operation: 1 })).not.toThrow();
+    expect(() =>
+      assertAllowedOperation(100, { to: MSCO.toLowerCase(), operation: 1 }),
+    ).not.toThrow();
+    for (const bad of [
+      { chainId: 100, to: A, operation: 1 },
+      { chainId: 100, to: SAFE_CONTRACTS_BY_CHAIN[100].singleton, operation: 1 },
+      { chainId: 1, to: MSCO, operation: 1 }, // no MultiSendCallOnly configured there
+      { chainId: 100, to: MSCO, operation: 2 },
+    ]) {
+      expect(() => assertAllowedOperation(bad.chainId, bad)).toThrow(
+        expect.objectContaining({ code: "operation_refused" }),
+      );
+    }
   });
 });

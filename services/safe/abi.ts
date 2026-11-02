@@ -299,3 +299,16 @@ export const ERC20_ABI = [
     outputs: [{ name: "", type: "uint8" }],
   },
 ] as const;
+
+// MultiSendCallOnly 1.4.1: `multiSend(bytes transactions)`, every transaction
+// packed as uint8 operation ‖ address to ‖ uint256 value ‖ uint256 dataLength
+// ‖ bytes data (safe-tx.ts::encodeMultiSendCallOnly). Reverts on operation 1.
+export const MULTI_SEND_ABI = [
+  {
+    type: "function",
+    name: "multiSend",
+    stateMutability: "payable",
+    inputs: [{ name: "transactions", type: "bytes" }],
+    outputs: [],
+  },
+] as const;

@@ -555,6 +555,7 @@
         "invalid_signature": "A signature is invalid.",
         "not_found": "Safe or transaction not found.",
         "invalid_state": "This action is not possible in the current state.",
+        "operation_refused": "This transaction would run another contract's code as the Safe (delegatecall). Only batches through MultiSendCallOnly are allowed.",
         "unknown": "Something went wrong. Try again.",
         "tokenNotEnabled": "This token is not enabled for this fund (Settings → Token).",
         "nameRequired": "Enter a name.",

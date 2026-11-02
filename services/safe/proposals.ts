@@ -36,6 +36,7 @@ import {
 } from "./passkey-signers";
 import {
   addOwnerWithThresholdData,
+  assertAllowedOperation,
   buildSafeTx,
   changeThresholdData,
   erc20TransferData,
@@ -659,7 +660,8 @@ async function propose(a: {
   safe: LoadedSafe;
   userId: string;
   kind: FundSafeTxKind;
-  call: { to: Address; value?: bigint; data: Hex };
+  // `operation` 1 only for a MultiSendCallOnly batch (safe-tx.ts batchCall).
+  call: { to: Address; value?: bigint; data: Hex; operation?: 0 | 1 };
   summary: SafeTxSummary;
   note?: string | null;
   nonce?: number; // REJECTION: the target's nonce
@@ -675,7 +677,9 @@ async function propose(a: {
     value: a.call.value ?? BigInt(0),
     data: a.call.data,
     nonce: BigInt(nonce),
+    operation: a.call.operation ?? 0,
   });
+  assertAllowedOperation(safe.chainId, tx);
   const hash = safeTxHash({ chainId: safe.chainId, safeAddress, tx });
   // A legacy server key signs right here. A passkey owner's signature is a
   // WebAuthn ceremony in the browser: the row is stored without it and
@@ -1144,10 +1148,12 @@ async function loadSignableTx(fundId: string, transactionId: string) {
   return tx;
 }
 
-// The SafeTx of a stored row, checked against its stored hash.
+// The SafeTx of a stored row, checked against its stored hash — and against
+// the operation rule, so a row altered underneath us is never signed.
 function checkedSafeTx(tx: SignableTx) {
   const safeAddress = getAddress(tx.safe.address);
   const safeTx = safeTxFromRow(tx);
+  assertAllowedOperation(tx.safe.chainId, safeTx);
   if (lc(safeTxHash({ chainId: tx.safe.chainId, safeAddress, tx: safeTx })) !== lc(tx.safeTxHash)) {
     throw new SafeError("invalid_state", "Stored transaction does not match its hash");
   }
@@ -1337,6 +1343,9 @@ export async function tryExecute(a: {
   if (tx.status !== "PENDING") return { executed: false, txHash: null, reason: "not_pending" };
 
   const { safe } = tx;
+  // Never execute a DelegateCall to anything but MultiSendCallOnly, whatever
+  // signatures the row has gathered (sync imports Safe{Wallet} confirmations).
+  assertAllowedOperation(safe.chainId, tx);
   const safeAddress = getAddress(safe.address);
   // Readiness comes from the chain, not the owner / threshold cache: a
   // threshold or owner changed in Safe{Wallet} must not stall or revert us.
