@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import "server-only";
 
-import { decodeFunctionData, formatUnits, getAddress, parseUnits } from "viem";
+import { decodeFunctionData, getAddress, parseUnits } from "viem";
 
 import { prisma } from "@/services/db/prisma";
 import { proposeConversionStep, type ProposeResult } from "@/services/safe/proposals";
@@ -9,6 +9,7 @@ import type { SafeTxSummary } from "@/services/safe/types";
 import type { DisplayTokensFund } from "@/services/token/display-tokens";
 import type { ExtraToken } from "@/services/token/extra-tokens";
 
+import { formatAmount } from "./amounts";
 import { COW_CONTRACTS_BY_CHAIN, assetAddress } from "./assets";
 import { holderBalance } from "./chain";
 import { ERC20_APPROVE_ABI } from "./cow-order";
@@ -120,12 +121,12 @@ export async function quoteConversion(a: {
   });
   return {
     converterId: pair.converter.id,
-    from: { symbol: pair.from.symbol, decimals: pair.from.decimals, amount: formatUnits(units, pair.from.decimals) },
+    from: { symbol: pair.from.symbol, decimals: pair.from.decimals, amount: formatAmount(units, pair.from.decimals) },
     to: {
       symbol: pair.to.symbol,
       decimals: pair.to.decimals,
-      expected: formatUnits(q.expectedOut, pair.to.decimals),
-      min: formatUnits(q.minOut, pair.to.decimals),
+      expected: formatAmount(q.expectedOut, pair.to.decimals),
+      min: formatAmount(q.minOut, pair.to.decimals),
     },
     amountIn: units.toString(),
     expectedOut: q.expectedOut.toString(),
@@ -177,8 +178,8 @@ function summaryFor(a: {
     step: a.step,
     steps: signingRounds(a.converter),
     label: a.position.step.label,
-    from: { symbol: a.from.symbol, amount: formatUnits(a.from.amountIn, a.from.decimals) },
-    to: { symbol: a.to.symbol, minAmount: formatUnits(a.to.minOut, a.to.decimals) },
+    from: { symbol: a.from.symbol, amount: formatAmount(a.from.amountIn, a.from.decimals) },
+    to: { symbol: a.to.symbol, minAmount: formatAmount(a.to.minOut, a.to.decimals) },
     ...(a.validUntil ? { validUntil: a.validUntil.toISOString() } : {}),
     calls: a.position.step.calls.map((c: Call) => ({
       to: c.to,

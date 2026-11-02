@@ -19,7 +19,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cancelConversionAction, continueConversionAction } from "@/services/convert/admin-actions";
-import { cowExplorerOrderUrl, type ConversionView } from "@/services/convert/data";
+import { cowExplorerOrderUrl, type ConversionView } from "@/services/convert/views";
 import type { FundConversionStatus } from "@/services/db/generated/enums";
 import type { SigningPasskeyHandle } from "@/services/safe/action-types";
 
