@@ -9,7 +9,13 @@ import {
   type PublicKeyCredentialCreationOptionsJSON,
   type RegistrationResponseJSON,
 } from "@simplewebauthn/server";
-import { cose, decodeCredentialPublicKey, isoBase64URL, isoCBOR } from "@simplewebauthn/server/helpers";
+import {
+  cose,
+  decodeAttestationObject,
+  decodeCredentialPublicKey,
+  isoBase64URL,
+  isoCBOR,
+} from "@simplewebauthn/server/helpers";
 import { hexToBytes, toHex } from "viem";
 
 import {
@@ -151,10 +157,10 @@ export async function verifySigningRegistration(a: {
 // The attestation object's authenticatorData, for the backup flags (the
 // library's result exposes them only as a device type + backed-up pair).
 function parseAuthData(response: RegistrationResponseJSON): Uint8Array {
-  const attestation = isoCBOR.decodeFirst<{ authData: Uint8Array }>(
-    isoBase64URL.toBuffer(response.response.attestationObject),
+  // CBOR maps decode to a Map, hence `.get`.
+  return decodeAttestationObject(isoBase64URL.toBuffer(response.response.attestationObject)).get(
+    "authData",
   );
-  return attestation.authData;
 }
 
 /** COSE EC2 key bytes for stored (x, y), as the verifier wants them. */

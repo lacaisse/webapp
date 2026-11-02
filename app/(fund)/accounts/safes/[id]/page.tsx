@@ -10,6 +10,7 @@ import {
   Send,
 } from "lucide-react";
 import Link from "next/link";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 
@@ -22,6 +23,7 @@ import { requireFundRole } from "@/services/auth/dal";
 import { userHasPasskey } from "@/services/auth/passkeys";
 import type { SigningPasskeyHandle } from "@/services/safe/action-types";
 import { safeMigrationRows } from "@/services/safe/migration";
+import { signingPasskeyRpId } from "@/services/safe/passkey-rp";
 import { syncSafe } from "@/services/safe/sync";
 import {
   explorerAddressUrl,
@@ -140,7 +142,10 @@ async function SafeDetailView({
         credentialId: signingPasskey.credentialId,
         transports: signingPasskey.transports,
         address: signingPasskey.address,
-        rpId: process.env.APP_DOMAIN ?? "localhost",
+        rpId: signingPasskeyRpId(
+          process.env.APP_DOMAIN ?? "localhost",
+          (await headers()).get("host") ?? "",
+        ),
       }
     : null;
   const viewer: ViewerOwner = { addresses: ownerAddresses, passkey: passkeyHandle };

@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-/* eslint-disable no-console */
 // Bench of the passkey-backed Safe owners (docs/safe-passkeys.md) against a
 // running dev server and a LOCAL bench database, with Chrome's virtual
 // authenticator (CDP WebAuthn domain) standing in for the members'
@@ -99,7 +98,7 @@ async function registerPasskey(page, email) {
   const card = page.getByText("Your signing passkey").first();
   await card.waitFor({ timeout: 30_000 });
   if (await page.getByText(/^Registered /).count()) {
-    const addr = await page.locator("text=/^0x[0-9a-fA-F]{4}…[0-9a-fA-F]{4}$/").first().textContent();
+    const addr = await page.getByText(/^0x[0-9a-fA-F]{4}…[0-9a-fA-F]{4}$/).first().textContent();
     log("passkey already registered for", email, addr);
     report.passkeys[email] = { address: addr, reused: true };
     return;
@@ -108,13 +107,13 @@ async function registerPasskey(page, email) {
   await page.getByRole("button", { name: /^create passkey$/i }).click();
   await answerStepUp(page);
   await page.getByText("Signing passkey ready").waitFor({ timeout: 120_000 });
-  const addr = await page.locator("[role=dialog] text=/^0x[0-9a-fA-F]{4}…[0-9a-fA-F]{4}$/").first().textContent();
+  const addr = await page.locator("[role=dialog]").getByText(/^0x[0-9a-fA-F]{4}…[0-9a-fA-F]{4}$/).first().textContent();
   const deviceOnly = await page.getByText(/exists on this device only/).count();
   const deployFailed = await page.getByText(/Owner contract not deployed yet/).count();
   log("passkey registered for", email, addr, deviceOnly ? "(device-only)" : "(backed up)", deployFailed ? "DEPLOY FAILED" : "deployed");
   report.passkeys[email] = { address: addr, deviceOnly: Boolean(deviceOnly), deployed: !deployFailed };
   if (deployFailed) throw new Error(`signer deployment failed for ${email}`);
-  await page.getByRole("button", { name: /^close$/i }).click();
+  await page.getByRole("button", { name: /^close$/i }).last().click();
 }
 
 async function createSafe(page, name, memberCount) {
@@ -136,7 +135,7 @@ async function createSafe(page, name, memberCount) {
   await page.waitForURL(/\/accounts\/safes\/[^/?]+/, { timeout: 180_000 });
   const safeId = page.url().match(/\/accounts\/safes\/([^/?]+)/)[1];
   await page.getByText(/^Active$/).first().waitFor({ timeout: 120_000 });
-  const address = await page.locator("header text=/^0x[0-9a-fA-F]{40}$/").first().textContent().catch(() => null);
+  const address = await page.locator("header").getByText(/^0x[0-9a-fA-F]{40}$/).first().textContent().catch(() => null);
   log("safe created", name, safeId, address);
   report.safe = { id: safeId, name, address };
   return safeId;
@@ -153,7 +152,7 @@ async function proposeAddExternal(page, safeId) {
   await page.getByText(/Proposed\. It runs once|Signed and executed|Proposed, but not signed/).waitFor({ timeout: 120_000 });
   const text = await page.locator("[role=dialog] [role=alert], [role=dialog] .text-sm").allTextContents();
   log("add-owner proposed:", text.join(" | ").slice(0, 160));
-  await page.getByRole("button", { name: /^close$/i }).click();
+  await page.getByRole("button", { name: /^close$/i }).last().click();
 }
 
 async function signPending(page, safeId, expectPasskey) {

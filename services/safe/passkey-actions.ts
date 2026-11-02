@@ -17,6 +17,7 @@ import {
   type PasskeyRegistrationStartResult,
   type SignActionResult,
 } from "./action-types";
+import { signingPasskeyRpId } from "./passkey-rp";
 import { encodeWebAuthnSignature } from "./passkey-signature";
 import {
   beginSigningPasskeyRegistration,
@@ -65,11 +66,13 @@ const isProd = process.env.NODE_ENV === "production";
 
 // rpID = the apex (same as the login passkey plugin, services/auth/better-
 // auth.ts), so a signing passkey registered on a fund host works on every
-// host of the fund. The expected origin is the host this request came in
-// on — the proxy validated it against Fund.domain / the apex before the
-// action ran, and the browser's clientDataJSON must name exactly it.
-function rpID(): string {
-  return process.env.APP_DOMAIN ?? "localhost";
+// host of the fund; in dev the request host (passkey-rp.ts). The expected
+// origin is the host this request came in on — the proxy validated it
+// against Fund.domain / the apex before the action ran, and the browser's
+// clientDataJSON must name exactly it.
+async function rpID(): Promise<string> {
+  const h = await headers();
+  return signingPasskeyRpId(process.env.APP_DOMAIN ?? "localhost", h.get("host") ?? "");
 }
 
 async function expectedOrigin(): Promise<string> {
@@ -95,7 +98,7 @@ export async function startSigningPasskeyRegistrationAction(input: {
     const { challengeId, options } = await beginSigningPasskeyRegistration({
       fund: { id: fund.id, name: fund.name },
       user: { id: user.id, email: user.email },
-      rpID: rpID(),
+      rpID: await rpID(),
       replace: parsed.data.replace,
     });
     return { ok: true, challengeId, options };
@@ -121,7 +124,7 @@ export async function finishSigningPasskeyRegistrationAction(input: {
       challengeId: parsed.data.challengeId,
       response: parsed.data.response,
       expectedOrigin: await expectedOrigin(),
-      rpID: rpID(),
+      rpID: await rpID(),
     });
     revalidatePath("/accounts");
     refresh();
@@ -184,7 +187,7 @@ export async function signTransactionWithPasskeyAction(input: {
       safeTxHash: tx.safeTxHash as `0x${string}`,
       response,
       expectedOrigin: await expectedOrigin(),
-      rpID: rpID(),
+      rpID: await rpID(),
     });
 
     // The ceremony is a fresh, user-verified authentication of this member on
