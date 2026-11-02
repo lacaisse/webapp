@@ -169,3 +169,39 @@ owners can do it.
   the owner contract accepts them, retirement + erasure of legacy keys.
 - Bench: `scripts/safe-passkeys-bench.mjs` (playwright-core on the installed Chrome, CDP
   virtual authenticator) — see the bench note in the PR.
+
+## Bench note — 2026-11-02 (Gnosis, bench fund `caisse-test`, relayer `0xf5c1…35D6`)
+
+Run with `scripts/safe-passkeys-bench.mjs` against the local bench database (Chrome's
+virtual authenticator, `protocol ctap2 / transport internal / UV`), every relayer transaction
+on Gnosis for real. Kevin's prod Safe was never touched.
+
+Exercised on chain:
+
+| Step | Result |
+| --- | --- |
+| Signer contract deployed per member (`createSigner`) | `0xddd5bd43…8383` (Safes Admin, signer `0x00eF…34DD`), `0x02f14f22…9c48` (Second Admin, `0x9AB9…3786`), `0x0e54d326…06cc` (Test Owner, `0x7898…fb1D`); each address re-derived through `getSigner` and found with code |
+| Passkey-only Safe created (3 PASSKEY owners, 2-of-3) | `0xaD6c647C1D947E4e28794daC3707329c0977a7a5`, deploy tx `0xc43dcc09…47d6` |
+| Add-owner proposed by a passkey owner (stored unsigned, then signed in the same flow) and co-signed by a second passkey | executed by the relayer, tx `0x83b348e4…a881`; both signatures are 417-byte contract signatures (`PASSKEY`); the Safe now lists the external owner |
+| Migration swap of a server key to its member's passkey (proposed + co-signed with server keys) | `0xf7e7aa1c…c5b0` (nonce 4, `migration: server_key`); sync turned the owner row into `PASSKEY`, the `FundSigner` got `retiredAt` and its ciphertext erased |
+| Second migration swap proposed with a server key and co-signed by the migrated member's **passkey** (mixed ECDSA + contract set in one `execTransaction`) | `0x08d15701…764f` (nonce 5); second `FundSigner` retired + erased |
+| Known-answer vector (unit test) | `isValidSignatureForSigner` on the factory answered `0x1626ba7e` at block 49068533 |
+
+Earlier attempts of the same run left two discarded artefacts on chain (signer proxies
+`0xc704…df5a`, `0xCe7d…5B5d`, `0x5239…2FcE` and Safe `0xC4F1…40Ae`, deploy `0x3144e275…ac04`):
+the virtual authenticators were re-created between runs, so those credentials can no longer
+answer. The script now exports / re-imports the authenticator state.
+
+Not exercised:
+
+- Transaction Service mirroring of a contract signature and the import of a contract
+  confirmation from Safe{Wallet} (unit-tested only — the bench Safes had no external owner
+  until the end).
+- A synced ("backed up") passkey: the virtual authenticator reports device-only, so the
+  "Backed up" chip was only seen in its device-only state.
+- The lost-device replacement flow end to end (state machine and rules unit-tested; the
+  banner's `replaced_passkey` rows share the swap path that ran).
+- A token transfer signed by passkeys (the Safes hold no funds; the owner change exercised
+  the same `execTransaction` path).
+- Real platform authenticators (Touch ID / iCloud Keychain, Android, security keys) and
+  production RP id `lacaisse.eu`; in dev the RP id is the fund host (`passkey-rp.ts`).

@@ -24,6 +24,10 @@
 // signed by the first member's PASSKEY → a mixed ECDSA + contract set on
 // chain. Prints what happened; exits non-zero on the first failure.
 
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { chromium } from "playwright-core";
 
 const BASE = process.env.BENCH_BASE ?? "http://caisse-test.localhost:3031";
@@ -35,6 +39,12 @@ const HEADED = process.argv.includes("--headed");
 const SKIP_CREATE = process.argv.includes("--skip-create");
 const SKIP_MIGRATE = process.argv.includes("--skip-migrate");
 const EXTERNAL_OWNER = process.env.BENCH_EXTERNAL_OWNER ?? "0x308bCBa768Ad9a1d95f4a64F7ee309fABB9963a4";
+// Display names of the users (the migration banner shows names, not emails).
+const NAMES = (process.env.BENCH_NAMES ?? "").split(",").map((s) => s.trim());
+// The virtual authenticators' credentials, exported after every run and
+// re-imported at the start of the next, so a passkey registered in one run
+// still answers in a later one (a fresh authenticator knows nothing).
+const STATE_FILE = process.env.BENCH_STATE ?? join(tmpdir(), "lacaisse-safe-passkeys-bench.json");
 
 if (!PASSWORD || USERS.length < 3) {
   console.error("Set BENCH_PASSWORD and BENCH_USERS (three admins of the bench fund).");
@@ -44,7 +54,30 @@ if (!PASSWORD || USERS.length < 3) {
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
 const report = { passkeys: {}, safe: null, txs: [] };
 
-async function withCdp(page) {
+function loadState() {
+  try {
+    return existsSync(STATE_FILE) ? JSON.parse(readFileSync(STATE_FILE, "utf8")) : {};
+  } catch {
+    return {};
+  }
+}
+const state = loadState();
+const authenticators = {}; // email → { cdp, authenticatorId }
+
+async function saveState() {
+  for (const [email, a] of Object.entries(authenticators)) {
+    try {
+      const { credentials } = await a.cdp.send("WebAuthn.getCredentials", { authenticatorId: a.authenticatorId });
+      if (credentials.length > 0) state[email] = credentials;
+    } catch (e) {
+      log("could not export credentials for", email, String(e).slice(0, 80));
+    }
+  }
+  writeFileSync(STATE_FILE, JSON.stringify(state, null, 1));
+  log("authenticator state saved to", STATE_FILE);
+}
+
+async function withCdp(page, email) {
   const cdp = await page.context().newCDPSession(page);
   await cdp.send("WebAuthn.enable", { enableUI: false });
   const { authenticatorId } = await cdp.send("WebAuthn.addVirtualAuthenticator", {
@@ -57,12 +90,17 @@ async function withCdp(page) {
       automaticPresenceSimulation: true,
     },
   });
+  for (const credential of state[email] ?? []) {
+    await cdp.send("WebAuthn.addCredential", { authenticatorId, credential });
+  }
+  if ((state[email] ?? []).length) log("  restored", state[email].length, "credential(s) for", email);
+  authenticators[email] = { cdp, authenticatorId };
   return { cdp, authenticatorId };
 }
 
 async function login(context, email) {
   const page = await context.newPage();
-  await withCdp(page);
+  await withCdp(page, email);
   await page.goto(`${AUTH}/login?return_to=${encodeURIComponent(`${BASE}/accounts`)}`);
   await page.fill("#email", email);
   await page.fill("#password", PASSWORD);
@@ -122,14 +160,14 @@ async function createSafe(page, name, memberCount) {
   const safeOption = page.getByRole("radio", { name: /several signatures/i });
   if (await safeOption.count()) await safeOption.click();
   await page.fill("#safe-name", name);
-  const boxes = page.locator("[role=dialog] [id^=safe-member-]");
+  // base-ui checkboxes: the id is on a hidden input, the clickable part is
+  // the role=checkbox button next to it.
+  const boxes = page.locator("[role=dialog] [role=checkbox]");
   const n = await boxes.count();
   if (n < memberCount) throw new Error(`only ${n} members listed`);
   for (let i = 0; i < memberCount; i++) {
     const box = boxes.nth(i);
-    if ((await box.getAttribute("aria-checked")) !== "true" && (await box.getAttribute("data-state")) !== "checked") {
-      await box.click();
-    }
+    if ((await box.getAttribute("aria-checked")) !== "true") await box.click();
   }
   await page.getByRole("button", { name: /^create safe$/i }).click();
   await page.waitForURL(/\/accounts\/safes\/[^/?]+/, { timeout: 180_000 });
@@ -214,7 +252,9 @@ try {
   // (1) registration
   for (const email of USERS) await registerPasskey(pages[email], email);
 
+  await saveState();
   const [first, second, third] = USERS;
+  const nameOf = (email) => NAMES[USERS.indexOf(email)] || email;
   let safeId = null;
   if (!SKIP_CREATE) {
     // (2) passkey-only Safe
@@ -228,16 +268,17 @@ try {
   if (!SKIP_MIGRATE) {
     // (4) migrate the first member's server key on the legacy Safe
     const legacyId = await findSafeIdByName(pages[first], LEGACY_SAFE);
-    await proposeMigrationSwap(pages[first], legacyId, first);
+    await proposeMigrationSwap(pages[first], legacyId, nameOf(first));
     await signPending(pages[third], legacyId, false);
     log("pending on legacy safe after swap:", await pendingCount(pages[first], legacyId));
     // (5) mixed set: server-key proposal, passkey co-signature
-    await proposeMigrationSwap(pages[third], legacyId, second);
+    await proposeMigrationSwap(pages[third], legacyId, nameOf(second));
     await signPending(pages[first], legacyId, true);
     log("pending on legacy safe after second swap:", await pendingCount(pages[first], legacyId));
   }
   console.log(JSON.stringify(report, null, 1));
 } finally {
+  await saveState().catch(() => {});
   for (const c of contexts) await c.close().catch(() => {});
   await browser.close();
 }
