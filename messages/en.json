@@ -541,6 +541,22 @@
         "lowGasBody": "The La Caisse relayer has {balance} xDAI left to pay for executions. Top it up soon:",
         "status": "Relayer balance: {balance} xDAI. Send xDAI to this address to pay for deployments and executions:"
       },
+      "conversion": {
+        "errors": {
+          "config": "Conversions are not configured for this network.",
+          "cow_api": "CoW Swap could not be reached. Try again in a moment.",
+          "no_pair": "This conversion is not available for this fund. Enable both tokens under Settings → Token.",
+          "quote_failed": "CoW Swap could not quote this amount.",
+          "quote_moved": "The price moved. Review the new quote.",
+          "amount": "Enter a positive amount with at most the token's decimals.",
+          "expired": "The order expired before it filled.",
+          "fill_mismatch": "The fill does not match what the chain shows.",
+          "funds_moved": "The Safe no longer holds enough of the token this step needs.",
+          "contract_refused": "This step would call a contract the converter does not use. It was refused.",
+          "not_found": "Conversion not found.",
+          "invalid_state": "This conversion is not in a state where that is possible."
+        }
+      },
       "errors": {
         "config": "The fund token is not configured yet. Connect Citizen Pay first.",
         "unsupported_chain": "This network is not supported for Safes.",

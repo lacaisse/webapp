@@ -71,11 +71,12 @@ model User {
   triggeredPendingAnnotations PendingAnnotation[]     @relation("PendingAnnotationTriggeredBy")
 
   // Safe multisig: this user's per-fund signer keys and what they signed/proposed.
-  fundSigners     FundSigner[]
-  passkeySigners  FundPasskeySigner[]
-  safesCreated    FundSafe[]            @relation("FundSafeCreatedBy")
-  safeTxsProposed FundSafeTransaction[] @relation("FundSafeTxProposedBy")
-  safeSignatures  FundSafeSignature[]   @relation("FundSafeSignatureUser")
+  fundSigners        FundSigner[]
+  passkeySigners     FundPasskeySigner[]
+  safesCreated       FundSafe[]            @relation("FundSafeCreatedBy")
+  safeTxsProposed    FundSafeTransaction[] @relation("FundSafeTxProposedBy")
+  conversionsCreated FundConversion[]      @relation("FundConversionCreatedBy")
+  safeSignatures     FundSafeSignature[]   @relation("FundSafeSignatureUser")
 
   // MCP OAuth provider (agents operating the dashboard via /api/mcp)
   oauthClients       OauthClient[]
@@ -597,6 +598,7 @@ model Fund {
   pendingAnnotations        PendingAnnotation[] // userOp hashes awaiting tx-hash resolution
   cardTopUps                CardTopUp[] // open-banking card top-ups (PAY_AND_GO /pay/<serial>)
   safes                     FundSafe[] // multisig Safes managed from La Caisse
+  conversions               FundConversion[] // token conversions (services/convert)
   signers                   FundSigner[] // per-user Safe signer keys (legacy, server-held)
   passkeySigners            FundPasskeySigner[] // per-user Safe passkey signers (WebAuthn, on-chain signer contract)
   displayTokens             FundDisplayToken[] // custom ERC-20s shown next to the fund token (Settings → Token)
@@ -769,9 +771,9 @@ model FundMember {
 // once no unarchived Safe of the fund lists the address any more. The row
 // itself stays: the address may still appear in signature history.
 model FundSigner {
-  id            String  @id @default(cuid())
+  id            String    @id @default(cuid())
   fundId        String
-  userId        String  @db.Uuid
+  userId        String    @db.Uuid
   address       String // EOA address (checksummed)
   privateKeyEnc String? // envelope from services/crypto/secret.ts; null once deleted
   retiredAt     DateTime? // first swap to a passkey owner executed
@@ -799,15 +801,15 @@ model FundSigner {
 // a lost device registers a replacement, which supersedes the old row and
 // is swapped in on every Safe through an ordinary proposal.
 model FundPasskeySigner {
-  id           String  @id @default(cuid())
-  fundId       String
-  userId       String  @db.Uuid
-  address      String // signer contract address (checksummed) — the Safe owner
-  credentialId String  @unique // WebAuthn credential id, base64url
-  publicKeyX   String // 0x-prefixed 32-byte hex
-  publicKeyY   String // 0x-prefixed 32-byte hex
-  verifiers    String // P256.Verifiers (uint176) used for the address, 0x-prefixed hex
-  counter      Int     @default(0) // authenticator signature counter from the last ceremony
+  id             String    @id @default(cuid())
+  fundId         String
+  userId         String    @db.Uuid
+  address        String // signer contract address (checksummed) — the Safe owner
+  credentialId   String    @unique // WebAuthn credential id, base64url
+  publicKeyX     String // 0x-prefixed 32-byte hex
+  publicKeyY     String // 0x-prefixed 32-byte hex
+  verifiers      String // P256.Verifiers (uint176) used for the address, 0x-prefixed hex
+  counter        Int       @default(0) // authenticator signature counter from the last ceremony
   // Backup flags from the LAST ceremony (registration or signature):
   // eligible = the credential can be synced (e.g. iCloud Keychain / Google
   // Password Manager); state = it currently is. A device-only credential
@@ -873,10 +875,10 @@ model FundSafe {
   saltNonce String
   address   String
 
-  threshold    Int // cached from chain (getThreshold), refreshed by sync
-  status       FundSafeStatus @default(DEPLOYING)
-  deployTxHash String?
-  errorMessage String? // last deployment / sync error
+  threshold     Int // cached from chain (getThreshold), refreshed by sync
+  status        FundSafeStatus @default(DEPLOYING)
+  deployTxHash  String?
+  errorMessage  String? // last deployment / sync error
   // Set by sync when the Safe's wiring is not canonical 1.4.1 (a module, a
   // guard, another singleton / fallback handler). Shown as a red banner and
   // blocks relayer execution until it clears (review S6).
@@ -890,6 +892,7 @@ model FundSafe {
   fund         Fund                  @relation(fields: [fundId], references: [id], onDelete: Cascade)
   owners       FundSafeOwner[]
   transactions FundSafeTransaction[]
+  conversions  FundConversion[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -908,9 +911,9 @@ enum FundSafeOwnerKind {
 // getOwners(); an owner that disappears on chain gets `removedAt` set (kept
 // so past signatures still resolve to a label).
 model FundSafeOwner {
-  id       String            @id @default(cuid())
-  safeId   String
-  address  String // checksummed
+  id        String            @id @default(cuid())
+  safeId    String
+  address   String // checksummed
   kind      FundSafeOwnerKind
   signerId  String? // set for MEMBER owners
   passkeyId String? // set for PASSKEY owners
@@ -934,6 +937,7 @@ enum FundSafeTxKind {
   SWAP_OWNER // swapOwner
   CHANGE_THRESHOLD // changeThreshold
   REJECTION // empty self-call at a taken nonce (standard Safe "reject")
+  CONVERSION // one on-chain step of a FundConversion (a MultiSendCallOnly batch, usually)
 }
 
 enum FundSafeTxStatus {
@@ -974,6 +978,12 @@ model FundSafeTransaction {
   // Set for executed TOKEN_TRANSFER: the TokenOperation row recorded for it.
   tokenOperationId String? @unique
 
+  // Set for CONVERSION: the conversion this transaction is a step of
+  // (services/convert). Its execution, withdrawal or supersession moves the
+  // conversion on (services/convert/progress.ts).
+  conversionId String?
+  conversion   FundConversion? @relation(fields: [conversionId], references: [id], onDelete: SetNull)
+
   safe       FundSafe            @relation(fields: [safeId], references: [id], onDelete: Cascade)
   signatures FundSafeSignature[]
 
@@ -982,6 +992,80 @@ model FundSafeTransaction {
 
   @@index([safeId, status])
   @@index([safeId, nonce])
+  @@index([conversionId])
+}
+
+// =============================================================================
+// Token conversions (services/convert)
+// =============================================================================
+// One asset a fund account holds turned into another (EURe → BREAD, BREAD →
+// EURe, …) through a registered converter: an ordered list of legs (a CoW
+// pre-sign swap, a BREAD mint / burn). The engine walks the legs: an `api`
+// step posts an order, a `calls` step becomes one Safe proposal (a
+// MultiSendCallOnly batch, kind CONVERSION, linked by conversionId), a
+// `wait` step is polled by the cron until the order fills.
+//
+// Lifecycle: PROPOSED (a Safe proposal is collecting signatures) → on
+// execution either FILLING (an order is out) or READY (the next on-chain
+// step waits for an owner to propose it) or DONE. A withdrawn / superseded
+// proposal puts it back to READY. The orderbook's expiry → EXPIRED; a
+// cancel from READY → CANCELLED; anything the engine refuses to continue
+// (funds moved, fill below minimum) → FAILED. Amounts are raw token units
+// as decimal strings; `state` holds each leg's quote and step results.
+
+enum FundConversionHolderKind {
+  SAFE // holder = a FundSafe (safeId set)
+  TOKEN_ACCOUNT // reserved: a CitizenPay token account (not implemented)
+}
+
+enum FundConversionStatus {
+  PROPOSED // its current Safe proposal is collecting signatures / executing
+  READY // an on-chain step waits for an owner to propose it
+  FILLING // an order is out; the cron polls for the fill
+  DONE
+  EXPIRED // the order ran out before it filled
+  CANCELLED // cancelled from READY
+  FAILED
+}
+
+model FundConversion {
+  id     String @id @default(cuid())
+  fundId String
+  fund   Fund   @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  holderKind    FundConversionHolderKind @default(SAFE)
+  safeId        String?
+  safe          FundSafe?                @relation(fields: [safeId], references: [id], onDelete: Cascade)
+  holderAddress String // checksummed: the account whose balances move
+
+  converterId String // services/convert/registry.ts id — never renamed
+  fromAsset   String // CAIP-19
+  toAsset     String // CAIP-19
+
+  amountIn    String // raw units of fromAsset
+  expectedOut String // raw units of toAsset, at the quote
+  minOut      String // raw units of toAsset, enforced
+  amountOut   String? // raw units of toAsset, once done
+  slippageBps Int
+
+  status       FundConversionStatus @default(READY)
+  round        Int                  @default(0) // Safe proposals made so far
+  state        Json // services/convert/types.ts ConversionState
+  // The order's validTo (or the quote's): past it the open proposal is moot.
+  validUntil   DateTime?
+  errorMessage String?
+
+  createdById String? @db.Uuid
+  createdBy   User?   @relation("FundConversionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  transactions FundSafeTransaction[]
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime?
+
+  @@index([fundId, status])
+  @@index([safeId, status])
 }
 
 enum FundSafeSignatureSource {

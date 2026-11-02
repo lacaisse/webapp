@@ -81,6 +81,22 @@ export type SafeTxSummary =
       threshold: number; // new threshold
       previousThreshold?: number; // on-chain threshold at proposal time
     }
+  | {
+      // One on-chain step of a token conversion (services/convert): a
+      // MultiSendCallOnly batch, or a single call. Signers see what moves
+      // and every inner call, never calldata.
+      kind: "CONVERSION";
+      conversionId: string;
+      converterId: string; // registry id ("eure-bread")
+      step: number; // 1-based: which of the conversion's proposals this is
+      steps: number; // how many proposals the conversion takes in all
+      label: string; // the leg's step label ("swap", "mint", "burn")
+      from: { symbol: string; amount: string }; // the conversion's input
+      to: { symbol: string; minAmount: string }; // the minimum it must yield
+      // What the step needs beforehand and until when (a CoW order's validTo).
+      validUntil?: string; // ISO
+      calls: { to: Address; label: string; value?: string }[]; // value in wei when non-zero
+    }
   | { kind: "REJECTION"; rejectsNonce: number };
 
 // Why an owner row should be swapped for the member's current passkey

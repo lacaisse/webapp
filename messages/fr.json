@@ -541,6 +541,22 @@
         "lowGasBody": "Il reste {balance} xDAI au relayeur de La Caisse pour payer les exécutions. Rechargez-le bientôt :",
         "status": "Solde du relayeur : {balance} xDAI. Envoyez des xDAI à cette adresse pour payer les déploiements et exécutions :"
       },
+      "conversion": {
+        "errors": {
+          "config": "Les conversions ne sont pas configurées pour ce réseau.",
+          "cow_api": "CoW Swap est injoignable. Réessayez dans un instant.",
+          "no_pair": "Cette conversion n'est pas disponible pour cette caisse. Activez les deux jetons dans Paramètres → Jeton.",
+          "quote_failed": "CoW Swap n'a pas pu coter ce montant.",
+          "quote_moved": "Le prix a bougé. Vérifiez la nouvelle cotation.",
+          "amount": "Entrez un montant positif avec au plus les décimales du jeton.",
+          "expired": "L'ordre a expiré avant d'être exécuté.",
+          "fill_mismatch": "L'exécution ne correspond pas à ce que montre la chaîne.",
+          "funds_moved": "Le Safe ne détient plus assez du jeton requis pour cette étape.",
+          "contract_refused": "Cette étape appellerait un contrat que le convertisseur n'utilise pas. Elle a été refusée.",
+          "not_found": "Conversion introuvable.",
+          "invalid_state": "Cette conversion n'est pas dans un état qui le permet."
+        }
+      },
       "errors": {
         "config": "Le jeton de la caisse n'est pas encore configuré. Connectez d'abord Citizen Pay.",
         "unsupported_chain": "Ce réseau n'est pas pris en charge pour les Safes.",
