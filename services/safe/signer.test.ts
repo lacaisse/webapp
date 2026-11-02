@@ -11,8 +11,8 @@ vi.mock("@/services/db/prisma", () => ({ prisma: db }));
 import { encryptSecret } from "@/services/crypto/secret";
 import { buildSafeTx, recoverSafeTxSigner } from "@/services/safe/safe-tx";
 import {
+  findFundSigner,
   generateSigner,
-  getOrCreateFundSigner,
   signSafeTxWithSigner,
   signerBinding,
 } from "@/services/safe/signer";
@@ -72,27 +72,23 @@ describe("signer", () => {
     expect(signerBinding("f1", "u1")).toBe("signer:f1:u1");
   });
 
-  it("returns the existing signer", async () => {
+  it("finds an existing legacy signer (checksummed) and never creates one", async () => {
     const row = { id: "s1", fundId: "f1", userId: "u1", address: SAFE.toLowerCase(), privateKeyEnc: "v1:x" };
     db.fundSigner.findUnique.mockResolvedValue(row);
-    await expect(getOrCreateFundSigner("f1", "u1")).resolves.toEqual({ ...row, address: SAFE });
+    await expect(findFundSigner("f1", "u1")).resolves.toEqual({ ...row, address: SAFE });
     expect(db.fundSigner.findUnique.mock.calls[0][0].where).toEqual({
       fundId_userId: { fundId: "f1", userId: "u1" },
     });
+    db.fundSigner.findUnique.mockResolvedValue(null);
+    await expect(findFundSigner("f1", "u2")).resolves.toBeNull();
     expect(db.fundSigner.create).not.toHaveBeenCalled();
   });
 
-  it("creates one, and re-reads the winner on a P2002 race", async () => {
-    db.fundSigner.findUnique.mockResolvedValueOnce(null);
-    db.fundSigner.create.mockImplementation(async ({ data }) => ({ id: "s2", ...data }));
-    const created = await getOrCreateFundSigner("f1", "u1");
-    expect(created.id).toBe("s2");
-    expect(db.fundSigner.create.mock.calls[0][0].data).toMatchObject({ fundId: "f1", userId: "u1" });
-    expect(String(db.fundSigner.create.mock.calls[0][0].data.privateKeyEnc).startsWith("v2:")).toBe(true);
-
-    const winner = { id: "s3", fundId: "f1", userId: "u1", address: SAFE, privateKeyEnc: "v1:y" };
-    db.fundSigner.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce(winner);
-    db.fundSigner.create.mockRejectedValue(Object.assign(new Error("unique"), { code: "P2002" }));
-    await expect(getOrCreateFundSigner("f1", "u1")).resolves.toEqual(winner);
+  it("refuses to sign with an erased key (migrated to a passkey)", async () => {
+    const erased = { id: "s1", fundId: "f1", userId: "u1", privateKeyEnc: null };
+    const tx = buildSafeTx({ to: SAFE, nonce: BigInt(1) });
+    await expect(
+      signSafeTxWithSigner(erased, { chainId: 100, safeAddress: SAFE, tx }),
+    ).rejects.toMatchObject({ code: "server_key_retired" });
   });
 });

@@ -25,7 +25,16 @@ import { CreateAccountDialog } from "./create-account-dialog";
 import { getTokenAccounts } from "./data";
 import { ExtraBalanceLines, extraLinesFor } from "./extra-balance-lines";
 import { getExtraBalances } from "./extra-balances";
-import { getArchivedSafes, getEligibleMembers, getRelayerStatus, getSafes } from "./safes/data";
+import { userHasPasskey } from "@/services/auth/passkeys";
+
+import {
+  getArchivedSafes,
+  getEligibleMembers,
+  getRelayerStatus,
+  getSafes,
+  getSigningPasskeyStatus,
+} from "./safes/data";
+import { SigningKeyCard } from "./safes/signing-key-card";
 import { formatNative, isDeployedAddress, thresholdLabel } from "./safes/format";
 import { RetryDeployButton } from "./safes/retry-deploy-button";
 import { SafeAddress } from "./safes/safe-address";
@@ -70,7 +79,11 @@ async function AccountsHeader() {
     fund.tokenMinterEoaAddress && fund.citizenPayAccountFactoryAddress,
   );
   const canCreateSafe = Boolean(fund.tokenAddress) && relayer.configured;
-  const members = canCreateSafe ? await getEligibleMembers(fund.id) : [];
+  const [members, signingPasskey, hasPasskey] = await Promise.all([
+    canCreateSafe ? getEligibleMembers(fund.id) : Promise.resolve([]),
+    canCreateSafe ? getSigningPasskeyStatus(fund.id, user.id) : Promise.resolve(null),
+    userHasPasskey(user.id),
+  ]);
 
   return (
     <>
@@ -89,8 +102,11 @@ async function AccountsHeader() {
             name: m.name,
             email: m.email,
             image: m.image,
+            passkeyAddress: m.passkeyAddress,
+            passkeyDeployed: m.passkeyDeployed,
           }))}
           currentUserId={user.id}
+          hasPasskey={hasPasskey}
         />
       </header>
 
@@ -118,6 +134,8 @@ async function AccountsHeader() {
           />
         </div>
       )}
+
+      {canCreateSafe && <SigningKeyCard status={signingPasskey} hasPasskey={hasPasskey} />}
     </>
   );
 }

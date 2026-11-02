@@ -24,6 +24,10 @@ import {
 } from "viem";
 
 import { ERC20_ABI, SAFE_ABI } from "@/services/safe/abi";
+import {
+  CONTRACT_SIGNATURE_STATIC_LENGTH,
+  parseContractSignature,
+} from "@/services/safe/passkey-signature";
 import { SafeError, type Address, type Hex, type SafeTx } from "@/services/safe/types";
 
 export const ZERO_ADDRESS: Address = "0x0000000000000000000000000000000000000000";
@@ -108,11 +112,6 @@ export function safeTxHash(a: { chainId: number; safeAddress: Address; tx: SafeT
 // Signatures
 // ---------------------------------------------------------------------------
 
-/**
- * Concatenate owner signatures in the order Safe.checkNSignatures requires
- * (owner addresses strictly ascending). Only 65-byte ECDSA signatures (v 27/28
- * or eth_sign-style 31/32) are supported.
- */
 // Case-insensitive address helpers shared by proposals / sync / UI loaders.
 export const lc = (a: string): string => a.toLowerCase();
 export const sameAddress = (a: string, b: string): boolean => lc(a) === lc(b);
@@ -135,28 +134,78 @@ export function safeTxFromRow(row: {
   });
 }
 
+/** v of a 65-byte signature; null when it is not 65 bytes of hex. */
+function ecdsaV(signature: Hex): number | null {
+  if (!/^0x[0-9a-fA-F]*$/.test(signature) || size(signature) !== 65) return null;
+  return hexToNumber(slice(signature, 64, 65));
+}
+
+/**
+ * Concatenate owner signatures in the order Safe.checkNSignatures requires
+ * (owner addresses strictly ascending). Each entry is either a 65-byte ECDSA
+ * signature (v 27/28, or eth_sign-style 31/32) or a standalone contract
+ * signature (passkey-signature.ts `contractSignature`: v = 0, r = owner,
+ * s = 65, then the length-prefixed dynamic part). The static parts are laid
+ * out first, in owner order; every dynamic part is appended after ALL static
+ * parts, and its `s` is rewritten to its byte offset in the final blob —
+ * exactly what the Safe reads back. A contract signature must carry the
+ * owner it is listed under.
+ */
 export function packSignatures(sigs: { owner: Address; signature: Hex }[]): Hex {
   const seen = new Set<string>();
-  for (const s of sigs) {
+  const entries = sigs.map((s) => {
     const owner = s.owner.toLowerCase();
     if (seen.has(owner)) {
       throw new SafeError("invalid_signature", `Duplicate signature for owner ${s.owner}`);
     }
     seen.add(owner);
-    if (!/^0x[0-9a-fA-F]*$/.test(s.signature) || size(s.signature) !== 65) {
+    const v = ecdsaV(s.signature);
+    // 65 bytes with v ≠ 0 is a static signature the Safe judges itself
+    // (ECDSA 27/28, eth_sign 31/32, approved hash 1 — recovery and GS026 are
+    // its business); v = 0 at 65 bytes is a contract signature missing its
+    // dynamic part.
+    if (v !== null && v !== 0) {
+      return { owner, ecdsa: s.signature, dynamicPart: null as Hex | null };
+    }
+    const contract = parseContractSignature(s.signature);
+    if (!contract) {
       throw new SafeError(
         "invalid_signature",
-        `Signature for owner ${s.owner} is not 65 bytes`,
+        `Signature for owner ${s.owner} is neither 65 bytes nor a contract signature`,
       );
     }
-  }
-  const sorted = [...sigs].sort((x, y) => {
-    const a = x.owner.toLowerCase();
-    const b = y.owner.toLowerCase();
-    return a < b ? -1 : a > b ? 1 : 0;
+    if (lc(contract.owner) !== owner) {
+      throw new SafeError(
+        "invalid_signature",
+        `Contract signature for ${s.owner} names another owner (${contract.owner})`,
+      );
+    }
+    return { owner, ecdsa: null as Hex | null, dynamicPart: contract.dynamicPart };
   });
+  const sorted = [...entries].sort((x, y) => (x.owner < y.owner ? -1 : x.owner > y.owner ? 1 : 0));
   if (sorted.length === 0) return "0x";
-  return concat(sorted.map((s) => s.signature));
+
+  const staticParts: Hex[] = [];
+  const dynamicParts: Hex[] = [];
+  let dynamicOffset = sorted.length * CONTRACT_SIGNATURE_STATIC_LENGTH;
+  for (const e of sorted) {
+    if (e.ecdsa) {
+      staticParts.push(e.ecdsa);
+      continue;
+    }
+    const dynamic = e.dynamicPart!;
+    staticParts.push(
+      concat([
+        toHex(BigInt(getAddress(e.owner)), { size: 32 }),
+        toHex(BigInt(dynamicOffset), { size: 32 }),
+        "0x00",
+      ]),
+    );
+    const prefixed = concat([toHex(BigInt(size(dynamic)), { size: 32 }), dynamic]);
+    dynamicParts.push(prefixed);
+    dynamicOffset += size(prefixed);
+  }
+  return concat([...staticParts, ...dynamicParts]);
 }
 
 /**
@@ -164,7 +213,9 @@ export function packSignatures(sigs: { owner: Address; signature: Hex }[]): Hex 
  *   v 27/28 → EIP-712 signature over the typed data (what our signer and
  *             Safe{Wallet} with eth_signTypedData produce).
  *   v 31/32 → eth_sign over the raw safeTxHash, v bumped by 4 (Safe's marker).
- * Contract signatures (v 0) and approved hashes (v 1) are rejected.
+ * Contract signatures (v 0) and approved hashes (v 1) are rejected: a
+ * contract owner's signature is checked on chain instead
+ * (relayer.ts verifyContractSignature).
  */
 export async function recoverSafeTxSigner(a: {
   chainId: number;

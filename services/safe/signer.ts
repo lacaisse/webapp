@@ -7,14 +7,19 @@ import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { decryptSecret, encryptSecret, envelopeVersion } from "@/services/crypto/secret";
 import { prisma } from "@/services/db/prisma";
 import { safeTxTypedData } from "@/services/safe/safe-tx";
-import type { Address, Hex, SafeTx } from "@/services/safe/types";
+import { SafeError, type Address, type Hex, type SafeTx } from "@/services/safe/types";
 
-// Per-member Safe signer keys. Each (fund, user) pair gets one secp256k1 key,
-// generated on first need and stored AES-256-GCM encrypted in
+// LEGACY server-held Safe signer keys. The first Safe release gave each
+// (fund, user) pair one secp256k1 key, stored AES-256-GCM encrypted in
 // `FundSigner.privateKeyEnc` (envelope from services/crypto/secret.ts, same
-// as the token minter in services/token/minter.ts). The address is the Safe
-// owner La Caisse signs with on that member's behalf. Keys never leave this
-// module in plaintext and are never logged.
+// as the token minter in services/token/minter.ts), and signed on the
+// member's behalf. That is custody: a server breach yields one signature per
+// member. Members now own their Safe key as a passkey (passkey-signers.ts),
+// so NO new FundSigner row is ever created here — `generateSigner` only
+// remains for the unit tests of the envelope binding — and a stored key
+// signs only on a Safe that still lists it as a MEMBER owner, until the
+// guided migration (migration.ts) swaps it out and the sweep erases the
+// ciphertext (`privateKeyEnc` null, `keyDeletedAt`).
 //
 // The envelope is bound (GCM additional data, envelope v2) to the row it
 // belongs to — `signer:<fundId>:<userId>` — so a ciphertext copied onto
@@ -53,7 +58,7 @@ export type SignerRow = {
   fundId: string;
   userId: string;
   address: Address;
-  privateKeyEnc: string;
+  privateKeyEnc: string | null; // null once erased by the migration sweep
 };
 
 function toSigner(row: {
@@ -61,45 +66,35 @@ function toSigner(row: {
   fundId: string;
   userId: string;
   address: string;
-  privateKeyEnc: string;
+  privateKeyEnc: string | null;
 }): SignerRow {
   return { ...row, address: getAddress(row.address) };
 }
 
-/**
- * The member's signer for this fund, creating it on first use. A concurrent
- * create for the same (fundId, userId) loses on the unique index (P2002) and
- * re-reads the winner's row, so a member never ends up with two keys.
- */
-export async function getOrCreateFundSigner(fundId: string, userId: string): Promise<SignerRow> {
-  const where = { fundId_userId: { fundId, userId } };
-  const existing = await prisma.fundSigner.findUnique({ where, select: signerSelect });
-  if (existing) return toSigner(existing);
-
-  const fresh = generateSigner(fundId, userId);
-  try {
-    const created = await prisma.fundSigner.create({
-      data: { fundId, userId, address: fresh.address, privateKeyEnc: fresh.privateKeyEnc },
-      select: signerSelect,
-    });
-    return toSigner(created);
-  } catch (e) {
-    if ((e as { code?: string }).code !== "P2002") throw e;
-    const winner = await prisma.fundSigner.findUnique({ where, select: signerSelect });
-    if (!winner) throw e;
-    return toSigner(winner);
-  }
+/** The member's legacy server-held signer for this fund, if one ever existed. */
+export async function findFundSigner(fundId: string, userId: string): Promise<SignerRow | null> {
+  const row = await prisma.fundSigner.findUnique({
+    where: { fundId_userId: { fundId, userId } },
+    select: signerSelect,
+  });
+  return row ? toSigner(row) : null;
 }
 
 /**
  * EIP-712 signature (v 27/28) of the SafeTx by a stored signer key. The key
  * is unsealed with the row's binding; a legacy (v1) envelope is re-sealed
- * as v2 on the way, best-effort.
+ * as v2 on the way, best-effort. Refused once the ciphertext was erased.
  */
 export async function signSafeTxWithSigner(
-  signer: { id: string; fundId: string; userId: string; privateKeyEnc: string },
+  signer: { id: string; fundId: string; userId: string; privateKeyEnc: string | null },
   a: { chainId: number; safeAddress: Address; tx: SafeTx },
 ): Promise<Hex> {
+  if (!signer.privateKeyEnc) {
+    throw new SafeError(
+      "server_key_retired",
+      "This server-held key was retired: sign with your passkey instead",
+    );
+  }
   const binding = signerBinding(signer.fundId, signer.userId);
   const privateKey = decryptSecret(signer.privateKeyEnc, binding) as Hex;
   if (envelopeVersion(signer.privateKeyEnc) === "v1") {

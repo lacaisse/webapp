@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 // In-memory stand-in for the slice of Prisma the Safe core uses
-// (proposals.ts / sync.ts), for their unit tests only. Implements just the
-// where-semantics those modules rely on: equality, null, { in }, { not },
-// { lt }, OR, and the `safe: { fundId }` relation filter on transactions /
-// owners. Not a general Prisma emulator.
+// (proposals.ts / sync.ts / migration.ts), for their unit tests only.
+// Implements just the where-semantics those modules rely on: equality, null,
+// { in }, { not }, { lt }, OR, the `safe: { fundId }` relation filter on
+// transactions / owners, and `signer: { is }` / `passkey: { is }` on owners.
+// Not a general Prisma emulator.
 
 type Row = Record<string, unknown>;
 type Where = Record<string, unknown>;
@@ -36,6 +37,7 @@ export function createFakePrisma() {
     fundSafe: [] as Row[],
     fundSafeOwner: [] as Row[],
     fundSigner: [] as Row[],
+    fundPasskeySigner: [] as Row[],
     fundSafeTransaction: [] as Row[],
     fundSafeSignature: [] as Row[],
     tokenOperation: [] as Row[],
@@ -58,6 +60,14 @@ export function createFakePrisma() {
         if (!safe || !matches(safe, cond as Where)) return false;
         continue;
       }
+      if ((k === "signer" || k === "passkey") && typeof cond === "object" && cond !== null) {
+        const table = k === "signer" ? db.fundSigner : db.fundPasskeySigner;
+        const fk = k === "signer" ? row.signerId : row.passkeyId;
+        const related = table.find((r) => r.id === fk) ?? null;
+        const inner = (cond as { is?: Where }).is ?? (cond as Where);
+        if (!related || !matches(related, inner)) return false;
+        continue;
+      }
       if (!matchValue(row[k], cond)) return false;
     }
     return true;
@@ -69,8 +79,13 @@ export function createFakePrisma() {
       .filter((o) => o.safeId === safeId && matches(o, where))
       .map((o) => {
         const signer = db.fundSigner.find((s) => s.id === o.signerId) ?? null;
-        const user = signer ? db.user.find((u) => u.id === signer.userId) ?? null : null;
-        return { ...o, signer: signer ? { ...signer, user } : null };
+        const passkey = db.fundPasskeySigner.find((p) => p.id === o.passkeyId) ?? null;
+        const userOf = (userId: unknown) => db.user.find((u) => u.id === userId) ?? null;
+        return {
+          ...o,
+          signer: signer ? { ...signer, user: userOf(signer.userId) } : null,
+          passkey: passkey ? { ...passkey, user: userOf(passkey.userId) } : null,
+        };
       });
   }
 
@@ -119,7 +134,16 @@ export function createFakePrisma() {
         };
         db.fundSafe.push(row);
         for (const o of ((owners as { create?: Row[] } | undefined)?.create ?? [])) {
-          db.fundSafeOwner.push({ id: newId("owner"), safeId: row.id, removedAt: null, signerId: null, label: null, ...o });
+          db.fundSafeOwner.push({
+            id: newId("owner"),
+            safeId: row.id,
+            removedAt: null,
+            signerId: null,
+            passkeyId: null,
+            label: null,
+            addedAt: new Date(),
+            ...o,
+          });
         }
         return row;
       },
@@ -137,6 +161,11 @@ export function createFakePrisma() {
     fundSafeOwner: {
       findMany: async (a: { where: Where }) =>
         db.fundSafeOwner.filter((o) => matches(o, a.where)).map((o) => ({ ...o })),
+      findFirst: async (a: { where: Where }) => {
+        const r = db.fundSafeOwner.find((o) => matches(o, a.where));
+        return r ? { ...r } : null;
+      },
+      count: async (a: { where: Where }) => db.fundSafeOwner.filter((o) => matches(o, a.where)).length,
       update: async (a: { where: { id: string }; data: Row }) => {
         const r = db.fundSafeOwner.find((o) => o.id === a.where.id)!;
         Object.assign(r, a.data);
@@ -150,7 +179,15 @@ export function createFakePrisma() {
         const { safeId, address } = a.where.safeId_address;
         const r = db.fundSafeOwner.find((o) => o.safeId === safeId && o.address === address);
         if (r) return Object.assign(r, a.update);
-        const row = { id: newId("owner"), removedAt: null, signerId: null, label: null, ...a.create };
+        const row = {
+          id: newId("owner"),
+          removedAt: null,
+          signerId: null,
+          passkeyId: null,
+          label: null,
+          addedAt: new Date(),
+          ...a.create,
+        };
         db.fundSafeOwner.push(row);
         return row;
       },
@@ -170,6 +207,42 @@ export function createFakePrisma() {
         }
         const { fundId, address } = a.where.fundId_address!;
         return db.fundSigner.find((s) => s.fundId === fundId && s.address === address) ?? null;
+      },
+      findMany: async (a: { where?: Where }) =>
+        db.fundSigner.filter((s) => matches(s, a.where)).map((s) => ({ ...s })),
+      updateMany: async (a: { where: Where; data: Row }) => {
+        const rows = db.fundSigner.filter((s) => matches(s, a.where));
+        rows.forEach((r) => Object.assign(r, a.data));
+        return { count: rows.length };
+      },
+    },
+    fundPasskeySigner: {
+      findFirst: async (a: { where: Where }) => {
+        const r = db.fundPasskeySigner.find((p) => matches(p, a.where));
+        return r ? { ...r } : null;
+      },
+      findMany: async (a: { where?: Where }) =>
+        db.fundPasskeySigner.filter((p) => matches(p, a.where)).map((p) => ({ ...p })),
+      findUnique: async (a: {
+        where: { id?: string; fundId_address?: { fundId: string; address: string } };
+      }) => {
+        if (a.where.id) return db.fundPasskeySigner.find((p) => p.id === a.where.id) ?? null;
+        const { fundId, address } = a.where.fundId_address!;
+        return (
+          db.fundPasskeySigner.find(
+            (p) => p.fundId === fundId && String(p.address).toLowerCase() === address.toLowerCase(),
+          ) ?? null
+        );
+      },
+      update: async (a: { where: { id: string }; data: Row }) => {
+        const r = db.fundPasskeySigner.find((p) => p.id === a.where.id)!;
+        Object.assign(r, a.data);
+        return { ...r };
+      },
+      updateMany: async (a: { where: Where; data: Row }) => {
+        const rows = db.fundPasskeySigner.filter((p) => matches(p, a.where));
+        rows.forEach((r) => Object.assign(r, a.data));
+        return { count: rows.length };
       },
     },
     fundSafeTransaction: {
@@ -235,7 +308,7 @@ export function createFakePrisma() {
         ) {
           throw uniqueViolation();
         }
-        const row = { id: newId("sig"), signerId: null, userId: null, ...a.data };
+        const row = { id: newId("sig"), signerId: null, passkeyId: null, userId: null, ...a.data };
         db.fundSafeSignature.push(row);
         return row;
       },

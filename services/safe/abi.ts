@@ -195,6 +195,84 @@ export const SAFE_PROXY_FACTORY_ABI = [
   },
 ] as const;
 
+// Safe passkey module v0.2.1 — SafeWebAuthnSignerFactory (ISafeSignerFactory).
+// `P256.Verifiers` is a uint176 user type (config.ts passkeyVerifiersFor).
+export const SAFE_WEBAUTHN_SIGNER_FACTORY_ABI = [
+  {
+    type: "function",
+    name: "SINGLETON",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+  },
+  {
+    type: "function",
+    name: "getSigner",
+    stateMutability: "view",
+    inputs: [
+      { name: "x", type: "uint256" },
+      { name: "y", type: "uint256" },
+      { name: "verifiers", type: "uint176" },
+    ],
+    outputs: [{ name: "signer", type: "address" }],
+  },
+  {
+    type: "function",
+    name: "createSigner",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "x", type: "uint256" },
+      { name: "y", type: "uint256" },
+      { name: "verifiers", type: "uint176" },
+    ],
+    outputs: [{ name: "signer", type: "address" }],
+  },
+  {
+    type: "function",
+    name: "isValidSignatureForSigner",
+    stateMutability: "view",
+    inputs: [
+      { name: "message", type: "bytes32" },
+      { name: "signature", type: "bytes" },
+      { name: "x", type: "uint256" },
+      { name: "y", type: "uint256" },
+      { name: "verifiers", type: "uint176" },
+    ],
+    outputs: [{ name: "magicValue", type: "bytes4" }],
+  },
+  {
+    type: "event",
+    name: "Created",
+    anonymous: false,
+    inputs: [
+      { name: "signer", type: "address", indexed: true },
+      { name: "x", type: "uint256", indexed: false },
+      { name: "y", type: "uint256", indexed: false },
+      { name: "verifiers", type: "uint176", indexed: false },
+    ],
+  },
+] as const;
+
+// EIP-1271 on a Safe owner that is a contract (the passkey signer proxy, a
+// nested Safe…). The bytes32 variant is what we call to verify a stored
+// contract signature; Safe 1.4.1's checkNSignatures itself calls the legacy
+// `isValidSignature(bytes data, bytes)` with the EIP-712 pre-image, which the
+// passkey singleton hashes with keccak256 — same message either way.
+export const ERC1271_ABI = [
+  {
+    type: "function",
+    name: "isValidSignature",
+    stateMutability: "view",
+    inputs: [
+      { name: "hash", type: "bytes32" },
+      { name: "signature", type: "bytes" },
+    ],
+    outputs: [{ name: "magicValue", type: "bytes4" }],
+  },
+] as const;
+
+export const ERC1271_MAGIC_VALUE = "0x1626ba7e";
+
 export const ERC20_ABI = [
   {
     type: "function",

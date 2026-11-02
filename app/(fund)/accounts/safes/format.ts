@@ -171,11 +171,19 @@ export function summaryLine(
       }
       return t(`tx.summary.${base}`, { owner, threshold: summary.threshold });
     }
-    case "SWAP_OWNER":
+    case "SWAP_OWNER": {
+      const migration: unknown = summary.migration;
+      if (migration === "server_key" || migration === "replaced_passkey") {
+        return t(`tx.summary.${migration === "server_key" ? "swapToPasskey" : "swapReplacedPasskey"}`, {
+          owner: who(summary.oldOwner, summary.oldOwnerLabel, names),
+          newOwner: who(summary.newOwner, summary.newOwnerLabel, names),
+        });
+      }
       return t("tx.summary.swapOwner", {
         oldOwner: who(summary.oldOwner, summary.oldOwnerLabel, names),
         newOwner: who(summary.newOwner, summary.newOwnerLabel, names),
       });
+    }
     case "CHANGE_THRESHOLD": {
       const from = previousThresholdOf(summary);
       if (from != null && from !== summary.threshold) {
@@ -223,10 +231,11 @@ export function initials(name: string): string {
 }
 
 /**
- * Whether La Caisse alone holds enough owner keys to meet the threshold
- * (review S3): true when `threshold <= memberOwners`. Every MEMBER owner's
- * key sits with the server, so such a Safe is not an independent multisig
- * against the server; the dialogs say so.
+ * Whether La Caisse alone holds enough LEGACY owner keys to meet the
+ * threshold (review S3): true when `threshold <= memberOwners`, counting
+ * only MEMBER (server-held) owners — a passkey owner's key is on the
+ * member's device, not the server. Such a Safe is not an independent
+ * multisig against the server; the dialogs say so until it is migrated.
  */
 export function serverCanSignAlone(threshold: number, memberOwners: number): boolean {
   return memberOwners > 0 && threshold <= memberOwners;

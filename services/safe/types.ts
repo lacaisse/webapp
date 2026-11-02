@@ -68,6 +68,11 @@ export type SafeTxSummary =
       oldOwnerLabel: string | null;
       newOwner: Address;
       newOwnerLabel: string | null;
+      // Set when the swap moves a member's owner key: from a server-held
+      // FundSigner to their passkey signer (`server_key`), or from a lost /
+      // replaced passkey to the new one (`replaced_passkey`). Recorded so
+      // the Safe's history says what the swap was for.
+      migration?: OwnerMigrationReason;
     }
   | {
       kind: "CHANGE_THRESHOLD";
@@ -75,6 +80,10 @@ export type SafeTxSummary =
       previousThreshold?: number; // on-chain threshold at proposal time
     }
   | { kind: "REJECTION"; rejectsNonce: number };
+
+// Why an owner row should be swapped for the member's current passkey
+// signer (services/safe/migration.ts).
+export type OwnerMigrationReason = "server_key" | "replaced_passkey";
 
 export type SafeErrorCode =
   | "config" // env / contracts missing
@@ -91,6 +100,11 @@ export type SafeErrorCode =
   | "not_found"
   | "queue_full" // open-proposal cap reached (review S9)
   | "holds_value" // archive refused: the Safe still holds funds (review S7)
+  | "passkey_missing" // a team owner has no (deployed) signing passkey for this fund
+  | "passkey_exists" // the member already has an active signing passkey here
+  | "rules_spare_owner" // owner rules: owners must be ≥ threshold + 1 (lost-key recovery)
+  | "rules_one_person" // owner rules: one person's keys alone must not meet the threshold
+  | "server_key_retired" // LEGACY key no longer signs (migrated / erased)
   | "invalid_state"; // e.g. acting on a non-ACTIVE safe or non-PENDING tx
 
 export class SafeError extends Error {

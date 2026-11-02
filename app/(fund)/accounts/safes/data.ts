@@ -166,7 +166,14 @@ export type SafeOwnerView = {
   userId: string | null;
   email: string | null;
   image: string | null;
-  isFormerMember: boolean; // MEMBER whose user left the fund staff
+  isFormerMember: boolean; // MEMBER / PASSKEY whose user left the fund staff
+  // PASSKEY owners: whether the credential is synced to a backup (from the
+  // last ceremony's flags); null for the other kinds.
+  backedUp: boolean | null;
+  backupEligible: boolean | null;
+  // PASSKEY owner whose credential the member replaced (lost device): the
+  // migration banner offers the swap to the new one.
+  passkeyReplaced: boolean;
   addedAt: string;
 };
 
@@ -230,6 +237,15 @@ export const getSafe = cache(
                 user: { select: { name: true, email: true, image: true } },
               },
             },
+            passkey: {
+              select: {
+                userId: true,
+                backupState: true,
+                backupEligible: true,
+                replacedAt: true,
+                user: { select: { name: true, email: true, image: true } },
+              },
+            },
           },
         },
         transactions: {
@@ -246,9 +262,9 @@ export const getSafe = cache(
     });
     if (!safe) return null;
 
-    // Which MEMBER owners still belong to the fund staff.
+    // Which team owners still belong to the fund staff.
     const memberUserIds = safe.owners
-      .map((o) => o.signer?.userId)
+      .map((o) => o.signer?.userId ?? o.passkey?.userId)
       .filter((id): id is string => Boolean(id));
     const stillMembers = new Set(
       memberUserIds.length === 0
@@ -262,7 +278,8 @@ export const getSafe = cache(
     );
 
     const owners: SafeOwnerView[] = safe.owners.map((o) => {
-      const user = o.signer?.user ?? null;
+      const person = o.kind === "PASSKEY" ? o.passkey : o.signer;
+      const user = person?.user ?? null;
       const label = o.label?.trim() || null;
       return {
         address: o.address,
@@ -271,12 +288,14 @@ export const getSafe = cache(
         displayName: user
           ? userDisplayName(user)
           : (label ?? shortAddress(o.address)),
-        userId: o.signer?.userId ?? null,
+        userId: person?.userId ?? null,
         email: user?.email ?? null,
         image: user?.image ?? null,
         isFormerMember:
-          o.kind === "MEMBER" &&
-          (!o.signer || !stillMembers.has(o.signer.userId)),
+          o.kind !== "EXTERNAL" && (!person || !stillMembers.has(person.userId)),
+        backedUp: o.kind === "PASSKEY" ? (o.passkey?.backupState ?? null) : null,
+        backupEligible: o.kind === "PASSKEY" ? (o.passkey?.backupEligible ?? null) : null,
+        passkeyReplaced: o.kind === "PASSKEY" && Boolean(o.passkey?.replacedAt),
         addedAt: o.addedAt.toISOString(),
       };
     });
@@ -345,13 +364,91 @@ export const getSafe = cache(
 // People
 // ---------------------------------------------------------------------------
 
-export const getCurrentSignerAddress = cache(
-  async (fundId: string, userId: string): Promise<string | null> => {
-    const signer = await prisma.fundSigner.findUnique({
-      where: { fundId_userId: { fundId, userId } },
-      select: { address: true },
+// The addresses the current user owns Safes with in this fund: their active
+// signing passkey's signer contract and, while the migration runs, their
+// legacy server-held key. Both may be owners of the same Safe mid-swap.
+export const getCurrentOwnerAddresses = cache(
+  async (fundId: string, userId: string): Promise<string[]> => {
+    const [passkey, signer] = await Promise.all([
+      prisma.fundPasskeySigner.findFirst({
+        where: { fundId, userId, replacedAt: null },
+        orderBy: { createdAt: "desc" },
+        select: { address: true },
+      }),
+      prisma.fundSigner.findUnique({
+        where: { fundId_userId: { fundId, userId } },
+        select: { address: true },
+      }),
+    ]);
+    return [passkey?.address, signer?.address].filter((a): a is string => Boolean(a));
+  },
+);
+
+// The current user's signing passkey for this fund, as the Safe page needs
+// it: what the browser passes to the ceremony, and how the card shows it.
+export type SigningPasskeyStatus = {
+  id: string;
+  address: string;
+  credentialId: string;
+  transports: string[];
+  deployed: boolean;
+  backupEligible: boolean;
+  backupState: boolean;
+  createdAt: string;
+  lastUsedAt: string | null;
+  // Addresses of this member's replaced passkeys that still own an
+  // unarchived Safe of the fund (lost-device swaps pending).
+  staleOwnerSafes: { id: string; name: string }[];
+};
+
+export const getSigningPasskeyStatus = cache(
+  async (fundId: string, userId: string): Promise<SigningPasskeyStatus | null> => {
+    const row = await prisma.fundPasskeySigner.findFirst({
+      where: { fundId, userId, replacedAt: null },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        address: true,
+        credentialId: true,
+        transports: true,
+        deployedAt: true,
+        backupEligible: true,
+        backupState: true,
+        createdAt: true,
+        lastUsedAt: true,
+      },
     });
-    return signer?.address ?? null;
+    if (!row) return null;
+    const stale = await prisma.fundSafeOwner.findMany({
+      where: {
+        removedAt: null,
+        safe: { fundId, archivedAt: null },
+        OR: [
+          { passkey: { is: { userId, replacedAt: { not: null } } } },
+          { signer: { is: { userId } } },
+        ],
+      },
+      select: { safe: { select: { id: true, name: true } } },
+    });
+    const seen = new Set<string>();
+    const staleOwnerSafes: { id: string; name: string }[] = [];
+    for (const s of stale) {
+      if (seen.has(s.safe.id)) continue;
+      seen.add(s.safe.id);
+      staleOwnerSafes.push(s.safe);
+    }
+    return {
+      id: row.id,
+      address: row.address,
+      credentialId: row.credentialId,
+      transports: row.transports ? row.transports.split(",") : [],
+      deployed: Boolean(row.deployedAt),
+      backupEligible: row.backupEligible,
+      backupState: row.backupState,
+      createdAt: row.createdAt.toISOString(),
+      lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
+      staleOwnerSafes,
+    };
   },
 );
 
@@ -377,10 +474,12 @@ export type EligibleMember = {
   name: string;
   email: string;
   image: string | null;
-  signerAddress: string | null; // their FundSigner, if one exists yet
+  signerAddress: string | null; // their legacy server-held key, if one ever existed
+  passkeyAddress: string | null; // their active signing passkey's signer contract
+  passkeyDeployed: boolean;
 };
 
-// Fund staff who may own a Safe: OWNER + ADMIN members.
+// Fund staff who may own a Safe: OWNER + ADMIN members — with their passkey.
 export const getEligibleMembers = cache(
   async (fundId: string): Promise<EligibleMember[]> => {
     const members = await prisma.fundMember.findMany({
@@ -391,20 +490,30 @@ export const getEligibleMembers = cache(
       },
     });
     const userIds = members.map((m) => m.user.id);
-    const signers =
+    const [signers, passkeys] =
       userIds.length === 0
-        ? []
-        : await prisma.fundSigner.findMany({
-            where: { fundId, userId: { in: userIds } },
-            select: { userId: true, address: true },
-          });
+        ? [[], []]
+        : await Promise.all([
+            prisma.fundSigner.findMany({
+              where: { fundId, userId: { in: userIds } },
+              select: { userId: true, address: true },
+            }),
+            prisma.fundPasskeySigner.findMany({
+              where: { fundId, userId: { in: userIds }, replacedAt: null },
+              orderBy: { createdAt: "asc" },
+              select: { userId: true, address: true, deployedAt: true },
+            }),
+          ]);
     const signerByUser = new Map(signers.map((s) => [s.userId, s.address]));
+    const passkeyByUser = new Map(passkeys.map((p) => [p.userId, p]));
     return members.map(({ user }) => ({
       userId: user.id,
       name: userDisplayName(user),
       email: user.email,
       image: user.image,
       signerAddress: signerByUser.get(user.id) ?? null,
+      passkeyAddress: passkeyByUser.get(user.id)?.address ?? null,
+      passkeyDeployed: Boolean(passkeyByUser.get(user.id)?.deployedAt),
     }));
   },
 );

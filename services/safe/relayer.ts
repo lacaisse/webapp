@@ -20,8 +20,14 @@ import { privateKeyToAccount, type PrivateKeyAccount } from "viem/accounts";
 import { gnosis } from "viem/chains";
 
 import { alchemyNetwork } from "@/services/alchemy/client";
-import { SAFE_ABI, SAFE_PROXY_FACTORY_ABI } from "@/services/safe/abi";
-import { safeContractsFor } from "@/services/safe/config";
+import {
+  ERC1271_ABI,
+  ERC1271_MAGIC_VALUE,
+  SAFE_ABI,
+  SAFE_PROXY_FACTORY_ABI,
+  SAFE_WEBAUTHN_SIGNER_FACTORY_ABI,
+} from "@/services/safe/abi";
+import { safeContractsFor, safePasskeyContractsFor } from "@/services/safe/config";
 import { predictSafeAddress, safeSetupData } from "@/services/safe/safe-tx";
 import { SafeError, isSafeError, type Address, type Hex, type SafeTx } from "@/services/safe/types";
 
@@ -412,6 +418,117 @@ export async function deploySafe(a: {
     );
   }
   return { address: predicted, txHash };
+}
+
+// ---------------------------------------------------------------------------
+// Passkey signer contracts (Safe passkey module v0.2.1)
+// ---------------------------------------------------------------------------
+
+/** Whether `address` has code on chain (a deployed signer proxy, a Safe…). */
+export async function hasContractCode(chainId: number, address: Address): Promise<boolean> {
+  return hasCode(publicClientFor(chainId), getAddress(address));
+}
+
+/**
+ * The address SafeWebAuthnSignerFactory.createSigner deploys the proxy for
+ * (x, y, verifiers) to — CREATE2 with salt 0, read from the factory so the
+ * proxy creation code never has to be mirrored here.
+ */
+export async function predictPasskeySignerAddress(a: {
+  chainId: number;
+  x: bigint;
+  y: bigint;
+  verifiers: bigint;
+}): Promise<Address> {
+  const { signerFactory } = safePasskeyContractsFor(a.chainId);
+  const signer = await publicClientFor(a.chainId).readContract({
+    address: signerFactory,
+    abi: SAFE_WEBAUTHN_SIGNER_FACTORY_ABI,
+    functionName: "getSigner",
+    args: [a.x, a.y, a.verifiers],
+  });
+  return getAddress(signer);
+}
+
+/**
+ * Deploy the member's signer proxy through the relayer. Idempotent: when
+ * the predicted address already has code nothing is sent (txHash "0x").
+ * The proxy must exist before a Safe lists it as an owner — a Safe deploys
+ * fine with a code-less owner address, but the first signature would then
+ * fail GS024 (no contract to call).
+ */
+export async function deployPasskeySigner(a: {
+  chainId: number;
+  x: bigint;
+  y: bigint;
+  verifiers: bigint;
+}): Promise<{ address: Address; txHash: Hex }> {
+  const { signerFactory } = safePasskeyContractsFor(a.chainId);
+  const client = publicClientFor(a.chainId);
+  const address = await predictPasskeySignerAddress(a);
+  if (await hasCode(client, address)) return { address, txHash: "0x" };
+
+  const wallet = walletClientFor(a.chainId);
+  let txHash: Hex;
+  try {
+    txHash = await wallet.writeContract({
+      address: signerFactory,
+      abi: SAFE_WEBAUTHN_SIGNER_FACTORY_ABI,
+      functionName: "createSigner",
+      args: [a.x, a.y, a.verifiers],
+    });
+  } catch (e) {
+    throw new SafeError("relayer_failed", `Signer deployment not sent: ${shortMessage(e)}`, {
+      cause: e,
+    });
+  }
+  const receipt = await waitForReceipt(client, txHash, "Signer deployment");
+  if (receipt.status !== "success") {
+    throw withTxHash(new SafeError("tx_reverted", `Signer deployment reverted (tx ${txHash})`), txHash);
+  }
+  if (!(await hasCode(client, address))) {
+    throw withTxHash(
+      new SafeError("relayer_failed", `Signer deployment mined but ${address} has no code (tx ${txHash})`),
+      txHash,
+    );
+  }
+  return { address, txHash };
+}
+
+/**
+ * EIP-1271 check of a contract owner's signature over `hash`, the way the
+ * Safe will judge it: `isValidSignature(bytes32, bytes)` on the owner must
+ * answer the magic value. `signature` is the dynamic part alone (for a
+ * passkey owner, the module's abi-encoded WebAuthn signature). False on a
+ * wrong answer or a revert (a malformed blob makes the proxy revert);
+ * relayer_failed only when the RPC itself fails.
+ */
+export async function verifyContractSignature(a: {
+  chainId: number;
+  owner: Address;
+  hash: Hex;
+  signature: Hex;
+}): Promise<boolean> {
+  const client = publicClientFor(a.chainId);
+  try {
+    const magic = await client.readContract({
+      address: getAddress(a.owner),
+      abi: ERC1271_ABI,
+      functionName: "isValidSignature",
+      args: [a.hash, a.signature],
+    });
+    return magic.toLowerCase() === ERC1271_MAGIC_VALUE;
+  } catch (e) {
+    if (e instanceof BaseError && e.walk((err) => err instanceof ContractFunctionRevertedError)) {
+      return false;
+    }
+    if (e instanceof BaseError && /revert|execution reverted|returned no data/i.test(e.shortMessage)) {
+      return false;
+    }
+    throw new SafeError("relayer_failed", `Signature check failed: ${shortMessage(e)}`, {
+      cause: e,
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
