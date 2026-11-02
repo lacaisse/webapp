@@ -437,6 +437,7 @@
           "SWAP_OWNER": "Ondertekenaar vervangen",
           "CHANGE_THRESHOLD": "Drempel wijzigen",
           "REJECTION": "Afwijzing",
+          "CONVERSION": "Omzetting",
           "UNKNOWN": "Transactie"
         },
         "summary": {
@@ -449,6 +450,8 @@
           "removeOwnerThresholdChange": "Ondertekenaar {owner} verwijderen, vereiste handtekeningen: {from} → {to}",
           "changeThresholdFromTo": "Drempel wijzigen van {from} naar {to, plural, one {# handtekening} other {# handtekeningen}}",
           "rejection": "Transactie nr. {nonce} afwijzen",
+          "conversion": "{from} omzetten naar minstens {to}",
+          "conversionStep": "{from} omzetten naar minstens {to} — stap {step} van {steps} ({label})",
           "swapToPasskey": "Sleutel van {owner} omzetten naar zijn of haar passkey {newOwner}",
           "swapReplacedPasskey": "Verloren passkey van {owner} vervangen door {newOwner}"
         },
@@ -489,7 +492,11 @@
           "threshold": "Vereiste handtekeningen",
           "unknownAddress": "Onbekend adres",
           "weakens": "Verzwakt de Safe",
-          "viewOnExplorer": "Bekijken in de explorer"
+          "viewOnExplorer": "Bekijken in de explorer",
+          "conversion": "Omzetting",
+          "step": "Stap",
+          "validUntil": "Order geldig tot",
+          "orderExpired": "Order verlopen"
         },
         "reject": "Afwijzen",
         "rejectTitle": "Transactie nr. {nonce} afwijzen?",
@@ -525,6 +532,62 @@
         "status": "Saldo van de relayer: {balance} xDAI. Stuur xDAI naar dit adres om deployments en uitvoeringen te betalen:"
       },
       "conversion": {
+        "trigger": "Omzetten",
+        "title": "Tokens omzetten",
+        "description": "Wissel een van de saldi van de Safe om naar een ander via CoW Swap. Elke on-chain stap is een Safe-transactie die loopt zodra {threshold, plural, one {# eigenaar heeft} other {# eigenaren hebben}} getekend.",
+        "pair": "Omzetting",
+        "pairOption": "{from} → {to}",
+        "amount": "Bedrag",
+        "balance": "Saldo: {balance} {symbol}",
+        "getQuote": "Prijsopgave ophalen",
+        "requote": "Opnieuw opvragen",
+        "quote": {
+          "expected": "Verwacht",
+          "minimum": "Minimum ({slippage} slippage)",
+          "rate": "Koers",
+          "fee": "De vergoeding van CoW Swap zit in de prijs.",
+          "validity": "De order blijft 7 dagen open terwijl de eigenaren tekenen.",
+          "roundsOne": "Eén Safe-transactie.",
+          "roundsTwo": "Twee Safe-transacties: nu de swap, daarna de mint zodra de order is uitgevoerd."
+        },
+        "confirm": "Voorstellen",
+        "steps": {
+          "swap": "swap",
+          "mint": "mint",
+          "burn": "burn"
+        },
+        "calls": {
+          "approve": "Goedkeuren voor CoW Swap",
+          "presign": "Order voortekenen",
+          "unwrap": "WXDAI uitpakken",
+          "mint": "BREAD minten",
+          "burn": "BREAD verbranden",
+          "wrap": "xDAI inpakken"
+        },
+        "status": {
+          "PROPOSED": "Wacht op handtekeningen",
+          "READY": "Wacht op een eigenaar",
+          "FILLING": "Wacht op uitvoering",
+          "DONE": "Klaar",
+          "EXPIRED": "Order verlopen",
+          "CANCELLED": "Geannuleerd",
+          "FAILED": "Mislukt"
+        },
+        "card": {
+          "title": "Omzettingen",
+          "line": "{from} → minstens {to}",
+          "lineDone": "{from} → {to}",
+          "order": "Order bekijken",
+          "by": "Gestart door {name}",
+          "continue": "Volgende stap voorstellen",
+          "cancel": "Annuleren",
+          "cancelTitle": "Deze omzetting annuleren?",
+          "cancelDescription": "Er loopt niets: geen open order, geen transactie in behandeling. Wat al is omgezet blijft in de Safe.",
+          "cancelConfirm": "Omzetting annuleren",
+          "proposalExpired": "De CoW-order verliep voordat de eigenaren tekenden. Wijs de openstaande transactie af en begin opnieuw.",
+          "fillHint": "Solvers voeren de order uit zodra de prijs het toelaat; deze pagina controleert om de paar minuten.",
+          "readyHint": "De order is uitgevoerd: de volgende transactie is afgestemd op wat binnenkwam."
+        },
         "errors": {
           "config": "Conversies zijn niet ingesteld voor dit netwerk.",
           "cow_api": "CoW Swap is niet bereikbaar. Probeer het zo opnieuw.",

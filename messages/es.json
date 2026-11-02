@@ -437,6 +437,7 @@
           "SWAP_OWNER": "Sustituir firmante",
           "CHANGE_THRESHOLD": "Cambiar umbral",
           "REJECTION": "Rechazo",
+          "CONVERSION": "Conversión",
           "UNKNOWN": "Transacción"
         },
         "summary": {
@@ -449,6 +450,8 @@
           "removeOwnerThresholdChange": "Quitar al firmante {owner}, firmas necesarias: {from} → {to}",
           "changeThresholdFromTo": "Cambiar el umbral de {from} a {to, plural, one {# firma} other {# firmas}}",
           "rejection": "Rechazar la transacción n.º {nonce}",
+          "conversion": "Convertir {from} en al menos {to}",
+          "conversionStep": "Convertir {from} en al menos {to} — paso {step} de {steps} ({label})",
           "swapToPasskey": "Pasar la clave de {owner} a su passkey {newOwner}",
           "swapReplacedPasskey": "Reemplazar la passkey perdida de {owner} por {newOwner}"
         },
@@ -489,7 +492,11 @@
           "threshold": "Firmas necesarias",
           "unknownAddress": "Dirección desconocida",
           "weakens": "Debilita el Safe",
-          "viewOnExplorer": "Ver en el explorador"
+          "viewOnExplorer": "Ver en el explorador",
+          "conversion": "Conversión",
+          "step": "Paso",
+          "validUntil": "Orden válida hasta",
+          "orderExpired": "Orden expirada"
         },
         "reject": "Rechazar",
         "rejectTitle": "¿Rechazar la transacción n.º {nonce}?",
@@ -525,6 +532,62 @@
         "status": "Saldo del relayer: {balance} xDAI. Envía xDAI a esta dirección para pagar los despliegues y ejecuciones:"
       },
       "conversion": {
+        "trigger": "Convertir",
+        "title": "Convertir tokens",
+        "description": "Cambia uno de los saldos del Safe por otro a través de CoW Swap. Cada paso en cadena es una transacción del Safe que se ejecuta cuando {threshold, plural, one {# propietario ha} other {# propietarios han}} firmado.",
+        "pair": "Conversión",
+        "pairOption": "{from} → {to}",
+        "amount": "Importe",
+        "balance": "Saldo: {balance} {symbol}",
+        "getQuote": "Obtener cotización",
+        "requote": "Volver a cotizar",
+        "quote": {
+          "expected": "Esperado",
+          "minimum": "Mínimo (deslizamiento {slippage})",
+          "rate": "Tipo",
+          "fee": "La comisión de CoW Swap está incluida en el precio.",
+          "validity": "La orden queda abierta 7 días mientras firman los propietarios.",
+          "roundsOne": "Una transacción del Safe.",
+          "roundsTwo": "Dos transacciones del Safe: el intercambio ahora y el mint cuando se ejecute la orden."
+        },
+        "confirm": "Proponer",
+        "steps": {
+          "swap": "intercambio",
+          "mint": "mint",
+          "burn": "burn"
+        },
+        "calls": {
+          "approve": "Aprobar para CoW Swap",
+          "presign": "Prefirmar la orden",
+          "unwrap": "Desenvolver WXDAI",
+          "mint": "Mintear BREAD",
+          "burn": "Quemar BREAD",
+          "wrap": "Envolver xDAI"
+        },
+        "status": {
+          "PROPOSED": "Esperando firmas",
+          "READY": "Esperando a un propietario",
+          "FILLING": "Esperando la ejecución",
+          "DONE": "Hecha",
+          "EXPIRED": "Orden expirada",
+          "CANCELLED": "Cancelada",
+          "FAILED": "Fallida"
+        },
+        "card": {
+          "title": "Conversiones",
+          "line": "{from} → al menos {to}",
+          "lineDone": "{from} → {to}",
+          "order": "Ver orden",
+          "by": "Iniciada por {name}",
+          "continue": "Proponer el siguiente paso",
+          "cancel": "Cancelar",
+          "cancelTitle": "¿Cancelar esta conversión?",
+          "cancelDescription": "No hay nada en curso: ninguna orden abierta ni transacción pendiente. Lo ya convertido se queda en el Safe.",
+          "cancelConfirm": "Cancelar conversión",
+          "proposalExpired": "La orden de CoW expiró antes de que firmaran los propietarios. Rechaza la transacción pendiente y vuelve a empezar.",
+          "fillHint": "Los solvers ejecutan la orden cuando el precio lo permite; esta página lo comprueba cada pocos minutos.",
+          "readyHint": "La orden se ejecutó: la siguiente transacción se ajusta a lo que llegó."
+        },
         "errors": {
           "config": "Las conversiones no están configuradas para esta red.",
           "cow_api": "No se pudo contactar con CoW Swap. Inténtalo de nuevo en un momento.",

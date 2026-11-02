@@ -7,6 +7,7 @@ import {
   Fuel,
   Info,
   Loader2,
+  Repeat,
   Send,
 } from "lucide-react";
 import Link from "next/link";
@@ -21,6 +22,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, resolveActiveTab } from "@/components/ui/tabs";
 import { requireFundRole } from "@/services/auth/dal";
 import { userHasPasskey } from "@/services/auth/passkeys";
+import { listSafeConversions } from "@/services/convert/data";
+import { pollSafeConversions } from "@/services/convert/progress";
+import { offeredPairs } from "@/services/convert/registry";
 import type { SigningPasskeyHandle } from "@/services/safe/action-types";
 import { safeMigrationRows } from "@/services/safe/migration";
 import { signingPasskeyRpId } from "@/services/safe/passkey-rp";
@@ -54,6 +58,8 @@ import { RetryDeployButton } from "../retry-deploy-button";
 import { SafeAddress } from "../safe-address";
 import { SafeDetailSkeleton, SafeTxListSkeleton } from "../skeleton";
 import { SafeStatusBadge } from "../status-badge";
+import { ConversionsCard } from "./conversions-card";
+import { ConvertDialog, type ConvertPairOption } from "./convert-dialog";
 import { HistoryList } from "./history-list";
 import { MigrationBanner } from "./migration-banner";
 import { OwnersCard } from "./owners-card";
@@ -112,6 +118,9 @@ async function SafeDetailView({
   } catch (e) {
     console.warn("[safes] page sync failed", id, e);
   }
+  // A conversion waiting for its CoW order: check the fill now rather than
+  // on the cron's next tick (never fails the page).
+  await pollSafeConversions(fund.id, id);
 
   const safe = await getSafe(fund.id, id);
   if (!safe) notFound();
@@ -175,6 +184,12 @@ async function SafeDetailView({
     getExtraBalances(display, sameChain ? [safe.address] : []),
   ]).then(([main, extra]) => ({ main, extra }));
   const active = safe.status === "ACTIVE";
+  // Token conversions (services/convert): the pairs this fund is offered
+  // (both ends among its display tokens) and this Safe's conversions.
+  const [pairs, conversions] = await Promise.all([
+    active && sameChain ? offeredPairs(display) : [],
+    listSafeConversions(display, safe.id),
+  ]);
   // Before deployment the address column holds a `pending:` placeholder.
   const deployed = isDeployedAddress(safe.address);
   const ownersTotal = safe.owners.length;
@@ -390,8 +405,46 @@ async function SafeDetailView({
               />
             </Suspense>
           )}
+          {active && pairs.length > 0 && (
+            <Suspense
+              fallback={
+                <Button size="sm" variant="outline" disabled>
+                  <Repeat className="size-4" />
+                  {t("conversion.trigger")}
+                </Button>
+              }
+            >
+              <ConvertSlot
+                safeId={safe.id}
+                chainId={safe.chainId}
+                threshold={safe.threshold}
+                pairs={pairs.map((p) => ({
+                  converterId: p.converter.id,
+                  fromKey: p.from.key,
+                  fromSymbol: p.from.symbol,
+                  toSymbol: p.to.symbol,
+                }))}
+                address={safe.address}
+                balances={balances}
+                hasPasskey={hasPasskey}
+                me={passkeyHandle}
+              />
+            </Suspense>
+          )}
         </div>
       </div>
+
+      {conversions.length > 0 && (
+        <ConversionsCard
+          safeId={safe.id}
+          chainId={safe.chainId}
+          threshold={safe.threshold}
+          conversions={conversions}
+          canAct={active && !safe.configWarning}
+          hasPasskey={hasPasskey}
+          me={passkeyHandle}
+        />
+      )}
 
       {safe.pending.length > 0 && (
         <section id="pending" className="space-y-3">
@@ -639,4 +692,31 @@ async function ProposeTransferSlot({
     })),
   ];
   return <ProposeTransferDialog {...dialog} tokens={tokens} />;
+}
+
+// "Convert" waits for the balances too, so the dialog can say what the Safe
+// holds of the token being converted.
+async function ConvertSlot({
+  address,
+  balances,
+  pairs,
+  ...dialog
+}: {
+  safeId: string;
+  chainId: number;
+  threshold: number;
+  pairs: { converterId: string; fromKey: string; fromSymbol: string; toSymbol: string }[];
+  hasPasskey: boolean;
+  me: SigningPasskeyHandle | null;
+  address: string;
+  balances: Promise<SafeBalances>;
+}) {
+  const { extra } = await balances;
+  const held = extra.byAddress.get(address.toLowerCase());
+  const options: ConvertPairOption[] = pairs.map((p) => ({
+    converterId: p.converterId,
+    from: { symbol: p.fromSymbol, balance: held?.find((b) => b.key === p.fromKey)?.amount ?? null },
+    to: { symbol: p.toSymbol },
+  }));
+  return <ConvertDialog {...dialog} pairs={options} />;
 }

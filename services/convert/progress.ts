@@ -215,6 +215,25 @@ export async function pollConversion(row: ConversionRow, now = new Date()): Prom
   }
 }
 
+/**
+ * Poll one Safe's FILLING conversions — the Safe page on view, so a fill
+ * shows without waiting for the cron. Best effort: errors are logged.
+ */
+export async function pollSafeConversions(fundId: string, safeId: string, now = new Date()): Promise<void> {
+  const rows = await prisma.fundConversion.findMany({
+    where: { fundId, safeId, status: "FILLING" },
+    orderBy: { updatedAt: "asc" },
+    take: 10,
+  });
+  for (const row of rows) {
+    try {
+      await pollConversion(row, now);
+    } catch (e) {
+      console.warn("[convert] poll on view failed", row.id, e instanceof Error ? e.message : e);
+    }
+  }
+}
+
 const POLL_BATCH = 50;
 // A PROPOSED row untouched this long is checked against its Safe transaction
 // in case the execution / withdrawal hook never ran.

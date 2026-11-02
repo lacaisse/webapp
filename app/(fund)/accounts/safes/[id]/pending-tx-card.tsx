@@ -39,7 +39,7 @@ import {
 } from "@/services/safe/admin-actions";
 
 import type { SafeTxView } from "../data";
-import { sameAddress, shortAddress, summaryLine } from "../format";
+import { conversionExpired, sameAddress, shortAddress, summaryLine } from "../format";
 import { useStepUp } from "@/components/reauth-dialog";
 import { usePasskeySigning, useProposeAndSign } from "../passkey-hooks";
 import type { OwnerRow } from "./owners-card";
@@ -181,6 +181,9 @@ export function PendingTxCard({
               )}
               {rejectionProposed && tx.kind !== "REJECTION" && (
                 <Badge variant="warning">{t("tx.rejectionProposed")}</Badge>
+              )}
+              {conversionExpired(tx.summary, now) && (
+                <Badge variant="destructive">{t("tx.details.orderExpired")}</Badge>
               )}
             </div>
             <p className="text-xs text-muted-foreground">

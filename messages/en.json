@@ -454,6 +454,7 @@
           "SWAP_OWNER": "Replace owner",
           "CHANGE_THRESHOLD": "Change threshold",
           "REJECTION": "Rejection",
+          "CONVERSION": "Conversion",
           "UNKNOWN": "Transaction"
         },
         "summary": {
@@ -466,6 +467,8 @@
           "removeOwnerThresholdChange": "Remove owner {owner}, signatures required: {from} → {to}",
           "changeThresholdFromTo": "Change threshold from {from} to {to, plural, one {# signature} other {# signatures}}",
           "rejection": "Reject transaction #{nonce}",
+          "conversion": "Convert {from} into at least {to}",
+          "conversionStep": "Convert {from} into at least {to} — step {step} of {steps} ({label})",
           "swapToPasskey": "Move {owner}'s key to their passkey {newOwner}",
           "swapReplacedPasskey": "Replace {owner}'s lost passkey with {newOwner}"
         },
@@ -506,7 +509,11 @@
           "threshold": "Signatures required",
           "unknownAddress": "Unknown address",
           "weakens": "Weakens the Safe",
-          "viewOnExplorer": "View on explorer"
+          "viewOnExplorer": "View on explorer",
+          "conversion": "Conversion",
+          "step": "Step",
+          "validUntil": "Order valid until",
+          "orderExpired": "Order expired"
         },
         "reject": "Reject",
         "rejectTitle": "Reject transaction #{nonce}?",
@@ -542,6 +549,62 @@
         "status": "Relayer balance: {balance} xDAI. Send xDAI to this address to pay for deployments and executions:"
       },
       "conversion": {
+        "trigger": "Convert",
+        "title": "Convert tokens",
+        "description": "Swap one of the Safe's balances for another through CoW Swap. Each on-chain step is a Safe transaction that runs once {threshold, plural, one {# owner has} other {# owners have}} signed.",
+        "pair": "Conversion",
+        "pairOption": "{from} → {to}",
+        "amount": "Amount",
+        "balance": "Balance: {balance} {symbol}",
+        "getQuote": "Get a quote",
+        "requote": "Quote again",
+        "quote": {
+          "expected": "Expected",
+          "minimum": "Minimum ({slippage} slippage)",
+          "rate": "Rate",
+          "fee": "CoW Swap's fee is included in the price.",
+          "validity": "The order stays open for 7 days while the owners sign.",
+          "roundsOne": "One Safe transaction.",
+          "roundsTwo": "Two Safe transactions: the swap now, then the mint once the order fills."
+        },
+        "confirm": "Propose",
+        "steps": {
+          "swap": "swap",
+          "mint": "mint",
+          "burn": "burn"
+        },
+        "calls": {
+          "approve": "Approve for CoW Swap",
+          "presign": "Pre-sign the order",
+          "unwrap": "Unwrap WXDAI",
+          "mint": "Mint BREAD",
+          "burn": "Burn BREAD",
+          "wrap": "Wrap xDAI"
+        },
+        "status": {
+          "PROPOSED": "Waiting for signatures",
+          "READY": "Waiting for an owner",
+          "FILLING": "Waiting for the fill",
+          "DONE": "Done",
+          "EXPIRED": "Order expired",
+          "CANCELLED": "Cancelled",
+          "FAILED": "Failed"
+        },
+        "card": {
+          "title": "Conversions",
+          "line": "{from} → at least {to}",
+          "lineDone": "{from} → {to}",
+          "order": "View order",
+          "by": "Started by {name}",
+          "continue": "Propose next step",
+          "cancel": "Cancel",
+          "cancelTitle": "Cancel this conversion?",
+          "cancelDescription": "Nothing is in flight: no order is open and no transaction is pending. What was converted so far stays in the Safe.",
+          "cancelConfirm": "Cancel conversion",
+          "proposalExpired": "The CoW order expired before the owners signed. Reject the pending transaction, then start again.",
+          "fillHint": "Solvers fill the order when the price allows; this page checks every couple of minutes.",
+          "readyHint": "The order filled: the next transaction is sized to what arrived."
+        },
         "errors": {
           "config": "Conversions are not configured for this network.",
           "cow_api": "CoW Swap could not be reached. Try again in a moment.",
