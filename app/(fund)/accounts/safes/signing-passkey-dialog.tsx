@@ -1,7 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 "use client";
 
-import { AlertTriangle, CheckCircle2, Fingerprint, Loader2, RotateCcw } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Cloud,
+  Fingerprint,
+  KeyRound,
+  Loader2,
+  RotateCcw,
+  Smartphone,
+  type LucideIcon,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useState, useTransition, type ReactNode } from "react";
@@ -179,11 +189,11 @@ export function SigningPasskeyDialog({
               )}
             </>
           ) : (
-            <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-              <li>{t("explainOwnKey")}</li>
-              <li>{t("explainPerFund")}</li>
-              <li>{t("explainBackup")}</li>
-              {replace && <li>{t("explainReplace")}</li>}
+            <ul className="space-y-3 text-sm text-muted-foreground">
+              <ExplainPoint icon={Smartphone}>{t("explainOwnKey")}</ExplainPoint>
+              <ExplainPoint icon={KeyRound}>{t("explainPerFund")}</ExplainPoint>
+              <ExplainPoint icon={Cloud}>{t("explainBackup")}</ExplainPoint>
+              {replace && <ExplainPoint icon={RotateCcw}>{t("explainReplace")}</ExplainPoint>}
             </ul>
           )}
           {error && (
@@ -248,5 +258,19 @@ export function RegisterSigningPasskeyButton({
         onRegistered={onRegistered}
       />
     </>
+  );
+}
+
+// One explanation point of the dialog: a small icon that says what the line
+// is about (the device holding the key, a dedicated key, cloud sync…) next
+// to the text.
+function ExplainPoint({ icon: Icon, children }: { icon: LucideIcon; children: ReactNode }) {
+  return (
+    <li className="flex items-start gap-3">
+      <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-foreground">
+        <Icon className="size-3.5" aria-hidden="true" />
+      </span>
+      <span>{children}</span>
+    </li>
   );
 }
