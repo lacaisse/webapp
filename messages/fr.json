@@ -360,18 +360,21 @@
         "title": "Signataires",
         "description": "{threshold} signatures requises pour chaque transaction.",
         "kind": {
-          "MEMBER": "Équipe",
-          "EXTERNAL": "Externe"
+          "MEMBER": "Clé serveur (ancienne)",
+          "EXTERNAL": "Externe",
+          "PASSKEY": "Passkey"
         },
         "externalHint": "Signe dans Safe'{Wallet}'.",
-        "formerMember": "Ne fait plus partie de l'équipe — pensez à retirer ou remplacer ce signataire."
+        "formerMember": "Ne fait plus partie de l'équipe — pensez à retirer ou remplacer ce signataire.",
+        "serverKeyHint": "Signe avec une clé détenue par le serveur de La Caisse. À migrer vers une passkey.",
+        "replacedPasskeyHint": "Cette passkey a été remplacée (appareil perdu). Remplacez-la par la nouvelle."
       },
       "create": {
         "description": "Choisissez qui détient le Safe et combien de signataires doivent approuver chaque transaction.",
         "name": "Nom",
         "namePlaceholder": "ex. Réserve, Bureau",
         "teamOwners": "Signataires de l'équipe",
-        "teamOwnersHint": "Les membres de l'équipe signent dans La Caisse en un clic, sans wallet.",
+        "teamOwnersHint": "Les membres de l'équipe possèdent le Safe avec leur propre passkey : une clé qui reste sur leur appareil, que La Caisse ne détient jamais. Un membre doit avoir une passkey de signature pour cette caisse avant d'être choisi.",
         "noMembers": "Aucun administrateur de cette caisse ne peut encore détenir un Safe.",
         "externalOwners": "Signataires externes",
         "externalOwnersHint": "N'importe quelle adresse (un wallet matériel, un partenaire…). Les signataires externes signent dans Safe'{Wallet}', sur app.safe.global.",
@@ -414,7 +417,8 @@
       },
       "proposal": {
         "executed": "Signé et exécuté.",
-        "proposed": "Proposé. Exécuté dès que {threshold, plural, one {# signataire aura signé} other {# signataires auront signé}}."
+        "proposed": "Proposé. Exécuté dès que {threshold, plural, one {# signataire aura signé} other {# signataires auront signé}}.",
+        "proposedUnsigned": "Proposée, mais pas encore signée par vous : signez-la depuis la liste des transactions en attente."
       },
       "ownerChange": {
         "needsSignatures": "Ce changement est lui-même une transaction du Safe : il s'applique dès que {threshold, plural, one {# signataire actuel a signé} other {# signataires actuels ont signé}}.",
@@ -425,7 +429,7 @@
         "modeExternal": "Adresse externe",
         "member": "Membre de l'équipe",
         "pickMember": "Choisir un membre…",
-        "memberHint": "Il ou elle signera dans La Caisse.",
+        "memberHint": "Il ou elle signera avec sa passkey, sur son propre appareil.",
         "address": "Adresse",
         "label": "Nom",
         "labelPlaceholder": "ex. Ledger du trésorier",
@@ -461,7 +465,9 @@
           "addOwnerThresholdChange": "Ajouter {owner} comme signataire, signatures requises : {from} → {to}",
           "removeOwnerThresholdChange": "Retirer le signataire {owner}, signatures requises : {from} → {to}",
           "changeThresholdFromTo": "Passer le seuil de {from} à {to, plural, one {# signature} other {# signatures}}",
-          "rejection": "Rejeter la transaction n° {nonce}"
+          "rejection": "Rejeter la transaction n° {nonce}",
+          "swapToPasskey": "Migrer la clé de {owner} vers sa passkey {newOwner}",
+          "swapReplacedPasskey": "Remplacer la passkey perdue de {owner} par {newOwner}"
         },
         "status": {
           "PENDING": "En attente",
@@ -472,7 +478,8 @@
         },
         "source": {
           "LACAISSE": "dans La Caisse",
-          "SAFE_WALLET": "dans Safe'{Wallet}'"
+          "SAFE_WALLET": "dans Safe'{Wallet}'",
+          "PASSKEY": "avec une passkey"
         },
         "nonce": "n° {nonce}",
         "proposedBy": "Proposée par {name}",
@@ -520,7 +527,10 @@
         "withdrawMirrored": "Ce Safe a des signataires externes : la proposition reste visible dans Safe'{Wallet}', où elle peut encore être signée. Pour l'empêcher définitivement, proposez plutôt un rejet.",
         "withdrawConfirm": "Retirer la proposition",
         "formerMember": "N'est plus membre de l'équipe",
-        "configBlocked": "Exécution suspendue : la configuration du Safe n'est pas standard."
+        "configBlocked": "Exécution suspendue : la configuration du Safe n'est pas standard.",
+        "signWithPasskey": "Signer avec la passkey",
+        "mirrorFailed": "Safe'{Wallet}' n'a pas encore cette transaction ({error}). Nouvel essai à chaque synchronisation.",
+        "passkeyReplaced": "Votre passkey sur ce Safe a été remplacée : terminez le remplacement de propriétaire pour signer à nouveau."
       },
       "history": {
         "title": "Historique",
@@ -560,7 +570,15 @@
         "duplicateOwner": "La même adresse figure deux fois.",
         "addressChecksum": "L'adresse contient une majuscule incorrecte (somme de contrôle). Vérifiez-la ou collez-la en minuscules.",
         "queue_full": "Trop de transactions en attente sur ce Safe. Faites signer, rejeter ou retirer les propositions ouvertes d'abord.",
-        "holds_value": "Ce Safe détient encore des fonds que seuls les membres de l'équipe peuvent déplacer. Videz-le avant de l'archiver."
+        "holds_value": "Ce Safe détient encore des fonds que seuls les membres de l'équipe peuvent déplacer. Videz-le avant de l'archiver.",
+        "passkey_missing": "Ce membre de l'équipe n'a pas encore de passkey de signature pour cette caisse.",
+        "passkey_exists": "Vous avez déjà une passkey de signature pour cette caisse. Utilisez « Remplacer » pour un appareil perdu.",
+        "rules_spare_owner": "Gardez au moins un propriétaire de plus que le seuil (récupération après appareil perdu).",
+        "rules_one_person": "Les clés d'une seule personne ne doivent pas suffire à atteindre le seuil.",
+        "server_key_retired": "Cette clé serveur a été retirée. Signez plutôt avec votre passkey.",
+        "passkey_replaced": "Votre passkey sur ce Safe a été remplacée. Terminez d'abord le remplacement de propriétaire vers la nouvelle.",
+        "passkey_replace_pending": "Une de vos anciennes passkeys possède encore un Safe. Terminez son remplacement avant d'en créer une autre.",
+        "passkey_rate_limited": "Trop de passkeys de signature créées aujourd'hui. Réessayez demain."
       },
       "archived": {
         "title": "Safes archivés",
@@ -571,6 +589,77 @@
       "custody": {
         "shared": "Avec {threshold} signature{threshold, plural, one {} other {s}} pour {members} clé{members, plural, one {} other {s}} d'équipe, La Caisse détient à elle seule de quoi signer : ce n'est pas un vrai multisig face au serveur. Ajoutez un signataire externe (portefeuille matériel) et montez le seuil au-dessus du nombre de clés d'équipe pour les montants importants.",
         "independent": "Le seuil dépasse le nombre de clés d'équipe : au moins un signataire externe est requis pour chaque transaction."
+      },
+      "rules": {
+        "rules_spare_owner": "Gardez au moins un propriétaire de plus que le seuil : si un membre perd son appareil, les autres doivent encore atteindre le seuil et pouvoir remplacer sa clé.",
+        "rules_one_person": "Les clés d'une seule personne ne doivent pas suffire à atteindre le seuil : augmentez le seuil ou ajoutez un propriétaire.",
+        "why": "Une passkey vit sur l'appareil d'une personne. Pour se remettre d'un appareil perdu, le Safe garde un propriétaire de plus que son seuil, et personne ne peut atteindre le seuil seul."
+      },
+      "passkey": {
+        "noHandle": "Vous n'avez pas de passkey de signature pour cette caisse.",
+        "ceremonyFailed": "La cérémonie de la passkey a échoué.",
+        "registerTitle": "Créer votre passkey de signature",
+        "replaceTitle": "Remplacer votre passkey de signature",
+        "registerDescription": "Votre clé pour signer les transactions des Safes de cette caisse. Elle est créée sur cet appareil et ne le quitte jamais.",
+        "replaceDescription": "Appareil perdu ou compromis ? Créez une nouvelle passkey de signature. Chaque Safe que vous possédez avec l'ancienne demandera ensuite un remplacement de propriétaire, signé par les autres.",
+        "registeredTitle": "Passkey de signature prête",
+        "registeredBody": "Votre adresse de propriétaire de Safe (un petit contrat qui vérifie les signatures de votre passkey) :",
+        "backedUpHint": "Cette passkey est synchronisée avec votre gestionnaire de mots de passe ou la sauvegarde de votre compte : un nouvel appareil la récupère.",
+        "deviceOnlyHint": "Cette passkey n'existe que sur cet appareil. Si vous le perdez, les autres propriétaires devront vous réintégrer avec une nouvelle — enregistrez un second appareil ou activez la synchronisation des passkeys.",
+        "deployFailedTitle": "Contrat de propriétaire pas encore déployé",
+        "retryDeploy": "Réessayer le déploiement",
+        "explainOwnKey": "La clé privée est créée et gardée par votre appareil (Touch ID, Face ID, Windows Hello, une clé de sécurité…). La Caisse ne la détient jamais.",
+        "explainPerFund": "C'est une clé de signature dédiée à cette caisse — pas votre passkey de connexion. Votre appareil l'affiche comme « Signing key · caisse · e-mail ».",
+        "explainBackup": "Préférez une passkey qui se synchronise (trousseau iCloud, gestionnaire Google…) : une passkey liée à un seul appareil est perdue avec lui.",
+        "explainReplace": "Votre passkey précédente n'est plus proposée ici ; les Safes qu'elle possède affichent une étape « migrer vers la passkey » jusqu'à l'exécution du remplacement.",
+        "waiting": "En attente de votre appareil…",
+        "registerConfirm": "Créer la passkey",
+        "replaceConfirm": "Créer une nouvelle passkey",
+        "registerTrigger": "Créer ma passkey de signature",
+        "replaceTrigger": "Remplacer (appareil perdu)",
+        "cardTitle": "Votre passkey de signature",
+        "cardDescription": "Votre façon de signer les transactions des Safes de cette caisse. Une par caisse, gardée sur votre appareil.",
+        "backedUp": "Sauvegardée",
+        "deviceOnly": "Appareil seul",
+        "notDeployed": "Non déployée",
+        "registeredOn": "Enregistrée le {date}",
+        "lastUsed": "dernière utilisation {date}",
+        "notDeployedHint": "Le contrat de propriétaire n'est pas encore sur la chaîne ; il est nécessaire avant qu'un Safe puisse vous lister.",
+        "staleOwners": "{count, plural, one {# Safe liste encore} other {# Safes listent encore}} une de vos anciennes clés comme propriétaire. Ouvrez chacun pour proposer le remplacement :",
+        "none": "Vous n'avez pas encore de passkey de signature pour cette caisse. Il en faut une pour posséder un Safe.",
+        "memberReady": "Passkey de signature prête",
+        "memberNotDeployed": "Passkey enregistrée, contrat de propriétaire pas encore déployé",
+        "memberMissing": "Pas encore de passkey de signature",
+        "deviceOnlyOwnerHint": "Passkey liée à un seul appareil : demandez-lui d'ajouter une sauvegarde, sinon les autres devront le ou la réintégrer après un appareil perdu."
+      },
+      "migration": {
+        "title": "Migrer vers les passkeys",
+        "bodyServerKeys": "{count, plural, one {# propriétaire signe} other {# propriétaires signent}} encore avec une clé détenue par le serveur de La Caisse. Chacun enregistre une passkey de signature, puis les autres propriétaires signent le remplacement — un changement de propriétaire ordinaire.",
+        "bodyReplaced": "Un propriétaire a remplacé sa passkey. Remplacez l'ancienne par la nouvelle — un changement de propriétaire ordinaire signé par les autres.",
+        "you": "Vous",
+        "reason": {
+          "server_key": "Clé serveur",
+          "replaced_passkey": "Passkey remplacée"
+        },
+        "step": {
+          "register": "A besoin d'une passkey de signature pour cette caisse.",
+          "deploy": "Passkey enregistrée ; le contrat de propriétaire doit être déployé.",
+          "propose": "Prêt : proposez le remplacement par la nouvelle passkey.",
+          "signing": "Remplacement proposé — {count} signature(s) sur {threshold}.",
+          "executing": "Remplacement en cours d'exécution…",
+          "failed": "Le remplacement a échoué ; relancez-le depuis la liste en attente."
+        },
+        "actions": {
+          "register": "Créer ma passkey",
+          "waitRegister": "En attente de son enregistrement",
+          "deploy": "Déployer mon contrat de propriétaire",
+          "waitDeploy": "En attente du déploiement",
+          "propose": "Proposer le remplacement",
+          "waitPropose": "Un propriétaire peut proposer le remplacement",
+          "signing": "Voir le remplacement en attente",
+          "executing": "Voir le remplacement en attente",
+          "failed": "Voir le remplacement échoué"
+        }
       }
     },
     "team": {

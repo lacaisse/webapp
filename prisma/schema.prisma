@@ -72,6 +72,7 @@ model User {
 
   // Safe multisig: this user's per-fund signer keys and what they signed/proposed.
   fundSigners     FundSigner[]
+  passkeySigners  FundPasskeySigner[]
   safesCreated    FundSafe[]            @relation("FundSafeCreatedBy")
   safeTxsProposed FundSafeTransaction[] @relation("FundSafeTxProposedBy")
   safeSignatures  FundSafeSignature[]   @relation("FundSafeSignatureUser")
@@ -596,7 +597,8 @@ model Fund {
   pendingAnnotations        PendingAnnotation[] // userOp hashes awaiting tx-hash resolution
   cardTopUps                CardTopUp[] // open-banking card top-ups (PAY_AND_GO /pay/<serial>)
   safes                     FundSafe[] // multisig Safes managed from La Caisse
-  signers                   FundSigner[] // per-user Safe signer keys
+  signers                   FundSigner[] // per-user Safe signer keys (legacy, server-held)
+  passkeySigners            FundPasskeySigner[] // per-user Safe passkey signers (WebAuthn, on-chain signer contract)
   displayTokens             FundDisplayToken[] // custom ERC-20s shown next to the fund token (Settings → Token)
 
   // Cross-fund card enrollment: requests other funds filed against cards this
@@ -756,17 +758,24 @@ model FundMember {
 // See services/safe/*.
 // ---------------------------------------------------------------------------
 
-// One signing key per (fund, user). Generated on first use (fresh secp256k1
-// key, AES-256-GCM encrypted via APP_CRED_KEY like Fund.tokenMinterPrivateKeyEnc)
-// and reused as that user's owner address on every Safe of the fund. Kept
-// when the membership is removed: the address may still be an on-chain owner
-// and the signature history must keep pointing at a person.
+// LEGACY: one server-held signing key per (fund, user). Generated on first
+// use by the first Safe release (fresh secp256k1 key, AES-256-GCM encrypted
+// via APP_CRED_KEY like Fund.tokenMinterPrivateKeyEnc) and reused as that
+// user's owner address on every Safe of the fund. No new rows are created
+// since passkey owners (FundPasskeySigner): the key only still signs on Safes
+// that list it as a MEMBER owner, until the guided migration swaps it for the
+// member's passkey signer. `retiredAt` is set once a swap away from it
+// executed; the ciphertext is deleted (`privateKeyEnc` null, `keyDeletedAt`)
+// once no unarchived Safe of the fund lists the address any more. The row
+// itself stays: the address may still appear in signature history.
 model FundSigner {
-  id            String @id @default(cuid())
+  id            String  @id @default(cuid())
   fundId        String
-  userId        String @db.Uuid
+  userId        String  @db.Uuid
   address       String // EOA address (checksummed)
-  privateKeyEnc String // envelope from services/crypto/secret.ts
+  privateKeyEnc String? // envelope from services/crypto/secret.ts; null once deleted
+  retiredAt     DateTime? // first swap to a passkey owner executed
+  keyDeletedAt  DateTime? // ciphertext erased (no unarchived Safe lists the address)
 
   fund Fund @relation(fields: [fundId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -778,6 +787,50 @@ model FundSigner {
 
   @@unique([fundId, userId])
   @@unique([fundId, address])
+}
+
+// A member's Safe signing passkey for one fund: a dedicated WebAuthn
+// credential (not the login passkey) whose P-256 public key is bound to a
+// Safe passkey signer contract (SafeWebAuthnSignerProxy, Safe passkey module
+// v0.2.1) deployed by the relayer at the CREATE2 address the factory derives
+// from (x, y, verifiers). That contract address is the Safe owner; the
+// private key never leaves the member's authenticator, so the server holds
+// nothing that can sign. One ACTIVE row (replacedAt null) per (fund, user);
+// a lost device registers a replacement, which supersedes the old row and
+// is swapped in on every Safe through an ordinary proposal.
+model FundPasskeySigner {
+  id           String  @id @default(cuid())
+  fundId       String
+  userId       String  @db.Uuid
+  address      String // signer contract address (checksummed) — the Safe owner
+  credentialId String  @unique // WebAuthn credential id, base64url
+  publicKeyX   String // 0x-prefixed 32-byte hex
+  publicKeyY   String // 0x-prefixed 32-byte hex
+  verifiers    String // P256.Verifiers (uint176) used for the address, 0x-prefixed hex
+  counter      Int     @default(0) // authenticator signature counter from the last ceremony
+  // Backup flags from the LAST ceremony (registration or signature):
+  // eligible = the credential can be synced (e.g. iCloud Keychain / Google
+  // Password Manager); state = it currently is. A device-only credential
+  // (false/false) is lost with the device.
+  backupEligible Boolean
+  backupState    Boolean
+  transports     String? // comma-separated hints for allowCredentials
+  aaguid         String?
+  deployTxHash   String? // relayer createSigner tx (null when the proxy already existed)
+  deployedAt     DateTime? // proxy confirmed on chain
+  lastUsedAt     DateTime? // last signature ceremony
+  replacedAt     DateTime? // superseded by a newer credential (lost device)
+
+  fund Fund @relation(fields: [fundId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  safeOwners FundSafeOwner[]
+  signatures FundSafeSignature[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([fundId, address])
+  @@index([fundId, userId])
 }
 
 // A custom ERC-20 a fund shows on its Accounts pages next to the fund token
@@ -846,8 +899,9 @@ model FundSafe {
 }
 
 enum FundSafeOwnerKind {
-  MEMBER // address is a FundSigner of this fund (signs inside La Caisse)
+  MEMBER // LEGACY: address is a server-held FundSigner of this fund
   EXTERNAL // any other address (signs in Safe{Wallet})
+  PASSKEY // address is a member's FundPasskeySigner contract (signs with a passkey)
 }
 
 // Cache of the Safe's on-chain owner set. Rows are upserted by sync from
@@ -857,12 +911,14 @@ model FundSafeOwner {
   id       String            @id @default(cuid())
   safeId   String
   address  String // checksummed
-  kind     FundSafeOwnerKind
-  signerId String? // set for MEMBER owners
-  label    String? // EXTERNAL owners: operator-given name
+  kind      FundSafeOwnerKind
+  signerId  String? // set for MEMBER owners
+  passkeyId String? // set for PASSKEY owners
+  label     String? // EXTERNAL owners: operator-given name
 
-  safe   FundSafe    @relation(fields: [safeId], references: [id], onDelete: Cascade)
-  signer FundSigner? @relation(fields: [signerId], references: [id], onDelete: SetNull)
+  safe    FundSafe           @relation(fields: [safeId], references: [id], onDelete: Cascade)
+  signer  FundSigner?        @relation(fields: [signerId], references: [id], onDelete: SetNull)
+  passkey FundPasskeySigner? @relation(fields: [passkeyId], references: [id], onDelete: SetNull)
 
   addedAt   DateTime  @default(now())
   removedAt DateTime?
@@ -929,8 +985,9 @@ model FundSafeTransaction {
 }
 
 enum FundSafeSignatureSource {
-  LACAISSE // signed in La Caisse with a FundSigner key
+  LACAISSE // LEGACY: signed in La Caisse with a server-held FundSigner key
   SAFE_WALLET // imported from the Safe Transaction Service (external signer)
+  PASSKEY // signed in La Caisse with the member's passkey (contract signature)
 }
 
 // Who signed what. One row per (transaction, owner address).
@@ -938,13 +995,19 @@ model FundSafeSignature {
   id            String                  @id @default(cuid())
   transactionId String
   ownerAddress  String // checksummed
-  signature     String // 65-byte hex (EIP-712 or eth_sign-style v+4)
+  // 65-byte hex (EIP-712 or eth_sign-style v+4), or a standalone Safe
+  // contract signature (static part v=0 / r=owner / s=65, then the
+  // length-prefixed dynamic part) for PASSKEY owners and contract owners seen
+  // in Safe{Wallet} — services/safe/safe-tx.ts packSignatures accepts both.
+  signature     String
   source        FundSafeSignatureSource
   signerId      String? // FundSigner used (LACAISSE)
-  userId        String?                 @db.Uuid // user who clicked Sign (LACAISSE)
+  passkeyId     String? // FundPasskeySigner used (PASSKEY)
+  userId        String?                 @db.Uuid // user who clicked Sign (LACAISSE / PASSKEY)
 
   transaction FundSafeTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
   signer      FundSigner?         @relation(fields: [signerId], references: [id], onDelete: SetNull)
+  passkey     FundPasskeySigner?  @relation(fields: [passkeyId], references: [id], onDelete: SetNull)
   user        User?               @relation("FundSafeSignatureUser", fields: [userId], references: [id], onDelete: SetNull)
 
   signedAt DateTime @default(now())

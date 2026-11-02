@@ -19,11 +19,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import type { SigningPasskeyHandle } from "@/services/safe/action-types";
 import { proposeTransferAction } from "@/services/safe/admin-actions";
 import { ProposeTransferSchema, type TransferToken } from "@/services/safe/schemas";
 
 import { sameAddress, shortAddress } from "../format";
 import { useStepUp } from "@/components/reauth-dialog";
+import { useProposeAndSign, type ProposalOutcome } from "../passkey-hooks";
 import { ProposalResult } from "./proposal-result";
 
 type RecipientOption = {
@@ -56,6 +58,7 @@ export function ProposeTransferDialog({
   options,
   tokens,
   hasPasskey,
+  me,
 }: {
   safeId: string;
   chainId: number;
@@ -63,6 +66,7 @@ export function ProposeTransferDialog({
   options: RecipientOption[];
   tokens: TransferTokenOption[];
   hasPasskey: boolean;
+  me: SigningPasskeyHandle | null; // the proposer's signing passkey, if any
 }) {
   const t = useTranslations("fund.safes.transfer");
   const tRoot = useTranslations();
@@ -74,11 +78,9 @@ export function ProposeTransferDialog({
   const [note, setNote] = useState("");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{
-    executed: boolean;
-    txHash: string | null;
-  } | null>(null);
+  const [result, setResult] = useState<ProposalOutcome | null>(null);
   const stepUp = useStepUp(hasPasskey);
+  const { finish } = useProposeAndSign(safeId, me);
 
   const picked = options.find((o) => sameAddress(o.address, to.trim()));
   const token = tokens.find((tok) => tok.key === tokenKey) ?? tokens[0];
@@ -125,7 +127,10 @@ export function ProposeTransferDialog({
         setError(res.error);
         return;
       }
-      setResult({ executed: res.executed, txHash: res.txHash });
+      // A passkey owner signs their own proposal right away (one more tap).
+      const outcome = await finish(res);
+      router.refresh();
+      setResult(outcome);
     });
   };
 
@@ -154,6 +159,8 @@ export function ProposeTransferDialog({
               executed={result.executed}
               txHash={result.txHash}
               threshold={threshold}
+              unsigned={result.unsigned}
+              error={result.error}
             />
           ) : (
             <>

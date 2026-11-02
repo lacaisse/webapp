@@ -17,6 +17,10 @@ const relayer = vi.hoisted(() => ({
   execSafeTransaction: vi.fn(),
   errorTxHash: vi.fn((e: unknown) => (e as { txHash?: string }).txHash ?? null),
   findSafeExecution: vi.fn(),
+  verifyContractSignature: vi.fn(),
+  hasContractCode: vi.fn(),
+  deployPasskeySigner: vi.fn(),
+  predictPasskeySignerAddress: vi.fn(),
 }));
 vi.mock("@/services/safe/relayer", () => relayer);
 
@@ -29,7 +33,7 @@ const txService = vi.hoisted(() => ({
 vi.mock("@/services/safe/tx-service", () => txService);
 
 const signer = vi.hoisted(() => ({
-  getOrCreateFundSigner: vi.fn(),
+  findFundSigner: vi.fn(),
   signSafeTxWithSigner: vi.fn(),
 }));
 vi.mock("@/services/safe/signer", () => signer);
@@ -44,16 +48,19 @@ const annotate = vi.hoisted(() => ({
 }));
 vi.mock("@/services/transaction-annotation/annotate", () => annotate);
 
+import { parseContractSignature } from "./passkey-signature";
 import { fake, resetFake } from "./test-fake-prisma";
 import {
   MAX_OPEN_PROPOSALS_PER_PROPOSER,
   MAX_OPEN_PROPOSALS_PER_SAFE,
+  createSafe,
   lowestFreeNonce,
   proposeOwnerChange,
   proposeRejection,
   proposeTokenTransfer,
   retryExecution,
   signTransaction,
+  signTransactionWithPasskey,
   tryExecute,
   withdrawProposal,
 } from "./proposals";
@@ -85,13 +92,42 @@ const sigFor = (enc: string) => `0x${enc.slice(-2).repeat(65)}` as `0x${string}`
 
 let safeId: string;
 
+// A member's signing passkey row (deployed) for the fake.
+function passkeyRow(userId: string, address: string, over: Record<string, unknown> = {}) {
+  return {
+    id: `pk-${userId}`,
+    fundId: FUND.id,
+    userId,
+    address,
+    credentialId: `cred-${userId}`,
+    publicKeyX: `0x${"01".repeat(32)}`,
+    publicKeyY: `0x${"02".repeat(32)}`,
+    verifiers: "0x0100c2b78104907f722dabac4c69f826a522b2754de4",
+    counter: 0,
+    backupEligible: true,
+    backupState: true,
+    transports: "internal",
+    deployedAt: new Date(),
+    replacedAt: null,
+    createdAt: new Date(),
+    ...over,
+  };
+}
+
 function seed(opts: {
   threshold: number;
   owners: { userId: string; address: string; byte: string }[];
   // Owners that sign outside La Caisse (Safe{Wallet}): owner rows only, no signer.
   external?: { address: string; label: string }[];
+  // Owners that sign with their passkey (PASSKEY rows + FundPasskeySigner).
+  passkeys?: { userId: string; address: string }[];
   chainNonce?: number;
 }) {
+  for (const p of opts.passkeys ?? []) {
+    db.user.push({ id: p.userId, name: `User ${p.userId}`, email: `${p.userId}@x.test` });
+    db.fundMember.push({ fundId: FUND.id, userId: p.userId, role: "ADMIN" });
+    db.fundPasskeySigner.push(passkeyRow(p.userId, p.address));
+  }
   for (const o of opts.owners) {
     db.user.push({ id: o.userId, name: `User ${o.userId}`, email: `${o.userId}@x.test` });
     db.fundMember.push({ fundId: FUND.id, userId: o.userId, role: "ADMIN" });
@@ -138,9 +174,25 @@ function seed(opts: {
       removedAt: null,
     });
   }
+  for (const p of opts.passkeys ?? []) {
+    db.fundSafeOwner.push({
+      id: `owner-pk-${p.userId}`,
+      safeId,
+      address: p.address,
+      kind: "PASSKEY",
+      signerId: null,
+      passkeyId: `pk-${p.userId}`,
+      label: null,
+      removedAt: null,
+    });
+  }
   relayer.readSafeState.mockResolvedValue({
     deployed: true,
-    owners: [...opts.owners.map((o) => o.address), ...(opts.external ?? []).map((o) => o.address)],
+    owners: [
+      ...opts.owners.map((o) => o.address),
+      ...(opts.external ?? []).map((o) => o.address),
+      ...(opts.passkeys ?? []).map((p) => p.address),
+    ],
     threshold: opts.threshold,
     nonce: opts.chainNonce ?? 0,
   });
@@ -168,12 +220,230 @@ beforeEach(() => {
   relayer.execSafeTransaction.mockResolvedValue({ txHash: EXEC_HASH });
   txService.isTxServiceEnabled.mockReturnValue(false);
   signer.signSafeTxWithSigner.mockImplementation(async (s: { privateKeyEnc: string }) => sigFor(s.privateKeyEnc));
-  signer.getOrCreateFundSigner.mockImplementation(async (fundId: string, userId: string) => {
-    const s = db.fundSigner.find((x) => x.fundId === fundId && x.userId === userId);
-    if (!s) throw new Error("no signer in test");
-    return s;
-  });
+  signer.findFundSigner.mockImplementation(
+    async (fundId: string, userId: string) =>
+      db.fundSigner.find((x) => x.fundId === fundId && x.userId === userId) ?? null,
+  );
+  relayer.hasContractCode.mockResolvedValue(true);
+  relayer.verifyContractSignature.mockResolvedValue(true);
+  relayer.deploySafe.mockImplementation(async () => ({ address: SAFE, txHash: EXEC_HASH }));
   sync.syncSafe.mockResolvedValue({ synced: true });
+});
+
+// Passkey owners: PA / PB / PC are the members' signer contracts.
+const PA = getAddress("0x1111111111111111111111111111111111111111");
+const PB = getAddress("0x2222222222222222222222222222222222222222");
+const PC = getAddress("0x4444444444444444444444444444444444444444");
+const DYN = "0xabcdef" as const; // a stand-in for the module's WebAuthn signature bytes
+
+describe("passkey owners", () => {
+  it("createSafe refuses a member without a signing passkey and never creates a server key", async () => {
+    db.user.push({ id: "u-a", name: "A", email: "a@x.test" });
+    db.fundMember.push({ fundId: FUND.id, userId: "u-a", role: "ADMIN" });
+    await expect(
+      createSafe({
+        fund: FUND,
+        userId: "u-a",
+        input: { name: "Reserve", memberUserIds: ["u-a"], externalOwners: [{ address: D, label: "HW" }, { address: C, label: "HW2" }], threshold: 2 },
+      }),
+    ).rejects.toMatchObject({ code: "passkey_missing" });
+    expect(db.fundSigner).toHaveLength(0);
+    expect(db.fundSafe).toHaveLength(0);
+    expect(relayer.deploySafe).not.toHaveBeenCalled();
+  });
+
+  it("createSafe lists the members' signer contracts as PASSKEY owners (deployed first)", async () => {
+    for (const [userId, address] of [["u-a", PA], ["u-b", PB], ["u-c", PC]] as const) {
+      db.user.push({ id: userId, name: userId, email: `${userId}@x.test` });
+      db.fundMember.push({ fundId: FUND.id, userId, role: "ADMIN" });
+      db.fundPasskeySigner.push(passkeyRow(userId, address, userId === "u-c" ? { deployedAt: null } : {}));
+    }
+    relayer.deployPasskeySigner.mockResolvedValue({ address: PC, txHash: EXEC_HASH });
+    const { safeId: id } = await createSafe({
+      fund: FUND,
+      userId: "u-a",
+      input: { name: "Reserve", memberUserIds: ["u-a", "u-b", "u-c"], externalOwners: [], threshold: 2 },
+    });
+    const owners = db.fundSafeOwner.filter((o) => o.safeId === id);
+    expect(owners.map((o) => [o.kind, o.passkeyId, o.signerId])).toEqual([
+      ["PASSKEY", "pk-u-a", null],
+      ["PASSKEY", "pk-u-b", null],
+      ["PASSKEY", "pk-u-c", null],
+    ]);
+    // The undeployed proxy was deployed through the relayer before setup.
+    expect(relayer.deployPasskeySigner).toHaveBeenCalledTimes(1);
+    expect(db.fundPasskeySigner.find((p) => p.id === "pk-u-c")!.deployedAt).toBeTruthy();
+    expect(relayer.deploySafe.mock.calls[0][0]).toMatchObject({
+      owners: [PA, PB, PC].sort((x, y) => (x.toLowerCase() < y.toLowerCase() ? -1 : 1)),
+      threshold: 2,
+    });
+    expect(db.fundSigner).toHaveLength(0);
+  });
+
+  it("createSafe enforces the recovery rules", async () => {
+    for (const [userId, address] of [["u-a", PA], ["u-b", PB]] as const) {
+      db.user.push({ id: userId, name: userId, email: `${userId}@x.test` });
+      db.fundMember.push({ fundId: FUND.id, userId, role: "ADMIN" });
+      db.fundPasskeySigner.push(passkeyRow(userId, address));
+    }
+    const input = (threshold: number, externalOwners: { address: string; label: string }[] = []) => ({
+      fund: FUND,
+      userId: "u-a",
+      input: { name: "R", memberUserIds: ["u-a", "u-b"], externalOwners, threshold },
+    });
+    await expect(createSafe(input(2))).rejects.toMatchObject({ code: "rules_spare_owner" });
+    await expect(createSafe(input(1))).rejects.toMatchObject({ code: "rules_one_person" });
+    // 2-of-3 with an external spare passes.
+    await expect(createSafe(input(2, [{ address: D, label: "HW" }]))).resolves.toMatchObject({ safeId: expect.any(String) });
+    expect(db.fundSafe).toHaveLength(1);
+  });
+
+  it("a passkey owner's proposal is stored unsigned, then signed with a contract signature", async () => {
+    seed({ threshold: 2, owners: [OWNERS_3[0]], passkeys: [{ userId: "u-p", address: PA }, { userId: "u-q", address: PB }] });
+    const res = await transfer("u-p");
+    expect(res).toMatchObject({ awaitingSignature: true, executed: false, txHash: null });
+    expect(db.fundSafeSignature).toHaveLength(0);
+    expect(relayer.execSafeTransaction).not.toHaveBeenCalled();
+    expect(signer.signSafeTxWithSigner).not.toHaveBeenCalled();
+
+    // The browser's ceremony comes back as the module signature bytes.
+    const signed = await signTransactionWithPasskey({
+      fundId: FUND.id,
+      transactionId: res.transactionId,
+      userId: "u-p",
+      dynamicPart: DYN,
+    });
+    expect(signed).toMatchObject({ executed: false, ownerAddress: PA });
+    expect(relayer.verifyContractSignature).toHaveBeenCalledWith({
+      chainId: 100,
+      owner: PA,
+      hash: res.safeTxHash,
+      signature: DYN,
+    });
+    const row = db.fundSafeSignature[0]!;
+    expect(row).toMatchObject({ ownerAddress: PA, source: "PASSKEY", passkeyId: "pk-u-p", userId: "u-p" });
+    expect(parseContractSignature(row.signature as `0x${string}`)).toEqual({ owner: PA, dynamicPart: DYN });
+
+    // The legacy member's second signature meets 2-of-3: a mixed set is packed.
+    const second = await signTransaction({ fundId: FUND.id, transactionId: res.transactionId, userId: "u-a" });
+    expect(second.executed).toBe(true);
+    const packed = relayer.execSafeTransaction.mock.calls[0][0].signatures as string;
+    // Owner order: PA (0x1111…) < A (0xaaaa…): the contract part comes first.
+    expect(packed.slice(2, 66)).toBe(`${"0".repeat(24)}${PA.slice(2).toLowerCase()}`);
+    expect(BigInt(`0x${packed.slice(66, 130)}`)).toBe(BigInt(130)); // dynamic part after 2 × 65
+    expect(packed.slice(130, 132)).toBe("00");
+    expect(packed.slice(132, 262)).toBe(sigFor("enc-1a").slice(2));
+    expect(packed.slice(262)).toBe(`${"0".repeat(62)}03${DYN.slice(2)}`);
+  });
+
+  it("refuses a passkey signature the owner contract rejects, and crossed paths", async () => {
+    seed({ threshold: 2, owners: [OWNERS_3[0]], passkeys: [{ userId: "u-p", address: PA }, { userId: "u-q", address: PB }] });
+    const res = await transfer("u-a"); // legacy proposer signs server-side
+    expect(res.awaitingSignature).toBe(false);
+    relayer.verifyContractSignature.mockResolvedValueOnce(false);
+    await expect(
+      signTransactionWithPasskey({ fundId: FUND.id, transactionId: res.transactionId, userId: "u-p", dynamicPart: DYN }),
+    ).rejects.toMatchObject({ code: "invalid_signature" });
+    expect(db.fundSafeSignature).toHaveLength(1);
+    // A passkey owner can't use the server-key path, nor a legacy owner the passkey one.
+    await expect(signTransaction({ fundId: FUND.id, transactionId: res.transactionId, userId: "u-p" })).rejects.toMatchObject({ code: "invalid_state" });
+    await expect(
+      signTransactionWithPasskey({ fundId: FUND.id, transactionId: res.transactionId, userId: "u-a", dynamicPart: DYN }),
+    ).rejects.toMatchObject({ code: "invalid_state" });
+    // Someone with neither is not an owner.
+    await expect(
+      signTransactionWithPasskey({ fundId: FUND.id, transactionId: res.transactionId, userId: "u-z", dynamicPart: DYN }),
+    ).rejects.toMatchObject({ code: "not_owner" });
+  });
+
+  it("adding a team owner needs their passkey; a server-key → passkey swap is recorded as a migration", async () => {
+    seed({ threshold: 2, owners: OWNERS_3, passkeys: [] });
+    // u-d has no passkey
+    db.user.push({ id: "u-d", name: "D", email: "d@x.test" });
+    db.fundMember.push({ fundId: FUND.id, userId: "u-d", role: "ADMIN" });
+    await expect(
+      proposeOwnerChange({ fund: FUND, safeId, userId: "u-a", input: { safeId, change: { kind: "ADD_OWNER", threshold: 2, memberUserId: "u-d" } } }),
+    ).rejects.toMatchObject({ code: "passkey_missing" });
+    expect(db.fundSigner.find((s) => s.userId === "u-d")).toBeUndefined();
+
+    // u-a registered a passkey: swapping their server key for it is the migration.
+    db.fundPasskeySigner.push(passkeyRow("u-a", PA));
+    const res = await proposeOwnerChange({
+      fund: FUND,
+      safeId,
+      userId: "u-b",
+      input: { safeId, change: { kind: "SWAP_OWNER", oldOwner: A, memberUserId: "u-a" } },
+    });
+    const tx = db.fundSafeTransaction.find((t) => t.id === res.transactionId)!;
+    expect(tx.summary).toMatchObject({ kind: "SWAP_OWNER", oldOwner: A, newOwner: PA, migration: "server_key", newOwnerLabel: "User u-a" });
+    // Proposed by the legacy key of u-b; u-a's own server key may co-sign.
+    expect(db.fundSafeSignature.map((s) => s.ownerAddress)).toEqual([B]);
+  });
+
+  it("a legacy Safe that already breaks the rules can still migrate, add an owner or raise its threshold", async () => {
+    // 1-of-1 server key: the worst legacy shape.
+    seed({ threshold: 1, owners: [OWNERS_3[0]] });
+    db.fundPasskeySigner.push(passkeyRow("u-a", PA));
+    const change = (c: Record<string, unknown>) =>
+      proposeOwnerChange({ fund: FUND, safeId, userId: "u-a", input: { safeId, change: c as never } });
+    // Swap the server key for the passkey (the migration itself).
+    const swap = await change({ kind: "SWAP_OWNER", oldOwner: A, memberUserId: "u-a" });
+    expect(db.fundSafeTransaction.find((t) => t.id === swap.transactionId)!.summary).toMatchObject({ migration: "server_key" });
+    // Add an external owner, keeping 1 or going to 2: both closer to the rules.
+    await expect(change({ kind: "ADD_OWNER", threshold: 1, address: D, label: "HW" })).resolves.toBeTruthy();
+    await expect(change({ kind: "ADD_OWNER", threshold: 2, address: C, label: "HW2" })).resolves.toBeTruthy();
+
+    // 2-of-2 member + external may swap its member key too…
+    resetFake();
+    relayer.isRelayerConfigured.mockReturnValue(true);
+    seed({ threshold: 2, owners: [OWNERS_3[0]], external: [{ address: D, label: "HW" }] });
+    db.fundPasskeySigner.push(passkeyRow("u-a", PA));
+    await expect(change({ kind: "SWAP_OWNER", oldOwner: A, memberUserId: "u-a" })).resolves.toBeTruthy();
+    // …but not drop to 1-of-2, which lets one person act alone.
+    await expect(change({ kind: "CHANGE_THRESHOLD", threshold: 1 })).rejects.toMatchObject({ code: "rules_one_person" });
+  });
+
+  it("a replaced passkey cannot sign until its swap executed (passkey_replaced)", async () => {
+    seed({ threshold: 2, owners: [OWNERS_3[0]], passkeys: [{ userId: "u-p", address: PA }, { userId: "u-q", address: PB }] });
+    const res = await transfer("u-a");
+    // u-p replaced their passkey (lost device): the owner row still points at the old one.
+    db.fundPasskeySigner.find((p) => p.id === "pk-u-p")!.replacedAt = new Date();
+    db.fundPasskeySigner.push(passkeyRow("u-p", PC, { id: "pk-u-p-2", credentialId: "cred-u-p-2" }));
+    await expect(
+      signTransactionWithPasskey({ fundId: FUND.id, transactionId: res.transactionId, userId: "u-p", dynamicPart: DYN }),
+    ).rejects.toMatchObject({ code: "passkey_replaced" });
+    expect(relayer.verifyContractSignature).not.toHaveBeenCalled();
+    // Once the swap put the new signer on the Safe, the new row is the one that signs.
+    db.fundSafeOwner.push({ id: "owner-pk-u-p-2", safeId, address: PC, kind: "PASSKEY", signerId: null, passkeyId: "pk-u-p-2", label: null, removedAt: null });
+    relayer.readSafeState.mockResolvedValue({ deployed: true, owners: [A, PA, PB, PC], threshold: 2, nonce: 0 });
+    const signed = await signTransactionWithPasskey({ fundId: FUND.id, transactionId: res.transactionId, userId: "u-p", dynamicPart: DYN });
+    expect(signed.ownerAddress).toBe(PC);
+  });
+
+  it("keeps a Transaction Service failure on the row and clears it once mirrored", async () => {
+    seed({ threshold: 2, owners: OWNERS_3, external: [{ address: D, label: "HW" }] });
+    txService.isTxServiceEnabled.mockReturnValue(true);
+    txService.proposeTransaction.mockRejectedValueOnce(new SafeError("tx_service", "HTTP 503"));
+    const res = await transfer("u-a");
+    const row = db.fundSafeTransaction.find((t) => t.id === res.transactionId)!;
+    expect(row.status).toBe("PENDING");
+    expect(String(row.errorMessage)).toMatch(/^tx_service: /);
+    // The next signature confirms on the service: the note goes away.
+    txService.confirmTransaction.mockResolvedValueOnce(undefined);
+    await signTransaction({ fundId: FUND.id, transactionId: res.transactionId, userId: "u-b" });
+    expect(row.errorMessage).toBeNull();
+  });
+
+  it("owner changes respect the recovery rules", async () => {
+    seed({ threshold: 2, owners: [], passkeys: [{ userId: "u-p", address: PA }, { userId: "u-q", address: PB }, { userId: "u-r", address: PC }] });
+    const change = (c: Record<string, unknown>) =>
+      proposeOwnerChange({ fund: FUND, safeId, userId: "u-p", input: { safeId, change: c as never } });
+    await expect(change({ kind: "CHANGE_THRESHOLD", threshold: 3 })).rejects.toMatchObject({ code: "rules_spare_owner" });
+    await expect(change({ kind: "CHANGE_THRESHOLD", threshold: 1 })).rejects.toMatchObject({ code: "rules_one_person" });
+    await expect(change({ kind: "REMOVE_OWNER", address: PC, threshold: 2 })).rejects.toMatchObject({ code: "rules_spare_owner" });
+    // Adding an external owner and keeping 2 is fine (stored unsigned: passkey proposer).
+    await expect(change({ kind: "ADD_OWNER", threshold: 2, address: D, label: "HW" })).resolves.toMatchObject({ awaitingSignature: true });
+  });
 });
 
 describe("proposeTokenTransfer", () => {
@@ -658,34 +928,39 @@ describe("rejections and owner changes", () => {
   });
 
   it("an executed owner change refreshes owners through sync", async () => {
-    seed({ threshold: 1, owners: [OWNERS_3[0]] });
+    // 2-of-3 team keys (the smallest set the recovery rules allow).
+    seed({ threshold: 2, owners: OWNERS_3 });
     const res = await proposeOwnerChange({
       fund: FUND,
       safeId,
       userId: "u-a",
-      input: { safeId, change: { kind: "ADD_OWNER", address: D, label: "Auditor", threshold: 1 } },
+      input: { safeId, change: { kind: "ADD_OWNER", address: D, label: "Auditor", threshold: 2 } },
     });
-    expect(res.executed).toBe(true);
+    expect(res.executed).toBe(false);
+    const signed = await signTransaction({ fundId: FUND.id, transactionId: res.transactionId, userId: "u-b" });
+    expect(signed.executed).toBe(true);
     const row = db.fundSafeTransaction[0];
     expect(row).toMatchObject({ kind: "ADD_OWNER", to: SAFE });
     expect(row.summary).toEqual({
       kind: "ADD_OWNER",
       owner: D,
       ownerLabel: "Auditor",
-      threshold: 1,
-      previousThreshold: 1,
+      threshold: 2,
+      previousThreshold: 2,
     });
     expect(sync.syncSafe).toHaveBeenCalledWith({ fundId: FUND.id, safeId, force: true });
   });
 
   it("owner / threshold summaries carry the on-chain threshold at proposal time", async () => {
-    seed({ threshold: 2, owners: OWNERS_3 });
+    // 2-of-4: three team keys + a hardware wallet, so a removal stays within the rules.
+    seed({ threshold: 2, owners: OWNERS_3, external: [{ address: D, label: "HW" }] });
+    const E = getAddress("0x5555555555555555555555555555555555555555");
 
     const add = await proposeOwnerChange({
       fund: FUND,
       safeId,
       userId: "u-a",
-      input: { safeId, change: { kind: "ADD_OWNER", address: D, label: "Auditor", threshold: 3 } },
+      input: { safeId, change: { kind: "ADD_OWNER", address: E, label: "Auditor", threshold: 3 } },
     });
     const addRow = db.fundSafeTransaction.find((t) => t.id === add.transactionId)!;
     expect(addRow.summary).toMatchObject({ kind: "ADD_OWNER", threshold: 3, previousThreshold: 2 });
@@ -694,10 +969,10 @@ describe("rejections and owner changes", () => {
       fund: FUND,
       safeId,
       userId: "u-a",
-      input: { safeId, change: { kind: "REMOVE_OWNER", address: C, threshold: 1 } },
+      input: { safeId, change: { kind: "REMOVE_OWNER", address: C, threshold: 2 } },
     });
     const removeRow = db.fundSafeTransaction.find((t) => t.id === remove.transactionId)!;
-    expect(removeRow.summary).toMatchObject({ kind: "REMOVE_OWNER", owner: C, threshold: 1, previousThreshold: 2 });
+    expect(removeRow.summary).toMatchObject({ kind: "REMOVE_OWNER", owner: C, threshold: 2, previousThreshold: 2 });
 
     const change = await proposeOwnerChange({
       fund: FUND,

@@ -85,6 +85,61 @@ export const SafeTxIdSchema = z.object({
   transactionId: z.string().min(1),
 });
 
+// WebAuthn responses from the browser (the @simplewebauthn JSON shapes).
+// Only the envelope is checked here; the ceremony verification parses the
+// base64url payloads for real (services/safe/passkey-webauthn.ts).
+const BASE64URL = z.string().min(1).max(100_000).regex(/^[A-Za-z0-9_-]+$/);
+const TRANSPORTS = ["ble", "cable", "hybrid", "internal", "nfc", "smart-card", "usb"] as const;
+type Transport = (typeof TRANSPORTS)[number];
+// Browsers may report transports we don't know; keep the known ones.
+const TRANSPORT_LIST = z
+  .array(z.string().max(20))
+  .max(10)
+  .transform((ts) => ts.filter((t): t is Transport => (TRANSPORTS as readonly string[]).includes(t)));
+
+export const PasskeyRegistrationResponseSchema = z.object({
+  id: BASE64URL,
+  rawId: BASE64URL,
+  type: z.literal("public-key"),
+  response: z.object({
+    clientDataJSON: BASE64URL,
+    attestationObject: BASE64URL,
+    transports: TRANSPORT_LIST.optional(),
+    publicKeyAlgorithm: z.number().optional(),
+    publicKey: BASE64URL.optional(),
+    authenticatorData: BASE64URL.optional(),
+  }),
+  authenticatorAttachment: z.enum(["platform", "cross-platform"]).optional(),
+  clientExtensionResults: z.record(z.string(), z.unknown()).default({}),
+});
+
+export const PasskeyAssertionResponseSchema = z.object({
+  id: BASE64URL,
+  rawId: BASE64URL,
+  type: z.literal("public-key"),
+  response: z.object({
+    clientDataJSON: BASE64URL,
+    authenticatorData: BASE64URL,
+    signature: BASE64URL,
+    userHandle: BASE64URL.optional(),
+  }),
+  authenticatorAttachment: z.enum(["platform", "cross-platform"]).optional(),
+  clientExtensionResults: z.record(z.string(), z.unknown()).default({}),
+});
+
+export const StartPasskeyRegistrationSchema = z.object({ replace: z.boolean().default(false) });
+
+export const FinishPasskeyRegistrationSchema = z.object({
+  challengeId: z.string().regex(/^[0-9a-f]{32}$/),
+  response: PasskeyRegistrationResponseSchema,
+});
+
+export const SignWithPasskeySchema = z.object({
+  safeId: z.string().min(1),
+  transactionId: z.string().min(1),
+  response: PasskeyAssertionResponseSchema,
+});
+
 // Which of the Safe's balances a transfer moves: the fund token, or one of the
 // display tokens the fund shows (services/token/extra-tokens.ts — xDAI is
 // "native", a plain value transfer; a fund-registered ERC-20 is
@@ -115,8 +170,8 @@ export type ProposeTransferInput = Omit<z.input<typeof ProposeTransferSchema>, "
   token?: TransferToken;
 };
 
-// Owner / threshold changes. A new owner is either a fund member (we create
-// or reuse their FundSigner) or an external address with a label.
+// Owner / threshold changes. A new owner is either a fund member (their
+// signing passkey's signer contract) or an external address with a label.
 const NewOwnerFields = {
   memberUserId: z.string().min(1).optional(),
   address: ADDRESS.optional(),

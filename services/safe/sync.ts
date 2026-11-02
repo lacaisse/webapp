@@ -5,9 +5,23 @@ import { getAddress } from "viem";
 
 import { prisma } from "@/services/db/prisma";
 
-import { isOwnerChangeKind, recordExecuted, tryExecute } from "./proposals";
+import { retireServerKeys } from "./migration";
+import { parseContractSignature } from "./passkey-signature";
+import {
+  clearMirrorFailure,
+  isOwnerChangeKind,
+  noteMirrorFailure,
+  recordExecuted,
+  tryExecute,
+} from "./proposals";
 import { redactRpcKey } from "./redact";
-import { describeSafeConfigDrift, findSafeExecution, readSafeConfig, readSafeState } from "./relayer";
+import {
+  describeSafeConfigDrift,
+  findSafeExecution,
+  readSafeConfig,
+  readSafeState,
+  verifyContractSignature,
+} from "./relayer";
 import { lc, recoverSafeTxSigner, safeTxFromRow, sameAddress } from "./safe-tx";
 import {
   confirmTransaction,
@@ -258,15 +272,16 @@ export async function syncSafe(a: {
                 signature: s.signature as Hex,
               });
             }
+            await clearMirrorFailure(a.fundId, tx.id);
           } catch (e) {
-            console.warn("[safe-sync] tx-service re-propose failed", tx.id, messageOf(e));
+            await noteMirrorFailure(a.fundId, tx.id, e);
           }
         }
       } else {
         // (2a) import Safe{Wallet} confirmations we don't have yet.
         const have = new Set(tx.signatures.map((s) => lc(s.ownerAddress)));
         for (const c of (remote.confirmations ?? []).slice(0, MAX_CONFIRMATIONS_PER_TX)) {
-          // Contract signatures / approved hashes carry no recoverable ECDSA sig.
+          // Approved hashes carry no signature at all.
           if (!c.signature) continue;
           const signature = c.signature;
           let owner: Address;
@@ -276,21 +291,48 @@ export async function syncSafe(a: {
             continue;
           }
           if (have.has(lc(owner)) || !ownerSet.has(lc(owner))) continue;
-          let recovered: Address;
-          try {
-            recovered = await recoverSafeTxSigner({
-              chainId: safe.chainId,
-              safeAddress,
-              tx: safeTx,
-              signature,
-            });
-          } catch (e) {
-            console.warn("[safe-sync] unrecoverable confirmation skipped", tx.id, owner, messageOf(e));
-            continue;
-          }
-          if (lc(recovered) !== lc(owner)) {
-            console.warn("[safe-sync] confirmation signer mismatch skipped", tx.id, owner);
-            continue;
+          // A contract owner's signature (a passkey signer, a nested Safe…)
+          // is judged by the owner contract itself, as the Safe will; an
+          // ECDSA one must recover to its owner.
+          const contract = parseContractSignature(signature);
+          if (contract) {
+            if (lc(contract.owner) !== lc(owner)) {
+              console.warn("[safe-sync] contract confirmation names another owner, skipped", tx.id, owner);
+              continue;
+            }
+            let accepted = false;
+            try {
+              accepted = await verifyContractSignature({
+                chainId: safe.chainId,
+                owner,
+                hash: tx.safeTxHash as Hex,
+                signature: contract.dynamicPart,
+              });
+            } catch (e) {
+              console.warn("[safe-sync] contract confirmation check failed", tx.id, owner, messageOf(e));
+              continue;
+            }
+            if (!accepted) {
+              console.warn("[safe-sync] contract confirmation rejected by the owner, skipped", tx.id, owner);
+              continue;
+            }
+          } else {
+            let recovered: Address;
+            try {
+              recovered = await recoverSafeTxSigner({
+                chainId: safe.chainId,
+                safeAddress,
+                tx: safeTx,
+                signature,
+              });
+            } catch (e) {
+              console.warn("[safe-sync] unrecoverable confirmation skipped", tx.id, owner, messageOf(e));
+              continue;
+            }
+            if (lc(recovered) !== lc(owner)) {
+              console.warn("[safe-sync] confirmation signer mismatch skipped", tx.id, owner);
+              continue;
+            }
           }
           try {
             await prisma.fundSafeSignature.create({
@@ -340,6 +382,15 @@ export async function syncSafe(a: {
     }
   }
 
+  // (4b) Legacy server keys that a migration swap moved off this (or any)
+  // Safe of the fund get retired, and erased once no unarchived Safe lists
+  // them (migration.ts). Never fails the sync.
+  try {
+    await retireServerKeys(a.fundId);
+  } catch (e) {
+    console.warn("[safe-sync] server-key retirement sweep failed", a.fundId, messageOf(e));
+  }
+
   // (5) A pass that hit errors leaves a note on the Safe (the chain-read
   // failure above does the same); a clean pass clears it.
   await prisma.fundSafe.updateMany({
@@ -356,10 +407,11 @@ function syncErrorMessage(problems: string[]): string | null {
   return `sync: ${first}`.slice(0, 400) + more;
 }
 
-// Upsert the owner cache from getOwners(): new chain owners become MEMBER
-// rows when a FundSigner of this fund holds the address (else EXTERNAL, label
-// taken from the executed ADD/SWAP proposal when there is one); owners gone
-// from chain get removedAt, returning ones have it cleared.
+// Upsert the owner cache from getOwners(): new chain owners become PASSKEY
+// rows when a member's passkey signer of this fund holds the address, MEMBER
+// rows when a legacy FundSigner does (else EXTERNAL, label taken from the
+// executed ADD/SWAP proposal when there is one); owners gone from chain get
+// removedAt, returning ones have it cleared.
 async function refreshOwners(a: {
   fundId: string;
   safeId: string;
@@ -412,15 +464,23 @@ async function refreshOwners(a: {
       }
       continue;
     }
-    const signer = await prisma.fundSigner.findUnique({
+    const passkey = await prisma.fundPasskeySigner.findUnique({
       where: { fundId_address: { fundId: a.fundId, address: owner } },
       select: { id: true },
     });
+    const signer = passkey
+      ? null
+      : await prisma.fundSigner.findUnique({
+          where: { fundId_address: { fundId: a.fundId, address: owner } },
+          select: { id: true },
+        });
     await prisma.fundSafeOwner.upsert({
       where: { safeId_address: { safeId: a.safeId, address: owner } },
-      create: signer
-        ? { safeId: a.safeId, address: owner, kind: "MEMBER", signerId: signer.id }
-        : { safeId: a.safeId, address: owner, kind: "EXTERNAL", label: await labelFor(owner) },
+      create: passkey
+        ? { safeId: a.safeId, address: owner, kind: "PASSKEY", passkeyId: passkey.id }
+        : signer
+          ? { safeId: a.safeId, address: owner, kind: "MEMBER", signerId: signer.id }
+          : { safeId: a.safeId, address: owner, kind: "EXTERNAL", label: await labelFor(owner) },
       update: { removedAt: null },
     });
   }

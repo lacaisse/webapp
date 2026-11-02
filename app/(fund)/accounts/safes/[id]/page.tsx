@@ -10,6 +10,7 @@ import {
   Send,
 } from "lucide-react";
 import Link from "next/link";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 
@@ -20,6 +21,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, resolveActiveTab } from "@/components/ui/tabs";
 import { requireFundRole } from "@/services/auth/dal";
 import { userHasPasskey } from "@/services/auth/passkeys";
+import type { SigningPasskeyHandle } from "@/services/safe/action-types";
+import { safeMigrationRows } from "@/services/safe/migration";
+import { signingPasskeyRpId } from "@/services/safe/passkey-rp";
 import { syncSafe } from "@/services/safe/sync";
 import {
   explorerAddressUrl,
@@ -36,13 +40,14 @@ import { ExtraBalanceLines, extraLinesFor } from "../../extra-balance-lines";
 import { getExtraBalances, type ExtraBalances } from "../../extra-balances";
 import { TransfersTableSkeleton } from "../../skeleton";
 import {
-  getCurrentSignerAddress,
+  getCurrentOwnerAddresses,
   getEligibleMembers,
   getRecipientOptions,
   getRelayerStatus,
   getSafe,
   getSafeBalance,
   getSafeTransfersFirstPage,
+  getSigningPasskeyStatus,
 } from "../data";
 import { formatNative, isDeployedAddress, isLowGas, thresholdLabel } from "../format";
 import { RetryDeployButton } from "../retry-deploy-button";
@@ -50,8 +55,9 @@ import { SafeAddress } from "../safe-address";
 import { SafeDetailSkeleton, SafeTxListSkeleton } from "../skeleton";
 import { SafeStatusBadge } from "../status-badge";
 import { HistoryList } from "./history-list";
+import { MigrationBanner } from "./migration-banner";
 import { OwnersCard } from "./owners-card";
-import { PendingTxCard } from "./pending-tx-card";
+import { PendingTxCard, type ViewerOwner } from "./pending-tx-card";
 import { SafeManage } from "./safe-manage";
 import { SafeTransfersTable } from "./safe-transfers-table";
 import { SyncButton } from "./sync-button";
@@ -110,15 +116,42 @@ async function SafeDetailView({
   const safe = await getSafe(fund.id, id);
   if (!safe) notFound();
 
-  const [signerAddress, members, recipients, relayer, fundAccounts, hasPasskey] =
-    await Promise.all([
-      getCurrentSignerAddress(fund.id, user.id),
-      getEligibleMembers(fund.id),
-      getRecipientOptions(fund.id),
-      getRelayerStatus(safe.chainId),
-      getAccountOptions(fund.id, ""),
-      userHasPasskey(user.id),
-    ]);
+  const [
+    ownerAddresses,
+    signingPasskey,
+    members,
+    recipients,
+    relayer,
+    fundAccounts,
+    hasPasskey,
+    migrationRows,
+  ] = await Promise.all([
+    getCurrentOwnerAddresses(fund.id, user.id),
+    getSigningPasskeyStatus(fund.id, user.id),
+    getEligibleMembers(fund.id),
+    getRecipientOptions(fund.id),
+    getRelayerStatus(safe.chainId),
+    getAccountOptions(fund.id, ""),
+    userHasPasskey(user.id),
+    safeMigrationRows({ fundId: fund.id, safeId: id, currentUserId: user.id }),
+  ]);
+  // What the browser needs to sign with the viewer's passkey (null without
+  // one; a legacy MEMBER owner then signs server-side).
+  const passkeyHandle: SigningPasskeyHandle | null = signingPasskey
+    ? {
+        credentialId: signingPasskey.credentialId,
+        transports: signingPasskey.transports,
+        address: signingPasskey.address,
+        rpId: signingPasskeyRpId(
+          process.env.APP_DOMAIN ?? "localhost",
+          (await headers()).get("host") ?? "",
+        ),
+      }
+    : null;
+  const viewer: ViewerOwner = { addresses: ownerAddresses, passkey: passkeyHandle };
+  const viewerIsOwner = safe.owners.some((o) =>
+    ownerAddresses.some((a) => a.toLowerCase() === o.address.toLowerCase()),
+  );
 
   const token = {
     tokenAddress: fund.tokenAddress,
@@ -154,6 +187,7 @@ async function SafeDetailView({
   for (const r of recipients) names[r.address.toLowerCase()] = r.label;
   for (const m of members) {
     if (m.signerAddress) names[m.signerAddress.toLowerCase()] = m.name;
+    if (m.passkeyAddress) names[m.passkeyAddress.toLowerCase()] = m.name;
   }
   for (const o of [...safe.formerOwners, ...safe.owners]) {
     names[o.address.toLowerCase()] = o.displayName;
@@ -192,6 +226,8 @@ async function SafeDetailView({
     email: o.email,
     image: o.image,
     isFormerMember: o.isFormerMember,
+    backedUp: o.backedUp,
+    passkeyReplaced: o.passkeyReplaced,
   }));
 
   return (
@@ -278,6 +314,16 @@ async function SafeDetailView({
           </AlertDescription>
         </Alert>
       )}
+      {active && migrationRows.length > 0 && (
+        <MigrationBanner
+          safeId={safe.id}
+          rows={migrationRows}
+          threshold={safe.threshold}
+          canPropose={viewerIsOwner}
+          hasPasskey={hasPasskey}
+          me={passkeyHandle}
+        />
+      )}
       {safe.status === "ACTIVE" && safe.errorMessage && (
         <Alert variant="warning">
           <AlertTriangle className="size-4" />
@@ -340,6 +386,7 @@ async function SafeDetailView({
                 fundSymbol={fund.tokenSymbol}
                 extraTokens={extraTokens}
                 hasPasskey={hasPasskey}
+                me={passkeyHandle}
               />
             </Suspense>
           )}
@@ -347,7 +394,7 @@ async function SafeDetailView({
       </div>
 
       {safe.pending.length > 0 && (
-        <section className="space-y-3">
+        <section id="pending" className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="font-heading text-lg font-medium">
               {t("detail.pendingTitle")}
@@ -367,7 +414,7 @@ async function SafeDetailView({
                 tx={tx}
                 owners={ownerRows}
                 threshold={safe.threshold}
-                currentSignerAddress={signerAddress}
+                viewer={viewer}
                 tokenSymbol={fund.tokenSymbol}
                 names={names}
                 safeWalletTxHref={
@@ -429,10 +476,13 @@ async function SafeDetailView({
               name: m.name,
               email: m.email,
               signerAddress: m.signerAddress,
+              passkeyAddress: m.passkeyAddress,
+              passkeyDeployed: m.passkeyDeployed,
             }))}
             currentUserId={user.id}
             canPropose={active}
             hasPasskey={hasPasskey}
+            me={passkeyHandle}
           />
 
           <section className="space-y-3">
@@ -572,6 +622,7 @@ async function ProposeTransferSlot({
   threshold: number;
   options: { address: string; label: string; kind: "ACCOUNT" | "CARD" }[];
   hasPasskey: boolean;
+  me: SigningPasskeyHandle | null;
   address: string;
   balances: Promise<SafeBalances>;
   fundSymbol: string | null;

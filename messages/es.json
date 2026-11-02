@@ -343,18 +343,21 @@
         "title": "Firmantes",
         "description": "{threshold} firmas necesarias para cada transacción.",
         "kind": {
-          "MEMBER": "Equipo",
-          "EXTERNAL": "Externo"
+          "MEMBER": "Clave del servidor (antigua)",
+          "EXTERNAL": "Externo",
+          "PASSKEY": "Passkey"
         },
         "externalHint": "Firma en Safe'{Wallet}'.",
-        "formerMember": "Ya no forma parte del equipo — considera quitar o sustituir a este firmante."
+        "formerMember": "Ya no forma parte del equipo — considera quitar o sustituir a este firmante.",
+        "serverKeyHint": "Firma con una clave guardada en el servidor de La Caisse. Pásala a una passkey.",
+        "replacedPasskeyHint": "Esta passkey fue reemplazada (dispositivo perdido). Cámbiala por la nueva."
       },
       "create": {
         "description": "Elige quién es propietario del Safe y cuántos deben firmar cada transacción.",
         "name": "Nombre",
         "namePlaceholder": "p. ej. Reserva, Junta",
         "teamOwners": "Firmantes del equipo",
-        "teamOwnersHint": "Los miembros del equipo firman en La Caisse con un clic, sin wallet.",
+        "teamOwnersHint": "Los miembros del equipo poseen el Safe con su propia passkey: una clave que se queda en su dispositivo y que La Caisse nunca guarda. Un miembro necesita una passkey de firma para este fondo antes de poder elegirlo.",
         "noMembers": "Ningún administrador de este fondo puede ser propietario de un Safe todavía.",
         "externalOwners": "Firmantes externos",
         "externalOwnersHint": "Cualquier dirección (una wallet física, un socio…). Los firmantes externos firman en Safe'{Wallet}', en app.safe.global.",
@@ -397,7 +400,8 @@
       },
       "proposal": {
         "executed": "Firmada y ejecutada.",
-        "proposed": "Propuesta. Se ejecuta en cuanto {threshold, plural, one {# firmante haya firmado} other {# firmantes hayan firmado}}."
+        "proposed": "Propuesta. Se ejecuta en cuanto {threshold, plural, one {# firmante haya firmado} other {# firmantes hayan firmado}}.",
+        "proposedUnsigned": "Propuesta, pero aún no firmada por ti: fírmala desde la lista de transacciones pendientes."
       },
       "ownerChange": {
         "needsSignatures": "Este cambio también es una transacción del Safe: se aplica en cuanto {threshold, plural, one {# firmante actual haya firmado} other {# firmantes actuales hayan firmado}}.",
@@ -408,7 +412,7 @@
         "modeExternal": "Dirección externa",
         "member": "Miembro del equipo",
         "pickMember": "Elige un miembro…",
-        "memberHint": "Firmará en La Caisse.",
+        "memberHint": "Firmará con su passkey, en su propio dispositivo.",
         "address": "Dirección",
         "label": "Nombre",
         "labelPlaceholder": "p. ej. Ledger del tesorero",
@@ -444,7 +448,9 @@
           "addOwnerThresholdChange": "Añadir a {owner} como firmante, firmas necesarias: {from} → {to}",
           "removeOwnerThresholdChange": "Quitar al firmante {owner}, firmas necesarias: {from} → {to}",
           "changeThresholdFromTo": "Cambiar el umbral de {from} a {to, plural, one {# firma} other {# firmas}}",
-          "rejection": "Rechazar la transacción n.º {nonce}"
+          "rejection": "Rechazar la transacción n.º {nonce}",
+          "swapToPasskey": "Pasar la clave de {owner} a su passkey {newOwner}",
+          "swapReplacedPasskey": "Reemplazar la passkey perdida de {owner} por {newOwner}"
         },
         "status": {
           "PENDING": "Pendiente",
@@ -455,7 +461,8 @@
         },
         "source": {
           "LACAISSE": "en La Caisse",
-          "SAFE_WALLET": "en Safe'{Wallet}'"
+          "SAFE_WALLET": "en Safe'{Wallet}'",
+          "PASSKEY": "con una passkey"
         },
         "nonce": "n.º {nonce}",
         "proposedBy": "Propuesta por {name}",
@@ -503,7 +510,10 @@
         "withdrawMirrored": "Este Safe tiene firmantes externos: la propuesta sigue visible en Safe'{Wallet}', donde todavía puede firmarse. Para bloquearla definitivamente, proponga un rechazo.",
         "withdrawConfirm": "Retirar la propuesta",
         "formerMember": "Ya no es miembro del equipo",
-        "configBlocked": "Ejecución en pausa: la configuración del Safe no es estándar."
+        "configBlocked": "Ejecución en pausa: la configuración del Safe no es estándar.",
+        "signWithPasskey": "Firmar con passkey",
+        "mirrorFailed": "Safe'{Wallet}' aún no tiene esta transacción ({error}). Se reintenta en cada sincronización.",
+        "passkeyReplaced": "Tu passkey en este Safe fue reemplazada: termina el cambio de propietario para volver a firmar."
       },
       "history": {
         "title": "Historial",
@@ -543,7 +553,15 @@
         "duplicateOwner": "La misma dirección aparece dos veces.",
         "addressChecksum": "La dirección tiene una mayúscula incorrecta (suma de verificación). Compruébela o péguela en minúsculas.",
         "queue_full": "Demasiadas transacciones abiertas en este Safe. Haga firmar, rechazar o retirar las propuestas abiertas primero.",
-        "holds_value": "Este Safe aún contiene fondos que solo los miembros del equipo pueden mover. Vacíelo antes de archivarlo."
+        "holds_value": "Este Safe aún contiene fondos que solo los miembros del equipo pueden mover. Vacíelo antes de archivarlo.",
+        "passkey_missing": "Este miembro del equipo aún no tiene una passkey de firma para este fondo.",
+        "passkey_exists": "Ya tienes una passkey de firma para este fondo. Usa «Reemplazar» si perdiste el dispositivo.",
+        "rules_spare_owner": "Mantén al menos un propietario más que el umbral (recuperación tras perder un dispositivo).",
+        "rules_one_person": "Las claves de una sola persona no deben bastar para alcanzar el umbral.",
+        "server_key_retired": "Esta clave del servidor fue retirada. Firma con tu passkey.",
+        "passkey_replaced": "Tu passkey en este Safe fue reemplazada. Termina primero el cambio de propietario a la nueva.",
+        "passkey_replace_pending": "Una passkey anterior tuya todavía posee un Safe. Termina su reemplazo antes de crear otra.",
+        "passkey_rate_limited": "Demasiadas passkeys de firma creadas hoy. Inténtalo de nuevo mañana."
       },
       "archived": {
         "title": "Safes archivados",
@@ -554,6 +572,77 @@
       "custody": {
         "shared": "Con {threshold} firma{threshold, plural, one {} other {s}} para {members} clave{members, plural, one {} other {s}} del equipo, La Caisse guarda por sí sola suficientes claves para firmar: no es un verdadero multifirma frente al servidor. Añada un firmante externo (cartera física) y suba el umbral por encima del número de claves del equipo para importes relevantes.",
         "independent": "El umbral supera el número de claves del equipo: al menos un firmante externo debe firmar cada transacción."
+      },
+      "rules": {
+        "rules_spare_owner": "Mantén al menos un propietario más que el umbral: si un miembro pierde su dispositivo, los demás deben seguir alcanzando el umbral y poder reemplazar su clave.",
+        "rules_one_person": "Las claves de una sola persona no deben bastar para alcanzar el umbral: sube el umbral o añade otro propietario.",
+        "why": "Una passkey vive en el dispositivo de una persona. Para recuperarse de un dispositivo perdido, el Safe conserva un propietario más que su umbral y nadie puede alcanzar el umbral por sí solo."
+      },
+      "passkey": {
+        "noHandle": "No tienes una passkey de firma para este fondo.",
+        "ceremonyFailed": "La ceremonia de la passkey falló.",
+        "registerTitle": "Crear tu passkey de firma",
+        "replaceTitle": "Reemplazar tu passkey de firma",
+        "registerDescription": "Tu clave para firmar las transacciones de los Safes de este fondo. Se crea en este dispositivo y nunca sale de él.",
+        "replaceDescription": "¿Dispositivo perdido o comprometido? Crea una nueva passkey de firma. Cada Safe que poseas con la antigua necesitará luego un cambio de propietario, firmado por los demás propietarios.",
+        "registeredTitle": "Passkey de firma lista",
+        "registeredBody": "Tu dirección de propietario del Safe (un pequeño contrato que verifica las firmas de tu passkey):",
+        "backedUpHint": "Esta passkey está sincronizada con tu gestor de contraseñas o la copia de seguridad de tu cuenta: un dispositivo nuevo la recupera.",
+        "deviceOnlyHint": "Esta passkey solo existe en este dispositivo. Si lo pierdes, los demás propietarios tendrán que reincorporarte con una nueva: registra un segundo dispositivo o activa la sincronización de passkeys.",
+        "deployFailedTitle": "Contrato de propietario aún no desplegado",
+        "retryDeploy": "Reintentar el despliegue",
+        "explainOwnKey": "La clave privada la crea y guarda tu dispositivo (Touch ID, Face ID, Windows Hello, una llave de seguridad…). La Caisse nunca la tiene.",
+        "explainPerFund": "Es una clave de firma dedicada a este fondo, no tu passkey de inicio de sesión. Tu dispositivo la muestra como «Signing key · fondo · correo».",
+        "explainBackup": "Prefiere una passkey que se sincronice (llavero de iCloud, gestor de Google…): una passkey de un solo dispositivo se pierde con él.",
+        "explainReplace": "Tu passkey anterior deja de ofrecerse aquí; los Safes que posee muestran un paso «pasar a passkey» hasta que se ejecute el reemplazo.",
+        "waiting": "Esperando tu dispositivo…",
+        "registerConfirm": "Crear passkey",
+        "replaceConfirm": "Crear una nueva passkey",
+        "registerTrigger": "Crear passkey de firma",
+        "replaceTrigger": "Reemplazar (dispositivo perdido)",
+        "cardTitle": "Tu passkey de firma",
+        "cardDescription": "Cómo firmas las transacciones de los Safes de este fondo. Una por fondo, guardada en tu dispositivo.",
+        "backedUp": "Con copia",
+        "deviceOnly": "Solo este dispositivo",
+        "notDeployed": "No desplegada",
+        "registeredOn": "Registrada el {date}",
+        "lastUsed": "último uso {date}",
+        "notDeployedHint": "El contrato de propietario aún no está en la cadena; hace falta antes de que un Safe pueda incluirte.",
+        "staleOwners": "{count, plural, one {# Safe todavía incluye} other {# Safes todavía incluyen}} una clave antigua tuya como propietario. Abre cada uno para proponer el reemplazo:",
+        "none": "Aún no tienes una passkey de firma para este fondo. Necesitas una para poseer un Safe.",
+        "memberReady": "Passkey de firma lista",
+        "memberNotDeployed": "Passkey registrada, contrato de propietario aún no desplegado",
+        "memberMissing": "Aún sin passkey de firma",
+        "deviceOnlyOwnerHint": "Passkey de un solo dispositivo: pídele que añada una copia, o los demás tendrán que reincorporarlo tras perder el dispositivo."
+      },
+      "migration": {
+        "title": "Pasar a passkeys",
+        "bodyServerKeys": "{count, plural, one {# propietario todavía firma} other {# propietarios todavía firman}} con una clave guardada en el servidor de La Caisse. Cada uno registra una passkey de firma y luego los demás propietarios firman el reemplazo, un cambio de propietario normal.",
+        "bodyReplaced": "Un propietario reemplazó su passkey. Cambia la antigua por la nueva: un cambio de propietario normal firmado por los demás.",
+        "you": "Tú",
+        "reason": {
+          "server_key": "Clave del servidor",
+          "replaced_passkey": "Passkey reemplazada"
+        },
+        "step": {
+          "register": "Necesita una passkey de firma para este fondo.",
+          "deploy": "Passkey registrada; hay que desplegar el contrato de propietario.",
+          "propose": "Listo: propón el reemplazo por la nueva passkey.",
+          "signing": "Reemplazo propuesto: {count} de {threshold} firmas.",
+          "executing": "Ejecutando el reemplazo…",
+          "failed": "El reemplazo falló; reinténtalo desde la lista de pendientes."
+        },
+        "actions": {
+          "register": "Crear mi passkey",
+          "waitRegister": "Esperando su registro",
+          "deploy": "Desplegar mi contrato de propietario",
+          "waitDeploy": "Esperando el despliegue",
+          "propose": "Proponer el reemplazo",
+          "waitPropose": "Un propietario puede proponer el reemplazo",
+          "signing": "Ver el reemplazo pendiente",
+          "executing": "Ver el reemplazo pendiente",
+          "failed": "Ver el reemplazo fallido"
+        }
       }
     },
     "team": {

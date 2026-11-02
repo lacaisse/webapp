@@ -2,6 +2,9 @@
 "use client";
 
 import {
+  AlertTriangle,
+  CheckCircle2,
+  Fingerprint,
   Info,
   Loader2,
   SlidersHorizontal,
@@ -36,7 +39,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import type { FundSafeOwnerKind } from "@/services/db/generated/enums";
+import type { SigningPasskeyHandle } from "@/services/safe/action-types";
 import { proposeOwnerChangeAction } from "@/services/safe/admin-actions";
+import { ownerRuleViolation, type RuleOwner } from "@/services/safe/owner-rules";
 import {
   ProposeOwnerChangeSchema,
   type OwnerChangeInput,
@@ -45,9 +50,10 @@ import {
 import { clampThreshold, sameAddress, shortAddress, thresholdLabel } from "../format";
 import { OwnerAvatar } from "../owner-avatar";
 import { useStepUp } from "@/components/reauth-dialog";
+import { useProposeAndSign, type ProposalOutcome } from "../passkey-hooks";
 import { SafeAddress } from "../safe-address";
 import { ThresholdStepper } from "../threshold-stepper";
-import { CustodyNote } from "../safe-create-form";
+import { CustodyNote, RecoveryRulesNote } from "../safe-create-form";
 import { ProposalResult } from "./proposal-result";
 
 export type OwnerRow = {
@@ -59,13 +65,17 @@ export type OwnerRow = {
   email: string | null;
   image: string | null;
   isFormerMember: boolean;
+  backedUp: boolean | null; // PASSKEY: synced to a backup (last ceremony's flags)
+  passkeyReplaced: boolean; // PASSKEY: credential replaced, swap pending
 };
 
 export type MemberOption = {
   userId: string;
   name: string;
   email: string;
-  signerAddress: string | null;
+  signerAddress: string | null; // legacy server key, if any
+  passkeyAddress: string | null;
+  passkeyDeployed: boolean;
 };
 
 type Shared = {
@@ -74,7 +84,16 @@ type Shared = {
   threshold: number;
   owners: OwnerRow[];
   hasPasskey: boolean;
+  me: SigningPasskeyHandle | null; // the viewer's signing passkey
 };
+
+// The recovery rules see each owner as who holds its key.
+function ruleOwnerOf(o: OwnerRow): RuleOwner {
+  return o.kind === "EXTERNAL"
+    ? { kind: "EXTERNAL", personId: null }
+    : { kind: o.kind, personId: o.userId };
+}
+const legacyCount = (owners: OwnerRow[]) => owners.filter((o) => o.kind === "MEMBER").length;
 
 const SELECT_CLASS =
   "h-8 w-full rounded-md bg-background px-2 text-sm ring-1 ring-foreground/15 outline-none focus-visible:ring-2 focus-visible:ring-ring";
@@ -88,6 +107,7 @@ export function OwnersCard({
   threshold,
   owners,
   hasPasskey,
+  me,
   members,
   currentUserId,
   canPropose,
@@ -98,15 +118,17 @@ export function OwnersCard({
 }) {
   const t = useTranslations("fund.safes.owners");
   const tSafes = useTranslations("fund.safes");
-  const shared = { safeId, chainId, threshold, owners, hasPasskey };
+  const tPasskey = useTranslations("fund.safes.passkey");
+  const shared = { safeId, chainId, threshold, owners, hasPasskey, me };
 
-  // Staff not yet owning this Safe (by user or by their signer address).
+  // Staff not yet owning this Safe (by user, or by either of their addresses).
   const addable = members.filter(
     (m) =>
       !owners.some(
         (o) =>
           (o.userId && o.userId === m.userId) ||
-          sameAddress(o.address, m.signerAddress),
+          sameAddress(o.address, m.signerAddress) ||
+          sameAddress(o.address, m.passkeyAddress),
       ),
   );
 
@@ -141,9 +163,20 @@ export function OwnersCard({
                   <div className="flex flex-wrap items-center gap-1.5 text-sm font-medium">
                     {o.displayName}
                     {isYou && <Badge variant="outline">{tSafes("you")}</Badge>}
-                    <Badge variant={external ? "info" : "default"}>
+                    <Badge variant={external ? "info" : o.kind === "PASSKEY" ? "success" : "warning"}>
+                      {o.kind === "PASSKEY" && <Fingerprint className="size-3" />}
                       {t(`kind.${o.kind}`)}
                     </Badge>
+                    {o.kind === "PASSKEY" && o.backedUp !== null && (
+                      <Badge variant={o.backedUp ? "default" : "warning"}>
+                        {o.backedUp ? (
+                          <CheckCircle2 className="size-3" />
+                        ) : (
+                          <AlertTriangle className="size-3" />
+                        )}
+                        {o.backedUp ? tPasskey("backedUp") : tPasskey("deviceOnly")}
+                      </Badge>
+                    )}
                   </div>
                   <div className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
                     {!external && o.email && <span>{o.email}</span>}
@@ -151,6 +184,21 @@ export function OwnersCard({
                   </div>
                   {external && (
                     <p className="text-xs text-muted-foreground">{t("externalHint")}</p>
+                  )}
+                  {o.kind === "MEMBER" && (
+                    <p className="flex items-center gap-1 text-xs text-warning">
+                      <Info className="size-3" />
+                      {t("serverKeyHint")}
+                    </p>
+                  )}
+                  {o.kind === "PASSKEY" && o.passkeyReplaced && (
+                    <p className="flex items-center gap-1 text-xs text-warning">
+                      <Info className="size-3" />
+                      {t("replacedPasskeyHint")}
+                    </p>
+                  )}
+                  {o.kind === "PASSKEY" && o.backedUp === false && !o.passkeyReplaced && (
+                    <p className="text-xs text-muted-foreground">{tPasskey("deviceOnlyOwnerHint")}</p>
                   )}
                   {o.isFormerMember && (
                     <p className="flex items-center gap-1 text-xs text-warning">
@@ -171,17 +219,16 @@ export function OwnersCard({
   );
 }
 
-// One propose-owner-change round trip, shared by the three dialogs.
-function useOwnerChange(safeId: string, hasPasskey: boolean) {
+// One propose-owner-change round trip, shared by the three dialogs. A
+// passkey owner's proposal is followed by their signing ceremony.
+function useOwnerChange(safeId: string, hasPasskey: boolean, me: SigningPasskeyHandle | null) {
   const tRoot = useTranslations();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{
-    executed: boolean;
-    txHash: string | null;
-  } | null>(null);
+  const [result, setResult] = useState<ProposalOutcome | null>(null);
   const stepUp = useStepUp(hasPasskey);
+  const { finish } = useProposeAndSign(safeId, me);
 
   function submit(change: OwnerChangeInput) {
     setError(null);
@@ -200,7 +247,9 @@ function useOwnerChange(safeId: string, hasPasskey: boolean) {
         setError(res.error);
         return;
       }
-      setResult({ executed: res.executed, txHash: res.txHash });
+      const outcome = await finish(res);
+      router.refresh();
+      setResult(outcome);
     });
   }
 
@@ -232,6 +281,8 @@ function ChangeDialogBody({
         executed={flow.result.executed}
         txHash={flow.result.txHash}
         threshold={threshold}
+        unsigned={flow.result.unsigned}
+        error={flow.result.error}
       />
     );
   }
@@ -300,10 +351,12 @@ function AddOwnerDialog({
   threshold,
   owners,
   hasPasskey,
+  me,
   members,
 }: Shared & { members: MemberOption[] }) {
   const t = useTranslations("fund.safes.ownerChange");
-  const flow = useOwnerChange(safeId, hasPasskey);
+  const tPasskey = useTranslations("fund.safes.passkey");
+  const flow = useOwnerChange(safeId, hasPasskey, me);
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"member" | "external">(
     members.length > 0 ? "member" : "external",
@@ -342,6 +395,18 @@ function AddOwnerDialog({
   };
 
   const ready = mode === "member" ? memberUserId !== "" : address.trim() !== "";
+  const pickedMember = members.find((m) => m.userId === memberUserId);
+  const newRule: RuleOwner | null =
+    mode === "member"
+      ? pickedMember
+        ? { kind: "PASSKEY", personId: pickedMember.userId }
+        : null
+      : address.trim() !== ""
+        ? { kind: "EXTERNAL", personId: null }
+        : null;
+  const violation = newRule
+    ? ownerRuleViolation([...owners.map(ruleOwnerOf), newRule], clampThreshold(newThreshold, total))
+    : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -394,11 +459,15 @@ function AddOwnerDialog({
                 className={SELECT_CLASS}
               >
                 <option value="">{t("pickMember")}</option>
-                {members.map((m) => (
-                  <option key={m.userId} value={m.userId}>
-                    {m.name === m.email ? m.email : `${m.name} (${m.email})`}
-                  </option>
-                ))}
+                {members.map((m) => {
+                  const ok = Boolean(m.passkeyAddress) && m.passkeyDeployed;
+                  return (
+                    <option key={m.userId} value={m.userId} disabled={!ok}>
+                      {m.name === m.email ? m.email : `${m.name} (${m.email})`}
+                      {ok ? "" : ` — ${tPasskey("memberMissing")}`}
+                    </option>
+                  );
+                })}
               </select>
               <p className="text-xs text-muted-foreground">{t("memberHint")}</p>
             </div>
@@ -434,18 +503,16 @@ function AddOwnerDialog({
             onChange={setNewThreshold}
             disabled={flow.pending}
           />
-          <CustodyNote
-            threshold={clampThreshold(newThreshold, total)}
-            memberOwners={
-              owners.filter((o) => o.kind === "MEMBER").length + (mode === "member" ? 1 : 0)
-            }
-          />
+          <RecoveryRulesNote violation={violation} teamOwners={legacyCount(owners) + owners.filter((o) => o.kind === "PASSKEY").length + (mode === "member" ? 1 : 0)} />
+          {legacyCount(owners) > 0 && (
+            <CustodyNote threshold={clampThreshold(newThreshold, total)} memberOwners={legacyCount(owners)} />
+          )}
         </ChangeDialogBody>
         <ChangeDialogFooter
           flow={flow}
           onClose={() => onOpenChange(false)}
           onSubmit={onSubmit}
-          disabled={!ready}
+          disabled={!ready || violation !== null}
           confirmLabel={t("addConfirm")}
         />
       </DialogContent>
@@ -459,16 +526,19 @@ function RemoveOwnerDialog({
   threshold,
   owners,
   hasPasskey,
+  me,
   owner,
   isYou,
 }: Shared & { owner: OwnerRow; isYou: boolean }) {
   const t = useTranslations("fund.safes.ownerChange");
-  const flow = useOwnerChange(safeId, hasPasskey);
+  const flow = useOwnerChange(safeId, hasPasskey, me);
   const remaining = owners.length - 1;
   const initial = clampThreshold(threshold, remaining);
   const [open, setOpen] = useState(false);
   const [newThreshold, setNewThreshold] = useState(initial);
   const mustDrop = threshold > remaining;
+  const rest = owners.filter((o) => !sameAddress(o.address, owner.address));
+  const violation = ownerRuleViolation(rest.map(ruleOwnerOf), clampThreshold(newThreshold, remaining));
 
   function onOpenChange(next: boolean) {
     if (flow.pending) return;
@@ -520,12 +590,10 @@ function RemoveOwnerDialog({
             onChange={setNewThreshold}
             disabled={flow.pending}
           />
-          <CustodyNote
-            threshold={clampThreshold(newThreshold, remaining)}
-            memberOwners={
-              owners.filter((o) => o.kind === "MEMBER" && !sameAddress(o.address, owner.address)).length
-            }
-          />
+          <RecoveryRulesNote violation={violation} teamOwners={rest.filter((o) => o.kind !== "EXTERNAL").length} />
+          {legacyCount(rest) > 0 && (
+            <CustodyNote threshold={clampThreshold(newThreshold, remaining)} memberOwners={legacyCount(rest)} />
+          )}
         </ChangeDialogBody>
         <ChangeDialogFooter
           flow={flow}
@@ -537,6 +605,7 @@ function RemoveOwnerDialog({
               threshold: clampThreshold(newThreshold, remaining),
             })
           }
+          disabled={violation !== null}
           confirmLabel={t("removeConfirm")}
           destructive
         />
@@ -545,12 +614,13 @@ function RemoveOwnerDialog({
   );
 }
 
-function ChangeThresholdDialog({ safeId, chainId, threshold, owners, hasPasskey }: Shared) {
+function ChangeThresholdDialog({ safeId, chainId, threshold, owners, hasPasskey, me }: Shared) {
   const t = useTranslations("fund.safes.ownerChange");
-  const flow = useOwnerChange(safeId, hasPasskey);
+  const flow = useOwnerChange(safeId, hasPasskey, me);
   const [open, setOpen] = useState(false);
   const [newThreshold, setNewThreshold] = useState(threshold);
   const value = clampThreshold(newThreshold, owners.length);
+  const violation = ownerRuleViolation(owners.map(ruleOwnerOf), value);
 
   function onOpenChange(next: boolean) {
     if (flow.pending) return;
@@ -584,16 +654,16 @@ function ChangeThresholdDialog({ safeId, chainId, threshold, owners, hasPasskey 
             onChange={setNewThreshold}
             disabled={flow.pending}
           />
-          <CustodyNote
-            threshold={value}
-            memberOwners={owners.filter((o) => o.kind === "MEMBER").length}
-          />
+          <RecoveryRulesNote violation={violation} teamOwners={owners.filter((o) => o.kind !== "EXTERNAL").length} />
+          {legacyCount(owners) > 0 && (
+            <CustodyNote threshold={value} memberOwners={legacyCount(owners)} />
+          )}
         </ChangeDialogBody>
         <ChangeDialogFooter
           flow={flow}
           onClose={() => onOpenChange(false)}
           onSubmit={() => flow.submit({ kind: "CHANGE_THRESHOLD", threshold: value })}
-          disabled={value === threshold}
+          disabled={value === threshold || violation !== null}
           confirmLabel={t("thresholdConfirm")}
         />
       </DialogContent>

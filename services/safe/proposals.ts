@@ -24,8 +24,16 @@ import {
   findSafeExecution,
   isRelayerConfigured,
   readSafeState,
+  verifyContractSignature,
 } from "./relayer";
 import { safeHoldsValue } from "./holdings";
+import { checkOwnerChange, ownerRuleViolation, type RuleOwner } from "./owner-rules";
+import { contractSignature } from "./passkey-signature";
+import {
+  activePasskeySignersByUser,
+  ensurePasskeySignerDeployed,
+  type PasskeySignerRow,
+} from "./passkey-signers";
 import {
   addOwnerWithThresholdData,
   buildSafeTx,
@@ -47,7 +55,7 @@ import type {
   TransferToken,
 } from "./schemas";
 import { redactRpcKey } from "./redact";
-import { getOrCreateFundSigner, signSafeTxWithSigner } from "./signer";
+import { findFundSigner, signSafeTxWithSigner, type SignerRow } from "./signer";
 import { syncSafe } from "./sync";
 import { confirmTransaction, isTxServiceEnabled, proposeTransaction } from "./tx-service";
 import {
@@ -55,12 +63,20 @@ import {
   isSafeError,
   type Address,
   type Hex,
+  type OwnerMigrationReason,
   type SafeTxSummary,
 } from "./types";
 
 // Fund-parameterised core of the Safe (multisig) manager: create / deploy a
 // Safe, propose transactions, collect La Caisse signatures, execute through
-// the relayer once the threshold is met. No auth here — callers pass the
+// the relayer once the threshold is met. Team members own their Safe key as
+// a passkey (PASSKEY owners: the member's signer contract, passkey-signers.ts)
+// — a passkey owner's proposal is stored unsigned and the browser's
+// WebAuthn assertion is turned into a contract signature right after
+// (`signTransactionWithPasskey`); a legacy server-held key (MEMBER owner,
+// signer.ts) still signs server-side on the Safes that list it, until the
+// migration (migration.ts) swapped it out. New Safes and new team owners
+// are passkeys only. No auth here — callers pass the
 // fund from the host (services/safe/admin-actions.ts via requireFundRole, or
 // the cron via the safe row it iterates). Every read of a safe / transaction
 // is scoped by that fund: `fundSafe.findFirst({ id, fundId })`, transactions
@@ -68,13 +84,18 @@ import {
 // layer revalidates.
 //
 // Tx-service calls (Safe{Wallet} mirror) are best-effort everywhere: a
-// failure is logged and never fails a proposal / signature.
+// failure never fails a proposal / signature, but it is kept on the row
+// (`errorMessage`, prefix `tx_service:`) so the card says the external
+// owners can't see it yet; sync's re-propose clears it.
 
 export type ProposeResult = {
   transactionId: string;
   safeTxHash: Hex;
   executed: boolean;
   txHash: Hex | null;
+  // True when the proposer is a passkey owner: the proposal carries no
+  // signature yet and the browser must run the signing ceremony next.
+  awaitingSignature: boolean;
 };
 
 export type TryExecuteReason =
@@ -146,7 +167,7 @@ function userLabel(u: { name: string | null; email: string } | null | undefined)
   return u.name?.trim() || u.email || null;
 }
 
-// Fund staff eligible to hold a member signer key: ADMIN or OWNER of THIS fund.
+// Fund staff eligible to own a Safe with their passkey: ADMIN or OWNER of THIS fund.
 async function requireAdminMembers(fundId: string, userIds: string[]): Promise<void> {
   if (userIds.length === 0) return;
   const rows = await prisma.fundMember.findMany({
@@ -158,6 +179,32 @@ async function requireAdminMembers(fundId: string, userIds: string[]): Promise<v
   if (missing.length > 0) {
     throw new SafeError("invalid_state", "Owner is not an admin of this fund");
   }
+}
+
+// Recovery rules (owner-rules.ts) for any Safe with team owners. A new Safe
+// must comply; a change to an existing Safe must not move it further from
+// the rules (a legacy 1-of-1 may still swap its server key for a passkey,
+// add an owner, or raise its threshold — anything that repairs it).
+function ruleError(violation: NonNullable<ReturnType<typeof ownerRuleViolation>>): SafeError {
+  return new SafeError(
+    violation,
+    violation === "rules_spare_owner"
+      ? "Keep at least one owner more than the threshold"
+      : "One person's keys alone must not meet the threshold",
+  );
+}
+
+function requireOwnerRules(owners: RuleOwner[], threshold: number): void {
+  const violation = ownerRuleViolation(owners, threshold);
+  if (violation) throw ruleError(violation);
+}
+
+function requireOwnerChangeRules(
+  before: { owners: RuleOwner[]; threshold: number },
+  after: { owners: RuleOwner[]; threshold: number },
+): void {
+  const check = checkOwnerChange(before, after);
+  if (!check.ok) throw ruleError(check.violation);
 }
 
 // ---------------------------------------------------------------------------
@@ -191,11 +238,18 @@ export async function createSafe(a: {
     throw new SafeError("relayer_not_configured", "Safe relayer is not configured");
   }
 
-  // Sequential: getOrCreateFundSigner inserts on first use.
-  const memberOwners: { address: Address; signerId: string }[] = [];
+  // Team owners are their passkey signer contracts — never a server-held
+  // key. Every selected member must have registered one for this fund, and
+  // the proxy must be on chain before the Safe lists it.
+  const passkeyOwners: { address: Address; passkeyId: string; userId: string }[] = [];
+  const passkeys = await activePasskeySignersByUser(fund.id, memberUserIds);
   for (const userId of memberUserIds) {
-    const signer = await getOrCreateFundSigner(fund.id, userId);
-    memberOwners.push({ address: getAddress(signer.address), signerId: signer.id });
+    const row = passkeys.get(userId);
+    if (!row) {
+      throw new SafeError("passkey_missing", "A team owner has no signing passkey for this fund");
+    }
+    const deployed = await ensurePasskeySignerDeployed(row, fund.tokenChainId);
+    passkeyOwners.push({ address: deployed.address, passkeyId: deployed.id, userId });
   }
 
   const externalOwners: { address: Address; label: string | null }[] = [];
@@ -209,13 +263,20 @@ export async function createSafe(a: {
     externalOwners.push({ address, label: ext.label?.trim() || null });
   }
 
-  const all = [...memberOwners.map((o) => o.address), ...externalOwners.map((o) => o.address)];
+  const all = [...passkeyOwners.map((o) => o.address), ...externalOwners.map((o) => o.address)];
   if (new Set(all.map(lc)).size !== all.length) {
     throw new SafeError("invalid_state", "Duplicate owner");
   }
   if (all.length === 0 || input.threshold < 1 || input.threshold > all.length) {
     throw new SafeError("invalid_state", "Threshold must be between 1 and the number of owners");
   }
+  requireOwnerRules(
+    [
+      ...passkeyOwners.map((o): RuleOwner => ({ kind: "PASSKEY", personId: o.userId })),
+      ...externalOwners.map((): RuleOwner => ({ kind: "EXTERNAL", personId: null })),
+    ],
+    input.threshold,
+  );
 
   const saltNonce = randomSaltNonce();
   const safe = await prisma.fundSafe.create({
@@ -230,10 +291,10 @@ export async function createSafe(a: {
       createdById: a.userId,
       owners: {
         create: [
-          ...memberOwners.map((o) => ({
+          ...passkeyOwners.map((o) => ({
             address: o.address,
-            kind: "MEMBER" as const,
-            signerId: o.signerId,
+            kind: "PASSKEY" as const,
+            passkeyId: o.passkeyId,
             label: null,
           })),
           ...externalOwners.map((o) => ({
@@ -349,16 +410,18 @@ async function requireSafeSteward(a: {
   isFundOwner: boolean;
 }): Promise<void> {
   if (a.isFundOwner) return;
-  const signer = await prisma.fundSigner.findUnique({
-    where: { fundId_userId: { fundId: a.fundId, userId: a.userId } },
+  const owner = await prisma.fundSafeOwner.findFirst({
+    where: {
+      safeId: a.safeId,
+      removedAt: null,
+      safe: { fundId: a.fundId },
+      OR: [
+        { passkey: { is: { userId: a.userId } } },
+        { signer: { is: { userId: a.userId } } },
+      ],
+    },
     select: { id: true },
   });
-  const owner = signer
-    ? await prisma.fundSafeOwner.findFirst({
-        where: { safeId: a.safeId, signerId: signer.id, removedAt: null, safe: { fundId: a.fundId } },
-        select: { id: true },
-      })
-    : null;
   if (!owner) throw new SafeError("not_owner", "Only an owner of this Safe or a fund owner can do this");
 }
 
@@ -456,7 +519,10 @@ export async function unarchiveSafe(a: {
 const ownerInclude = {
   owners: {
     where: { removedAt: null },
-    include: { signer: { include: { user: { select: { name: true, email: true } } } } },
+    include: {
+      signer: { include: { user: { select: { name: true, email: true } } } },
+      passkey: { include: { user: { select: { name: true, email: true } } } },
+    },
   },
 } satisfies Prisma.FundSafeInclude;
 
@@ -472,27 +538,85 @@ async function loadActiveSafe(fundId: string, safeId: string): Promise<LoadedSaf
   return safe;
 }
 
-// The acting user's signer key for this fund, which must be a current owner.
-// Never creates a signer: proposing / signing is for existing owners only.
-async function requireOwnerSigner(
+// How the acting user owns this Safe: through their passkey signer contract
+// (PASSKEY owner row of theirs), or through a legacy server-held key still
+// listed as a MEMBER owner. Never creates anything: proposing / signing is
+// for existing owners only. A member who is both (mid-migration) acts with
+// the passkey.
+type ActingOwner =
+  | { kind: "PASSKEY"; address: Address; passkeyId: string }
+  | { kind: "MEMBER"; address: Address; signer: SignerRow };
+
+type OwnerRowLike = {
+  address: string;
+  kind: "MEMBER" | "EXTERNAL" | "PASSKEY";
+  passkeyId?: string | null;
+  passkey?: { userId: string; replacedAt: Date | null } | null;
+};
+
+async function requireActingOwner(
   fundId: string,
   userId: string,
-  owners: { address: string }[],
-) {
-  const signer = await prisma.fundSigner.findUnique({
-    where: { fundId_userId: { fundId, userId } },
-  });
-  if (!signer || !owners.some((o) => sameAddress(o.address, signer.address))) {
-    throw new SafeError("not_owner", "You are not an owner of this Safe");
+  owners: OwnerRowLike[],
+): Promise<ActingOwner> {
+  const mine = owners.filter((o) => o.kind === "PASSKEY" && o.passkey?.userId === userId && o.passkeyId);
+  // Only the ACTIVE credential signs (the browser asserts with it); a row
+  // whose passkey was replaced is an owner the swap has not reached yet.
+  const active = mine.find((o) => !o.passkey?.replacedAt);
+  if (active) {
+    return { kind: "PASSKEY", address: getAddress(active.address), passkeyId: active.passkeyId! };
   }
-  return signer;
+  const signer = await findFundSigner(fundId, userId);
+  if (signer && owners.some((o) => o.kind === "MEMBER" && sameAddress(o.address, signer.address))) {
+    return { kind: "MEMBER", address: signer.address, signer };
+  }
+  if (mine.length > 0) {
+    throw new SafeError(
+      "passkey_replaced",
+      "Your passkey on this Safe was replaced: finish the owner swap first",
+    );
+  }
+  throw new SafeError("not_owner", "You are not an owner of this Safe");
+}
+
+/**
+ * How `userId` would act on this Safe: with a passkey, a legacy server key,
+ * or not at all (null, including a replaced passkey awaiting its swap). For
+ * the actions, which skip the pre-proposal step-up for passkey owners.
+ */
+export async function actingOwnerKind(a: {
+  fundId: string;
+  safeId: string;
+  userId: string;
+}): Promise<"PASSKEY" | "MEMBER" | null> {
+  const safe = await prisma.fundSafe.findFirst({
+    where: { id: a.safeId, fundId: a.fundId, archivedAt: null },
+    include: ownerInclude,
+  });
+  if (!safe) return null;
+  try {
+    return (await requireActingOwner(a.fundId, a.userId, safe.owners)).kind;
+  } catch {
+    return null;
+  }
 }
 
 function ownerLabel(safe: LoadedSafe, address: string): string | null {
   const o = safe.owners.find((x) => sameAddress(x.address, address));
   if (!o) return null;
   if (o.kind === "MEMBER") return userLabel(o.signer?.user);
+  if (o.kind === "PASSKEY") return userLabel(o.passkey?.user);
   return o.label;
+}
+
+// Who is behind an owner row, for the recovery rules.
+function ruleOwnerOf(o: {
+  kind: "MEMBER" | "EXTERNAL" | "PASSKEY";
+  signer?: { userId: string } | null;
+  passkey?: { userId: string } | null;
+}): RuleOwner {
+  if (o.kind === "EXTERNAL") return { kind: "EXTERNAL", personId: null };
+  return { kind: o.kind, personId: o.signer?.userId ?? o.passkey?.userId ?? null };
 }
 
 // Whether La Caisse publishes proposals / signatures to the public Safe
@@ -541,7 +665,7 @@ async function propose(a: {
   nonce?: number; // REJECTION: the target's nonce
 }): Promise<ProposeResult> {
   const { safe } = a;
-  const signer = await requireOwnerSigner(a.fundId, a.userId, safe.owners);
+  const acting = await requireActingOwner(a.fundId, a.userId, safe.owners);
   const safeAddress = getAddress(safe.address);
   if (a.kind !== "REJECTION") await requireQueueRoom(safe.id, a.userId);
 
@@ -553,7 +677,14 @@ async function propose(a: {
     nonce: BigInt(nonce),
   });
   const hash = safeTxHash({ chainId: safe.chainId, safeAddress, tx });
-  const signature = await signSafeTxWithSigner(signer, { chainId: safe.chainId, safeAddress, tx });
+  // A legacy server key signs right here. A passkey owner's signature is a
+  // WebAuthn ceremony in the browser: the row is stored without it and
+  // `signTransactionWithPasskey` adds it next (the proposal is a plain
+  // unsigned Safe proposal until then — withdrawable, visible to all).
+  const signature =
+    acting.kind === "MEMBER"
+      ? await signSafeTxWithSigner(acting.signer, { chainId: safe.chainId, safeAddress, tx })
+      : null;
 
   let created: { id: string };
   try {
@@ -572,15 +703,19 @@ async function propose(a: {
         proposedById: a.userId,
         // Nested create: the transaction and the proposer's signature are
         // written atomically.
-        signatures: {
-          create: {
-            ownerAddress: getAddress(signer.address),
-            signature,
-            source: "LACAISSE",
-            signerId: signer.id,
-            userId: a.userId,
-          },
-        },
+        ...(signature && acting.kind === "MEMBER"
+          ? {
+              signatures: {
+                create: {
+                  ownerAddress: acting.address,
+                  signature,
+                  source: "LACAISSE" as const,
+                  signerId: acting.signer.id,
+                  userId: a.userId,
+                },
+              },
+            }
+          : {}),
       },
       select: { id: true },
     });
@@ -591,6 +726,18 @@ async function propose(a: {
     throw e;
   }
 
+  if (!signature) {
+    // Mirrored to the Transaction Service with the first signature instead
+    // (the service wants the proposer's signature with the proposal).
+    return {
+      transactionId: created.id,
+      safeTxHash: hash,
+      executed: false,
+      txHash: null,
+      awaitingSignature: true,
+    };
+  }
+
   const mirror = shouldMirror(safe.chainId, safe.owners);
   if (mirror) {
     try {
@@ -599,17 +746,23 @@ async function propose(a: {
         safeAddress,
         tx,
         safeTxHash: hash,
-        sender: getAddress(signer.address),
+        sender: acting.address,
         signature,
         origin: "La Caisse",
       });
     } catch (e) {
-      console.warn("[safe] tx-service propose failed", created.id, errorMessageOf(e));
+      await noteMirrorFailure(a.fundId, created.id, e);
     }
   }
 
   const exec = await tryExecute({ fundId: a.fundId, transactionId: created.id });
-  return { transactionId: created.id, safeTxHash: hash, executed: exec.executed, txHash: exec.txHash };
+  return {
+    transactionId: created.id,
+    safeTxHash: hash,
+    executed: exec.executed,
+    txHash: exec.txHash,
+    awaitingSignature: false,
+  };
 }
 
 // What a transfer moves and how: the fund token (an ERC-20 transfer on
@@ -718,23 +871,39 @@ export async function proposeTokenTransfer(a: {
   });
 }
 
-// Resolve the "new owner" of an ADD / SWAP: a fund member (ADMIN/OWNER — we
-// create or reuse their FundSigner) or an external address with a label.
+// Resolve the "new owner" of an ADD / SWAP: a fund member (ADMIN/OWNER) —
+// their active passkey signer contract, deployed if need be; never a
+// server-held key — or an external address with a label.
 async function resolveNewOwner(
   fundId: string,
+  chainId: number,
   v: { memberUserId?: string; address?: string; label?: string },
-): Promise<{ address: Address; label: string | null }> {
+): Promise<{ address: Address; label: string | null; rule: RuleOwner; passkey: PasskeySignerRow | null }> {
   if (v.memberUserId) {
     await requireAdminMembers(fundId, [v.memberUserId]);
-    const signer = await getOrCreateFundSigner(fundId, v.memberUserId);
+    const row = (await activePasskeySignersByUser(fundId, [v.memberUserId])).get(v.memberUserId);
+    if (!row) {
+      throw new SafeError("passkey_missing", "This member has no signing passkey for this fund");
+    }
+    const passkey = await ensurePasskeySignerDeployed(row, chainId);
     const user = await prisma.user.findUnique({
       where: { id: v.memberUserId },
       select: { name: true, email: true },
     });
-    return { address: getAddress(signer.address), label: userLabel(user) };
+    return {
+      address: passkey.address,
+      label: userLabel(user),
+      rule: { kind: "PASSKEY", personId: v.memberUserId },
+      passkey,
+    };
   }
   if (!v.address) throw new SafeError("invalid_state", "New owner is required");
-  return { address: getAddress(v.address), label: v.label?.trim() || null };
+  return {
+    address: getAddress(v.address),
+    label: v.label?.trim() || null,
+    rule: { kind: "EXTERNAL", personId: null },
+    passkey: null,
+  };
 }
 
 export async function proposeOwnerChange(a: {
@@ -751,6 +920,14 @@ export async function proposeOwnerChange(a: {
   const state = await readSafeState({ chainId: safe.chainId, safeAddress });
   const chainOwners = state.owners.map((o) => getAddress(o));
   const isOwner = (addr: string) => chainOwners.some((o) => sameAddress(o, addr));
+  // The owner set as the chain has it, with the person behind each row we
+  // know (an address La Caisse never recorded counts as external).
+  const ruleOwnerAt = (addr: Address): RuleOwner => {
+    const row = safe.owners.find((o) => sameAddress(o.address, addr));
+    return row ? ruleOwnerOf(row) : { kind: "EXTERNAL", personId: null };
+  };
+  const currentRules = chainOwners.map(ruleOwnerAt);
+  const before = { owners: currentRules, threshold: state.threshold };
 
   let kind: FundSafeTxKind;
   let data: Hex;
@@ -758,11 +935,12 @@ export async function proposeOwnerChange(a: {
 
   switch (change.kind) {
     case "ADD_OWNER": {
-      const owner = await resolveNewOwner(fund.id, change);
+      const owner = await resolveNewOwner(fund.id, safe.chainId, change);
       if (isOwner(owner.address)) throw new SafeError("invalid_state", "Already an owner");
       if (change.threshold < 1 || change.threshold > chainOwners.length + 1) {
         throw new SafeError("invalid_state", "Invalid threshold");
       }
+      requireOwnerChangeRules(before, { owners: [...currentRules, owner.rule], threshold: change.threshold });
       kind = "ADD_OWNER";
       data = addOwnerWithThresholdData(owner.address, BigInt(change.threshold));
       summary = {
@@ -781,6 +959,10 @@ export async function proposeOwnerChange(a: {
       if (change.threshold < 1 || change.threshold > chainOwners.length - 1) {
         throw new SafeError("invalid_state", "Invalid threshold");
       }
+      requireOwnerChangeRules(before, {
+        owners: chainOwners.filter((o) => !sameAddress(o, owner)).map(ruleOwnerAt),
+        threshold: change.threshold,
+      });
       kind = "REMOVE_OWNER";
       data = removeOwnerData(chainOwners, owner, BigInt(change.threshold));
       summary = {
@@ -795,16 +977,22 @@ export async function proposeOwnerChange(a: {
     case "SWAP_OWNER": {
       const oldOwner = getAddress(change.oldOwner);
       if (!isOwner(oldOwner)) throw new SafeError("invalid_state", "Not an owner");
-      const next = await resolveNewOwner(fund.id, change);
+      const next = await resolveNewOwner(fund.id, safe.chainId, change);
       if (isOwner(next.address)) throw new SafeError("invalid_state", "Already an owner");
+      requireOwnerChangeRules(before, {
+        owners: chainOwners.map((o) => (sameAddress(o, oldOwner) ? next.rule : ruleOwnerAt(o))),
+        threshold: state.threshold,
+      });
       kind = "SWAP_OWNER";
       data = swapOwnerData(chainOwners, oldOwner, next.address);
+      const migration = migrationReasonFor(safe, oldOwner, next);
       summary = {
         kind,
         oldOwner,
         oldOwnerLabel: ownerLabel(safe, oldOwner),
         newOwner: next.address,
         newOwnerLabel: next.label,
+        ...(migration ? { migration } : {}),
       };
       break;
     }
@@ -815,6 +1003,7 @@ export async function proposeOwnerChange(a: {
       if (change.threshold === state.threshold) {
         throw new SafeError("invalid_state", "Threshold unchanged");
       }
+      requireOwnerChangeRules(before, { owners: currentRules, threshold: change.threshold });
       kind = "CHANGE_THRESHOLD";
       data = changeThresholdData(BigInt(change.threshold));
       summary = { kind, threshold: change.threshold, previousThreshold: state.threshold };
@@ -831,6 +1020,24 @@ export async function proposeOwnerChange(a: {
     summary,
     note: input.note,
   });
+}
+
+// A swap that moves a member's owner key to their passkey: the old owner is
+// their server-held key, or their replaced (lost) passkey, and the new one
+// is their active passkey signer. Recorded on the summary for the history.
+function migrationReasonFor(
+  safe: LoadedSafe,
+  oldOwner: Address,
+  next: { passkey: PasskeySignerRow | null },
+): OwnerMigrationReason | null {
+  if (!next.passkey) return null;
+  const old = safe.owners.find((o) => sameAddress(o.address, oldOwner));
+  if (!old) return null;
+  if (old.kind === "MEMBER" && old.signer?.userId === next.passkey.userId) return "server_key";
+  if (old.kind === "PASSKEY" && old.passkey?.userId === next.passkey.userId && old.passkey.replacedAt) {
+    return "replaced_passkey";
+  }
+  return null;
 }
 
 // Standard Safe rejection: an empty self-call at the target's nonce. Once it
@@ -919,16 +1126,14 @@ export async function withdrawProposal(a: {
 // Signing + execution
 // ---------------------------------------------------------------------------
 
-export async function signTransaction(a: {
-  fundId: string;
-  transactionId: string;
-  userId: string;
-}): Promise<{ executed: boolean; txHash: Hex | null }> {
+type SignableTx = NonNullable<Awaited<ReturnType<typeof loadSignableTx>>>;
+
+async function loadSignableTx(fundId: string, transactionId: string) {
   const tx = await prisma.fundSafeTransaction.findFirst({
-    where: { id: a.transactionId, safe: { fundId: a.fundId } },
+    where: { id: transactionId, safe: { fundId } },
     include: {
       signatures: { select: { ownerAddress: true } },
-      safe: { include: { owners: { where: { removedAt: null } } } },
+      safe: { include: ownerInclude },
     },
   });
   if (!tx) throw new SafeError("not_found", "Transaction not found");
@@ -936,32 +1141,115 @@ export async function signTransaction(a: {
   if (tx.safe.status !== "ACTIVE" || tx.safe.archivedAt) {
     throw new SafeError("invalid_state", "Safe is not active");
   }
+  return tx;
+}
 
-  const signer = await requireOwnerSigner(a.fundId, a.userId, tx.safe.owners);
-  if (tx.signatures.some((s) => sameAddress(s.ownerAddress, signer.address))) {
-    throw new SafeError("already_signed", "Already signed");
-  }
-
+// The SafeTx of a stored row, checked against its stored hash.
+function checkedSafeTx(tx: SignableTx) {
   const safeAddress = getAddress(tx.safe.address);
   const safeTx = safeTxFromRow(tx);
   if (lc(safeTxHash({ chainId: tx.safe.chainId, safeAddress, tx: safeTx })) !== lc(tx.safeTxHash)) {
     throw new SafeError("invalid_state", "Stored transaction does not match its hash");
   }
-  const signature = await signSafeTxWithSigner(signer, {
+  return { safeAddress, safeTx };
+}
+
+/**
+ * Sign with the acting user's LEGACY server-held key (MEMBER owner). A
+ * passkey owner is refused here: their signature is a browser ceremony
+ * (`signTransactionWithPasskey`).
+ */
+export async function signTransaction(a: {
+  fundId: string;
+  transactionId: string;
+  userId: string;
+}): Promise<{ executed: boolean; txHash: Hex | null }> {
+  const tx = await loadSignableTx(a.fundId, a.transactionId);
+  const acting = await requireActingOwner(a.fundId, a.userId, tx.safe.owners);
+  if (acting.kind !== "MEMBER") {
+    throw new SafeError("invalid_state", "This owner signs with a passkey");
+  }
+  if (tx.signatures.some((s) => sameAddress(s.ownerAddress, acting.address))) {
+    throw new SafeError("already_signed", "Already signed");
+  }
+  const { safeAddress, safeTx } = checkedSafeTx(tx);
+  const signature = await signSafeTxWithSigner(acting.signer, {
     chainId: tx.safe.chainId,
     safeAddress,
     tx: safeTx,
   });
+  return storeSignatureAndExecute({
+    fundId: a.fundId,
+    tx,
+    safeTx,
+    owner: acting.address,
+    signature,
+    row: { source: "LACAISSE", signerId: acting.signer.id, userId: a.userId },
+  });
+}
 
+/**
+ * Sign as a PASSKEY owner with the signer contract's signature bytes
+ * (`dynamicPart`: the module's abi-encoded WebAuthn signature, already
+ * checked against the member's credential by the caller). The contract
+ * itself is asked whether it accepts it — the same EIP-1271 call the Safe
+ * makes — before the row is stored.
+ */
+export async function signTransactionWithPasskey(a: {
+  fundId: string;
+  transactionId: string;
+  userId: string;
+  dynamicPart: Hex;
+}): Promise<{ executed: boolean; txHash: Hex | null; ownerAddress: Address }> {
+  const tx = await loadSignableTx(a.fundId, a.transactionId);
+  const acting = await requireActingOwner(a.fundId, a.userId, tx.safe.owners);
+  if (acting.kind !== "PASSKEY") {
+    throw new SafeError("invalid_state", "This owner signs with a server-held key");
+  }
+  if (tx.signatures.some((s) => sameAddress(s.ownerAddress, acting.address))) {
+    throw new SafeError("already_signed", "Already signed");
+  }
+  const { safeTx } = checkedSafeTx(tx);
+  const accepted = await verifyContractSignature({
+    chainId: tx.safe.chainId,
+    owner: acting.address,
+    hash: tx.safeTxHash as Hex,
+    signature: a.dynamicPart,
+  });
+  if (!accepted) {
+    throw new SafeError("invalid_signature", "The signer contract rejected the passkey signature");
+  }
+  const res = await storeSignatureAndExecute({
+    fundId: a.fundId,
+    tx,
+    safeTx,
+    owner: acting.address,
+    signature: contractSignature(acting.address, a.dynamicPart),
+    row: { source: "PASSKEY", passkeyId: acting.passkeyId, userId: a.userId },
+  });
+  return { ...res, ownerAddress: acting.address };
+}
+
+// Store a signature, mirror it to the Transaction Service (the proposal
+// itself when this is its first signature), then try to execute.
+async function storeSignatureAndExecute(a: {
+  fundId: string;
+  tx: SignableTx;
+  safeTx: ReturnType<typeof safeTxFromRow>;
+  owner: Address;
+  signature: Hex;
+  row:
+    | { source: "LACAISSE"; signerId: string; userId: string }
+    | { source: "PASSKEY"; passkeyId: string; userId: string };
+}): Promise<{ executed: boolean; txHash: Hex | null }> {
+  const { tx } = a;
   try {
     await prisma.fundSafeSignature.create({
       data: {
         transactionId: tx.id,
-        ownerAddress: getAddress(signer.address),
-        signature,
-        source: "LACAISSE",
-        signerId: signer.id,
-        userId: a.userId,
+        ownerAddress: a.owner,
+        signature: a.signature,
+        ...a.row,
       },
     });
   } catch (e) {
@@ -972,18 +1260,59 @@ export async function signTransaction(a: {
   const mirror = shouldMirror(tx.safe.chainId, tx.safe.owners);
   if (mirror) {
     try {
-      await confirmTransaction({
-        chainId: tx.safe.chainId,
-        safeTxHash: tx.safeTxHash as Hex,
-        signature,
-      });
+      if (tx.signatures.length === 0) {
+        await proposeTransaction({
+          chainId: tx.safe.chainId,
+          safeAddress: getAddress(tx.safe.address),
+          tx: a.safeTx,
+          safeTxHash: tx.safeTxHash as Hex,
+          sender: a.owner,
+          signature: a.signature,
+          origin: "La Caisse",
+        });
+      } else {
+        await confirmTransaction({
+          chainId: tx.safe.chainId,
+          safeTxHash: tx.safeTxHash as Hex,
+          signature: a.signature,
+        });
+      }
+      await clearMirrorFailure(a.fundId, tx.id);
     } catch (e) {
-      console.warn("[safe] tx-service confirm failed", tx.id, errorMessageOf(e));
+      await noteMirrorFailure(a.fundId, tx.id, e);
     }
   }
 
   const exec = await tryExecute({ fundId: a.fundId, transactionId: tx.id });
   return { executed: exec.executed, txHash: exec.txHash };
+}
+
+export const MIRROR_ERROR_PREFIX = "tx_service:";
+
+/** Keep a Transaction Service failure on the (still PENDING) row. Never throws. */
+export async function noteMirrorFailure(fundId: string, transactionId: string, e: unknown): Promise<void> {
+  const message = `${MIRROR_ERROR_PREFIX} ${errorMessageOf(e).replace(/^tx_service: /, "")}`.slice(0, 400);
+  console.warn("[safe] tx-service mirror failed", transactionId, message);
+  try {
+    await prisma.fundSafeTransaction.updateMany({
+      where: { id: transactionId, safe: { fundId }, status: "PENDING" },
+      data: { errorMessage: message },
+    });
+  } catch (err) {
+    console.warn("[safe] could not record mirror failure", transactionId, errorMessageOf(err));
+  }
+}
+
+/** Drop a recorded mirror failure once the service has the transaction. */
+export async function clearMirrorFailure(fundId: string, transactionId: string): Promise<void> {
+  try {
+    await prisma.fundSafeTransaction.updateMany({
+      where: { id: transactionId, safe: { fundId }, errorMessage: { startsWith: MIRROR_ERROR_PREFIX } },
+      data: { errorMessage: null },
+    });
+  } catch (err) {
+    console.warn("[safe] could not clear mirror failure", transactionId, errorMessageOf(err));
+  }
 }
 
 // Execute when the threshold is met. Returns a reason (not an error) for the

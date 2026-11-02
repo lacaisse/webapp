@@ -5,6 +5,7 @@ import {
   Ban,
   Check,
   Circle,
+  Fingerprint,
   Info,
   Undo2,
   Loader2,
@@ -29,6 +30,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import type { SigningPasskeyHandle } from "@/services/safe/action-types";
 import {
   proposeRejectionAction,
   retryExecutionAction,
@@ -39,7 +41,16 @@ import {
 import type { SafeTxView } from "../data";
 import { sameAddress, shortAddress, summaryLine } from "../format";
 import { useStepUp } from "@/components/reauth-dialog";
+import { usePasskeySigning, useProposeAndSign } from "../passkey-hooks";
 import type { OwnerRow } from "./owners-card";
+
+// How the viewer owns Safes in this fund: the addresses that are theirs
+// (passkey signer contract and/or legacy server key) and the passkey handle
+// for the signing ceremony.
+export type ViewerOwner = {
+  addresses: string[];
+  passkey: SigningPasskeyHandle | null;
+};
 import { TxDetails } from "./tx-details";
 import { TxKindIcon } from "./tx-kind-icon";
 
@@ -52,7 +63,7 @@ export function PendingTxCard({
   tx,
   owners,
   threshold,
-  currentSignerAddress,
+  viewer,
   tokenSymbol,
   names,
   safeWalletTxHref,
@@ -74,7 +85,7 @@ export function PendingTxCard({
   tx: SafeTxView;
   owners: OwnerRow[];
   threshold: number;
-  currentSignerAddress: string | null;
+  viewer: ViewerOwner;
   tokenSymbol: string | null;
   names: Record<string, string>;
   safeWalletTxHref: string | null;
@@ -95,9 +106,14 @@ export function PendingTxCard({
   const missing = owners.filter((o) => !signatureFor(o.address));
   const signedCount = signedOwners.length;
 
-  const me = currentSignerAddress
-    ? owners.find((o) => sameAddress(o.address, currentSignerAddress))
-    : undefined;
+  // The owner row the viewer signs as: their passkey first, else their
+  // legacy server key (both may be owners mid-migration).
+  const mine = owners.filter((o) => viewer.addresses.some((a) => sameAddress(a, o.address)));
+  // A replaced passkey can't sign any more (the browser only asserts with
+  // the active one): that owner waits for its swap.
+  const usable = mine.filter((o) => !(o.kind === "PASSKEY" && o.passkeyReplaced));
+  const me = usable.find((o) => !signatureFor(o.address)) ?? usable[0];
+  const replacedOnly = mine.length > 0 && usable.length === 0;
   const canSign =
     canAct && tx.status === "PENDING" && Boolean(me) && !signatureFor(me!.address);
   // Withdraw deletes a proposal nobody ran: the proposer's own, or any for a
@@ -210,7 +226,8 @@ export function PendingTxCard({
                   </li>
                 );
               }
-              const SourceIcon = sig.source === "SAFE_WALLET" ? Wallet : PenLine;
+              const SourceIcon =
+                sig.source === "SAFE_WALLET" ? Wallet : sig.source === "PASSKEY" ? Fingerprint : PenLine;
               return (
                 <li
                   key={o.address}
@@ -257,6 +274,13 @@ export function PendingTxCard({
             <AlertDescription className="break-words">{tx.errorMessage}</AlertDescription>
           </Alert>
         )}
+        {tx.status === "PENDING" && tx.errorMessage?.startsWith("tx_service:") && (
+          <Alert variant="warning">
+            <AlertDescription className="break-words">
+              {t("tx.mirrorFailed", { error: tx.errorMessage.slice("tx_service:".length).trim() })}
+            </AlertDescription>
+          </Alert>
+        )}
         {error && (
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
@@ -270,7 +294,7 @@ export function PendingTxCard({
               {t("tx.executing")}
             </span>
           )}
-          {canSign && (
+          {canSign && me && (
             <SignDialog
               safeId={safeId}
               tx={tx}
@@ -279,6 +303,9 @@ export function PendingTxCard({
               details={details}
               onError={setError}
               hasPasskey={hasPasskey}
+              // A passkey owner signs with the ceremony; a legacy one with
+              // the server key (step-up gated).
+              passkey={me.kind === "PASSKEY" ? viewer.passkey : null}
             />
           )}
           {canAct && tx.status === "FAILED" && (
@@ -300,6 +327,7 @@ export function PendingTxCard({
               threshold={threshold}
               line={line}
               hasPasskey={hasPasskey}
+              passkey={me?.kind === "PASSKEY" ? viewer.passkey : null}
             />
           )}
           {canWithdraw && <WithdrawDialog safeId={safeId} tx={tx} line={line} />}
@@ -310,6 +338,9 @@ export function PendingTxCard({
             <span className="text-xs text-muted-foreground">
               {t("tx.youSigned")}
             </span>
+          )}
+          {replacedOnly && tx.status === "PENDING" && (
+            <span className="text-xs text-warning">{t("tx.passkeyReplaced")}</span>
           )}
         </div>
         {stepUp.dialog}
@@ -329,6 +360,7 @@ function SignDialog({
   details,
   onError,
   hasPasskey,
+  passkey,
 }: {
   safeId: string;
   tx: SafeTxView;
@@ -336,6 +368,7 @@ function SignDialog({
   line: string;
   details: ReactNode;
   hasPasskey: boolean;
+  passkey: SigningPasskeyHandle | null; // sign with the passkey ceremony
   // Errors are shown on the card, not in the dialog: after the refresh the
   // user may no longer be able to sign (signature stored, execution failed),
   // which unmounts the dialog and would take its error with it.
@@ -347,9 +380,24 @@ function SignDialog({
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const stepUp = useStepUp(hasPasskey);
+  const passkeySigning = usePasskeySigning(passkey);
 
   const onConfirm = () => {
     startTransition(async () => {
+      if (passkey) {
+        // One tap: the WebAuthn assertion over the safeTxHash is both the
+        // step-up and the signature.
+        const outcome = await passkeySigning.sign({
+          safeId,
+          transactionId: tx.id,
+          safeTxHash: tx.safeTxHash,
+        });
+        if (outcome.kind === "cancelled") return;
+        if (outcome.kind === "error") onError(outcome.error);
+        router.refresh();
+        setOpen(false);
+        return;
+      }
       const res = await signTransactionAction({ safeId, transactionId: tx.id });
       // Not fresh enough: confirm identity, then sign again.
       if (stepUp.check(res, onConfirm)) return;
@@ -396,8 +444,14 @@ function SignDialog({
             {tRoot("common.cancel")}
           </Button>
           <Button type="button" onClick={onConfirm} disabled={pending}>
-            {pending ? <Loader2 className="size-4 animate-spin" /> : <PenLine className="size-4" />}
-            {t("signConfirm")}
+            {pending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : passkey ? (
+              <Fingerprint className="size-4" />
+            ) : (
+              <PenLine className="size-4" />
+            )}
+            {passkey ? t("signWithPasskey") : t("signConfirm")}
           </Button>
         </DialogFooter>
         {stepUp.dialog}
@@ -412,12 +466,14 @@ function RejectDialog({
   threshold,
   line,
   hasPasskey,
+  passkey,
 }: {
   safeId: string;
   tx: SafeTxView;
   threshold: number;
   line: string;
   hasPasskey: boolean;
+  passkey: SigningPasskeyHandle | null;
 }) {
   const t = useTranslations("fund.safes.tx");
   const tRoot = useTranslations();
@@ -426,15 +482,23 @@ function RejectDialog({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const stepUp = useStepUp(hasPasskey);
+  const { finish } = useProposeAndSign(safeId, passkey);
 
   const onConfirm = () => {
     setError(null);
     startTransition(async () => {
       const res = await proposeRejectionAction({ safeId, transactionId: tx.id });
       if (stepUp.check(res, onConfirm)) return;
-      router.refresh();
       if ("error" in res) {
+        router.refresh();
         setError(res.error);
+        return;
+      }
+      // A passkey proposer signs the rejection right away.
+      const outcome = await finish(res);
+      router.refresh();
+      if (outcome.error) {
+        setError(outcome.error);
         return;
       }
       setOpen(false);

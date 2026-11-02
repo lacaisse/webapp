@@ -49,3 +49,6 @@ next-env.d.ts
 
 # Landing copy scratch file
 /LANDING_COPY.md
+
+# local bench state (scripts/safe-passkeys-bench.mjs)
+/.bench/

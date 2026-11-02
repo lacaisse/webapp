@@ -343,18 +343,21 @@
         "title": "Ondertekenaars",
         "description": "{threshold} handtekeningen vereist voor elke transactie.",
         "kind": {
-          "MEMBER": "Team",
-          "EXTERNAL": "Extern"
+          "MEMBER": "Serversleutel (oud)",
+          "EXTERNAL": "Extern",
+          "PASSKEY": "Passkey"
         },
         "externalHint": "Tekent in Safe'{Wallet}'.",
-        "formerMember": "Geen teamlid meer — overweeg deze ondertekenaar te verwijderen of te vervangen."
+        "formerMember": "Geen teamlid meer — overweeg deze ondertekenaar te verwijderen of te vervangen.",
+        "serverKeyHint": "Tekent met een sleutel die op de server van La Caisse ligt. Zet hem om naar een passkey.",
+        "replacedPasskeyHint": "Deze passkey is vervangen (toestel verloren). Wissel hem om voor de nieuwe."
       },
       "create": {
         "description": "Kies wie eigenaar is van de Safe en hoeveel van hen elke transactie moeten ondertekenen.",
         "name": "Naam",
         "namePlaceholder": "bv. Reserve, Bestuur",
         "teamOwners": "Ondertekenaars uit het team",
-        "teamOwnersHint": "Teamleden tekenen in La Caisse met één klik, zonder wallet.",
+        "teamOwnersHint": "Teamleden bezitten de Safe met hun eigen passkey: een sleutel die op hun toestel blijft en die La Caisse nooit bewaart. Een lid heeft een handtekening-passkey voor dit fonds nodig voor je het kan kiezen.",
         "noMembers": "Nog geen beheerder van dit fonds kan eigenaar zijn van een Safe.",
         "externalOwners": "Externe ondertekenaars",
         "externalOwnersHint": "Elk walletadres (een hardware wallet, een partner…). Externe ondertekenaars tekenen in Safe'{Wallet}', op app.safe.global.",
@@ -397,7 +400,8 @@
       },
       "proposal": {
         "executed": "Getekend en uitgevoerd.",
-        "proposed": "Voorgesteld. Wordt uitgevoerd zodra {threshold, plural, one {# ondertekenaar heeft} other {# ondertekenaars hebben}} getekend."
+        "proposed": "Voorgesteld. Wordt uitgevoerd zodra {threshold, plural, one {# ondertekenaar heeft} other {# ondertekenaars hebben}} getekend.",
+        "proposedUnsigned": "Voorgesteld, maar nog niet door jou getekend: teken het vanuit de lijst van transacties in behandeling."
       },
       "ownerChange": {
         "needsSignatures": "Deze wijziging is zelf een Safe-transactie: ze gaat in zodra {threshold, plural, one {# huidige ondertekenaar heeft} other {# huidige ondertekenaars hebben}} getekend.",
@@ -408,7 +412,7 @@
         "modeExternal": "Extern adres",
         "member": "Teamlid",
         "pickMember": "Kies een teamlid…",
-        "memberHint": "Diegene tekent in La Caisse.",
+        "memberHint": "Tekent met de eigen passkey, op het eigen toestel.",
         "address": "Adres",
         "label": "Naam",
         "labelPlaceholder": "bv. Ledger van de penningmeester",
@@ -444,7 +448,9 @@
           "addOwnerThresholdChange": "{owner} toevoegen als ondertekenaar, vereiste handtekeningen: {from} → {to}",
           "removeOwnerThresholdChange": "Ondertekenaar {owner} verwijderen, vereiste handtekeningen: {from} → {to}",
           "changeThresholdFromTo": "Drempel wijzigen van {from} naar {to, plural, one {# handtekening} other {# handtekeningen}}",
-          "rejection": "Transactie nr. {nonce} afwijzen"
+          "rejection": "Transactie nr. {nonce} afwijzen",
+          "swapToPasskey": "Sleutel van {owner} omzetten naar zijn of haar passkey {newOwner}",
+          "swapReplacedPasskey": "Verloren passkey van {owner} vervangen door {newOwner}"
         },
         "status": {
           "PENDING": "Openstaand",
@@ -455,7 +461,8 @@
         },
         "source": {
           "LACAISSE": "in La Caisse",
-          "SAFE_WALLET": "in Safe'{Wallet}'"
+          "SAFE_WALLET": "in Safe'{Wallet}'",
+          "PASSKEY": "met een passkey"
         },
         "nonce": "nr. {nonce}",
         "proposedBy": "Voorgesteld door {name}",
@@ -503,7 +510,10 @@
         "withdrawMirrored": "Deze Safe heeft externe ondertekenaars: het voorstel blijft zichtbaar in Safe'{Wallet}', waar het nog ondertekend kan worden. Stel een afwijzing voor om het definitief te blokkeren.",
         "withdrawConfirm": "Voorstel intrekken",
         "formerMember": "Geen teamlid meer",
-        "configBlocked": "Uitvoering gepauzeerd: de configuratie van de Safe is niet standaard."
+        "configBlocked": "Uitvoering gepauzeerd: de configuratie van de Safe is niet standaard.",
+        "signWithPasskey": "Tekenen met passkey",
+        "mirrorFailed": "Safe'{Wallet}' heeft deze transactie nog niet ({error}). Wordt bij elke synchronisatie opnieuw geprobeerd.",
+        "passkeyReplaced": "Je passkey op deze Safe is vervangen: rond de eigenaarswissel af om weer te tekenen."
       },
       "history": {
         "title": "Geschiedenis",
@@ -543,7 +553,15 @@
         "duplicateOwner": "Hetzelfde adres staat er twee keer in.",
         "addressChecksum": "Het adres bevat een verkeerde hoofdletter (controlesom). Controleer het of plak het in kleine letters.",
         "queue_full": "Te veel openstaande transacties op deze Safe. Laat de open voorstellen eerst ondertekenen, afwijzen of intrekken.",
-        "holds_value": "Deze Safe bevat nog tegoeden die alleen teamleden kunnen verplaatsen. Maak hem leeg voordat u archiveert."
+        "holds_value": "Deze Safe bevat nog tegoeden die alleen teamleden kunnen verplaatsen. Maak hem leeg voordat u archiveert.",
+        "passkey_missing": "Dit teamlid heeft nog geen handtekening-passkey voor dit fonds.",
+        "passkey_exists": "Je hebt al een handtekening-passkey voor dit fonds. Gebruik “Vervangen” bij een verloren toestel.",
+        "rules_spare_owner": "Houd minstens één eigenaar meer dan de drempel (herstel na een verloren toestel).",
+        "rules_one_person": "De sleutels van één persoon mogen niet volstaan om de drempel te halen.",
+        "server_key_retired": "Deze serversleutel is ingetrokken. Teken met je passkey.",
+        "passkey_replaced": "Je passkey op deze Safe is vervangen. Rond eerst de eigenaarswissel naar de nieuwe af.",
+        "passkey_replace_pending": "Een vorige passkey van jou bezit nog een Safe. Rond die wissel af voor je opnieuw vervangt.",
+        "passkey_rate_limited": "Te veel handtekening-passkeys vandaag geregistreerd. Probeer het morgen opnieuw."
       },
       "archived": {
         "title": "Gearchiveerde Safes",
@@ -554,6 +572,77 @@
       "custody": {
         "shared": "Met {threshold} handtekening{threshold, plural, one {} other {en}} voor {members} teamsleutel{members, plural, one {} other {s}} heeft La Caisse alleen al genoeg sleutels om te ondertekenen: dit is geen echte multisig tegenover de server. Voeg een externe ondertekenaar (hardwarewallet) toe en zet de drempel boven het aantal teamsleutels voor grotere bedragen.",
         "independent": "De drempel ligt boven het aantal teamsleutels: minstens één externe ondertekenaar moet elke transactie ondertekenen."
+      },
+      "rules": {
+        "rules_spare_owner": "Houd minstens één eigenaar meer dan de drempel: als een lid zijn toestel verliest, moeten de anderen de drempel nog halen én de sleutel kunnen vervangen.",
+        "rules_one_person": "De sleutels van één persoon mogen niet volstaan om de drempel te halen: verhoog de drempel of voeg een eigenaar toe.",
+        "why": "Een passkey leeft op het toestel van één persoon. Om een verloren toestel op te vangen houdt de Safe één eigenaar meer dan zijn drempel, en kan niemand de drempel alleen halen."
+      },
+      "passkey": {
+        "noHandle": "Je hebt geen handtekening-passkey voor dit fonds.",
+        "ceremonyFailed": "De passkey-procedure is mislukt.",
+        "registerTitle": "Je handtekening-passkey aanmaken",
+        "replaceTitle": "Je handtekening-passkey vervangen",
+        "registerDescription": "Je sleutel om de Safe-transacties van dit fonds te tekenen. Hij wordt op dit toestel aangemaakt en verlaat het nooit.",
+        "replaceDescription": "Toestel verloren of gecompromitteerd? Maak een nieuwe handtekening-passkey. Elke Safe die je met de oude bezit, heeft dan een eigenaarswissel nodig, getekend door de andere eigenaars.",
+        "registeredTitle": "Handtekening-passkey klaar",
+        "registeredBody": "Je Safe-eigenaarsadres (een klein contract dat de handtekeningen van je passkey controleert):",
+        "backedUpHint": "Deze passkey wordt gesynchroniseerd met je wachtwoordbeheerder of accountback-up: een nieuw toestel krijgt hem terug.",
+        "deviceOnlyHint": "Deze passkey bestaat alleen op dit toestel. Verlies je het, dan moeten de andere eigenaars je met een nieuwe opnieuw opnemen — registreer een tweede toestel of zet passkey-synchronisatie aan.",
+        "deployFailedTitle": "Eigenaarscontract nog niet uitgerold",
+        "retryDeploy": "Uitrol opnieuw proberen",
+        "explainOwnKey": "De privésleutel wordt door je toestel aangemaakt en bewaard (Touch ID, Face ID, Windows Hello, een beveiligingssleutel…). La Caisse heeft hem nooit.",
+        "explainPerFund": "Het is een aparte handtekeningsleutel voor dit fonds — niet je login-passkey. Je toestel toont hem als “Signing key · fonds · e-mail”.",
+        "explainBackup": "Kies bij voorkeur een passkey die synchroniseert (iCloud-sleutelhanger, Google-wachtwoordbeheer…): een passkey op één toestel gaat met dat toestel verloren.",
+        "explainReplace": "Je vorige passkey wordt hier niet meer aangeboden; de Safes die hij bezit tonen een stap “naar passkey” tot de wissel is uitgevoerd.",
+        "waiting": "Wachten op je toestel…",
+        "registerConfirm": "Passkey aanmaken",
+        "replaceConfirm": "Nieuwe passkey aanmaken",
+        "registerTrigger": "Handtekening-passkey aanmaken",
+        "replaceTrigger": "Vervangen (toestel verloren)",
+        "cardTitle": "Je handtekening-passkey",
+        "cardDescription": "Hoe je de Safe-transacties van dit fonds tekent. Eén per fonds, bewaard op je toestel.",
+        "backedUp": "Geback-upt",
+        "deviceOnly": "Alleen dit toestel",
+        "notDeployed": "Niet uitgerold",
+        "registeredOn": "Geregistreerd op {date}",
+        "lastUsed": "laatst gebruikt {date}",
+        "notDeployedHint": "Het eigenaarscontract staat nog niet op de keten; het is nodig voor een Safe je kan opnemen.",
+        "staleOwners": "{count, plural, one {# Safe vermeldt nog} other {# Safes vermelden nog}} een oude sleutel van jou als eigenaar. Open elke Safe om de wissel voor te stellen:",
+        "none": "Je hebt nog geen handtekening-passkey voor dit fonds. Je hebt er een nodig om een Safe te bezitten.",
+        "memberReady": "Handtekening-passkey klaar",
+        "memberNotDeployed": "Passkey geregistreerd, eigenaarscontract nog niet uitgerold",
+        "memberMissing": "Nog geen handtekening-passkey",
+        "deviceOnlyOwnerHint": "Passkey op één toestel: vraag om een back-up toe te voegen, anders moeten de anderen hem of haar na een verloren toestel opnieuw opnemen."
+      },
+      "migration": {
+        "title": "Overstappen op passkeys",
+        "bodyServerKeys": "{count, plural, one {# eigenaar tekent} other {# eigenaars tekenen}} nog met een sleutel op de server van La Caisse. Elk registreert een handtekening-passkey, daarna tekenen de andere eigenaars de wissel — een gewone eigenaarswijziging.",
+        "bodyReplaced": "Een eigenaar heeft zijn passkey vervangen. Wissel de oude om voor de nieuwe — een gewone eigenaarswijziging, getekend door de anderen.",
+        "you": "Jij",
+        "reason": {
+          "server_key": "Serversleutel",
+          "replaced_passkey": "Vervangen passkey"
+        },
+        "step": {
+          "register": "Heeft een handtekening-passkey voor dit fonds nodig.",
+          "deploy": "Passkey geregistreerd; het eigenaarscontract moet worden uitgerold.",
+          "propose": "Klaar: stel de wissel naar de nieuwe passkey voor.",
+          "signing": "Wissel voorgesteld — {count} van {threshold} handtekeningen.",
+          "executing": "Wissel wordt uitgevoerd…",
+          "failed": "De wissel is mislukt; probeer opnieuw vanuit de lijst in behandeling."
+        },
+        "actions": {
+          "register": "Mijn passkey aanmaken",
+          "waitRegister": "Wachten op registratie",
+          "deploy": "Mijn eigenaarscontract uitrollen",
+          "waitDeploy": "Wachten op de uitrol",
+          "propose": "Wissel voorstellen",
+          "waitPropose": "Een eigenaar kan de wissel voorstellen",
+          "signing": "Bekijk de wissel in behandeling",
+          "executing": "Bekijk de wissel in behandeling",
+          "failed": "Bekijk de mislukte wissel"
+        }
       }
     },
     "team": {

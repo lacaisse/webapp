@@ -28,9 +28,11 @@ import {
   renameSafe,
   retryExecution,
   retrySafeDeployment,
+  actingOwnerKind,
   signTransaction,
   unarchiveSafe,
   withdrawProposal,
+  type ProposeResult,
 } from "./proposals";
 import {
   CreateSafeSchema,
@@ -64,7 +66,11 @@ function errorFor(t: T, e: unknown, context: string): string {
       e.code !== "already_signed" &&
       e.code !== "threshold" &&
       e.code !== "queue_full" &&
-      e.code !== "holds_value"
+      e.code !== "holds_value" &&
+      e.code !== "passkey_missing" &&
+      e.code !== "passkey_exists" &&
+      e.code !== "rules_spare_owner" &&
+      e.code !== "rules_one_person"
     ) {
       console.warn(`[safe] ${context}:`, e.code, e.message);
     }
@@ -82,6 +88,29 @@ function errorFor(t: T, e: unknown, context: string): string {
 async function requireStepUp(t: T): Promise<ActionError | null> {
   if (await hasRecentAuth()) return null;
   return { error: t("auth.errors.reauthRequired" as never), code: REAUTH_REQUIRED };
+}
+
+// A passkey owner's proposal is stored unsigned (withdrawable, moving
+// nothing) and the signing ceremony that follows is itself the step-up, so
+// the re-authentication before the proposal is only asked of legacy
+// server-key proposers.
+async function requireProposerStepUp(
+  t: T,
+  a: { fundId: string; safeId: string; userId: string },
+): Promise<ActionError | null> {
+  if ((await actingOwnerKind(a)) === "PASSKEY") return null;
+  return requireStepUp(t);
+}
+
+function proposed(res: ProposeResult): ProposeActionResult {
+  return {
+    ok: true,
+    transactionId: res.transactionId,
+    safeTxHash: res.safeTxHash,
+    executed: res.executed,
+    txHash: res.txHash,
+    awaitingSignature: res.awaitingSignature,
+  };
 }
 
 function revalidateSafe(safeId?: string) {
@@ -244,7 +273,7 @@ export async function proposeTransferAction(
     return { error: t("fund.safes.errors.tokenNotEnabled" as never) };
   }
 
-  const stepUp = await requireStepUp(t);
+  const stepUp = await requireProposerStepUp(t, { fundId: fund.id, safeId: parsed.data.safeId, userId: user.id });
   if (stepUp) return stepUp;
 
   try {
@@ -255,12 +284,7 @@ export async function proposeTransferAction(
       input: parsed.data,
     });
     revalidateSafe(parsed.data.safeId);
-    return {
-      ok: true,
-      transactionId: res.transactionId,
-      executed: res.executed,
-      txHash: res.txHash,
-    };
+    return proposed(res);
   } catch (e) {
     revalidateSafe(parsed.data.safeId);
     return { error: errorFor(t, e, "propose transfer") };
@@ -276,7 +300,7 @@ export async function proposeOwnerChangeAction(
   const parsed = ProposeOwnerChangeSchema.safeParse(input);
   if (!parsed.success) return { error: t(parsed.error.issues[0].message as never) };
 
-  const stepUp = await requireStepUp(t);
+  const stepUp = await requireProposerStepUp(t, { fundId: fund.id, safeId: parsed.data.safeId, userId: user.id });
   if (stepUp) return stepUp;
 
   try {
@@ -287,12 +311,7 @@ export async function proposeOwnerChangeAction(
       input: parsed.data,
     });
     revalidateSafe(parsed.data.safeId);
-    return {
-      ok: true,
-      transactionId: res.transactionId,
-      executed: res.executed,
-      txHash: res.txHash,
-    };
+    return proposed(res);
   } catch (e) {
     revalidateSafe(parsed.data.safeId);
     return { error: errorFor(t, e, "propose owner change") };
@@ -309,7 +328,7 @@ export async function proposeRejectionAction(input: {
   const parsed = SafeTxIdSchema.safeParse(input);
   if (!parsed.success) return { error: t(parsed.error.issues[0].message as never) };
 
-  const stepUp = await requireStepUp(t);
+  const stepUp = await requireProposerStepUp(t, { fundId: fund.id, safeId: parsed.data.safeId, userId: user.id });
   if (stepUp) return stepUp;
 
   try {
@@ -320,12 +339,7 @@ export async function proposeRejectionAction(input: {
       transactionId: parsed.data.transactionId,
     });
     revalidateSafe(parsed.data.safeId);
-    return {
-      ok: true,
-      transactionId: res.transactionId,
-      executed: res.executed,
-      txHash: res.txHash,
-    };
+    return proposed(res);
   } catch (e) {
     revalidateSafe(parsed.data.safeId);
     return { error: errorFor(t, e, "propose rejection") };

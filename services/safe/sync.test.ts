@@ -19,6 +19,8 @@ const relayer = vi.hoisted(() => ({
   findSafeExecution: vi.fn(),
   readSafeConfig: vi.fn(),
   describeSafeConfigDrift: vi.fn<() => string | null>(() => null),
+  verifyContractSignature: vi.fn(),
+  hasContractCode: vi.fn(),
 }));
 vi.mock("@/services/safe/relayer", () => relayer);
 
@@ -32,7 +34,7 @@ const txService = vi.hoisted(() => ({
 vi.mock("@/services/safe/tx-service", () => txService);
 
 vi.mock("@/services/safe/signer", () => ({
-  getOrCreateFundSigner: vi.fn(),
+  findFundSigner: vi.fn(),
   signSafeTxWithSigner: vi.fn(),
 }));
 
@@ -48,6 +50,7 @@ vi.mock("@/services/transaction-annotation/annotate", () => ({
   ANNOTATION_TRIGGERS: { safeTransfer: "SAFE_TRANSFER" },
 }));
 
+import { contractSignature } from "./passkey-signature";
 import { fake, resetFake } from "./test-fake-prisma";
 import { syncSafe } from "./sync";
 
@@ -60,6 +63,7 @@ const RECIPIENT = getAddress("0x9999999999999999999999999999999999999999");
 const A = getAddress("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"); // member
 const X = getAddress("0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"); // external
 const Y = getAddress("0x7777777777777777777777777777777777777777");
+const P = getAddress("0x1111111111111111111111111111111111111111"); // a member's passkey signer
 const EXEC_HASH = `0x${"e1".repeat(32)}`;
 const EXT_HASH = `0x${"e2".repeat(32)}`;
 const sig = (b: string) => `0x${b.repeat(65)}`;
@@ -125,6 +129,87 @@ beforeEach(() => {
     { id: "o-x", safeId: SAFE_ID, address: X, kind: "EXTERNAL", signerId: null, label: "Bank", removedAt: null },
   );
   chain([A, X], 2, 0);
+});
+
+function passkeyOf(userId: string, address: string, over: Record<string, unknown> = {}) {
+  return {
+    id: `pk-${userId}`,
+    fundId: FUND_ID,
+    userId,
+    address,
+    credentialId: `cred-${userId}`,
+    publicKeyX: "0x01",
+    publicKeyY: "0x02",
+    verifiers: "0x0100",
+    counter: 0,
+    backupEligible: true,
+    backupState: true,
+    transports: null,
+    deployedAt: new Date(),
+    replacedAt: null,
+    createdAt: new Date(),
+    ...over,
+  };
+}
+
+describe("passkey owners in sync", () => {
+  it("adds a chain owner held by a member's passkey signer as PASSKEY", async () => {
+    db.fundPasskeySigner.push(passkeyOf("u-p", P));
+    chain([A, X, P], 2, 0);
+    await syncSafe({ fundId: FUND_ID, safeId: SAFE_ID, force: true });
+    const row = db.fundSafeOwner.find((o) => o.address === P);
+    expect(row).toMatchObject({ kind: "PASSKEY", passkeyId: "pk-u-p", signerId: null, removedAt: null });
+  });
+
+  it("imports a contract-signature confirmation only when the owner contract accepts it", async () => {
+    db.fundPasskeySigner.push(passkeyOf("u-p", P));
+    db.fundSafeOwner.push({ id: "o-p", safeId: SAFE_ID, address: P, kind: "PASSKEY", signerId: null, passkeyId: "pk-u-p", label: null, removedAt: null });
+    chain([A, X, P], 3, 0);
+    const tx = addTx({ safeTxHash: EXT_HASH });
+    const sig = contractSignature(P, "0xabcdef");
+    txService.listPendingTransactions.mockResolvedValue([
+      { safeTxHash: EXT_HASH, confirmations: [{ owner: P, signature: sig, signatureType: "CONTRACT_SIGNATURE" }] },
+    ]);
+    relayer.verifyContractSignature.mockResolvedValueOnce(false);
+    await syncSafe({ fundId: FUND_ID, safeId: SAFE_ID, force: true });
+    expect(db.fundSafeSignature.filter((s) => s.transactionId === tx.id)).toHaveLength(0);
+    expect(relayer.verifyContractSignature).toHaveBeenCalledWith({ chainId: 100, owner: P, hash: EXT_HASH, signature: "0xabcdef" });
+    expect(recoverSafeTxSigner).not.toHaveBeenCalled();
+
+    relayer.verifyContractSignature.mockResolvedValueOnce(true);
+    await syncSafe({ fundId: FUND_ID, safeId: SAFE_ID, force: true });
+    const stored = db.fundSafeSignature.find((s) => s.transactionId === tx.id);
+    expect(stored).toMatchObject({ ownerAddress: P, source: "SAFE_WALLET", signature: sig });
+  });
+
+  it("retires a legacy key once its migration swap executed, and erases it once no Safe at all lists it", async () => {
+    db.fundPasskeySigner.push(passkeyOf("u-a", P));
+    addTx({
+      kind: "SWAP_OWNER",
+      status: "EXECUTED",
+      nonce: 0,
+      summary: { kind: "SWAP_OWNER", oldOwner: A, oldOwnerLabel: null, newOwner: P, newOwnerLabel: null, migration: "server_key" },
+    });
+    // An ARCHIVED Safe still lists A (it could be unarchived): retired, ciphertext kept.
+    db.fundSafe.push({ ...db.fundSafe[0]!, id: "safe-2", address: Y, archivedAt: new Date() });
+    db.fundSafeOwner.push({ id: "o-a2", safeId: "safe-2", address: A, kind: "MEMBER", signerId: "signer-a", label: null, removedAt: null });
+    chain([P, X], 2, 1);
+    await syncSafe({ fundId: FUND_ID, safeId: SAFE_ID, force: true });
+    const signer = db.fundSigner.find((s) => s.id === "signer-a")!;
+    expect(signer.retiredAt).toBeInstanceOf(Date);
+    expect(signer.privateKeyEnc).toBe("enc");
+    expect(db.fundSafeOwner.find((o) => o.id === "o-a")!.removedAt).toBeInstanceOf(Date);
+
+    // A key that never migrated is never erased, even when nothing lists it.
+    db.fundSigner.push({ id: "signer-z", fundId: FUND_ID, userId: "u-z", address: Y, privateKeyEnc: "enc-z", retiredAt: null });
+
+    // The other Safe dropped A on chain: nothing lists A any more → erased.
+    db.fundSafeOwner.find((o) => o.id === "o-a2")!.removedAt = new Date();
+    await syncSafe({ fundId: FUND_ID, safeId: SAFE_ID, force: true });
+    expect(signer.privateKeyEnc).toBeNull();
+    expect(signer.keyDeletedAt).toBeInstanceOf(Date);
+    expect(db.fundSigner.find((s) => s.id === "signer-z")!.privateKeyEnc).toBe("enc-z");
+  });
 });
 
 describe("syncSafe", () => {

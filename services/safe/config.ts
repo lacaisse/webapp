@@ -18,8 +18,19 @@
 //   safe-tx.ts       — pure helpers: SafeTx building, EIP-712 hash, signature
 //                      packing + recovery, owner-management calldata, CREATE2
 //                      address prediction. Unit-tested, isomorphic.
-//   signer.ts        — per-member signer keys (FundSigner rows, encrypted via
-//                      services/crypto/secret.ts) and SafeTx signing. Server.
+//   signer.ts        — LEGACY server-held member keys (FundSigner rows,
+//                      encrypted via services/crypto/secret.ts): signs only
+//                      on Safes that still list one as a MEMBER owner. Server.
+//   passkey-signature.ts — pure: Safe passkey module (v0.2.1) signature
+//                      encoding, WebAuthn client-data parsing, DER → (r, s),
+//                      the signer contract's CREATE2 inputs. Unit-tested.
+//   passkey-webauthn.ts — server: registration / assertion verification of
+//                      a member's signing passkey (@simplewebauthn/server).
+//   passkey-signers.ts — server: FundPasskeySigner rows (register, replace,
+//                      deploy the signer contract through the relayer).
+//   migration.ts     — server-key → passkey migration state per Safe and the
+//                      retirement sweep of FundSigner ciphertexts.
+//   owner-rules.ts   — pure: recovery rules for Safes with team owners.
 //   relayer.ts       — chain I/O through the relayer EOA: read Safe state,
 //                      deploy a Safe, simulate + broadcast execTransaction.
 //   tx-service.ts    — Safe Transaction Service HTTP client (no SDK).
@@ -51,6 +62,53 @@ export const SAFE_CONTRACTS_BY_CHAIN: Record<number, SafeContracts> = {
     fallbackHandler: "0xfd0732Dc9E303f09fCEf3a7388Ad10A83459Ec99",
   },
 };
+
+// Safe passkey module v0.2.1 (safe-global/safe-modules, modules/passkey):
+// `signerFactory` is the canonical SafeWebAuthnSignerFactory, which derives
+// (CREATE2, salt 0) and deploys one SafeWebAuthnSignerProxy per (x, y,
+// verifiers). The proxy is the Safe owner; it validates WebAuthn
+// (P-256) signatures with the RIP-7212 precompile at 0x…0100 first and the
+// Solidity verifier (DaimoP256Verifier / FreshCryptoLib) as fallback. Both
+// verified on Gnosis 2026-10-29: factory + fallback have code, the precompile
+// answers the spec test vector with 1.
+export type SafePasskeyContracts = {
+  moduleVersion: "0.2.1";
+  signerFactory: Address;
+  p256Precompile: Address; // RIP-7212
+  p256Fallback: Address;
+};
+
+export const SAFE_PASSKEY_CONTRACTS_BY_CHAIN: Record<number, SafePasskeyContracts> = {
+  [GNOSIS_CHAIN_ID]: {
+    moduleVersion: "0.2.1",
+    signerFactory: "0x1d31F259eE307358a26dFb23EB365939E8641195",
+    p256Precompile: "0x0000000000000000000000000000000000000100",
+    p256Fallback: "0xc2b78104907F722DABAc4C69f826a522B2754De4",
+  },
+};
+
+export function safePasskeyContractsFor(chainId: number): SafePasskeyContracts {
+  const contracts = SAFE_PASSKEY_CONTRACTS_BY_CHAIN[chainId];
+  if (!contracts) {
+    throw new SafeError(
+      "unsupported_chain",
+      `Safe passkey contracts are not configured for chain ${chainId}`,
+    );
+  }
+  return contracts;
+}
+
+/**
+ * The module's `P256.Verifiers` (uint176) for a chain: the precompile's
+ * address in the top 16 bits (`>> 160`), the fallback verifier's in the low
+ * 160. Part of the signer contract's CREATE2 salt, so it is frozen on the
+ * FundPasskeySigner row at registration (`verifiers`) and read back from
+ * there, never recomputed, when the address matters.
+ */
+export function passkeyVerifiersFor(chainId: number): bigint {
+  const c = safePasskeyContractsFor(chainId);
+  return (BigInt(c.p256Precompile) << BigInt(160)) | BigInt(c.p256Fallback);
+}
 
 export function safeContractsFor(chainId: number): SafeContracts {
   const contracts = SAFE_CONTRACTS_BY_CHAIN[chainId];

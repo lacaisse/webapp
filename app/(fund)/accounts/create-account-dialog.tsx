@@ -35,11 +35,13 @@ export function CreateAccountDialog({
   canCreateSafe,
   members,
   currentUserId,
+  hasPasskey,
 }: {
   canCreateAccount: boolean;
   canCreateSafe: boolean;
   members: SafeMemberOption[];
   currentUserId: string;
+  hasPasskey: boolean; // login passkey → step-up dialog offers it
 }) {
   const t = useTranslations("fund.accounts.create");
   const tSafes = useTranslations("fund.safes.create");
@@ -134,6 +136,7 @@ export function CreateAccountDialog({
             onNameChange={setName}
             members={members}
             currentUserId={currentUserId}
+            hasPasskey={hasPasskey}
             onCancel={() => onOpenChange(false)}
             onPendingChange={onPendingChange}
             onCreated={(safeId) => {

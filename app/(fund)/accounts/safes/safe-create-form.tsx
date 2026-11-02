@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 "use client";
 
-import { CheckCircle2, Loader2, Plus, ShieldCheck, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Fingerprint, Loader2, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useState, useTransition } from "react";
 
@@ -13,10 +13,12 @@ import { DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createSafeAction } from "@/services/safe/admin-actions";
+import { ownerRuleViolation, type OwnerRuleViolation, type RuleOwner } from "@/services/safe/owner-rules";
 import { ADDRESS, CreateSafeSchema } from "@/services/safe/schemas";
 
 import { clampThreshold, serverCanSignAlone } from "./format";
 import { OwnerAvatar } from "./owner-avatar";
+import { RegisterSigningPasskeyButton } from "./signing-passkey-dialog";
 import { ThresholdStepper } from "./threshold-stepper";
 
 export type SafeMemberOption = {
@@ -24,6 +26,10 @@ export type SafeMemberOption = {
   name: string;
   email: string;
   image: string | null;
+  // The member's signing passkey for this fund (the Safe owner address);
+  // a member without one cannot be an owner yet.
+  passkeyAddress: string | null;
+  passkeyDeployed: boolean;
 };
 
 type ExternalRow = { key: number; address: string; label: string };
@@ -39,8 +45,9 @@ const majority = (total: number) => Math.max(1, Math.floor(total / 2) + 1);
 export function SafeCreateForm({
   name,
   onNameChange,
-  members,
+  members: initialMembers,
   currentUserId,
+  hasPasskey,
   onCancel,
   onCreated,
   onPendingChange,
@@ -49,18 +56,24 @@ export function SafeCreateForm({
   onNameChange: (name: string) => void;
   members: SafeMemberOption[];
   currentUserId: string;
+  hasPasskey: boolean; // login passkey → step-up dialog offers it
   onCancel: () => void;
   onCreated: (safeId: string) => void;
   onPendingChange?: (pending: boolean) => void;
 }) {
   const t = useTranslations("fund.safes.create");
   const tSafes = useTranslations("fund.safes");
+  const tPasskey = useTranslations("fund.safes.passkey");
   const tRoot = useTranslations();
 
-  const [selected, setSelected] = useState<Set<string>>(
-    () =>
-      new Set(members.some((m) => m.userId === currentUserId) ? [currentUserId] : []),
-  );
+  // Local copy so a passkey the current user registers inline shows up
+  // (and gets selected) without waiting for the page to re-render.
+  const [members, setMembers] = useState(initialMembers);
+  const canOwn = (m: SafeMemberOption) => Boolean(m.passkeyAddress) && m.passkeyDeployed;
+  const [selected, setSelected] = useState<Set<string>>(() => {
+    const self = members.find((m) => m.userId === currentUserId);
+    return new Set(self && canOwn(self) ? [currentUserId] : []);
+  });
   const [externals, setExternals] = useState<ExternalRow[]>([]);
   const [nextKey, setNextKey] = useState(1);
   const [threshold, setThreshold] = useState<number | null>(null); // null = auto
@@ -77,6 +90,13 @@ export function SafeCreateForm({
   );
   const total = selected.size + filledExternals.length;
   const effectiveThreshold = clampThreshold(threshold ?? majority(total), total);
+  // Recovery rules (services/safe/owner-rules.ts): checked here for
+  // immediate feedback, again by the server.
+  const ruleOwners: RuleOwner[] = [
+    ...[...selected].map((userId): RuleOwner => ({ kind: "PASSKEY", personId: userId })),
+    ...filledExternals.map((): RuleOwner => ({ kind: "EXTERNAL", personId: null })),
+  ];
+  const violation = total > 0 ? ownerRuleViolation(ruleOwners, effectiveThreshold) : null;
 
   function toggleMember(userId: string, checked: boolean) {
     setSelected((prev) => {
@@ -156,11 +176,14 @@ export function SafeCreateForm({
             <ul className="divide-y divide-border rounded-lg ring-1 ring-foreground/10">
               {members.map((m) => {
                 const id = `safe-member-${m.userId}`;
+                const ready = canOwn(m);
+                const isMe = m.userId === currentUserId;
                 return (
                   <li key={m.userId} className="flex items-center gap-3 px-3 py-2">
                     <Checkbox
                       id={id}
                       checked={selected.has(m.userId)}
+                      disabled={!ready}
                       onCheckedChange={(c) => toggleMember(m.userId, c === true)}
                     />
                     <OwnerAvatar name={m.name} image={m.image} className="size-7" />
@@ -170,14 +193,38 @@ export function SafeCreateForm({
                     >
                       <span className="flex items-center gap-1.5 text-sm">
                         {m.name}
-                        {m.userId === currentUserId && (
-                          <Badge variant="outline">{tSafes("you")}</Badge>
-                        )}
+                        {isMe && <Badge variant="outline">{tSafes("you")}</Badge>}
                       </span>
                       <span className="truncate text-xs text-muted-foreground">
                         {m.email}
                       </span>
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Fingerprint className="size-3" />
+                        {ready
+                          ? tPasskey("memberReady")
+                          : m.passkeyAddress
+                            ? tPasskey("memberNotDeployed")
+                            : tPasskey("memberMissing")}
+                      </span>
                     </Label>
+                    {isMe && !m.passkeyAddress && (
+                      <RegisterSigningPasskeyButton
+                        replace={false}
+                        hasPasskey={hasPasskey}
+                        size="xs"
+                        variant="outline"
+                        onRegistered={(pk) => {
+                          setMembers((prev) =>
+                            prev.map((x) =>
+                              x.userId === currentUserId
+                                ? { ...x, passkeyAddress: pk.address, passkeyDeployed: pk.deployed }
+                                : x,
+                            ),
+                          );
+                          if (pk.deployed) toggleMember(currentUserId, true);
+                        }}
+                      />
+                    )}
                   </li>
                 );
               })}
@@ -241,9 +288,7 @@ export function SafeCreateForm({
           />
         )}
 
-        {total > 0 && (
-          <CustodyNote threshold={effectiveThreshold} memberOwners={selected.size} />
-        )}
+        {total > 0 && <RecoveryRulesNote violation={violation} teamOwners={selected.size} />}
 
         <p className="flex items-start gap-2 text-xs text-muted-foreground">
           <ShieldCheck className="mt-0.5 size-3.5 shrink-0" />
@@ -264,7 +309,7 @@ export function SafeCreateForm({
         <Button
           type="button"
           onClick={onCreate}
-          disabled={pending || name.trim() === "" || total === 0}
+          disabled={pending || name.trim() === "" || total === 0 || violation !== null}
         >
           {pending ? (
             <Loader2 className="size-4 animate-spin" />
@@ -278,9 +323,38 @@ export function SafeCreateForm({
   );
 }
 
-// Who really controls the Safe at this threshold (review S3): all team keys
-// are held by La Caisse, so a threshold the team keys alone can meet is
-// not independent of the server. Shared with the owner-change dialogs.
+// The recovery rules for Safes with team owners (owner-rules.ts), as the
+// dialogs explain them: a violation blocks the submit with its reason, a
+// passing set with team owners gets the reminder of why the rules exist.
+export function RecoveryRulesNote({
+  violation,
+  teamOwners,
+}: {
+  violation: OwnerRuleViolation | null;
+  teamOwners: number;
+}) {
+  const t = useTranslations("fund.safes.rules");
+  if (violation) {
+    return (
+      <Alert variant="warning">
+        <AlertTriangle className="size-4" />
+        <AlertDescription>{t(violation)}</AlertDescription>
+      </Alert>
+    );
+  }
+  if (teamOwners === 0) return null;
+  return (
+    <p className="flex items-start gap-2 text-xs text-muted-foreground">
+      <ShieldCheck className="mt-0.5 size-3.5 shrink-0" />
+      {t("why")}
+    </p>
+  );
+}
+
+// Who really controls the Safe at this threshold (review S3): LEGACY team
+// keys (server-held, MEMBER owners) sit with La Caisse, so a threshold those
+// keys alone can meet is not independent of the server. Only shown while a
+// Safe still has such owners (the migration removes them).
 export function CustodyNote({
   threshold,
   memberOwners,

@@ -360,18 +360,21 @@
         "title": "Owners",
         "description": "{threshold} signatures required for every transaction.",
         "kind": {
-          "MEMBER": "Team",
-          "EXTERNAL": "External"
+          "MEMBER": "Server key (legacy)",
+          "EXTERNAL": "External",
+          "PASSKEY": "Passkey"
         },
         "externalHint": "Signs in Safe'{Wallet}'.",
-        "formerMember": "No longer a team member — consider removing or replacing this owner."
+        "formerMember": "No longer a team member — consider removing or replacing this owner.",
+        "serverKeyHint": "Signs with a key held by La Caisse's server. Move it to a passkey.",
+        "replacedPasskeyHint": "This passkey was replaced (lost device). Swap it for the new one."
       },
       "create": {
         "description": "Choose who owns the Safe and how many of them must sign each transaction.",
         "name": "Name",
         "namePlaceholder": "e.g. Reserve, Board",
         "teamOwners": "Owners from the team",
-        "teamOwnersHint": "Team members sign inside La Caisse with one click — no wallet needed.",
+        "teamOwnersHint": "Team members own the Safe with their own passkey: a key that stays on their device, which La Caisse never holds. A member needs a signing passkey for this fund before being picked.",
         "noMembers": "No admin in this fund can own a Safe yet.",
         "externalOwners": "External owners",
         "externalOwnersHint": "Any wallet address (a hardware wallet, a partner…). External owners sign in Safe'{Wallet}', at app.safe.global.",
@@ -414,7 +417,8 @@
       },
       "proposal": {
         "executed": "Signed and executed.",
-        "proposed": "Proposed. It runs once {threshold, plural, one {# owner has} other {# owners have}} signed."
+        "proposed": "Proposed. It runs once {threshold, plural, one {# owner has} other {# owners have}} signed.",
+        "proposedUnsigned": "Proposed, but not signed by you yet: sign it from the list of pending transactions."
       },
       "ownerChange": {
         "needsSignatures": "This change is itself a Safe transaction: it takes effect once {threshold, plural, one {# current owner has} other {# current owners have}} signed.",
@@ -425,7 +429,7 @@
         "modeExternal": "External address",
         "member": "Team member",
         "pickMember": "Pick a team member…",
-        "memberHint": "They will sign inside La Caisse.",
+        "memberHint": "They will sign with their passkey, on their own device.",
         "address": "Address",
         "label": "Name",
         "labelPlaceholder": "e.g. Treasurer's Ledger",
@@ -461,7 +465,9 @@
           "addOwnerThresholdChange": "Add owner {owner}, signatures required: {from} → {to}",
           "removeOwnerThresholdChange": "Remove owner {owner}, signatures required: {from} → {to}",
           "changeThresholdFromTo": "Change threshold from {from} to {to, plural, one {# signature} other {# signatures}}",
-          "rejection": "Reject transaction #{nonce}"
+          "rejection": "Reject transaction #{nonce}",
+          "swapToPasskey": "Move {owner}'s key to their passkey {newOwner}",
+          "swapReplacedPasskey": "Replace {owner}'s lost passkey with {newOwner}"
         },
         "status": {
           "PENDING": "Pending",
@@ -472,7 +478,8 @@
         },
         "source": {
           "LACAISSE": "in La Caisse",
-          "SAFE_WALLET": "in Safe'{Wallet}'"
+          "SAFE_WALLET": "in Safe'{Wallet}'",
+          "PASSKEY": "with a passkey"
         },
         "nonce": "#{nonce}",
         "proposedBy": "Proposed by {name}",
@@ -520,7 +527,10 @@
         "withdrawMirrored": "This Safe has external owners: the proposal stays visible in Safe'{Wallet}', where it can still be signed. To block it for good, propose a rejection instead.",
         "withdrawConfirm": "Withdraw proposal",
         "formerMember": "No longer a team member",
-        "configBlocked": "Execution paused: the Safe's configuration is not standard."
+        "configBlocked": "Execution paused: the Safe's configuration is not standard.",
+        "signWithPasskey": "Sign with passkey",
+        "mirrorFailed": "Safe'{Wallet}' does not have this transaction yet ({error}). It is retried on every sync.",
+        "passkeyReplaced": "Your passkey on this Safe was replaced: finish the owner swap to sign again."
       },
       "history": {
         "title": "History",
@@ -560,7 +570,15 @@
         "duplicateOwner": "The same address is listed twice.",
         "addressChecksum": "The address has a wrong capital letter (checksum). Check it, or paste it in lowercase.",
         "queue_full": "Too many open transactions on this Safe. Have the open proposals signed, rejected or withdrawn first.",
-        "holds_value": "This Safe still holds funds that only team members can move. Empty it before archiving."
+        "holds_value": "This Safe still holds funds that only team members can move. Empty it before archiving.",
+        "passkey_missing": "This team member has no signing passkey for this fund yet.",
+        "passkey_exists": "You already have a signing passkey for this fund. Use “Replace” for a lost device.",
+        "rules_spare_owner": "Keep at least one owner more than the threshold (lost-device recovery).",
+        "rules_one_person": "One person's keys alone must not meet the threshold.",
+        "server_key_retired": "This server-held key was retired. Sign with your passkey instead.",
+        "passkey_replaced": "Your passkey on this Safe was replaced. Finish the owner swap to the new one first.",
+        "passkey_replace_pending": "A previous passkey of yours still owns a Safe. Finish its swap before replacing again.",
+        "passkey_rate_limited": "Too many signing passkeys registered today. Try again tomorrow."
       },
       "archived": {
         "title": "Archived Safes",
@@ -571,6 +589,77 @@
       "custody": {
         "shared": "With {threshold} signature{threshold, plural, one {} other {s}} for {members} team key{members, plural, one {} other {s}}, La Caisse alone holds enough keys to sign: this is not a real multisig against the server. Add an external owner (hardware wallet) and raise the threshold above the number of team keys for anything valuable.",
         "independent": "The threshold exceeds the number of team keys: at least one external owner must sign every transaction."
+      },
+      "rules": {
+        "rules_spare_owner": "Keep at least one owner more than the threshold: if a member loses their device, the others must still reach the threshold and be able to replace their key.",
+        "rules_one_person": "One person's keys alone must not meet the threshold: raise the threshold or add another owner.",
+        "why": "A passkey lives on one person's device. To recover from a lost device, the Safe keeps one owner more than its threshold, and no single person can meet the threshold alone."
+      },
+      "passkey": {
+        "noHandle": "You have no signing passkey for this fund.",
+        "ceremonyFailed": "The passkey ceremony failed.",
+        "registerTitle": "Create your signing passkey",
+        "replaceTitle": "Replace your signing passkey",
+        "registerDescription": "Your key to sign this fund's Safe transactions. It is created on this device and never leaves it.",
+        "replaceDescription": "Lost or compromised device? Create a new signing passkey. Every Safe you own with the old one then needs an owner swap, signed by the other owners.",
+        "registeredTitle": "Signing passkey ready",
+        "registeredBody": "Your Safe owner address (a small contract that checks your passkey's signatures):",
+        "backedUpHint": "This passkey is synced to your password manager or account backup: a new device gets it back.",
+        "deviceOnlyHint": "This passkey exists on this device only. If you lose it, the other owners will have to swap you in with a new one — register a second device or enable passkey sync.",
+        "deployFailedTitle": "Owner contract not deployed yet",
+        "retryDeploy": "Retry deployment",
+        "explainOwnKey": "The private key is created and kept by your device (Touch ID, Face ID, Windows Hello, a security key…). La Caisse never holds it.",
+        "explainPerFund": "It is a dedicated signing key for this fund — not your login passkey. Your authenticator shows it as “Signing key · fund · email”.",
+        "explainBackup": "Prefer a passkey that syncs (iCloud Keychain, Google Password Manager…): a device-only passkey is lost with the device.",
+        "explainReplace": "Your previous passkey stops being offered here; the Safes it owns show a “move to passkey” step until the swap is executed.",
+        "waiting": "Waiting for your device…",
+        "registerConfirm": "Create passkey",
+        "replaceConfirm": "Create a new passkey",
+        "registerTrigger": "Create signing passkey",
+        "replaceTrigger": "Replace (lost device)",
+        "cardTitle": "Your signing passkey",
+        "cardDescription": "How you sign this fund's Safe transactions. One per fund, kept on your device.",
+        "backedUp": "Backed up",
+        "deviceOnly": "Device-only",
+        "notDeployed": "Not deployed",
+        "registeredOn": "Registered {date}",
+        "lastUsed": "last used {date}",
+        "notDeployedHint": "The owner contract is not on chain yet; it is needed before a Safe can list you.",
+        "staleOwners": "{count, plural, one {# Safe still lists} other {# Safes still list}} an old key of yours as owner. Open each one to propose the swap:",
+        "none": "You have no signing passkey for this fund yet. You need one to own a Safe.",
+        "memberReady": "Signing passkey ready",
+        "memberNotDeployed": "Passkey registered, owner contract not deployed yet",
+        "memberMissing": "No signing passkey yet",
+        "deviceOnlyOwnerHint": "Device-only passkey: ask them to add a backup, or the others will have to swap them in after a lost device."
+      },
+      "migration": {
+        "title": "Move to passkeys",
+        "bodyServerKeys": "{count, plural, one {# owner still signs} other {# owners still sign}} with a key held by La Caisse's server. Each one registers a signing passkey, then the other owners sign the swap — an ordinary owner change.",
+        "bodyReplaced": "An owner replaced their passkey. Swap the old one for the new one — an ordinary owner change signed by the other owners.",
+        "you": "You",
+        "reason": {
+          "server_key": "Server key",
+          "replaced_passkey": "Replaced passkey"
+        },
+        "step": {
+          "register": "Needs a signing passkey for this fund.",
+          "deploy": "Passkey registered; the owner contract must be deployed.",
+          "propose": "Ready: propose the swap to the new passkey.",
+          "signing": "Swap proposed — {count} of {threshold} signatures.",
+          "executing": "Swap executing…",
+          "failed": "The swap failed; retry it from the pending list."
+        },
+        "actions": {
+          "register": "Create my passkey",
+          "waitRegister": "Waiting for them to register",
+          "deploy": "Deploy my owner contract",
+          "waitDeploy": "Waiting for the deployment",
+          "propose": "Propose swap",
+          "waitPropose": "An owner can propose the swap",
+          "signing": "See the pending swap",
+          "executing": "See the pending swap",
+          "failed": "See the failed swap"
+        }
       }
     },
     "team": {

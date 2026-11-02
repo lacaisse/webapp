@@ -231,6 +231,61 @@ describe("packSignatures", () => {
   });
 });
 
+describe("packSignatures with contract signatures", () => {
+  const OWNER_LOW: Address = "0x1111111111111111111111111111111111111111";
+  const OWNER_MID: Address = "0x5555555555555555555555555555555555555555";
+  const OWNER_HIGH: Address = "0x9999999999999999999999999999999999999999";
+  const ecdsa = (b: string) => `0x${b.repeat(64)}1b` as Hex;
+  const standalone = (owner: Address, dyn: Hex) =>
+    concat([
+      toHex(BigInt(owner), { size: 32 }),
+      toHex(BigInt(65), { size: 32 }),
+      "0x00",
+      toHex(BigInt(size(dyn)), { size: 32 }),
+      dyn,
+    ]);
+
+  it("lays out static parts in owner order and appends every dynamic part after them, re-offset", () => {
+    const packed = packSignatures([
+      { owner: OWNER_HIGH, signature: standalone(OWNER_HIGH, "0xcafebabe") },
+      { owner: OWNER_MID, signature: ecdsa("22") },
+      { owner: OWNER_LOW, signature: standalone(OWNER_LOW, "0x0102030405") },
+    ]);
+    // 3 × 65 static, then LOW's dynamic (32 + 5), then HIGH's (32 + 4).
+    expect(size(packed)).toBe(195 + 37 + 36);
+    // LOW: v 0, r owner, s = 195
+    expect(slice(packed, 0, 32)).toBe(toHex(BigInt(OWNER_LOW), { size: 32 }));
+    expect(BigInt(slice(packed, 32, 64))).toBe(BigInt(195));
+    expect(slice(packed, 64, 65)).toBe("0x00");
+    // MID: the ECDSA bytes verbatim
+    expect(slice(packed, 65, 130)).toBe(ecdsa("22"));
+    // HIGH: s = 195 + 37
+    expect(slice(packed, 130, 162)).toBe(toHex(BigInt(OWNER_HIGH), { size: 32 }));
+    expect(BigInt(slice(packed, 162, 194))).toBe(BigInt(232));
+    expect(slice(packed, 194, 195)).toBe("0x00");
+    // Dynamic parts: length-prefixed, in the same order.
+    expect(slice(packed, 195, 227)).toBe(toHex(BigInt(5), { size: 32 }));
+    expect(slice(packed, 227, 232)).toBe("0x0102030405");
+    expect(slice(packed, 232, 264)).toBe(toHex(BigInt(4), { size: 32 }));
+    expect(slice(packed, 264)).toBe("0xcafebabe");
+  });
+
+  it("a single contract signature keeps s = 65", () => {
+    const sig = standalone(OWNER_LOW, "0xaa");
+    expect(packSignatures([{ owner: OWNER_LOW, signature: sig }])).toBe(sig);
+  });
+
+  it("rejects a contract signature filed under another owner, a v=0 static part on its own, and junk", () => {
+    expect(() =>
+      packSignatures([{ owner: OWNER_MID, signature: standalone(OWNER_LOW, "0xaa") }]),
+    ).toThrow(/names another owner/);
+    expect(() => packSignatures([{ owner: OWNER_MID, signature: `0x${"22".repeat(64)}00` }])).toThrow(
+      /neither/,
+    );
+    expect(() => packSignatures([{ owner: OWNER_MID, signature: "0x1234" }])).toThrow(/neither/);
+  });
+});
+
 describe("recoverSafeTxSigner", () => {
   const tx = buildSafeTx({ to: B, data: changeThresholdData(BigInt(2)), nonce: BigInt(1) });
   const args = { chainId: 100, safeAddress: SAFE, tx };

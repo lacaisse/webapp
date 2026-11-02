@@ -6,13 +6,16 @@ export type SafeSignerShape = {
   id: string;
   name: string;
   threshold: number;
-  owners: { kind: "MEMBER" | "EXTERNAL"; userId: string | null }[];
+  // MEMBER (legacy server key) and PASSKEY owners belong to a person;
+  // EXTERNAL owners sign in Safe{Wallet}.
+  owners: { kind: "MEMBER" | "EXTERNAL" | "PASSKEY"; userId: string | null }[];
 };
 
 /**
  * Safes that could no longer reach their threshold if `leavingUserId` lost
- * ADMIN access: reachable signers are the other MEMBER owners whose user is
- * still ADMIN+ (`adminUserIds`) plus every EXTERNAL owner.
+ * ADMIN access: reachable signers are the other team owners (server key or
+ * passkey) whose user is still ADMIN+ (`adminUserIds`) plus every EXTERNAL
+ * owner.
  */
 export function blockingSafes(
   safes: SafeSignerShape[],
