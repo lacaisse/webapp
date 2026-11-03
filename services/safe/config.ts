@@ -63,6 +63,28 @@ export const SAFE_CONTRACTS_BY_CHAIN: Record<number, SafeContracts> = {
   },
 };
 
+// Canonical MultiSendCallOnly 1.4.1 (safe-global/safe-deployments): the one
+// contract a fund Safe may DelegateCall. It runs a batch of plain calls from
+// the Safe's own context and reverts on any inner DelegateCall, so it cannot
+// touch the Safe's storage — the same batching Safe{Wallet} uses
+// (`createTransaction({ onlyCalls: true })`). Has code on Gnosis (410 bytes,
+// checked 2026-11-02). safe-tx.ts::assertAllowedOperation refuses operation 1
+// to any other address.
+export const MULTISEND_CALL_ONLY_BY_CHAIN: Record<number, Address> = {
+  [GNOSIS_CHAIN_ID]: "0x9641d764fc13c8B624c04430C7356C1C7C8102e2",
+};
+
+export function multiSendCallOnlyFor(chainId: number): Address {
+  const address = MULTISEND_CALL_ONLY_BY_CHAIN[chainId];
+  if (!address) {
+    throw new SafeError(
+      "unsupported_chain",
+      `MultiSendCallOnly is not configured for chain ${chainId}`,
+    );
+  }
+  return address;
+}
+
 // Safe passkey module v0.2.1 (safe-global/safe-modules, modules/passkey):
 // `signerFactory` is the canonical SafeWebAuthnSignerFactory, which derives
 // (CREATE2, salt 0) and deploys one SafeWebAuthnSignerProxy per (x, y,

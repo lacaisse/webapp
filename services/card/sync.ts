@@ -14,6 +14,8 @@ import type {
 import type { CardEnrollmentRequestStatus } from "@/services/db/generated/enums";
 import { prisma } from "@/services/db/prisma";
 
+import { planCardStateSync } from "./pin-block-rules";
+
 // Shared helpers for the card-sync flow. Both the preview action (used to
 // populate the confirmation dialog) and the run action (which actually
 // pushes/pulls) start from `computeCardSyncPlan`. Lives outside the
@@ -55,12 +57,24 @@ export type CardSyncPlan = {
     card: ForeignCard;
     requestStatus: CardEnrollmentRequestStatus;
   }>;
-  // Local is authoritative for status — if CP differs, push ours.
+  // Local is authoritative for status — if CP differs, push ours. Except for
+  // a PIN block, which is the api's (see `pinBlockSync`).
   statusUpdate: Array<{
     cardId: string;
     serialNumber: string;
     localStatus: CpCardStatus;
     remoteStatus: CpCardStatus;
+  }>;
+  // PIN blocks the api owns, found while computing the plan: a block the api
+  // reports that the row does not carry (`pin_block`), or a block the row
+  // carries that the api no longer reports — the holder set a new PIN in the
+  // wallet, the webhook was missed (`pin_release`). Nothing is written here
+  // (the preview is read-only): the run's status step
+  // (`pushOneCardStatusAction`) re-reads each card and applies the rule.
+  pinBlockSync: Array<{
+    cardId: string;
+    serialNumber: string;
+    kind: "pin_block" | "pin_release";
   }>;
 };
 
@@ -129,6 +143,8 @@ export async function computeCardSyncPlan(
         id: true,
         serialNumber: true,
         status: true,
+        blockedReason: true,
+        blockedAt: true,
         account: true,
         holderName: true,
         sourceSerial: true,
@@ -164,6 +180,7 @@ export async function computeCardSyncPlan(
     requestEnrollment: [],
     awaitingIssuer: [],
     statusUpdate: [],
+    pinBlockSync: [],
   };
 
   // Heal the local `sourceSerial` display cache while we have both sides in
@@ -191,12 +208,29 @@ export async function computeCardSyncPlan(
         serialNumber: l.serialNumber,
         holderName: holderDisplayName(l.member, l.holderName),
       });
-    } else if (r.status !== l.status) {
+      continue;
+    }
+    // Status: local-authoritative, pushed on a mismatch — except a PIN block,
+    // which belongs to the api (services/card/pin-block-rules.ts holds the
+    // rule). A card the api PIN-blocked is never pushed ACTIVE; a local PIN
+    // block the api no longer reports is pulled back to the api's status.
+    // Both go to `pinBlockSync` for the run to apply.
+    const transition = planCardStateSync(l, {
+      status: r.status,
+      pinBlockedAt: r.pinBlockedAt,
+    });
+    if (transition.kind === "push") {
       plan.statusUpdate.push({
         cardId: l.id,
         serialNumber: l.serialNumber,
         localStatus: l.status,
         remoteStatus: r.status,
+      });
+    } else if (transition.kind !== "none") {
+      plan.pinBlockSync.push({
+        cardId: l.id,
+        serialNumber: l.serialNumber,
+        kind: transition.kind,
       });
     }
   }

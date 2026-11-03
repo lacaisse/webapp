@@ -186,6 +186,7 @@
       "ACCOUNT_BURN": "Burn",
       "ACCOUNT_TRANSFER": "Transfer",
       "SAFE_TRANSFER": "Safe transfer",
+      "SAFE_CONVERSION": "Safe conversion",
       "system": "System",
       "by": "by {name}",
       "triggers": {
@@ -198,6 +199,7 @@
         "ACCOUNT_BURN": "Account burn",
         "ACCOUNT_TRANSFER": "Account transfer",
         "SAFE_TRANSFER": "Safe (multisig) transfer",
+        "SAFE_CONVERSION": "Safe (multisig) conversion",
         "ORDER_SETTLEMENT_MINT": "Order settlement (mint)",
         "ORDER_SETTLEMENT_BURN": "Order settlement (burn)",
         "PAYOUT_BURN": "Payout burn",
@@ -459,6 +461,7 @@
           "SWAP_OWNER": "Replace owner",
           "CHANGE_THRESHOLD": "Change threshold",
           "REJECTION": "Rejection",
+          "CONVERSION": "Conversion",
           "UNKNOWN": "Transaction"
         },
         "summary": {
@@ -471,6 +474,8 @@
           "removeOwnerThresholdChange": "Remove owner {owner}, signatures required: {from} → {to}",
           "changeThresholdFromTo": "Change threshold from {from} to {to, plural, one {# signature} other {# signatures}}",
           "rejection": "Reject transaction #{nonce}",
+          "conversion": "Convert {from} into at least {to}",
+          "conversionStep": "Convert {from} into at least {to} — step {step} of {steps} ({label})",
           "swapToPasskey": "Move {owner}'s key to their passkey {newOwner}",
           "swapReplacedPasskey": "Replace {owner}'s lost passkey with {newOwner}"
         },
@@ -511,7 +516,11 @@
           "threshold": "Signatures required",
           "unknownAddress": "Unknown address",
           "weakens": "Weakens the Safe",
-          "viewOnExplorer": "View on explorer"
+          "viewOnExplorer": "View on explorer",
+          "conversion": "Conversion",
+          "step": "Step",
+          "validUntil": "Valid until",
+          "orderExpired": "Order expired"
         },
         "reject": "Reject",
         "rejectTitle": "Reject transaction #{nonce}?",
@@ -546,6 +555,98 @@
         "lowGasBody": "The La Caisse relayer has {balance} xDAI left to pay for executions. Top it up soon:",
         "status": "Relayer balance: {balance} xDAI. Send xDAI to this address to pay for deployments and executions:"
       },
+      "conversion": {
+        "trigger": "Convert",
+        "title": "Convert tokens",
+        "description": "Swap one of the Safe's balances for another at the market rate. Each on-chain step is a Safe transaction that runs once {threshold, plural, one {# owner has} other {# owners have}} signed.",
+        "pair": "Conversion",
+        "pairOption": "{from} → {to}",
+        "amount": "Amount",
+        "balance": "Balance: {balance} {symbol}",
+        "getQuote": "Get a quote",
+        "requote": "Quote again",
+        "quote": {
+          "expected": "Expected",
+          "minimum": "Minimum ({slippage} slippage)",
+          "rate": "Rate",
+          "validity": "The conversion stays open for 7 days while the owners sign.",
+          "roundsOne": "One Safe transaction.",
+          "roundsTwo": "Two Safe transactions: the conversion now, then the mint once it has filled.",
+          "cost": "Conversion cost: about {percent} %, included in the price",
+          "costTiny": "Conversion cost: under 0.01 %, included in the price",
+          "costAmount": " ({amount} {symbol})"
+        },
+        "confirm": "Propose",
+        "steps": {
+          "swap": "swap",
+          "mint": "mint",
+          "burn": "burn"
+        },
+        "calls": {
+          "approve": "Approve the amount to convert",
+          "presign": "Confirm the conversion order",
+          "unwrap": "Unwrap WXDAI",
+          "mint": "Mint BREAD",
+          "burn": "Burn BREAD",
+          "wrap": "Wrap xDAI"
+        },
+        "status": {
+          "PROPOSED": "Waiting for signatures",
+          "READY": "Waiting for an owner",
+          "FILLING": "Converting",
+          "DONE": "Done",
+          "EXPIRED": "Order expired",
+          "CANCELLED": "Cancelled",
+          "FAILED": "Failed"
+        },
+        "card": {
+          "title": "Conversions",
+          "line": "{from} → at least {to}",
+          "lineDone": "{from} → {to}",
+          "order": "View order details",
+          "by": "Started by {name}",
+          "continue": "Propose next step",
+          "cancel": "Cancel",
+          "cancelTitle": "Cancel this conversion?",
+          "cancelDescription": "Nothing is in flight: no order is open and no transaction is pending. What was converted so far stays in the Safe.",
+          "cancelConfirm": "Cancel conversion",
+          "proposalExpired": "The conversion order expired before the owners signed. Reject the pending transaction, then start again.",
+          "readyExpired": "The conversion order expired before the next step was proposed. Cancel this conversion and start again.",
+          "fillHint": "The conversion fills at the market rate; this page checks every couple of minutes.",
+          "readyHint": "The order filled: the next transaction is sized to what arrived."
+        },
+        "errors": {
+          "config": "Conversions are not configured for this network.",
+          "cow_api": "The conversion service could not be reached. Try again in a moment.",
+          "rate_limited": "The conversion service is busy right now. Try again in a few minutes.",
+          "no_pair": "This conversion is not available for this fund. Enable both tokens under Settings → Token.",
+          "quote_failed": "This amount could not be quoted.",
+          "quote_moved": "The price moved. Review the new quote.",
+          "amount": "Enter a positive amount with at most the token's decimals.",
+          "expired": "The order expired before it filled.",
+          "fill_mismatch": "The fill does not match what the chain shows.",
+          "funds_moved": "The Safe no longer holds enough of the token this step needs.",
+          "contract_refused": "This step would call a contract the converter does not use. It was refused.",
+          "not_found": "Conversion not found.",
+          "invalid_state": "This conversion is not in a state where that is possible."
+        },
+        "progress": {
+          "cow-swap": {
+            "api": "Place the conversion order",
+            "calls": "Approve and confirm the conversion (Safe transaction)",
+            "wait": "Conversion fills at the market rate"
+          },
+          "bread-mint": {
+            "calls": "Unwrap and mint BREAD (Safe transaction)"
+          },
+          "bread-burn": {
+            "calls": "Burn BREAD and wrap (Safe transaction)"
+          },
+          "bread-burn+cow-swap": {
+            "calls": "Burn BREAD, wrap and confirm the conversion (Safe transaction)"
+          }
+        }
+      },
       "errors": {
         "config": "The fund token is not configured yet. Connect Citizen Pay first.",
         "unsupported_chain": "This network is not supported for Safes.",
@@ -560,6 +661,7 @@
         "invalid_signature": "A signature is invalid.",
         "not_found": "Safe or transaction not found.",
         "invalid_state": "This action is not possible in the current state.",
+        "operation_refused": "This transaction would run another contract's code as the Safe (delegatecall). Only batches through MultiSendCallOnly are allowed.",
         "unknown": "Something went wrong. Try again.",
         "tokenNotEnabled": "This token is not enabled for this fund (Settings → Token).",
         "nameRequired": "Enter a name.",
@@ -1069,7 +1171,8 @@
       },
       "primary": "Primary card",
       "badges": {
-        "lost": "Lost"
+        "lost": "Lost",
+        "pinBlocked": "PIN"
       },
       "empty": "No cards to show.",
       "prev": "Previous",
@@ -2534,6 +2637,32 @@
             "registrationPending": "A Citizen Pay registration started less than 30 minutes ago is still open. Resume it to get back to the Citizen Pay form, or start over to cancel it and begin a new one.",
             "forbidden": "This action can only be started from the fund's own settings page."
           }
+        },
+        "events": {
+          "title": "Events webhook",
+          "description": "Citizen Pay tells this fund when it blocks a card after 3 wrong PIN entries, and when the block is lifted. The address below is registered with Citizen Pay when the fund connects; register it by hand for a fund connected before, or after a failed attempt.",
+          "registeredAt": "Registered with Citizen Pay on {date}",
+          "notRegistered": "Not registered with Citizen Pay yet",
+          "urlLabel": "Address",
+          "lastDeliveryLabel": "Last delivery",
+          "lastDelivery": "{type} · card {serial} · {date} · {outcome}",
+          "noDelivery": "No event received yet",
+          "outcome": {
+            "RECEIVED": "received",
+            "APPLIED": "applied",
+            "IGNORED": "ignored",
+            "FAILED": "failed"
+          },
+          "registrationError": "The last registration failed: {message}",
+          "register": "Register with Citizen Pay",
+          "reregister": "Register again",
+          "registering": "Registering…",
+          "connectFirst": "Connect the fund to Citizen Pay first.",
+          "errors": {
+            "notConnected": "Connect the fund to Citizen Pay first.",
+            "insecureUrl": "This deployment's address is not https; Citizen Pay only accepts https webhooks.",
+            "failed": "Citizen Pay refused the registration: {message}"
+          }
         }
       },
       "fees": {
@@ -3359,7 +3488,8 @@
         "apply": "Apply",
         "applying": "Applying…",
         "errors": {
-          "none": "No matching cards selected."
+          "none": "No matching cards selected.",
+          "pinBlocked": "{count, plural, one {# of the selected cards is blocked by Citizen Pay after wrong PIN entries. Deselect it first.} other {# of the selected cards are blocked by Citizen Pay after wrong PIN entries. Deselect them first.}}"
         }
       },
       "errors": {
@@ -3371,7 +3501,9 @@
         "amountInvalid": "Amount must be a number with up to 2 decimal places.",
         "amountPositive": "Amount must be greater than zero.",
         "tokenNotConfigured": "This fund has no token configured yet — connect to Citizen Pay first.",
-        "submitFailed": "On-chain submission failed. Check the token operations log for details."
+        "submitFailed": "On-chain submission failed. Check the token operations log for details.",
+        "pinBlocked": "Citizen Pay blocked this card after 3 wrong PIN entries. Its status can't be changed here: an admin lifts the block with Unblock on the card page.",
+        "pinBlockedAtApi": "Citizen Pay refused the change: this card is blocked there after 3 wrong PIN entries. The issuing fund unblocks it from the card page, or the holder sets a new PIN in the card wallet."
       },
       "sync": {
         "trigger": "Sync with Citizen Pay",
@@ -3384,7 +3516,8 @@
           "import": "{count, plural, one {Import # card from Citizen Pay} other {Import # cards from Citizen Pay}}",
           "requestEnrollment": "{count, plural, one {# card was issued by another fund ({issuers}) and needs the issuer's acceptance — a request will be sent} other {# cards were issued by another fund ({issuers}) and need the issuer's acceptance — requests will be sent}}",
           "awaitingIssuer": "{count, plural, one {# card is waiting on another fund ({issuers}) — request {statuses}, nothing to send} other {# cards are waiting on another fund ({issuers}) — requests {statuses}, nothing to send}}",
-          "statusUpdate": "{count, plural, one {Update # card status on Citizen Pay} other {Update # card statuses on Citizen Pay}}"
+          "statusUpdate": "{count, plural, one {Update # card status on Citizen Pay} other {Update # card statuses on Citizen Pay}}",
+          "pinBlockSync": "{count, plural, one {# PIN block to reconcile with Citizen Pay} other {# PIN blocks to reconcile with Citizen Pay}}"
         },
         "nothingToSync": "Everything is already in sync.",
         "confirm": "Sync now",
@@ -3537,6 +3670,71 @@
           "noDestination": "The merchant has no account to receive the payment yet.",
           "placeNotFound": "Citizen Pay does not know this merchant for this fund.",
           "unknown": "No answer came back. Charging again is safe: the same sale will be reused rather than charged twice."
+        }
+      },
+      "pinBlock": {
+        "banner": {
+          "title": "Blocked after 3 wrong PIN entries",
+          "atPlaceOn": "at {place}, {date}",
+          "atPlace": "at {place}",
+          "on": "{date}",
+          "description": "Citizen Pay refuses this card at every terminal until it is unblocked. Unblocking lets whoever holds the card enter the PIN again; the holder can also unblock it by setting a new PIN in the card wallet.",
+          "adminOnly": "Only an admin of the fund can unblock it.",
+          "loading": "Loading the card's PIN history…",
+          "loadFailed": "Couldn't load the card's PIN history from Citizen Pay.",
+          "events": {
+            "title": "Last PIN events",
+            "action": {
+              "blocked": "Blocked",
+              "unblocked": "Unblocked",
+              "pin_set": "PIN set"
+            },
+            "by": {
+              "system": "after 3 wrong entries",
+              "treasury": "by the fund",
+              "member": "by the holder"
+            }
+          },
+          "refusals": {
+            "title": "Refused taps",
+            "reason": {
+              "insufficient": "Insufficient balance",
+              "source_insufficient": "Source card short",
+              "weekly_limit": "Weekly limit reached",
+              "pin_invalid": "Wrong PIN",
+              "pin_blocked": "Card blocked (PIN)"
+            }
+          }
+        },
+        "unblock": {
+          "button": "Unblock",
+          "title": "Unblock this card?",
+          "description": "{holderLabel}'s card will accept PIN entries and pay at the terminals again right away. You'll be asked to confirm it's you.",
+          "cancel": "Cancel",
+          "confirm": "Unblock card",
+          "unblocking": "Unblocking…"
+        },
+        "statusDialog": {
+          "notice": "Citizen Pay blocked this card after 3 wrong PIN entries. The status can't be changed here: an admin lifts the block with Unblock on the card page."
+        },
+        "errors": {
+          "notPinBlocked": "This card is not blocked for wrong PIN entries.",
+          "apiRefused": "Citizen Pay refused the unblock: only the fund that issued the card can lift it.",
+          "failed": "Citizen Pay could not be reached. Try again in a moment."
+        },
+        "email": {
+          "staff": {
+            "subject": "Card {serial} blocked after 3 wrong PIN entries",
+            "textBody": "Hello,\n\nCitizen Pay blocked card {serial} ({holder}) after 3 wrong PIN entries at {place} on {date}. It is refused at every terminal until it is unblocked.\n\nAn admin of {fundName} can unblock it from the card page:\n\n{cardUrl}\n\nThe holder can also unblock it by setting a new PIN in the card wallet.\n\nThe {fundName} team",
+            "ctaLabel": "Open the card",
+            "unknownPlace": "a terminal"
+          },
+          "holder": {
+            "subject": "Your {fundName} card is blocked",
+            "textBody": "Hi {firstName},\n\nYour {fundName} card was blocked after 3 wrong PIN entries at {place} on {date}. It will be refused at the terminals until it is unblocked.\n\nTo unblock it, set a new PIN from your card page:\n\n{walletUrl}\n\nIf you didn't try to pay with your card, tell {fundName} right away.\n\nThe {fundName} team",
+            "ctaLabel": "Open my card",
+            "unknownPlace": "a terminal"
+          }
         }
       }
     }

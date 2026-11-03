@@ -9,11 +9,14 @@
 import {
   bytesToBigInt,
   concat,
+  decodeFunctionData,
   encodeAbiParameters,
   encodeFunctionData,
+  encodePacked,
   getAddress,
   getContractAddress,
   hashTypedData,
+  hexToBigInt,
   keccak256,
   recoverMessageAddress,
   recoverTypedDataAddress,
@@ -23,7 +26,8 @@ import {
   hexToNumber,
 } from "viem";
 
-import { ERC20_ABI, SAFE_ABI } from "@/services/safe/abi";
+import { ERC20_ABI, MULTI_SEND_ABI, SAFE_ABI } from "@/services/safe/abi";
+import { MULTISEND_CALL_ONLY_BY_CHAIN, multiSendCallOnlyFor } from "@/services/safe/config";
 import {
   CONTRACT_SIGNATURE_STATIC_LENGTH,
   parseContractSignature,
@@ -312,6 +316,110 @@ export function changeThresholdData(threshold: bigint): Hex {
     functionName: "changeThreshold",
     args: [threshold],
   });
+}
+
+// ---------------------------------------------------------------------------
+// Batches (MultiSendCallOnly)
+// ---------------------------------------------------------------------------
+
+export type SafeCall = { to: Address; value?: bigint; data?: Hex };
+
+// Each packed transaction: uint8 operation ‖ address to ‖ uint256 value ‖
+// uint256 data length ‖ data — 85 bytes of header before the data.
+const MULTISEND_HEADER_BYTES = 85;
+
+/**
+ * `multiSend(bytes)` calldata for MultiSendCallOnly: the calls packed back
+ * to back, every one with operation 0 (Call). The contract itself reverts on
+ * operation 1, so nothing in a batch can run in the Safe's context.
+ */
+export function encodeMultiSendCallOnly(calls: SafeCall[]): Hex {
+  if (calls.length === 0) throw new SafeError("invalid_state", "Nothing to batch");
+  const packed = concat(
+    calls.map((c) => {
+      const data = c.data ?? "0x";
+      return encodePacked(
+        ["uint8", "address", "uint256", "uint256", "bytes"],
+        [0, getAddress(c.to), c.value ?? BigInt(0), BigInt(size(data)), data],
+      );
+    }),
+  );
+  return encodeFunctionData({ abi: MULTI_SEND_ABI, functionName: "multiSend", args: [packed] });
+}
+
+/** The calls inside `multiSend(bytes)` calldata (inverse of encodeMultiSendCallOnly). */
+export function decodeMultiSendCallOnly(
+  data: Hex,
+): { operation: number; to: Address; value: bigint; data: Hex }[] {
+  const { args } = decodeFunctionData({ abi: MULTI_SEND_ABI, data });
+  const packed = args[0];
+  const total = size(packed);
+  const calls: { operation: number; to: Address; value: bigint; data: Hex }[] = [];
+  let offset = 0;
+  while (offset < total) {
+    if (offset + MULTISEND_HEADER_BYTES > total) {
+      throw new SafeError("invalid_state", "Truncated multiSend transaction header");
+    }
+    const operation = hexToNumber(slice(packed, offset, offset + 1));
+    const to = getAddress(slice(packed, offset + 1, offset + 21));
+    const value = hexToBigInt(slice(packed, offset + 21, offset + 53));
+    const length = Number(hexToBigInt(slice(packed, offset + 53, offset + 85)));
+    const start = offset + MULTISEND_HEADER_BYTES;
+    if (start + length > total) {
+      throw new SafeError("invalid_state", "Truncated multiSend transaction data");
+    }
+    calls.push({
+      operation,
+      to,
+      value,
+      data: length === 0 ? "0x" : slice(packed, start, start + length),
+    });
+    offset = start + length;
+  }
+  return calls;
+}
+
+/**
+ * One Safe transaction for `calls`: a single call goes as it is (operation
+ * 0); several are batched through the chain's MultiSendCallOnly (operation
+ * 1, outer value 0 — each inner value is paid by the Safe inside the batch).
+ */
+export function batchCall(
+  chainId: number,
+  calls: SafeCall[],
+): { to: Address; value: bigint; data: Hex; operation: 0 | 1 } {
+  if (calls.length === 0) throw new SafeError("invalid_state", "Nothing to batch");
+  if (calls.length === 1) {
+    const [c] = calls;
+    return { to: getAddress(c.to), value: c.value ?? BigInt(0), data: c.data ?? "0x", operation: 0 };
+  }
+  return {
+    to: multiSendCallOnlyFor(chainId),
+    value: BigInt(0),
+    data: encodeMultiSendCallOnly(calls),
+    operation: 1,
+  };
+}
+
+/**
+ * DelegateCall (operation 1) runs the target's code as the Safe: it can
+ * rewrite owners, threshold, modules, even the singleton. The only target
+ * ever allowed is the chain's canonical MultiSendCallOnly, which can do
+ * nothing but plain calls. Checked when a transaction is proposed and again
+ * before it is signed or executed, so a row changed underneath us is refused
+ * as well.
+ */
+export function assertAllowedOperation(
+  chainId: number,
+  tx: { to: Address | string; operation: number },
+): void {
+  if (tx.operation === 0) return;
+  const allowed = MULTISEND_CALL_ONLY_BY_CHAIN[chainId];
+  if (tx.operation === 1 && allowed && sameAddress(tx.to, allowed)) return;
+  throw new SafeError(
+    "operation_refused",
+    `Operation ${tx.operation} to ${tx.to} is not allowed (Call, or DelegateCall to MultiSendCallOnly only)`,
+  );
 }
 
 // ---------------------------------------------------------------------------

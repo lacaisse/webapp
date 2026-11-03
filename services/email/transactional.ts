@@ -273,6 +273,106 @@ function formatEmailDate(isoTimestamp: string, locale: string): string {
   }).format(new Date(isoTimestamp));
 }
 
+// Date and time in the fund's zone, for moments where the hour matters (a
+// card blocked at a terminal). The zone comes from `Fund.timezone`.
+function formatEmailDateTime(
+  isoTimestamp: string,
+  locale: string,
+  timeZone: string,
+): string {
+  return new Intl.DateTimeFormat(locale, {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone,
+  }).format(new Date(isoTimestamp));
+}
+
+// Citizen Pay blocked the card after three wrong PIN entries (D12). To the
+// fund's OWNER/ADMIN staff, with the card page where the Unblock button is;
+// sent by services/card/pin-block-emails.ts from the events webhook. No
+// member on the row, so the fund's default locale and the platform sender.
+export async function sendCardPinBlocked(args: {
+  emailId: string;
+  fundId: string;
+  toEmail: string;
+  fund: FundBranding;
+  serial: string;
+  holder: string;
+  // The place (merchant location) where the block happened; "" when unknown.
+  place: string;
+  blockedAt: string; // ISO 8601
+  timeZone: string;
+  cardUrl: string;
+}): Promise<void> {
+  await dispatchTemplate({
+    emailId: args.emailId,
+    fund: args.fund,
+    render: async (locale) => {
+      const t = await getTranslations({
+        locale,
+        namespace: "cards.admin.pinBlock.email.staff",
+      });
+      const place = args.place || t("unknownPlace");
+      return {
+        subject: t("subject", { serial: args.serial, fundName: args.fund.name }),
+        // The bare-URL paragraph renders as the primary CTA button.
+        text: t("textBody", {
+          fundName: args.fund.name,
+          serial: args.serial,
+          holder: args.holder,
+          place,
+          date: formatEmailDateTime(args.blockedAt, locale, args.timeZone),
+          cardUrl: args.cardUrl,
+        }),
+        ctaLabel: t("ctaLabel"),
+      };
+    },
+    to: args.toEmail,
+  });
+}
+
+// The same block, to the card's holder: what happened and the card wallet
+// page where setting a new PIN unblocks the card. Member-facing (their own
+// locale, the fund's sender).
+export async function sendCardPinBlockedHolder(args: {
+  emailId: string;
+  fundId: string;
+  toEmail: string;
+  fund: FundBranding;
+  firstName: string;
+  place: string;
+  blockedAt: string; // ISO 8601
+  timeZone: string;
+  walletUrl: string;
+}): Promise<void> {
+  await dispatchTemplate({
+    emailId: args.emailId,
+    fund: args.fund,
+    render: async (locale) => {
+      const t = await getTranslations({
+        locale,
+        namespace: "cards.admin.pinBlock.email.holder",
+      });
+      const place = args.place || t("unknownPlace");
+      return {
+        subject: t("subject", { fundName: args.fund.name }),
+        text: t("textBody", {
+          firstName: args.firstName,
+          fundName: args.fund.name,
+          place,
+          date: formatEmailDateTime(args.blockedAt, locale, args.timeZone),
+          walletUrl: args.walletUrl,
+        }),
+        ctaLabel: t("ctaLabel"),
+      };
+    },
+    to: args.toEmail,
+  });
+}
+
 // Sent (in place of PAYMENT_CONFIRMATION) when a matched deposit is below the
 // member's tier minimum contribution: confirms receipt but flags the shortfall
 // and the top-up deadline. Like the confirmation, `occurredAt` arrives as a raw

@@ -14,6 +14,7 @@ import { Tabs, resolveActiveTab } from "@/components/ui/tabs";
 import { prisma } from "@/services/db/prisma";
 import { requireFundRole } from "@/services/auth/dal";
 import { getFundUrl, requireCurrentFund } from "@/services/fund/server";
+import { eventsWebhookUrlFor } from "@/services/citizenpay/events-webhook-url";
 import { parseVisibleIf } from "@/services/onboarding/visibility";
 import { alchemyNetwork } from "@/services/alchemy/client";
 import { listCustomDisplayTokens } from "@/services/token/display-tokens";
@@ -33,6 +34,7 @@ import { EmailsTab } from "./emails-tab";
 import { DocumentsTab } from "./documents-tab";
 import { EmbedsTab } from "./embeds-tab";
 import { CitizenPayConnect } from "./citizenpay-connect";
+import { EventsWebhookSection } from "./events-webhook";
 import { TokenInfo } from "./token-info";
 import { BalanceDisplayForm } from "./balance-display-form";
 import { CustomTokensForm } from "./custom-tokens-form";
@@ -86,6 +88,51 @@ async function SettingsHeader() {
       <h1 className="font-heading text-2xl font-medium">{t("title")}</h1>
       <p className="text-sm text-muted-foreground">{t("description")}</p>
     </header>
+  );
+}
+
+// The Citizen Pay events webhook block (Settings → Citizen Pay): registration
+// state from the fund row plus the last delivery received.
+async function EventsWebhookSettings({
+  fund,
+}: {
+  fund: {
+    id: string;
+    domain: string;
+    connected: boolean;
+    registeredAt: Date | null;
+    error: string | null;
+  };
+}) {
+  const last = await prisma.citizenPayEvent.findFirst({
+    where: { fundId: fund.id },
+    orderBy: { receivedAt: "desc" },
+    select: {
+      type: true,
+      serial: true,
+      receivedAt: true,
+      outcome: true,
+      detail: true,
+    },
+  });
+  return (
+    <EventsWebhookSection
+      status={{
+        connected: fund.connected,
+        url: eventsWebhookUrlFor(fund),
+        registeredAt: fund.registeredAt?.toISOString() ?? null,
+        error: fund.error,
+        lastDelivery: last
+          ? {
+              type: last.type,
+              serial: last.serial,
+              receivedAt: last.receivedAt.toISOString(),
+              outcome: last.outcome,
+              detail: last.detail,
+            }
+          : null,
+      }}
+    />
   );
 }
 
@@ -304,6 +351,19 @@ async function SettingsContent({
             >
               <CitizenPayForm fund={fundForForms} />
             </CitizenPayConnect>
+            <Suspense fallback={<Skeleton className="h-32 w-full" />}>
+              <EventsWebhookSettings
+                fund={{
+                  id: fund.id,
+                  domain: fund.domain,
+                  connected: Boolean(
+                    fund.citizenPayFundId && fund.citizenPayApiKeyId,
+                  ),
+                  registeredAt: fund.citizenPayEventsWebhookRegisteredAt,
+                  error: fund.citizenPayEventsWebhookError,
+                }}
+              />
+            </Suspense>
           </CardContent>
         </Card>
       )}

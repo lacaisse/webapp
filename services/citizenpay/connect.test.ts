@@ -24,6 +24,10 @@ const fetchTokenInfo = vi.hoisted(() => vi.fn(async (): Promise<unknown> => null
 vi.mock("./sync", () => ({ fetchTokenInfo }));
 const schedule = vi.hoisted(() => vi.fn());
 vi.mock("./sync-top-up-url", () => ({ scheduleTreasuryTopUpUrlSync: schedule }));
+const scheduleEvents = vi.hoisted(() => vi.fn());
+vi.mock("./events-webhook", () => ({
+  scheduleTreasuryEventsWebhookRegistration: scheduleEvents,
+}));
 const scheduleRoles = vi.hoisted(() => vi.fn());
 vi.mock("./token-roles", () => ({ scheduleEnsureMinterRoles: scheduleRoles }));
 
@@ -48,6 +52,7 @@ beforeEach(() => {
   }
   prisma.$transaction.mockResolvedValue([]);
   schedule.mockReset();
+  scheduleEvents.mockReset();
   scheduleRoles.mockReset();
   deriveSmartAccountAddress.mockReset();
   deriveSmartAccountAddress.mockResolvedValue(null);
@@ -320,6 +325,7 @@ describe("consumeConnect — top-up URL", () => {
     prisma.fund.findUnique.mockResolvedValue({ citizenPayFundId });
     await expect(call()).resolves.toEqual({ treasuryId: "t-1", apiKeyId: "0xkey" });
     expect(schedule).toHaveBeenCalledExactlyOnceWith(connectedFund);
+    expect(scheduleEvents).toHaveBeenCalledExactlyOnceWith(connectedFund);
     // Only the pre-transaction read (treasury check + fee/minter fields).
     expect(prisma.fund.findUnique).toHaveBeenCalledOnce();
   });
@@ -328,6 +334,7 @@ describe("consumeConnect — top-up URL", () => {
     prisma.fund.findUnique.mockResolvedValue({ citizenPayFundId: "t-other" });
     await expect(code(call())).resolves.toBe("treasury_mismatch");
     expect(schedule).not.toHaveBeenCalled();
+    expect(scheduleEvents).not.toHaveBeenCalled();
   });
 });
 

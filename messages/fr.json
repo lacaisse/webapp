@@ -186,6 +186,7 @@
       "ACCOUNT_BURN": "Brûlage",
       "ACCOUNT_TRANSFER": "Transfert",
       "SAFE_TRANSFER": "Transfert Safe",
+      "SAFE_CONVERSION": "Conversion Safe",
       "system": "Système",
       "by": "par {name}",
       "triggers": {
@@ -198,6 +199,7 @@
         "ACCOUNT_BURN": "Brûlage sur compte",
         "ACCOUNT_TRANSFER": "Transfert de compte",
         "SAFE_TRANSFER": "Transfert Safe (multisignature)",
+        "SAFE_CONVERSION": "Conversion Safe (multisignature)",
         "ORDER_SETTLEMENT_MINT": "Règlement de commande (émission)",
         "ORDER_SETTLEMENT_BURN": "Règlement de commande (brûlage)",
         "PAYOUT_BURN": "Brûlage de virement",
@@ -459,6 +461,7 @@
           "SWAP_OWNER": "Remplacement de signataire",
           "CHANGE_THRESHOLD": "Changement de seuil",
           "REJECTION": "Rejet",
+          "CONVERSION": "Conversion",
           "UNKNOWN": "Transaction"
         },
         "summary": {
@@ -471,6 +474,8 @@
           "removeOwnerThresholdChange": "Retirer le signataire {owner}, signatures requises : {from} → {to}",
           "changeThresholdFromTo": "Passer le seuil de {from} à {to, plural, one {# signature} other {# signatures}}",
           "rejection": "Rejeter la transaction n° {nonce}",
+          "conversion": "Convertir {from} en au moins {to}",
+          "conversionStep": "Convertir {from} en au moins {to} — étape {step} sur {steps} ({label})",
           "swapToPasskey": "Migrer la clé de {owner} vers sa passkey {newOwner}",
           "swapReplacedPasskey": "Remplacer la passkey perdue de {owner} par {newOwner}"
         },
@@ -511,7 +516,11 @@
           "threshold": "Signatures requises",
           "unknownAddress": "Adresse inconnue",
           "weakens": "Affaiblit le Safe",
-          "viewOnExplorer": "Voir dans l'explorateur"
+          "viewOnExplorer": "Voir dans l'explorateur",
+          "conversion": "Conversion",
+          "step": "Étape",
+          "validUntil": "Valable jusqu'au",
+          "orderExpired": "Ordre expiré"
         },
         "reject": "Rejeter",
         "rejectTitle": "Rejeter la transaction n° {nonce} ?",
@@ -546,6 +555,98 @@
         "lowGasBody": "Il reste {balance} xDAI au relayeur de La Caisse pour payer les exécutions. Rechargez-le bientôt :",
         "status": "Solde du relayeur : {balance} xDAI. Envoyez des xDAI à cette adresse pour payer les déploiements et exécutions :"
       },
+      "conversion": {
+        "trigger": "Convertir",
+        "title": "Convertir des jetons",
+        "description": "Échangez un des soldes du Safe contre un autre au cours du marché. Chaque étape on-chain est une transaction du Safe qui s'exécute dès que {threshold, plural, one {# propriétaire a} other {# propriétaires ont}} signé.",
+        "pair": "Conversion",
+        "pairOption": "{from} → {to}",
+        "amount": "Montant",
+        "balance": "Solde : {balance} {symbol}",
+        "getQuote": "Obtenir une cotation",
+        "requote": "Recoter",
+        "quote": {
+          "expected": "Attendu",
+          "minimum": "Minimum (glissement {slippage})",
+          "rate": "Taux",
+          "validity": "La conversion reste ouverte 7 jours, le temps que les propriétaires signent.",
+          "roundsOne": "Une transaction du Safe.",
+          "roundsTwo": "Deux transactions du Safe : la conversion maintenant, puis le mint une fois exécutée.",
+          "cost": "Coût de la conversion : environ {percent} %, inclus dans le prix",
+          "costTiny": "Coût de la conversion : moins de 0,01 %, inclus dans le prix",
+          "costAmount": " ({amount} {symbol})"
+        },
+        "confirm": "Proposer",
+        "steps": {
+          "swap": "échange",
+          "mint": "mint",
+          "burn": "burn"
+        },
+        "calls": {
+          "approve": "Approuver le montant à convertir",
+          "presign": "Confirmer l'ordre de conversion",
+          "unwrap": "Déballer le WXDAI",
+          "mint": "Minter du BREAD",
+          "burn": "Brûler du BREAD",
+          "wrap": "Emballer le xDAI"
+        },
+        "status": {
+          "PROPOSED": "En attente de signatures",
+          "READY": "En attente d'un propriétaire",
+          "FILLING": "Conversion en cours",
+          "DONE": "Terminée",
+          "EXPIRED": "Ordre expiré",
+          "CANCELLED": "Annulée",
+          "FAILED": "Échouée"
+        },
+        "card": {
+          "title": "Conversions",
+          "line": "{from} → au moins {to}",
+          "lineDone": "{from} → {to}",
+          "order": "Voir le détail de l'ordre",
+          "by": "Lancée par {name}",
+          "continue": "Proposer l'étape suivante",
+          "cancel": "Annuler",
+          "cancelTitle": "Annuler cette conversion ?",
+          "cancelDescription": "Rien n'est en cours : aucun ordre ouvert, aucune transaction en attente. Ce qui a déjà été converti reste dans le Safe.",
+          "cancelConfirm": "Annuler la conversion",
+          "proposalExpired": "L'ordre de conversion a expiré avant que les propriétaires ne signent. Rejetez la transaction en attente, puis recommencez.",
+          "readyExpired": "L'ordre de conversion a expiré avant que l'étape suivante ne soit proposée. Annulez cette conversion, puis recommencez.",
+          "fillHint": "La conversion s'exécute au cours du marché ; cette page vérifie toutes les deux minutes environ.",
+          "readyHint": "L'ordre est exécuté : la prochaine transaction est dimensionnée sur ce qui est arrivé."
+        },
+        "errors": {
+          "config": "Les conversions ne sont pas configurées pour ce réseau.",
+          "cow_api": "Le service de conversion est injoignable. Réessayez dans un instant.",
+          "rate_limited": "Le service de conversion est saturé pour le moment. Réessayez dans quelques minutes.",
+          "no_pair": "Cette conversion n'est pas disponible pour cette caisse. Activez les deux jetons dans Paramètres → Jeton.",
+          "quote_failed": "Ce montant n'a pas pu être coté.",
+          "quote_moved": "Le prix a bougé. Vérifiez la nouvelle cotation.",
+          "amount": "Entrez un montant positif avec au plus les décimales du jeton.",
+          "expired": "L'ordre a expiré avant d'être exécuté.",
+          "fill_mismatch": "L'exécution ne correspond pas à ce que montre la chaîne.",
+          "funds_moved": "Le Safe ne détient plus assez du jeton requis pour cette étape.",
+          "contract_refused": "Cette étape appellerait un contrat que le convertisseur n'utilise pas. Elle a été refusée.",
+          "not_found": "Conversion introuvable.",
+          "invalid_state": "Cette conversion n'est pas dans un état qui le permet."
+        },
+        "progress": {
+          "cow-swap": {
+            "api": "Placer l'ordre de conversion",
+            "calls": "Approuver et confirmer la conversion (transaction du Safe)",
+            "wait": "Conversion exécutée au cours du marché"
+          },
+          "bread-mint": {
+            "calls": "Déballer et minter du BREAD (transaction du Safe)"
+          },
+          "bread-burn": {
+            "calls": "Brûler du BREAD et emballer (transaction du Safe)"
+          },
+          "bread-burn+cow-swap": {
+            "calls": "Brûler du BREAD, emballer et confirmer la conversion (transaction du Safe)"
+          }
+        }
+      },
       "errors": {
         "config": "Le jeton de la caisse n'est pas encore configuré. Connectez d'abord Citizen Pay.",
         "unsupported_chain": "Ce réseau n'est pas pris en charge pour les Safes.",
@@ -560,6 +661,7 @@
         "invalid_signature": "Une signature est invalide.",
         "not_found": "Safe ou transaction introuvable.",
         "invalid_state": "Cette action n'est pas possible dans l'état actuel.",
+        "operation_refused": "Cette transaction exécuterait le code d'un autre contrat au nom du Safe (delegatecall). Seuls les lots via MultiSendCallOnly sont autorisés.",
         "unknown": "Une erreur s'est produite. Réessayez.",
         "tokenNotEnabled": "Ce jeton n'est pas activé pour cette caisse (Paramètres → Jeton).",
         "nameRequired": "Saisissez un nom.",
@@ -1069,7 +1171,8 @@
       },
       "primary": "Carte principale",
       "badges": {
-        "lost": "Perdue"
+        "lost": "Perdue",
+        "pinBlocked": "PIN"
       },
       "empty": "Aucune carte à afficher.",
       "prev": "Précédent",
@@ -2534,6 +2637,32 @@
             "registrationPending": "Un enregistrement Citizen Pay commencé il y a moins de 30 minutes est encore ouvert. Reprenez-le pour revenir au formulaire Citizen Pay, ou recommencez pour l'annuler et en lancer un nouveau.",
             "forbidden": "Cette action ne peut être lancée que depuis la page des paramètres de la caisse."
           }
+        },
+        "events": {
+          "title": "Webhook d'événements",
+          "description": "Citizen Pay prévient cette caisse quand il bloque une carte après 3 codes PIN erronés, et quand le blocage est levé. L'adresse ci-dessous est enregistrée auprès de Citizen Pay à la connexion de la caisse ; enregistrez-la à la main pour une caisse connectée avant, ou après un échec.",
+          "registeredAt": "Enregistré auprès de Citizen Pay le {date}",
+          "notRegistered": "Pas encore enregistré auprès de Citizen Pay",
+          "urlLabel": "Adresse",
+          "lastDeliveryLabel": "Dernière livraison",
+          "lastDelivery": "{type} · carte {serial} · {date} · {outcome}",
+          "noDelivery": "Aucun événement reçu pour l'instant",
+          "outcome": {
+            "RECEIVED": "reçu",
+            "APPLIED": "appliqué",
+            "IGNORED": "ignoré",
+            "FAILED": "échoué"
+          },
+          "registrationError": "Le dernier enregistrement a échoué : {message}",
+          "register": "Enregistrer auprès de Citizen Pay",
+          "reregister": "Enregistrer à nouveau",
+          "registering": "Enregistrement…",
+          "connectFirst": "Connectez d'abord la caisse à Citizen Pay.",
+          "errors": {
+            "notConnected": "Connectez d'abord la caisse à Citizen Pay.",
+            "insecureUrl": "L'adresse de ce déploiement n'est pas en https ; Citizen Pay n'accepte que des webhooks https.",
+            "failed": "Citizen Pay a refusé l'enregistrement : {message}"
+          }
         }
       },
       "fees": {
@@ -3359,7 +3488,8 @@
         "apply": "Appliquer",
         "applying": "Application…",
         "errors": {
-          "none": "Aucune carte correspondante sélectionnée."
+          "none": "Aucune carte correspondante sélectionnée.",
+          "pinBlocked": "{count, plural, one {# des cartes sélectionnées est bloquée par Citizen Pay après des codes PIN erronés. Désélectionnez-la d'abord.} other {# des cartes sélectionnées sont bloquées par Citizen Pay après des codes PIN erronés. Désélectionnez-les d'abord.}}"
         }
       },
       "errors": {
@@ -3371,7 +3501,9 @@
         "amountInvalid": "Le montant doit être un nombre avec au maximum 2 décimales.",
         "amountPositive": "Le montant doit être supérieur à zéro.",
         "tokenNotConfigured": "Cette caisse n'a pas encore de jeton configuré — connectez-vous d'abord à Citizen Pay.",
-        "submitFailed": "L'envoi on-chain a échoué. Consultez le journal des opérations pour plus de détails."
+        "submitFailed": "L'envoi on-chain a échoué. Consultez le journal des opérations pour plus de détails.",
+        "pinBlocked": "Citizen Pay a bloqué cette carte après 3 codes PIN erronés. Son statut ne peut pas être changé ici : un admin lève le blocage avec Débloquer sur la page de la carte.",
+        "pinBlockedAtApi": "Citizen Pay a refusé le changement : cette carte y est bloquée après 3 codes PIN erronés. La caisse émettrice la débloque depuis la page de la carte, ou le ou la titulaire définit un nouveau code PIN dans le portefeuille de la carte."
       },
       "sync": {
         "trigger": "Synchroniser avec Citizen Pay",
@@ -3384,7 +3516,8 @@
           "import": "{count, plural, one {Importer # carte depuis Citizen Pay} other {Importer # cartes depuis Citizen Pay}}",
           "requestEnrollment": "{count, plural, one {# carte a été émise par une autre caisse ({issuers}) et doit être acceptée par celle-ci — une demande sera envoyée} other {# cartes ont été émises par une autre caisse ({issuers}) et doivent être acceptées par celle-ci — des demandes seront envoyées}}",
           "awaitingIssuer": "{count, plural, one {# carte est en attente d’une autre caisse ({issuers}) — demande : {statuses}, rien à envoyer} other {# cartes sont en attente d’une autre caisse ({issuers}) — demandes : {statuses}, rien à envoyer}}",
-          "statusUpdate": "{count, plural, one {Mettre à jour # statut de carte sur Citizen Pay} other {Mettre à jour # statuts de cartes sur Citizen Pay}}"
+          "statusUpdate": "{count, plural, one {Mettre à jour # statut de carte sur Citizen Pay} other {Mettre à jour # statuts de cartes sur Citizen Pay}}",
+          "pinBlockSync": "{count, plural, one {# blocage PIN à réconcilier avec Citizen Pay} other {# blocages PIN à réconcilier avec Citizen Pay}}"
         },
         "nothingToSync": "Tout est déjà synchronisé.",
         "confirm": "Synchroniser maintenant",
@@ -3537,6 +3670,71 @@
           "noDestination": "Le commerçant n'a pas encore de compte pour recevoir le paiement.",
           "placeNotFound": "Citizen Pay ne connaît pas ce commerçant pour cette caisse.",
           "unknown": "Aucune réponse n'est revenue. Débiter à nouveau est sans risque : la même vente sera réutilisée plutôt que débitée deux fois."
+        }
+      },
+      "pinBlock": {
+        "banner": {
+          "title": "Bloquée après 3 codes PIN erronés",
+          "atPlaceOn": "chez {place}, le {date}",
+          "atPlace": "chez {place}",
+          "on": "le {date}",
+          "description": "Citizen Pay refuse cette carte à tous les terminaux tant qu'elle n'est pas débloquée. Débloquer permet à la personne qui tient la carte de ressaisir le code ; le ou la titulaire peut aussi la débloquer en définissant un nouveau code PIN dans le portefeuille de la carte.",
+          "adminOnly": "Seul un admin de la caisse peut la débloquer.",
+          "loading": "Chargement de l'historique PIN de la carte…",
+          "loadFailed": "Impossible de charger l'historique PIN de la carte depuis Citizen Pay.",
+          "events": {
+            "title": "Derniers événements PIN",
+            "action": {
+              "blocked": "Bloquée",
+              "unblocked": "Débloquée",
+              "pin_set": "PIN défini"
+            },
+            "by": {
+              "system": "après 3 codes erronés",
+              "treasury": "par la caisse",
+              "member": "par le/la titulaire"
+            }
+          },
+          "refusals": {
+            "title": "Paiements refusés",
+            "reason": {
+              "insufficient": "Solde insuffisant",
+              "source_insufficient": "Carte source insuffisante",
+              "weekly_limit": "Plafond hebdomadaire atteint",
+              "pin_invalid": "Code PIN erroné",
+              "pin_blocked": "Carte bloquée (PIN)"
+            }
+          }
+        },
+        "unblock": {
+          "button": "Débloquer",
+          "title": "Débloquer cette carte ?",
+          "description": "La carte de {holderLabel} acceptera à nouveau le code PIN et paiera aux terminaux immédiatement. Il vous sera demandé de confirmer votre identité.",
+          "cancel": "Annuler",
+          "confirm": "Débloquer la carte",
+          "unblocking": "Déblocage…"
+        },
+        "statusDialog": {
+          "notice": "Citizen Pay a bloqué cette carte après 3 codes PIN erronés. Le statut ne peut pas être changé ici : un admin lève le blocage avec Débloquer sur la page de la carte."
+        },
+        "errors": {
+          "notPinBlocked": "Cette carte n'est pas bloquée pour codes PIN erronés.",
+          "apiRefused": "Citizen Pay a refusé le déblocage : seule la caisse qui a émis la carte peut le lever.",
+          "failed": "Citizen Pay est injoignable. Réessayez dans un instant."
+        },
+        "email": {
+          "staff": {
+            "subject": "Carte {serial} bloquée après 3 codes PIN erronés",
+            "textBody": "Bonjour,\n\nCitizen Pay a bloqué la carte {serial} ({holder}) après 3 codes PIN erronés chez {place} le {date}. Elle est refusée à tous les terminaux tant qu'elle n'est pas débloquée.\n\nUn admin de {fundName} peut la débloquer depuis la page de la carte :\n\n{cardUrl}\n\nLe ou la titulaire peut aussi la débloquer en définissant un nouveau code PIN dans le portefeuille de la carte.\n\nL'équipe {fundName}",
+            "ctaLabel": "Ouvrir la carte",
+            "unknownPlace": "un terminal"
+          },
+          "holder": {
+            "subject": "Votre carte {fundName} est bloquée",
+            "textBody": "Bonjour {firstName},\n\nVotre carte {fundName} a été bloquée après 3 codes PIN erronés chez {place} le {date}. Elle sera refusée aux terminaux tant qu'elle n'est pas débloquée.\n\nPour la débloquer, définissez un nouveau code PIN depuis la page de votre carte :\n\n{walletUrl}\n\nSi vous n'avez pas essayé de payer avec votre carte, prévenez {fundName} sans attendre.\n\nL'équipe {fundName}",
+            "ctaLabel": "Ouvrir ma carte",
+            "unknownPlace": "un terminal"
+          }
         }
       }
     }

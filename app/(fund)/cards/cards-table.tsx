@@ -254,6 +254,8 @@ export async function CardsTable({
               const holderDisplay = privacy ? maskValue("name") : holderLabel;
               const isPrimary = c.member?.primaryCardId === c.id;
               const isLost = c.reportedLostAt !== null;
+              const pinBlocked =
+                c.status === "BLOCKED" && c.blockedReason === "PIN";
               const rawBalance = c.account
                 ? balanceByAddress.get(c.account)
                 : undefined;
@@ -314,6 +316,11 @@ export async function CardsTable({
                   <TableCell>
                     <div className="flex flex-wrap items-center gap-1">
                       <StatusBadge status={c.status} />
+                      {pinBlocked && (
+                        <Badge variant="destructive">
+                          {t("badges.pinBlocked")}
+                        </Badge>
+                      )}
                       {isLost && (
                         <Badge variant="warning">{t("badges.lost")}</Badge>
                       )}
@@ -341,6 +348,7 @@ export async function CardsTable({
                       cardId={c.id}
                       status={c.status}
                       isLost={isLost}
+                      pinBlocked={pinBlocked}
                       holderLabel={holderDisplay}
                       hasAccount={c.account !== null}
                       tokenSymbol={fund.tokenSymbol}

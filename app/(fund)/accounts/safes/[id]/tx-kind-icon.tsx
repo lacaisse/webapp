@@ -2,6 +2,7 @@
 import {
   ArrowLeftRight,
   Ban,
+  Repeat,
   Send,
   SlidersHorizontal,
   UserMinus,
@@ -18,6 +19,7 @@ const ICONS: Record<FundSafeTxKind, React.ComponentType<{ className?: string }>>
   SWAP_OWNER: ArrowLeftRight,
   CHANGE_THRESHOLD: SlidersHorizontal,
   REJECTION: Ban,
+  CONVERSION: Repeat,
 };
 
 // Round glyph for a Safe transaction kind. Hook-free (server + client).

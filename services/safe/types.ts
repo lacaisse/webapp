@@ -17,7 +17,9 @@ export type SafeTx = {
   to: Address;
   value: bigint;
   data: Hex;
-  operation: 0 | 1; // 0 = Call, 1 = DelegateCall (never used by us)
+  // 0 = Call. 1 = DelegateCall, allowed to the chain's MultiSendCallOnly only
+  // (a batch of plain calls) — safe-tx.ts::assertAllowedOperation.
+  operation: 0 | 1;
   safeTxGas: bigint;
   baseGas: bigint;
   gasPrice: bigint;
@@ -79,6 +81,22 @@ export type SafeTxSummary =
       threshold: number; // new threshold
       previousThreshold?: number; // on-chain threshold at proposal time
     }
+  | {
+      // One on-chain step of a token conversion (services/convert): a
+      // MultiSendCallOnly batch, or a single call. Signers see what moves
+      // and every inner call, never calldata.
+      kind: "CONVERSION";
+      conversionId: string;
+      converterId: string; // registry id ("eure-bread")
+      step: number; // 1-based: which of the conversion's proposals this is
+      steps: number; // how many proposals the conversion takes in all
+      label: string; // the leg's step label ("swap", "mint", "burn")
+      from: { symbol: string; amount: string }; // the conversion's input
+      to: { symbol: string; minAmount: string }; // the minimum it must yield
+      // What the step needs beforehand and until when (a CoW order's validTo).
+      validUntil?: string; // ISO
+      calls: { to: Address; label: string; value?: string }[]; // value in wei when non-zero
+    }
   | { kind: "REJECTION"; rejectsNonce: number };
 
 // Why an owner row should be swapped for the member's current passkey
@@ -108,6 +126,7 @@ export type SafeErrorCode =
   | "rules_spare_owner" // owner rules: owners must be ≥ threshold + 1 (lost-key recovery)
   | "rules_one_person" // owner rules: one person's keys alone must not meet the threshold
   | "server_key_retired" // LEGACY key no longer signs (migrated / erased)
+  | "operation_refused" // DelegateCall to anything but MultiSendCallOnly
   | "invalid_state"; // e.g. acting on a non-ACTIVE safe or non-PENDING tx
 
 export class SafeError extends Error {

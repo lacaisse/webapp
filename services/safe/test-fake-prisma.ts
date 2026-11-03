@@ -47,6 +47,7 @@ export function createFakePrisma() {
     fundPasskeySigner: [] as Row[],
     fundSafeTransaction: [] as Row[],
     fundSafeSignature: [] as Row[],
+    fundConversion: [] as Row[],
     tokenOperation: [] as Row[],
     fundDisplayToken: [] as Row[],
     fundMember: [] as Row[],
@@ -324,6 +325,51 @@ export function createFakePrisma() {
       create: async (a: { data: Row }) => {
         const row = { id: newId("op"), ...a.data };
         db.tokenOperation.push(row);
+        return row;
+      },
+    },
+    // Token conversions (services/convert/engine.ts / progress.ts).
+    fundConversion: {
+      findFirst: async (a: { where: Where }) => {
+        const r = db.fundConversion.find((c) => matches(c, a.where));
+        return r ? { ...r } : null;
+      },
+      findMany: async (a: { where?: Where; take?: number }) => {
+        const rows = db.fundConversion
+          .filter((c) => matches(c, a.where))
+          .sort((x, y) => (x.updatedAt as Date).getTime() - (y.updatedAt as Date).getTime())
+          .map((c) => ({ ...c }));
+        return a.take === undefined ? rows : rows.slice(0, a.take);
+      },
+      create: async (a: { data: Row }) => {
+        const row: Row = {
+          id: newId("conv"),
+          holderKind: "SAFE",
+          amountOut: null,
+          round: 0,
+          validUntil: null,
+          errorMessage: null,
+          completedAt: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          ...a.data,
+        };
+        db.fundConversion.push(row);
+        return { ...row };
+      },
+      updateMany: async (a: { where: Where; data: Row }) => {
+        const rows = db.fundConversion.filter((c) => matches(c, a.where));
+        rows.forEach((r) => Object.assign(r, a.data, { updatedAt: new Date() }));
+        return { count: rows.length };
+      },
+      delete: async (a: { where: { id: string } }) => {
+        const i = db.fundConversion.findIndex((c) => c.id === a.where.id);
+        if (i === -1) throw Object.assign(new Error("Record not found"), { code: "P2025" });
+        const [row] = db.fundConversion.splice(i, 1);
+        // Steps keep their row but lose the link (schema: onDelete SetNull).
+        db.fundSafeTransaction.forEach((t) => {
+          if (t.conversionId === row.id) t.conversionId = null;
+        });
         return row;
       },
     },

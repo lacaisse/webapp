@@ -1,0 +1,224 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { getAddress } from "viem";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("server-only", () => ({}));
+
+import { COW_CONTRACTS_BY_CHAIN } from "./assets";
+import { cowApiBaseUrl, getOrder, getTrades, postPreSignOrder, requestQuote } from "./cow-api";
+import { APP_DATA_DOC, APP_DATA_HASH, orderUid, type CowOrder } from "./cow-order";
+
+// The orderbook client against a stubbed fetch: request shapes, the answers
+// it accepts, and the ones it refuses (services/safe/tx-service.test.ts
+// pattern).
+
+const SAFE = getAddress("0x5afe00000000000000000000000000000000cafe");
+const EURE = getAddress("0x420CA0f9B9b604cE0fd9C18EF134C705e5Fa3430");
+const WXDAI = getAddress("0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d");
+const ORDER: CowOrder = {
+  sellToken: EURE,
+  buyToken: WXDAI,
+  receiver: SAFE,
+  sellAmount: BigInt("500000000000000000"),
+  buyAmount: BigInt("557364217142754180"),
+  validTo: 1794295416,
+  appData: APP_DATA_HASH,
+  feeAmount: BigInt(0),
+  kind: "sell",
+  partiallyFillable: false,
+  sellTokenBalance: "erc20",
+  buyTokenBalance: "erc20",
+};
+const UID = orderUid(100, COW_CONTRACTS_BY_CHAIN[100].settlement, ORDER, SAFE);
+
+type Call = { url: string; init?: RequestInit };
+let calls: Call[];
+function stubFetch(responder: (url: string, init?: RequestInit, n?: number) => Response | Promise<Response>) {
+  calls = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push({ url, init });
+      return responder(url, init, calls.length);
+    }),
+  );
+}
+const json = (status: number, body: unknown) =>
+  new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+const bodyOf = (c: Call) => JSON.parse(String(c.init?.body)) as Record<string, unknown>;
+
+beforeEach(() => {
+  vi.stubEnv("COW_API_URL", "");
+});
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+});
+
+describe("base url", () => {
+  it("hosted orderbook per chain, COW_API_URL overrides, unknown chain is null", () => {
+    expect(cowApiBaseUrl(100)).toBe("https://api.cow.fi/xdai");
+    expect(cowApiBaseUrl(1)).toBeNull();
+    vi.stubEnv("COW_API_URL", "https://cow.test/");
+    expect(cowApiBaseUrl(1)).toBe("https://cow.test");
+  });
+});
+
+describe("requestQuote", () => {
+  it("asks for a pre-sign sell quote from the owner and parses the amounts", async () => {
+    stubFetch(() =>
+      json(200, {
+        quote: { sellAmount: "499700000000000000", feeAmount: "300000000000000", buyAmount: "560165000000000000", validTo: 1794295416 },
+        expiration: "2026-11-03T08:00:00Z",
+        id: 42,
+      }),
+    );
+    const q = await requestQuote(100, {
+      sellToken: EURE,
+      buyToken: WXDAI,
+      owner: SAFE,
+      sellAmountBeforeFee: BigInt("500000000000000000"),
+      appDataDoc: APP_DATA_DOC,
+      appDataHash: APP_DATA_HASH,
+      validFor: 600,
+    });
+    expect(q).toEqual({
+      sellAmount: BigInt("499700000000000000"),
+      feeAmount: BigInt("300000000000000"),
+      buyAmount: BigInt("560165000000000000"),
+      validTo: 1794295416,
+      expiration: new Date("2026-11-03T08:00:00Z"),
+      id: 42,
+    });
+    expect(calls[0].url).toBe("https://api.cow.fi/xdai/api/v1/quote");
+    expect(bodyOf(calls[0])).toMatchObject({
+      sellToken: EURE,
+      buyToken: WXDAI,
+      from: SAFE,
+      receiver: SAFE,
+      kind: "sell",
+      sellAmountBeforeFee: "500000000000000000",
+      signingScheme: "presign",
+      appData: APP_DATA_DOC,
+      appDataHash: APP_DATA_HASH,
+    });
+  });
+
+  it("a 400 is a quote problem, a 500 an outage, junk a shape error", async () => {
+    const req = {
+      sellToken: EURE,
+      buyToken: WXDAI,
+      owner: SAFE,
+      sellAmountBeforeFee: BigInt(1),
+      appDataDoc: APP_DATA_DOC,
+      appDataHash: APP_DATA_HASH,
+      validFor: 600,
+    };
+    stubFetch(() => json(400, { errorType: "SellAmountDoesNotCoverFee" }));
+    await expect(requestQuote(100, req)).rejects.toMatchObject({ code: "quote_failed" });
+    stubFetch(() => json(503, {}));
+    await expect(requestQuote(100, req)).rejects.toMatchObject({ code: "cow_api" });
+    stubFetch(() => json(200, { quote: { sellAmount: "x" }, expiration: "2026-11-03T08:00:00Z" }));
+    await expect(requestQuote(100, req)).rejects.toMatchObject({ code: "cow_api" });
+    await expect(requestQuote(1, req)).rejects.toMatchObject({ code: "config" });
+  });
+});
+
+describe("postPreSignOrder", () => {
+  const args = { chainId: 100, order: ORDER, owner: SAFE, appDataDoc: APP_DATA_DOC, uid: UID };
+
+  it("posts the fee-less order with the owner as its signature and checks the uid answered", async () => {
+    stubFetch(() => json(201, UID));
+    await postPreSignOrder(args);
+    expect(calls[0].url).toBe("https://api.cow.fi/xdai/api/v1/orders");
+    expect(bodyOf(calls[0])).toMatchObject({
+      sellToken: EURE,
+      buyToken: WXDAI,
+      receiver: SAFE,
+      sellAmount: "500000000000000000",
+      buyAmount: "557364217142754180",
+      feeAmount: "0",
+      kind: "sell",
+      partiallyFillable: false,
+      appData: APP_DATA_DOC,
+      appDataHash: APP_DATA_HASH,
+      from: SAFE,
+      signingScheme: "presign",
+      signature: SAFE,
+    });
+  });
+
+  it("refuses an answered uid that is not the one computed (the fields differ from what was hashed)", async () => {
+    stubFetch(() => json(201, `0x${"ab".repeat(56)}`));
+    await expect(postPreSignOrder(args)).rejects.toMatchObject({ code: "cow_api" });
+  });
+
+  it("an order the orderbook already has is ours: fine", async () => {
+    stubFetch(() => json(400, { errorType: "DuplicatedOrder", description: "order already exists" }));
+    await expect(postPreSignOrder(args)).resolves.toBeUndefined();
+  });
+
+  it("retries one 429 after a pause; a second 429 is rate_limited", async () => {
+    vi.useFakeTimers();
+    try {
+      stubFetch((_url, _init, n) => (n === 1 ? json(429, { error: "rate limit" }) : json(201, UID)));
+      const p = postPreSignOrder(args);
+      await vi.advanceTimersByTimeAsync(2_000);
+      await expect(p).resolves.toBeUndefined();
+      expect(calls).toHaveLength(2);
+
+      stubFetch(() => json(429, { error: "rate limit" }));
+      const q = postPreSignOrder(args);
+      const expectation = expect(q).rejects.toMatchObject({ code: "rate_limited" });
+      await vi.advanceTimersByTimeAsync(2_000);
+      await expectation;
+      expect(calls).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("any other refusal is cow_api with the orderbook's words", async () => {
+    stubFetch(() => json(400, { errorType: "InsufficientBalance", description: "insufficient balance" }));
+    await expect(postPreSignOrder(args)).rejects.toMatchObject({
+      code: "cow_api",
+      message: expect.stringContaining("InsufficientBalance"),
+    });
+  });
+});
+
+describe("getOrder / getTrades", () => {
+  it("parses an order, null on 404, refuses an unknown status", async () => {
+    stubFetch(() =>
+      json(200, { uid: UID, status: "fulfilled", executedSellAmount: "500000000000000000", executedBuyAmount: "560166047667388179", invalidated: false, validTo: 1794295416 }),
+    );
+    expect(await getOrder(100, UID)).toEqual({
+      uid: UID,
+      status: "fulfilled",
+      executedSellAmount: BigInt("500000000000000000"),
+      executedBuyAmount: BigInt("560166047667388179"),
+      invalidated: false,
+      validTo: 1794295416,
+    });
+    expect(calls[0].url).toBe(`https://api.cow.fi/xdai/api/v1/orders/${UID}`);
+    stubFetch(() => json(404, { errorType: "OrderNotFound" }));
+    expect(await getOrder(100, UID)).toBeNull();
+    stubFetch(() => json(200, { uid: UID, status: "teleported", executedSellAmount: "0", executedBuyAmount: "0", validTo: 1 }));
+    await expect(getOrder(100, UID)).rejects.toMatchObject({ code: "cow_api" });
+  });
+
+  it("parses the trades of an order", async () => {
+    stubFetch(() =>
+      json(200, [
+        { orderUid: UID, owner: SAFE.toLowerCase(), sellAmount: "500000000000000000", buyAmount: "560166047667388179", txHash: `0x${"9e".repeat(32)}`, blockNumber: 49084770, logIndex: 3 },
+      ]),
+    );
+    const trades = await getTrades(100, UID);
+    expect(trades).toEqual([
+      { orderUid: UID, owner: SAFE, sellAmount: BigInt("500000000000000000"), buyAmount: BigInt("560166047667388179"), txHash: `0x${"9e".repeat(32)}`, blockNumber: 49084770, logIndex: 3 },
+    ]);
+    expect(calls[0].url).toBe(`https://api.cow.fi/xdai/api/v1/trades?orderUid=${UID}`);
+    stubFetch(() => json(200, { not: "an array" }));
+    await expect(getTrades(100, UID)).rejects.toMatchObject({ code: "cow_api" });
+  });
+});

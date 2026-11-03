@@ -1,8 +1,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import "server-only";
 
-import { getAddress, isAddress, isHex } from "viem";
+import { getAddress } from "viem";
 
+import {
+  ShapeError,
+  addr,
+  addrOrNull,
+  hex,
+  hexOrNull,
+  int,
+  obj,
+  shaped as shapedWith,
+  str,
+  strOrNull,
+} from "@/services/http/shape";
 import { txServiceBaseUrl } from "@/services/safe/config";
 import { SafeError, type Address, type Hex, type SafeTx } from "@/services/safe/types";
 
@@ -150,54 +162,8 @@ async function postJson(chainId: number, path: string, body: unknown): Promise<v
 }
 
 // ---------------------------------------------------------------------------
-// Shape parsing
+// Shape parsing (helpers: services/http/shape.ts)
 // ---------------------------------------------------------------------------
-
-class ShapeError extends Error {}
-
-function obj(v: unknown, what: string): Record<string, unknown> {
-  if (typeof v !== "object" || v === null || Array.isArray(v)) {
-    throw new ShapeError(`${what} is not an object`);
-  }
-  return v as Record<string, unknown>;
-}
-
-function addr(v: unknown, what: string): Address {
-  if (typeof v !== "string" || !isAddress(v, { strict: false })) {
-    throw new ShapeError(`${what} is not an address`);
-  }
-  return getAddress(v);
-}
-
-function addrOrNull(v: unknown, what: string): Address | null {
-  return v === null || v === undefined || v === "" ? null : addr(v, what);
-}
-
-function hex(v: unknown, what: string): Hex {
-  if (typeof v !== "string" || !isHex(v)) throw new ShapeError(`${what} is not hex`);
-  return v;
-}
-
-function hexOrNull(v: unknown, what: string): Hex | null {
-  return v === null || v === undefined || v === "" ? null : hex(v, what);
-}
-
-function int(v: unknown, what: string): number {
-  const n = typeof v === "string" && /^\d+$/.test(v) ? Number(v) : v;
-  if (typeof n !== "number" || !Number.isSafeInteger(n)) {
-    throw new ShapeError(`${what} is not an integer`);
-  }
-  return n;
-}
-
-function str(v: unknown, what: string): string {
-  if (typeof v !== "string") throw new ShapeError(`${what} is not a string`);
-  return v;
-}
-
-function strOrNull(v: unknown, what: string): string | null {
-  return v === null || v === undefined ? null : str(v, what);
-}
 
 function parseConfirmation(v: unknown): TxServiceConfirmation {
   const c = obj(v, "confirmation");
@@ -252,14 +218,10 @@ function parseSafeInfo(v: unknown): TxServiceSafeInfo {
 }
 
 function shaped<T>(method: string, path: string, parse: () => T): T {
-  try {
-    return parse();
-  } catch (e) {
-    if (e instanceof ShapeError) {
-      throw new SafeError("tx_service", `${method} ${path}: unexpected response (${e.message})`);
-    }
-    throw e;
-  }
+  return shapedWith(
+    parse,
+    (e) => new SafeError("tx_service", `${method} ${path}: unexpected response (${e.message})`),
+  );
 }
 
 // ---------------------------------------------------------------------------
