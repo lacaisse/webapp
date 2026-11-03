@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import "server-only";
 
-import { getAddress } from "viem";
-
 import { COW_CONTRACTS_BY_CHAIN, assetAddress, assetChainId } from "../assets";
 import { readSettledTrade } from "../chain";
 import { getOrder, getTrades, postPreSignOrder, requestQuote } from "../cow-api";
 import {
   APP_DATA_DOC,
   APP_DATA_HASH,
+  ERC20_APPROVE_SELECTOR,
+  SET_PRE_SIGNATURE_SELECTOR,
   applySlippage,
   erc20ApproveData,
   orderFromJson,
@@ -75,7 +75,10 @@ export function cowLeg(from: Erc20AssetId, to: Erc20AssetId): Leg {
     to,
     exact: false,
     steps: ["api", "calls", "wait"],
-    contracts: (c) => [sellToken, cowFor(c).settlement],
+    contracts: (c) => [
+      { address: sellToken, selectors: [ERC20_APPROVE_SELECTOR] },
+      { address: cowFor(c).settlement, selectors: [SET_PRE_SIGNATURE_SELECTOR] },
+    ],
 
     quote: async (r) => {
       if (r.chainId !== chainId) throw new ConvertError("config", "CoW leg: wrong chain");
@@ -189,5 +192,3 @@ export function cowLeg(from: Erc20AssetId, to: Erc20AssetId): Leg {
     },
   };
 }
-
-export { getAddress as _checksum };

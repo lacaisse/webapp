@@ -47,4 +47,10 @@ describe("formatExtraAmount", () => {
     expect(formatExtraAmount("1000000000000", 18)).toBe("0"); // dust
     expect(formatExtraAmount("7000000000000000000", 18)).toBe("7");
   });
+
+  it("cuts to an explicit number of decimals", () => {
+    expect(formatExtraAmount("12345678900000000000", 18, 2)).toBe("12.34");
+    expect(formatExtraAmount("12345678900000000000", 18, 6)).toBe("12.345678");
+    expect(formatExtraAmount("12300000000000000000", 18, 2)).toBe("12.3");
+  });
 });

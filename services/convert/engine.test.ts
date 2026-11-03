@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { getAddress } from "viem";
+import { encodeFunctionData, getAddress } from "viem";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // The conversion engine end to end against the real Safe core
@@ -45,8 +45,8 @@ vi.mock("@/services/safe/sync", () => sync);
 
 const annotate = vi.hoisted(() => ({
   annotateTransaction: vi.fn(),
-  ANNOTATION_KINDS: { safeTransfer: "SAFE_TRANSFER" },
-  ANNOTATION_TRIGGERS: { safeTransfer: "SAFE_TRANSFER" },
+  ANNOTATION_KINDS: { safeTransfer: "SAFE_TRANSFER", safeConversion: "SAFE_CONVERSION" },
+  ANNOTATION_TRIGGERS: { safeTransfer: "SAFE_TRANSFER", safeConversion: "SAFE_CONVERSION" },
 }));
 vi.mock("@/services/transaction-annotation/annotate", () => annotate);
 
@@ -72,17 +72,20 @@ import { fake, resetFake } from "@/services/safe/test-fake-prisma";
 import type { SafeTxSummary } from "@/services/safe/types";
 
 import { BREAD_CONTRACTS_BY_CHAIN, COW_CONTRACTS_BY_CHAIN, EURE_BY_CHAIN } from "./assets";
-import { APP_DATA_HASH, orderUid } from "./cow-order";
+import { APP_DATA_HASH, erc20ApproveData, orderUid, setPreSignatureData } from "./cow-order";
 import {
   ORDER_VALID_FOR_S,
   cancelConversion,
+  checkCalls,
   continueConversion,
   quoteConversion,
   signingRounds,
   startConversion,
 } from "./engine";
 import { advanceConversions } from "./progress";
-import { CONVERTERS } from "./registry";
+import { CONVERTERS, converterById } from "./registry";
+import type { Call } from "./types";
+import type { Position } from "./walk";
 
 const db = fake.db;
 const SAFE = getAddress("0x5afe00000000000000000000000000000000cafe");
@@ -298,6 +301,13 @@ describe("EURe → BREAD on a 1-of-1 Safe", () => {
     });
     expect(row()).toMatchObject({ status: "DONE", round: 2, amountOut: FILLED.toString() });
     expect(row().completedAt).toBeInstanceOf(Date);
+
+    // Both executed batches and the fill's settlement are annotated like a
+    // transfer from the Safe, in the order they happened.
+    expect(annotate.annotateTransaction.mock.calls.map(([c]) => c.txHash)).toEqual([EXEC_HASH, SETTLE_HASH, EXEC_HASH]);
+    for (const [call] of annotate.annotateTransaction.mock.calls) {
+      expect(call).toMatchObject({ fundId: FUND.id, kind: "SAFE_CONVERSION", trigger: "SAFE_CONVERSION", triggeredByUserId: "u-a" });
+    }
   });
 
   it("refuses to start when the fresh minimum is below what the user accepted, writing nothing", async () => {
@@ -326,6 +336,7 @@ describe("EURe → BREAD on a 1-of-1 Safe", () => {
     seed(ONE_OF_ONE);
     chain.holderBalance.mockResolvedValue(E("10"));
     await expect(quoteAndStart("eure-bread")).rejects.toMatchObject({ code: "funds_moved" });
+    expect(cowApi.postPreSignOrder).not.toHaveBeenCalled();
     expect(db.fundConversion).toHaveLength(0);
   });
 
@@ -437,6 +448,37 @@ describe("multisig: a proposal that waits, is withdrawn, or whose hook was misse
     expect(db.fundConversion[0]).toMatchObject({ status: "PROPOSED", round: 2 });
   });
 
+  it("refuses to re-propose a batch whose order has run out, ending the conversion EXPIRED", async () => {
+    seed(TWO_OF_THREE);
+    const { started } = await quoteAndStart("eure-bread");
+    await withdrawProposal({ fundId: FUND.id, safeId, transactionId: started.proposal.transactionId, userId: "u-a", isFundOwner: false });
+    const late = new Date(NOW.getTime() + 8 * 86_400_000); // past the week the order is valid
+    await expect(
+      continueConversion({ fund: FUND, safeId, userId: "u-b", conversionId: started.conversionId, now: late }),
+    ).rejects.toMatchObject({ code: "expired" });
+    expect(db.fundConversion[0]).toMatchObject({ status: "EXPIRED", completedAt: late });
+    expect(db.fundSafeTransaction).toHaveLength(0);
+    expect(cowApi.postPreSignOrder).toHaveBeenCalledTimes(1);
+  });
+
+  it("a mint step proposed after the fill depends on no order: it goes ahead however late, with no validity on its card", async () => {
+    seed(ONE_OF_ONE);
+    const { started } = await quoteAndStart("eure-bread");
+    const posted = cowApi.postPreSignOrder.mock.calls[0][0];
+    cowApi.getOrder.mockResolvedValue({ uid: posted.uid, status: "fulfilled", executedSellAmount: IN, executedBuyAmount: FILLED, invalidated: false, validTo: posted.order.validTo });
+    cowApi.getTrades.mockResolvedValue([{ orderUid: posted.uid, owner: SAFE, sellAmount: IN, buyAmount: FILLED, txHash: SETTLE_HASH, blockNumber: 1, logIndex: 0 }]);
+    chain.readSettledTrade.mockResolvedValue({ sellAmount: IN, buyAmount: FILLED, feeAmount: BigInt(0) });
+    await advanceConversions(new Date(NOW.getTime() + 60_000));
+    expect(db.fundConversion[0].status).toBe("READY");
+
+    const late = new Date(NOW.getTime() + 8 * 86_400_000);
+    const second = await continueConversion({ fund: FUND, safeId, userId: "u-a", conversionId: started.conversionId, now: late });
+    expect(second.executed).toBe(true);
+    expect(summaryOf(1)).toMatchObject({ step: 2, label: "mint" });
+    expect(summaryOf(1)).not.toHaveProperty("validUntil");
+    expect(db.fundConversion[0]).toMatchObject({ status: "DONE", amountOut: FILLED.toString() });
+  });
+
   it("the cron repairs a PROPOSED row whose proposal executed (hook missed) or vanished", async () => {
     seed(ONE_OF_ONE);
     const { started } = await quoteAndStart("eure-bread");
@@ -454,5 +496,54 @@ describe("multisig: a proposal that waits, is withdrawn, or whose hook was misse
     Object.assign(row, { status: "PROPOSED", round: 2, updatedAt: new Date(NOW.getTime() - 10 * 60_000) });
     await advanceConversions(NOW);
     expect(row.status).toBe("READY");
+  });
+});
+
+describe("checkCalls", () => {
+  const converter = converterById("eure-bread");
+  const ERC20_TRANSFER_ABI = [
+    {
+      type: "function",
+      name: "transfer",
+      stateMutability: "nonpayable",
+      inputs: [
+        { name: "to", type: "address" },
+        { name: "amount", type: "uint256" },
+      ],
+      outputs: [{ name: "", type: "bool" }],
+    },
+  ] as const;
+  const UID = `0x${"ab".repeat(56)}` as const;
+  const approve = (to: `0x${string}`, spender: `0x${string}`, amount: bigint): Call => ({ to, value: BigInt(0), data: erc20ApproveData(spender, amount), label: "approve" });
+  const presign = (to: `0x${string}`): Call => ({ to, value: BigInt(0), data: setPreSignatureData(UID, true), label: "presign" });
+  const check = (calls: Call[]) => {
+    const position: Position = { legIndex: 0, appliesTo: [0], amountIn: IN, step: { kind: "calls", label: "swap", calls } };
+    return () => checkCalls({ converter, chainId: 100, position });
+  };
+  const refused = expect.objectContaining({ code: "contract_refused" });
+
+  it("passes the swap batch: the exact approval to the vault relayer, then the presign", () => {
+    expect(check([approve(EURE, COW.vaultRelayer, IN), presign(COW.settlement)])).not.toThrow();
+  });
+
+  it("refuses a call outside the converter's contracts", () => {
+    expect(check([approve(A, COW.vaultRelayer, IN)])).toThrow(refused);
+  });
+
+  it("refuses an approval to anyone but the vault relayer, or of any other amount", () => {
+    expect(check([approve(EURE, B, IN)])).toThrow(refused);
+    expect(check([approve(EURE, COW.vaultRelayer, IN - BigInt(1))])).toThrow(refused);
+  });
+
+  it("refuses a function the leg did not list, even on its own contract", () => {
+    const transfer: Call = {
+      to: EURE,
+      value: BigInt(0),
+      data: encodeFunctionData({ abi: ERC20_TRANSFER_ABI, functionName: "transfer", args: [A, IN] }),
+      label: "approve",
+    };
+    expect(check([transfer])).toThrow(refused);
+    expect(check([presign(EURE)])).toThrow(refused); // setPreSignature belongs to the settlement
+    expect(check([{ to: EURE, value: BigInt(0), data: "0x09", label: "approve" }])).toThrow(refused); // no selector at all
   });
 });

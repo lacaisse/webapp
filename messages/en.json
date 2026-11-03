@@ -181,6 +181,7 @@
       "ACCOUNT_BURN": "Burn",
       "ACCOUNT_TRANSFER": "Transfer",
       "SAFE_TRANSFER": "Safe transfer",
+      "SAFE_CONVERSION": "Safe conversion",
       "system": "System",
       "by": "by {name}",
       "triggers": {
@@ -193,6 +194,7 @@
         "ACCOUNT_BURN": "Account burn",
         "ACCOUNT_TRANSFER": "Account transfer",
         "SAFE_TRANSFER": "Safe (multisig) transfer",
+        "SAFE_CONVERSION": "Safe (multisig) conversion",
         "ORDER_SETTLEMENT_MINT": "Order settlement (mint)",
         "ORDER_SETTLEMENT_BURN": "Order settlement (burn)",
         "PAYOUT_BURN": "Payout burn",
@@ -604,6 +606,7 @@
           "cancelDescription": "Nothing is in flight: no order is open and no transaction is pending. What was converted so far stays in the Safe.",
           "cancelConfirm": "Cancel conversion",
           "proposalExpired": "The conversion order expired before the owners signed. Reject the pending transaction, then start again.",
+          "readyExpired": "The conversion order expired before the next step was proposed. Cancel this conversion and start again.",
           "fillHint": "The conversion fills at the market rate; this page checks every couple of minutes.",
           "readyHint": "The order filled: the next transaction is sized to what arrived."
         },

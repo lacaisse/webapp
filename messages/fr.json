@@ -181,6 +181,7 @@
       "ACCOUNT_BURN": "Brûlage",
       "ACCOUNT_TRANSFER": "Transfert",
       "SAFE_TRANSFER": "Transfert Safe",
+      "SAFE_CONVERSION": "Conversion Safe",
       "system": "Système",
       "by": "par {name}",
       "triggers": {
@@ -193,6 +194,7 @@
         "ACCOUNT_BURN": "Brûlage sur compte",
         "ACCOUNT_TRANSFER": "Transfert de compte",
         "SAFE_TRANSFER": "Transfert Safe (multisignature)",
+        "SAFE_CONVERSION": "Conversion Safe (multisignature)",
         "ORDER_SETTLEMENT_MINT": "Règlement de commande (émission)",
         "ORDER_SETTLEMENT_BURN": "Règlement de commande (brûlage)",
         "PAYOUT_BURN": "Brûlage de virement",
@@ -604,6 +606,7 @@
           "cancelDescription": "Rien n'est en cours : aucun ordre ouvert, aucune transaction en attente. Ce qui a déjà été converti reste dans le Safe.",
           "cancelConfirm": "Annuler la conversion",
           "proposalExpired": "L'ordre de conversion a expiré avant que les propriétaires ne signent. Rejetez la transaction en attente, puis recommencez.",
+          "readyExpired": "L'ordre de conversion a expiré avant que l'étape suivante ne soit proposée. Annulez cette conversion, puis recommencez.",
           "fillHint": "La conversion s'exécute au cours du marché ; cette page vérifie toutes les deux minutes environ.",
           "readyHint": "L'ordre est exécuté : la prochaine transaction est dimensionnée sur ce qui est arrivé."
         },

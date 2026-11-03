@@ -21,7 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { quoteConversionAction, startConversionAction } from "@/services/convert/admin-actions";
 import type { ConversionQuote } from "@/services/convert/engine";
-import { QuoteConversionSchema } from "@/services/convert/schemas";
+import { DEFAULT_SLIPPAGE_BPS, QuoteConversionSchema } from "@/services/convert/schemas";
 import type { SigningPasskeyHandle } from "@/services/safe/action-types";
 
 import { useStepUp } from "@/components/reauth-dialog";
@@ -38,7 +38,6 @@ export type ConvertPairOption = {
 
 const SELECT_CLASS =
   "h-8 w-full rounded-md bg-background px-2 text-sm ring-1 ring-foreground/15 outline-none focus-visible:ring-2 focus-visible:ring-ring";
-const SLIPPAGE_BPS = 50;
 
 // Swap one of the Safe's balances for another (EURe ↔ BREAD) through a CoW
 // order the Safe pre-signs. Quote first — expected, minimum, how many Safe
@@ -103,7 +102,12 @@ export function ConvertDialog({
   };
 
   const parsedInput = () =>
-    QuoteConversionSchema.safeParse({ safeId, converterId: pair?.converterId, amount, slippageBps: SLIPPAGE_BPS });
+    QuoteConversionSchema.safeParse({
+      safeId,
+      converterId: pair?.converterId,
+      amount,
+      slippageBps: DEFAULT_SLIPPAGE_BPS,
+    });
 
   const onQuote = () => {
     setError(null);

@@ -31,8 +31,9 @@ import { ProposalResult } from "./proposal-result";
 
 // The Safe's conversions (services/convert): where each one stands, its
 // CoW order, and — when the engine waits for an owner — the button that
-// proposes the next step, or cancels. A conversion whose proposal is still
-// collecting signatures shows up in the pending list too.
+// proposes the next step, or cancels (only cancels once the order ran out:
+// the engine refuses to continue past it). A conversion whose proposal is
+// still collecting signatures shows up in the pending list too.
 
 const STATUS_VARIANT: Record<FundConversionStatus, "info" | "warning" | "success" | "outline" | "destructive"> = {
   PROPOSED: "info",
@@ -83,7 +84,7 @@ export function ConversionsCard({
             hasPasskey={hasPasskey}
             me={me}
             relative={(iso) => format.relativeTime(new Date(iso), now)}
-            expired={Boolean(c.validUntil && new Date(c.validUntil).getTime() < now.getTime())}
+            expired={Boolean(c.orderOpen && c.validUntil && new Date(c.validUntil).getTime() < now.getTime())}
           />
         ))}
       </div>
@@ -171,7 +172,7 @@ function ConversionRow({
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-medium tabular-nums break-words">{line}</span>
               <Badge variant={STATUS_VARIANT[c.status]}>{t(`status.${c.status}`)}</Badge>
-              {c.status === "PROPOSED" && expired && (
+              {(c.status === "PROPOSED" || c.status === "READY") && expired && (
                 <Badge variant="destructive">
                   <AlertTriangle />
                   {t("status.EXPIRED")}
@@ -234,6 +235,9 @@ function ConversionRow({
             {c.status === "PROPOSED" && expired && (
               <p className="text-xs text-destructive">{t("card.proposalExpired")}</p>
             )}
+            {c.status === "READY" && expired && (
+              <p className="text-xs text-destructive">{t("card.readyExpired")}</p>
+            )}
             {c.status === "FAILED" && c.errorMessage && (
               <p className="text-xs text-destructive break-words">{c.errorMessage}</p>
             )}
@@ -268,10 +272,12 @@ function ConversionRow({
               <X className="size-4" />
               {t("card.cancel")}
             </Button>
-            <Button type="button" size="sm" onClick={onContinue} disabled={pending || cancelling}>
-              {pending ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4" />}
-              {t("card.continue")}
-            </Button>
+            {!expired && (
+              <Button type="button" size="sm" onClick={onContinue} disabled={pending || cancelling}>
+                {pending ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4" />}
+                {t("card.continue")}
+              </Button>
+            )}
           </div>
         )}
 

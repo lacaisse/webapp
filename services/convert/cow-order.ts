@@ -18,6 +18,7 @@
 import {
   encodeFunctionData,
   encodePacked,
+  getAbiItem,
   getAddress,
   hashTypedData,
   hexToNumber,
@@ -25,6 +26,7 @@ import {
   size,
   slice,
   stringToHex,
+  toFunctionSelector,
 } from "viem";
 
 import type { Address, Hex } from "./types";
@@ -244,6 +246,13 @@ export const ERC20_APPROVE_ABI = [
     outputs: [{ name: "", type: "uint256" }],
   },
 ] as const;
+
+// The only functions the CoW leg calls — what the engine lets its batch do
+// on the sell token and on the settlement contract.
+export const ERC20_APPROVE_SELECTOR: Hex = toFunctionSelector(getAbiItem({ abi: ERC20_APPROVE_ABI, name: "approve" }));
+export const SET_PRE_SIGNATURE_SELECTOR: Hex = toFunctionSelector(
+  getAbiItem({ abi: GPV2_SETTLEMENT_ABI, name: "setPreSignature" }),
+);
 
 export function setPreSignatureData(uid: Hex, signed = true): Hex {
   return encodeFunctionData({

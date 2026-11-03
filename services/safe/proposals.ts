@@ -531,9 +531,10 @@ const ownerInclude = {
   },
 } satisfies Prisma.FundSafeInclude;
 
-type LoadedSafe = Prisma.FundSafeGetPayload<{ include: typeof ownerInclude }>;
+export type LoadedSafe = Prisma.FundSafeGetPayload<{ include: typeof ownerInclude }>;
 
-async function loadActiveSafe(fundId: string, safeId: string): Promise<LoadedSafe> {
+/** The Safe with its current owners — what a proposal needs; one read per action. */
+export async function loadActiveSafe(fundId: string, safeId: string): Promise<LoadedSafe> {
   const safe = await prisma.fundSafe.findFirst({
     where: { id: safeId, fundId, archivedAt: null },
     include: ownerInclude,
@@ -885,18 +886,19 @@ export async function proposeTokenTransfer(a: {
  * One on-chain step of a token conversion (services/convert/engine.ts): the
  * leg's calls as one Safe transaction — a MultiSendCallOnly batch when there
  * are several (operation 1, allowed to that contract only). The engine has
- * already checked every call against the converter's contracts; the summary
- * tells signers what moves and lists the inner calls.
+ * already loaded the Safe (loadActiveSafe) and checked every call against
+ * the converter's contracts; the summary tells signers what moves and lists
+ * the inner calls.
  */
 export async function proposeConversionStep(a: {
   fund: { id: string; tokenChainId: number };
-  safeId: string;
+  safe: LoadedSafe;
   userId: string;
   conversionId: string;
   calls: SafeCall[];
   summary: Extract<SafeTxSummary, { kind: "CONVERSION" }>;
 }): Promise<ProposeResult> {
-  const safe = await loadActiveSafe(a.fund.id, a.safeId);
+  const { safe } = a;
   if (safe.chainId !== a.fund.tokenChainId) {
     throw new SafeError("unsupported_chain", "Safe and fund token are on different chains");
   }
@@ -1553,8 +1555,9 @@ export async function retryExecution(a: {
 // Mark a transaction EXECUTED (by our relayer or seen executed externally),
 // supersede the other open transactions at the same nonce, and for a
 // fund-token TOKEN_TRANSFER record the TokenOperation + annotation (xDAI /
-// EURe: the annotation only). Idempotent: a row
-// that is already EXECUTED is left alone.
+// EURe: the annotation only); a CONVERSION step gets the annotation and
+// moves its conversion on. Idempotent: a row that is already EXECUTED is
+// left alone.
 export async function recordExecuted(a: {
   fundId: string;
   transactionId: string;
@@ -1607,6 +1610,18 @@ export async function recordExecuted(a: {
 
   const summary = tx.summary as SafeTxSummary | null;
   if (tx.kind === "CONVERSION" && tx.conversionId) {
+    // The batch's token movements show in the Safe's history with the same
+    // trigger column as a transfer. Never throws.
+    if (a.txHash) {
+      await annotateTransaction({
+        fundId: a.fundId,
+        txHash: a.txHash,
+        kind: ANNOTATION_KINDS.safeConversion,
+        note: tx.note,
+        trigger: ANNOTATION_TRIGGERS.safeConversion,
+        triggeredByUserId: tx.proposedById,
+      });
+    }
     // The conversion moves on (an order is out → FILLING, a next step →
     // READY, or DONE). Best effort: the conversions cron repairs a miss.
     try {

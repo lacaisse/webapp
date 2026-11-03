@@ -9,10 +9,17 @@
 // walk folds their calls into the neighbouring swap's batch.
 // Pure: no server-only, no fetch, no DB.
 
-import { encodeFunctionData } from "viem";
+import { encodeFunctionData, getAbiItem, toFunctionSelector } from "viem";
 
-import { BREAD_CONTRACTS_BY_CHAIN, GNOSIS_ASSETS } from "../assets";
-import { ConvertError, type Address, type Leg, type LegContext, type Step } from "../types";
+import { BREAD_CONTRACTS_BY_CHAIN, GNOSIS_ASSETS, type BreadContracts } from "../assets";
+import {
+  ConvertError,
+  type Address,
+  type AllowedContract,
+  type Leg,
+  type LegContext,
+  type Step,
+} from "../types";
 
 const BREAD_ABI = [
   {
@@ -45,6 +52,12 @@ const WXDAI_ABI = [
   },
 ] as const;
 
+// The one function each leg calls on each contract — all a batch may do.
+const BREAD_MINT_SELECTOR = toFunctionSelector(getAbiItem({ abi: BREAD_ABI, name: "mint" }));
+const BREAD_BURN_SELECTOR = toFunctionSelector(getAbiItem({ abi: BREAD_ABI, name: "burn" }));
+const WXDAI_DEPOSIT_SELECTOR = toFunctionSelector(getAbiItem({ abi: WXDAI_ABI, name: "deposit" }));
+const WXDAI_WITHDRAW_SELECTOR = toFunctionSelector(getAbiItem({ abi: WXDAI_ABI, name: "withdraw" }));
+
 function contractsFor(chainId: number) {
   const c = BREAD_CONTRACTS_BY_CHAIN[chainId];
   if (!c) throw new ConvertError("config", `BREAD is not configured for chain ${chainId}`);
@@ -70,15 +83,13 @@ export function wxdaiWithdrawData(amount: bigint) {
 // An exact leg's whole life is one `calls` step.
 const exactLeg = (
   a: Pick<Leg, "id" | "from" | "to">,
+  allowed: (c: BreadContracts) => AllowedContract[],
   calls: (c: LegContext) => Step,
 ): Leg => ({
   ...a,
   exact: true,
   steps: ["calls"],
-  contracts: (chainId) => {
-    const c = contractsFor(chainId);
-    return [c.wxdai, c.bread];
-  },
+  contracts: (chainId) => allowed(contractsFor(chainId)),
   quote: async (r) => {
     if (r.amountIn <= BigInt(0)) throw new ConvertError("amount", "Amount must be positive");
     contractsFor(r.chainId);
@@ -96,6 +107,10 @@ const exactLeg = (
 /** WXDAI → BREAD: unwrap, then mint with the native xDAI (1:1). */
 export const breadMint: Leg = exactLeg(
   { id: "bread-mint", from: GNOSIS_ASSETS.WXDAI, to: GNOSIS_ASSETS.BREAD },
+  (c) => [
+    { address: c.wxdai, selectors: [WXDAI_WITHDRAW_SELECTOR] },
+    { address: c.bread, selectors: [BREAD_MINT_SELECTOR] },
+  ],
   (c) => {
     const { wxdai, bread } = contractsFor(c.chainId);
     return {
@@ -112,6 +127,10 @@ export const breadMint: Leg = exactLeg(
 /** BREAD → WXDAI: burn for native xDAI, then wrap it (1:1). */
 export const breadBurn: Leg = exactLeg(
   { id: "bread-burn", from: GNOSIS_ASSETS.BREAD, to: GNOSIS_ASSETS.WXDAI },
+  (c) => [
+    { address: c.bread, selectors: [BREAD_BURN_SELECTOR] },
+    { address: c.wxdai, selectors: [WXDAI_DEPOSIT_SELECTOR] },
+  ],
   (c) => {
     const { wxdai, bread } = contractsFor(c.chainId);
     return {

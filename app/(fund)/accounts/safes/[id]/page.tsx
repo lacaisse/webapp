@@ -118,9 +118,6 @@ async function SafeDetailView({
   } catch (e) {
     console.warn("[safes] page sync failed", id, e);
   }
-  // A conversion waiting for its CoW order: check the fill now rather than
-  // on the cron's next tick (never fails the page).
-  await pollSafeConversions(fund.id, id);
 
   const safe = await getSafe(fund.id, id);
   if (!safe) notFound();
@@ -190,6 +187,17 @@ async function SafeDetailView({
     active && sameChain ? offeredPairs(display) : [],
     listSafeConversions(display, safe.id),
   ]);
+  // A conversion waiting for its CoW order is worth a fill check on view
+  // (PolledConversions below); the rest only changes through the cron.
+  const filling = conversions.some((c) => c.status === "FILLING");
+  const conversionsCard = {
+    safeId: safe.id,
+    chainId: safe.chainId,
+    threshold: safe.threshold,
+    canAct: active && !safe.configWarning,
+    hasPasskey,
+    me: passkeyHandle,
+  };
   // Before deployment the address column holds a `pending:` placeholder.
   const deployed = isDeployedAddress(safe.address);
   const ownersTotal = safe.owners.length;
@@ -434,16 +442,12 @@ async function SafeDetailView({
         </div>
       </div>
 
-      {conversions.length > 0 && (
-        <ConversionsCard
-          safeId={safe.id}
-          chainId={safe.chainId}
-          threshold={safe.threshold}
-          conversions={conversions}
-          canAct={active && !safe.configWarning}
-          hasPasskey={hasPasskey}
-          me={passkeyHandle}
-        />
+      {filling ? (
+        <Suspense fallback={<ConversionsCard {...conversionsCard} conversions={conversions} />}>
+          <PolledConversions fundId={fund.id} display={display} {...conversionsCard} />
+        </Suspense>
+      ) : (
+        conversions.length > 0 && <ConversionsCard {...conversionsCard} conversions={conversions} />
       )}
 
       {safe.pending.length > 0 && (
@@ -719,4 +723,26 @@ async function ConvertSlot({
     to: { symbol: p.toSymbol },
   }));
   return <ConvertDialog {...dialog} pairs={options} />;
+}
+
+// A FILLING conversion is checked against the CoW orderbook on view rather
+// than on the cron's next tick; that round-trip (10 s worst case) streams in
+// behind the rows already known, so a slow orderbook never holds the page.
+async function PolledConversions({
+  fundId,
+  display,
+  ...card
+}: {
+  fundId: string;
+  display: DisplayTokensFund;
+  safeId: string;
+  chainId: number;
+  threshold: number;
+  canAct: boolean;
+  hasPasskey: boolean;
+  me: SigningPasskeyHandle | null;
+}) {
+  await pollSafeConversions(fundId, card.safeId);
+  const conversions = await listSafeConversions(display, card.safeId);
+  return <ConversionsCard {...card} conversions={conversions} />;
 }

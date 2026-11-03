@@ -4,7 +4,11 @@ import "server-only";
 import { decodeFunctionData, getAddress, parseUnits } from "viem";
 
 import { prisma } from "@/services/db/prisma";
-import { proposeConversionStep, type ProposeResult } from "@/services/safe/proposals";
+import {
+  loadActiveSafe as loadSafeWithOwners,
+  proposeConversionStep,
+  type ProposeResult,
+} from "@/services/safe/proposals";
 import type { SafeTxSummary } from "@/services/safe/types";
 import type { DisplayTokensFund } from "@/services/token/display-tokens";
 import type { ExtraToken } from "@/services/token/extra-tokens";
@@ -12,13 +16,14 @@ import type { ExtraToken } from "@/services/token/extra-tokens";
 import { formatAmount, percentOf } from "./amounts";
 import { COW_CONTRACTS_BY_CHAIN, assetAddress } from "./assets";
 import { holderBalance } from "./chain";
-import { ERC20_APPROVE_ABI } from "./cow-order";
+import { ERC20_APPROVE_ABI, ERC20_APPROVE_SELECTOR } from "./cow-order";
 import { runApiSteps, stateOf, walkRow } from "./progress";
 import { converterById, offeredPairs, type OfferedPair } from "./registry";
 import {
   ConvertError,
   legQuoteToJson,
   type Address,
+  type AssetId,
   type Call,
   type ConversionState,
   type Converter,
@@ -34,10 +39,6 @@ import { converterContracts, quoteChain, type Position } from "./walk";
 // A CoW pre-sign order has no maximum validity; a week leaves room for the
 // owners' signatures without an order hanging around for ever.
 export const ORDER_VALID_FOR_S = 7 * 24 * 3600;
-export const DEFAULT_SLIPPAGE_BPS = 50;
-export const MAX_SLIPPAGE_BPS = 300;
-
-const APPROVE_SELECTOR = "0x095ea7b3";
 
 export type ConvertFund = DisplayTokensFund;
 
@@ -47,17 +48,29 @@ async function pairFor(fund: ConvertFund, converterId: string): Promise<OfferedP
   return pair;
 }
 
+// The Safe as the proposal needs it (owners included), read once per action
+// and handed to proposeConversionStep. A SafeError (not found, not active)
+// reaches the action as any Safe error does.
 async function loadActiveSafe(fund: ConvertFund, safeId: string) {
+  const safe = await loadSafeWithOwners(fund.id, safeId);
+  if (safe.chainId !== fund.tokenChainId) {
+    throw new ConvertError("config", "Safe and fund token are on different chains");
+  }
+  return { safe, chainId: safe.chainId, address: getAddress(safe.address) };
+}
+
+// A quote proposes nothing: the holder's chain and address, without the owners.
+async function quoteHolder(fund: ConvertFund, safeId: string) {
   const safe = await prisma.fundSafe.findFirst({
     where: { id: safeId, fundId: fund.id, archivedAt: null },
-    select: { id: true, chainId: true, address: true, status: true },
+    select: { chainId: true, address: true, status: true },
   });
   if (!safe) throw new ConvertError("not_found", "Safe not found");
   if (safe.status !== "ACTIVE") throw new ConvertError("invalid_state", "Safe is not active");
   if (safe.chainId !== fund.tokenChainId) {
     throw new ConvertError("config", "Safe and fund token are on different chains");
   }
-  return { id: safe.id, chainId: safe.chainId, address: getAddress(safe.address) };
+  return { chainId: safe.chainId, address: getAddress(safe.address) };
 }
 
 function parseAmount(amount: string, token: ExtraToken): bigint {
@@ -114,11 +127,11 @@ export async function quoteConversion(a: {
 }): Promise<ConversionQuote> {
   const now = a.now ?? new Date();
   const pair = await pairFor(a.fund, a.converterId);
-  const safe = await loadActiveSafe(a.fund, a.safeId);
+  const { chainId, address } = await quoteHolder(a.fund, a.safeId);
   const units = parseAmount(a.amount, pair.from);
   const q = await quoteChain(pair.converter, {
-    chainId: safe.chainId,
-    holder: safe.address,
+    chainId,
+    holder: address,
     amountIn: units,
     slippageBps: a.slippageBps,
     validFor: ORDER_VALID_FOR_S,
@@ -152,18 +165,24 @@ export async function quoteConversion(a: {
   };
 }
 
-// Every call of a step must target one of the converter's contracts, and an
-// ERC-20 approval may only be the exact sell amount to CoW's vault relayer.
-// A leg could never do otherwise today; this keeps a future leg honest.
+// Every call of a step must target one of the converter's contracts with a
+// function that leg listed for it, and an ERC-20 approval may only be the
+// exact sell amount to CoW's vault relayer. A leg could never do otherwise
+// today; this keeps a future leg honest.
 export function checkCalls(a: { converter: Converter; chainId: number; position: Position }): void {
   const allowed = converterContracts(a.converter, a.chainId);
   const cow = COW_CONTRACTS_BY_CHAIN[a.chainId];
   if (a.position.step.kind !== "calls") throw new ConvertError("invalid_state", "Not a calls step");
   for (const call of a.position.step.calls) {
-    if (!allowed.has(getAddress(call.to))) {
+    const selectors = allowed.get(getAddress(call.to));
+    if (!selectors) {
       throw new ConvertError("contract_refused", `Call to ${call.to} is outside the converter's contracts`);
     }
-    if (call.data.toLowerCase().startsWith(APPROVE_SELECTOR)) {
+    const selector = call.data.slice(0, 10).toLowerCase();
+    if (call.data.length < 10 || !selectors.has(selector)) {
+      throw new ConvertError("contract_refused", `Call to ${call.to} is not a function the converter may call (${selector})`);
+    }
+    if (selector === ERC20_APPROVE_SELECTOR) {
       const { args } = decodeFunctionData({ abi: ERC20_APPROVE_ABI, data: call.data });
       const [spender, amount] = args as readonly [Address, bigint];
       if (!cow || getAddress(spender) !== getAddress(cow.vaultRelayer)) {
@@ -209,16 +228,12 @@ function summaryFor(a: {
 async function requireHolderBalance(a: {
   chainId: number;
   holder: Address;
-  converter: Converter;
-  position: Position;
+  asset: AssetId;
+  amountIn: bigint;
 }): Promise<void> {
-  const inputLeg = a.converter.legs[a.position.appliesTo[0]];
-  const balance = await holderBalance({ chainId: a.chainId, holder: a.holder, token: assetAddress(inputLeg.from) });
-  if (balance < a.position.amountIn) {
-    throw new ConvertError(
-      "funds_moved",
-      `Holder has ${balance} of ${inputLeg.from}, the step needs ${a.position.amountIn}`,
-    );
+  const balance = await holderBalance({ chainId: a.chainId, holder: a.holder, token: assetAddress(a.asset) });
+  if (balance < a.amountIn) {
+    throw new ConvertError("funds_moved", `Holder has ${balance} of ${a.asset}, the step needs ${a.amountIn}`);
   }
 }
 
@@ -231,10 +246,11 @@ export type StartConversionInput = {
 
 /**
  * Start a conversion: re-quote, refuse if the market moved below what the
- * user accepted, run the api steps (post the CoW order), then create the
- * row and its first Safe proposal. Nothing is written if the order cannot be
- * posted; the row is removed if the proposal cannot be made (the posted
- * order is never pre-signed, so it can never fill).
+ * user accepted or the Safe does not hold the input, run the api steps (post
+ * the CoW order), then create the row and its first Safe proposal. Nothing
+ * is written if the order cannot be posted; the row is removed if the
+ * proposal cannot be made (the posted order is never pre-signed, so it can
+ * never fill).
  */
 export async function startConversion(a: {
   fund: ConvertFund;
@@ -246,14 +262,14 @@ export async function startConversion(a: {
   const now = a.now ?? new Date();
   const pair = await pairFor(a.fund, a.input.converterId);
   const { converter } = pair;
-  const safe = await loadActiveSafe(a.fund, a.safeId);
+  const { safe, chainId, address } = await loadActiveSafe(a.fund, a.safeId);
   const amountIn = parseAmount(a.input.amount, pair.from);
   if (!/^\d+$/.test(a.input.minOut)) throw new ConvertError("amount", "Bad minimum");
   const userMin = BigInt(a.input.minOut);
 
   const fresh = await quoteChain(converter, {
-    chainId: safe.chainId,
-    holder: safe.address,
+    chainId,
+    holder: address,
     amountIn,
     slippageBps: a.input.slippageBps,
     validFor: ORDER_VALID_FOR_S,
@@ -262,21 +278,22 @@ export async function startConversion(a: {
   if (fresh.minOut < userMin) {
     throw new ConvertError("quote_moved", `Fresh minimum ${fresh.minOut} is below the accepted ${userMin}`);
   }
-  // The minimum the user accepted is the minimum posted. With one swap leg
-  // (all registered converters) the overall minimum IS that leg's minimum;
-  // a second swap leg would need its own share of it.
-  const swapLegs = converter.legs.filter((l) => !l.exact);
-  if (swapLegs.length > 1) throw new ConvertError("invalid_state", "Converters with two swap legs are not supported");
+  // The minimum the user accepted is the minimum posted: the registry
+  // guarantees one swap leg, so the overall minimum IS that leg's minimum.
   const legs: LegQuote[] = fresh.legs.map((q, i) =>
     converter.legs[i].exact ? q : { ...q, minAmountOut: q.minAmountOut > userMin ? q.minAmountOut : userMin },
   );
   const minOut = fresh.minOut > userMin ? fresh.minOut : userMin;
 
+  // Before the order is posted: a refusal must not leave an order behind.
+  // The first batch's input is the conversion's (exact legs pass it through).
+  await requireHolderBalance({ chainId, holder: address, asset: converter.legs[0].from, amountIn });
+
   const state: ConversionState = { legs: legs.map((q) => ({ quote: legQuoteToJson(q), results: [] })) };
   const w = await runApiSteps({
     converterId: converter.id,
-    chainId: safe.chainId,
-    holder: safe.address,
+    chainId,
+    holder: address,
     amountIn,
     state,
     now,
@@ -284,15 +301,14 @@ export async function startConversion(a: {
   if (w.done || w.position.step.kind !== "calls") {
     throw new ConvertError("invalid_state", "Conversion does not start with an on-chain step");
   }
-  checkCalls({ converter, chainId: safe.chainId, position: w.position });
-  await requireHolderBalance({ chainId: safe.chainId, holder: safe.address, converter, position: w.position });
+  checkCalls({ converter, chainId, position: w.position });
 
   const row = await prisma.fundConversion.create({
     data: {
       fundId: a.fund.id,
       holderKind: "SAFE",
       safeId: safe.id,
-      holderAddress: safe.address,
+      holderAddress: address,
       converterId: converter.id,
       fromAsset: converter.legs[0].from,
       toAsset: converter.legs[converter.legs.length - 1].to,
@@ -311,7 +327,7 @@ export async function startConversion(a: {
   try {
     const proposal = await proposeConversionStep({
       fund: { id: a.fund.id, tokenChainId: a.fund.tokenChainId },
-      safeId: safe.id,
+      safe,
       userId: a.userId,
       conversionId: row.id,
       calls: w.position.step.calls,
@@ -348,15 +364,34 @@ export async function continueConversion(a: {
   if (row.status !== "READY") throw new ConvertError("invalid_state", `Conversion is ${row.status}`);
   const pair = await pairFor(a.fund, row.converterId);
   const { converter } = pair;
-  const safe = await loadActiveSafe(a.fund, a.safeId);
+  const { safe, chainId, address } = await loadActiveSafe(a.fund, a.safeId);
   const state = stateOf(row);
   const w = walkRow(row, state, now);
   if (w.done || w.position.step.kind !== "calls") {
     throw new ConvertError("invalid_state", "Conversion has no on-chain step to propose");
   }
-  checkCalls({ converter, chainId: safe.chainId, position: w.position });
+  // A swap leg sits in appliesTo only while its presign is pending: the step
+  // then hangs on an order the orderbook may have expired since (a first
+  // proposal withdrawn late). A later mint depends on no order.
+  const awaitsOrder = w.position.appliesTo.some((i) => !converter.legs[i].exact);
+  const orderExpired = w.position.appliesTo.some(
+    (i) => !converter.legs[i].exact && new Date(state.legs[i].quote.validUntil) <= now,
+  );
+  if (orderExpired) {
+    await prisma.fundConversion.updateMany({
+      where: { id: row.id, fundId: a.fund.id, status: "READY" },
+      data: { status: "EXPIRED", completedAt: now },
+    });
+    throw new ConvertError("expired", "The order behind this step has expired");
+  }
+  checkCalls({ converter, chainId, position: w.position });
   try {
-    await requireHolderBalance({ chainId: safe.chainId, holder: safe.address, converter, position: w.position });
+    await requireHolderBalance({
+      chainId,
+      holder: address,
+      asset: converter.legs[w.position.appliesTo[0]].from,
+      amountIn: w.position.amountIn,
+    });
   } catch (e) {
     if (e instanceof ConvertError && e.code === "funds_moved") {
       await prisma.fundConversion.updateMany({
@@ -375,7 +410,7 @@ export async function continueConversion(a: {
   try {
     return await proposeConversionStep({
       fund: { id: a.fund.id, tokenChainId: a.fund.tokenChainId },
-      safeId: safe.id,
+      safe,
       userId: a.userId,
       conversionId: row.id,
       calls: w.position.step.calls,
@@ -386,7 +421,7 @@ export async function continueConversion(a: {
         position: w.position,
         from: { symbol: pair.from.symbol, decimals: pair.from.decimals, amountIn: BigInt(row.amountIn) },
         to: { symbol: pair.to.symbol, decimals: pair.to.decimals, minOut: BigInt(row.minOut) },
-        validUntil: row.validUntil,
+        validUntil: awaitsOrder ? row.validUntil : null,
       }),
     });
   } catch (e) {

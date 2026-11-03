@@ -8,6 +8,7 @@ import { GNOSIS_ASSETS, displayTokenAsset } from "./assets";
 import { breadBurn, breadMint } from "./legs/bread";
 import { cowLeg } from "./legs/cow";
 import { ConvertError, type AssetId, type Converter } from "./types";
+import { assertConverter } from "./walk";
 
 // The converters La Caisse offers. A converter is an id (stored on rows:
 // never rename) and its legs in order; adding a pair whose legs exist is one
@@ -21,6 +22,8 @@ export const CONVERTERS: readonly Converter[] = [
   // BREAD → EURe: burn + wrap fold into the swap's batch — one proposal.
   { id: "bread-eure", legs: [breadBurn, cowLeg(GNOSIS_ASSETS.WXDAI, GNOSIS_ASSETS.EURE)] },
 ];
+// A converter the engine could not run fails here, at load, not on a click.
+CONVERTERS.forEach(assertConverter);
 
 export function converterFrom(c: Converter): AssetId {
   return c.legs[0].from;

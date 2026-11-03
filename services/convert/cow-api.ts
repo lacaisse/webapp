@@ -1,7 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import "server-only";
 
-import { getAddress, isAddress, isHex } from "viem";
+import {
+  ShapeError,
+  addr,
+  hex,
+  int,
+  obj,
+  shaped as shapedWith,
+  str,
+  uint,
+} from "@/services/http/shape";
 
 import { orderToJson, type CowOrder } from "./cow-order";
 import { ConvertError, type Address, type Hex } from "./types";
@@ -80,55 +89,14 @@ function parseJson(method: string, path: string, r: HttpResult): unknown {
 }
 
 // ---------------------------------------------------------------------------
-// Shape parsing
+// Shape parsing (helpers: services/http/shape.ts)
 // ---------------------------------------------------------------------------
 
-class ShapeError extends Error {}
-
-function obj(v: unknown, what: string): Record<string, unknown> {
-  if (typeof v !== "object" || v === null || Array.isArray(v)) {
-    throw new ShapeError(`${what} is not an object`);
-  }
-  return v as Record<string, unknown>;
-}
-
-function addr(v: unknown, what: string): Address {
-  if (typeof v !== "string" || !isAddress(v, { strict: false })) {
-    throw new ShapeError(`${what} is not an address`);
-  }
-  return getAddress(v);
-}
-
-function hex(v: unknown, what: string): Hex {
-  if (typeof v !== "string" || !isHex(v)) throw new ShapeError(`${what} is not hex`);
-  return v;
-}
-
-function uint(v: unknown, what: string): bigint {
-  if (typeof v === "number" && Number.isInteger(v) && v >= 0) return BigInt(v);
-  if (typeof v !== "string" || !/^\d+$/.test(v)) throw new ShapeError(`${what} is not an integer`);
-  return BigInt(v);
-}
-
-function int(v: unknown, what: string): number {
-  if (typeof v !== "number" || !Number.isInteger(v)) throw new ShapeError(`${what} is not an integer`);
-  return v;
-}
-
-function str(v: unknown, what: string): string {
-  if (typeof v !== "string") throw new ShapeError(`${what} is not a string`);
-  return v;
-}
-
 function shaped<T>(what: string, f: () => T): T {
-  try {
-    return f();
-  } catch (e) {
-    if (e instanceof ShapeError) {
-      throw new ConvertError("cow_api", `CoW orderbook: unexpected ${what} (${e.message})`);
-    }
-    throw e;
-  }
+  return shapedWith(
+    f,
+    (e) => new ConvertError("cow_api", `CoW orderbook: unexpected ${what} (${e.message})`),
+  );
 }
 
 // ---------------------------------------------------------------------------

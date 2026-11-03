@@ -78,6 +78,10 @@ export type LegContext = {
   now: Date;
 };
 
+// A contract a leg may call and the functions (4-byte selectors, lowercase)
+// it may call on it.
+export type AllowedContract = { address: Address; selectors: Hex[] };
+
 export type Leg = {
   id: string; // stored on rows: never rename
   from: AssetId;
@@ -88,9 +92,9 @@ export type Leg = {
   // The kinds of its steps, in order — what `next` will ask for. Drives the
   // progress shown to people (steps.ts); `next` stays the source of truth.
   steps: readonly StepKind[];
-  // Every address this leg's calls may target: the engine refuses anything
-  // else before it reaches a Safe.
-  contracts(chainId: number): Address[];
+  // Every contract this leg's calls may target and the functions it may call
+  // on it: the engine refuses anything else before it reaches a Safe.
+  contracts(chainId: number): AllowedContract[];
   quote(r: QuoteRequest): Promise<LegQuote>;
   // Pure: the next step given the results so far, null once the leg is done.
   next(c: LegContext): Step | null;

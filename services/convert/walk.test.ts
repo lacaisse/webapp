@@ -12,13 +12,15 @@ import {
   type Leg,
   type StepResult,
 } from "./types";
-import { converterContracts, quoteChain, walk } from "./walk";
+import { assertConverter, converterContracts, quoteChain, walk } from "./walk";
 
 // The walk is exercised with the real BREAD legs and a stand-in swap leg
 // that behaves like the CoW one (api → calls → wait) without the orderbook.
 const SAFE = getAddress("0x5afe00000000000000000000000000000000cafe");
 const SELL = getAddress("0x1111111111111111111111111111111111111111");
 const SETTLE = getAddress("0x2222222222222222222222222222222222222222");
+const APPROVE = "0x095ea7b3";
+const PRESIGN = "0xec6cb13f";
 const NOW = new Date("2026-11-02T12:00:00Z");
 const IN = BigInt("50000000000000000000"); // 50 EURe
 const QUOTED = BigInt("56000000000000000000"); // 56 WXDAI expected
@@ -31,7 +33,10 @@ function swapLeg(from: Erc20AssetId, to: Erc20AssetId): Leg {
     to,
     exact: false,
     steps: ["api", "calls", "wait"],
-    contracts: () => [SELL, SETTLE],
+    contracts: () => [
+      { address: SELL, selectors: [APPROVE] },
+      { address: SETTLE, selectors: [PRESIGN] },
+    ],
     quote: async (r) => ({
       amountIn: r.amountIn,
       amountOut: QUOTED,
@@ -160,9 +165,36 @@ describe("walk: BREAD → EURe (exact burn folds into the swap's batch)", () => 
     expect(() => at(EURE_BREAD, state)).toThrow(expect.objectContaining({ code: "invalid_state" }));
   });
 
-  it("converterContracts is the union of the legs' contracts, checksummed", () => {
-    expect([...converterContracts(BREAD_EURE, 100)].sort()).toEqual(
-      [SELL, SETTLE, ...breadBurn.contracts(100)].map((a) => getAddress(a)).sort(),
-    );
+  it("converterContracts maps each checksummed address to the selectors its legs may call, merged", () => {
+    const allowed = converterContracts(BREAD_EURE, 100);
+    const [burn, wrap] = breadBurn.contracts(100);
+    expect([...allowed.keys()].sort()).toEqual([SELL, SETTLE, burn.address, wrap.address].sort());
+    expect(allowed.get(SELL)).toEqual(new Set([APPROVE]));
+    expect(allowed.get(SETTLE)).toEqual(new Set([PRESIGN]));
+    expect(allowed.get(burn.address)).toEqual(new Set(burn.selectors));
+    expect(allowed.get(wrap.address)).toEqual(new Set(wrap.selectors));
+
+    // Two legs naming the same contract (any case) pool their selectors, lowercased.
+    const other: Leg = {
+      ...breadMint,
+      contracts: () => [{ address: SELL.toLowerCase() as `0x${string}`, selectors: ["0xDEADBEEF"] }],
+    };
+    const merged = converterContracts({ id: "x", legs: [swapLeg(GNOSIS_ASSETS.EURE, GNOSIS_ASSETS.WXDAI), other] }, 100);
+    expect(merged.get(SELL)).toEqual(new Set([APPROVE, "0xdeadbeef"]));
+  });
+});
+
+describe("assertConverter", () => {
+  it("accepts the registered shapes: legs that chain around exactly one swap", () => {
+    expect(() => assertConverter(EURE_BREAD)).not.toThrow();
+    expect(() => assertConverter(BREAD_EURE)).not.toThrow();
+  });
+
+  it("rejects two swap legs, legs that do not chain, no legs and no id", () => {
+    const swap = (from: Erc20AssetId, to: Erc20AssetId) => swapLeg(from, to);
+    expect(() => assertConverter({ id: "two-swaps", legs: [swap(GNOSIS_ASSETS.EURE, GNOSIS_ASSETS.WXDAI), swap(GNOSIS_ASSETS.WXDAI, GNOSIS_ASSETS.EURE)] })).toThrow(/two-swaps.*2 swap legs/);
+    expect(() => assertConverter({ id: "broken", legs: [swap(GNOSIS_ASSETS.EURE, GNOSIS_ASSETS.WXDAI), breadBurn] })).toThrow(/broken/);
+    expect(() => assertConverter({ id: "empty", legs: [] })).toThrow(/empty/);
+    expect(() => assertConverter({ id: "", legs: [swap(GNOSIS_ASSETS.EURE, GNOSIS_ASSETS.WXDAI)] })).toThrow(/no id/);
   });
 });

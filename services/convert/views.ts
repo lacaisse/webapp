@@ -19,6 +19,9 @@ export type ConversionView = {
   from: { symbol: string; amount: string }; // human amounts
   to: { symbol: string; expected: string; min: string; amount: string | null };
   orderUid: Hex | null; // the CoW order of the swap leg, once posted
+  // The swap's order is posted and not filled yet, so validUntil still
+  // matters; false before the order is posted and once it filled.
+  orderOpen: boolean;
   progress: ProgressStep[]; // every step of the conversion, done / active / pending
   validUntil: string | null; // ISO
   errorMessage: string | null;

@@ -165,6 +165,7 @@
       "ACCOUNT_BURN": "Quema",
       "ACCOUNT_TRANSFER": "Transferencia",
       "SAFE_TRANSFER": "Transferencia Safe",
+      "SAFE_CONVERSION": "Conversión Safe",
       "system": "Sistema",
       "by": "por {name}",
       "triggers": {
@@ -177,6 +178,7 @@
         "ACCOUNT_BURN": "Quema en cuenta",
         "ACCOUNT_TRANSFER": "Transferencia de cuenta",
         "SAFE_TRANSFER": "Transferencia Safe (multifirma)",
+        "SAFE_CONVERSION": "Conversión Safe (multifirma)",
         "ORDER_SETTLEMENT_MINT": "Liquidación de pedido (emisión)",
         "ORDER_SETTLEMENT_BURN": "Liquidación de pedido (quema)",
         "PAYOUT_BURN": "Quema de pago",
@@ -587,6 +589,7 @@
           "cancelDescription": "No hay nada en curso: ninguna orden abierta ni transacción pendiente. Lo ya convertido se queda en el Safe.",
           "cancelConfirm": "Cancelar conversión",
           "proposalExpired": "La orden de conversión expiró antes de que firmaran los propietarios. Rechaza la transacción pendiente y vuelve a empezar.",
+          "readyExpired": "La orden de conversión expiró antes de que se propusiera el siguiente paso. Cancela esta conversión y vuelve a empezar.",
           "fillHint": "La conversión se ejecuta al precio de mercado; esta página lo comprueba cada pocos minutos.",
           "readyHint": "La orden se ejecutó: la siguiente transacción se ajusta a lo que llegó."
         },

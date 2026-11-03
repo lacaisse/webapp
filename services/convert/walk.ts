@@ -114,9 +114,41 @@ export function walk(a: {
   return { done: true, position: null, amountOut: amountIn };
 }
 
-/** Every address a converter's legs may call on a chain (checksummed). */
-export function converterContracts(converter: Converter, chainId: number): Set<string> {
-  return new Set(converter.legs.flatMap((l) => l.contracts(chainId)).map((c) => getAddress(c)));
+/**
+ * What a converter's legs may call on a chain: the selectors (lowercase) by
+ * checksummed address, merged across legs.
+ */
+export function converterContracts(converter: Converter, chainId: number): Map<string, Set<string>> {
+  const allowed = new Map<string, Set<string>>();
+  for (const leg of converter.legs) {
+    for (const c of leg.contracts(chainId)) {
+      const address = getAddress(c.address);
+      const selectors = allowed.get(address) ?? new Set<string>();
+      for (const s of c.selectors) selectors.add(s.toLowerCase());
+      allowed.set(address, selectors);
+    }
+  }
+  return allowed;
+}
+
+/**
+ * What the engine and quoteChain take for granted about a converter, checked
+ * once when the registry loads: legs that chain, and exactly one swap leg —
+ * the minimum the user accepts is that leg's minimum, and a batch waits on
+ * at most one order.
+ */
+export function assertConverter(c: Converter): void {
+  if (!c.id) throw new Error("Converter has no id");
+  if (c.legs.length === 0) throw new Error(`Converter ${c.id} has no legs`);
+  for (let i = 1; i < c.legs.length; i++) {
+    const prev = c.legs[i - 1];
+    const leg = c.legs[i];
+    if (prev.to !== leg.from) {
+      throw new Error(`Converter ${c.id}: leg ${prev.id} ends in ${prev.to}, leg ${leg.id} starts from ${leg.from}`);
+    }
+  }
+  const swaps = c.legs.filter((l) => !l.exact).length;
+  if (swaps !== 1) throw new Error(`Converter ${c.id} has ${swaps} swap legs, exactly one is supported`);
 }
 
 export type ChainQuote = {
@@ -135,10 +167,10 @@ export type ChainQuote = {
 
 /**
  * Quote every leg in turn, each on the expected output of the previous one.
- * With the converters registered today (one swap leg, exact legs around it)
- * the overall minimum is exact: a swap's minimum passes through exact legs
+ * With one swap leg and exact legs around it (what assertConverter enforces)
+ * the overall minimum is exact: the swap's minimum passes through exact legs
  * unchanged. A second swap leg would need its own minimum quoted on the
- * first's minimum — add that when such a converter exists.
+ * first's minimum.
  */
 export async function quoteChain(converter: Converter, req: QuoteRequest): Promise<ChainQuote> {
   const legs: LegQuote[] = [];
@@ -156,7 +188,7 @@ export async function quoteChain(converter: Converter, req: QuoteRequest): Promi
     if (!leg.exact) inputUnits = false;
     amountIn = q.amountOut;
     minOut = leg.exact ? minOut : q.minAmountOut;
-    validUntil = validUntil && validUntil < q.validUntil ? validUntil : q.validUntil;
+    if (!validUntil || q.validUntil < validUntil) validUntil = q.validUntil;
   }
   if (!validUntil) throw new ConvertError("invalid_state", "Converter has no legs");
   return { legs, expectedOut: amountIn, minOut, fee, validUntil };

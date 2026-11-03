@@ -2,6 +2,11 @@
 import "server-only";
 
 import { prisma } from "@/services/db/prisma";
+import {
+  ANNOTATION_KINDS,
+  ANNOTATION_TRIGGERS,
+  annotateTransaction,
+} from "@/services/transaction-annotation/annotate";
 import type { FundConversion, FundConversionStatus, Prisma } from "@/services/db/generated/client";
 
 import { assetChainId } from "./assets";
@@ -204,6 +209,17 @@ export async function pollConversion(row: ConversionRow, now = new Date()): Prom
       return "pending";
     case "filled": {
       const moved = await recordAndAdvance({ row, state, appliesTo, result: res.result, from: "FILLING", now });
+      // The settlement moved the tokens (the Safe batch only approved): its
+      // rows in the Safe's history carry the conversion too. Never throws.
+      if (moved && res.result.txHash) {
+        await annotateTransaction({
+          fundId: row.fundId,
+          txHash: res.result.txHash,
+          kind: ANNOTATION_KINDS.safeConversion,
+          trigger: ANNOTATION_TRIGGERS.safeConversion,
+          triggeredByUserId: row.createdById,
+        });
+      }
       return moved ? "filled" : "moved";
     }
     case "expired":

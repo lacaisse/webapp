@@ -165,6 +165,7 @@
       "ACCOUNT_BURN": "Vernietiging",
       "ACCOUNT_TRANSFER": "Overdracht",
       "SAFE_TRANSFER": "Safe-overdracht",
+      "SAFE_CONVERSION": "Safe-conversie",
       "system": "Systeem",
       "by": "door {name}",
       "triggers": {
@@ -177,6 +178,7 @@
         "ACCOUNT_BURN": "Vernietiging op rekening",
         "ACCOUNT_TRANSFER": "Rekeningoverdracht",
         "SAFE_TRANSFER": "Safe-overdracht (multisig)",
+        "SAFE_CONVERSION": "Safe-conversie (multisig)",
         "ORDER_SETTLEMENT_MINT": "Orderafwikkeling (uitgifte)",
         "ORDER_SETTLEMENT_BURN": "Orderafwikkeling (vernietiging)",
         "PAYOUT_BURN": "Uitbetaling vernietigd",
@@ -587,6 +589,7 @@
           "cancelDescription": "Er loopt niets: geen open order, geen transactie in behandeling. Wat al is omgezet blijft in de Safe.",
           "cancelConfirm": "Omzetting annuleren",
           "proposalExpired": "De omzettingsorder verliep voordat de eigenaren tekenden. Wijs de openstaande transactie af en begin opnieuw.",
+          "readyExpired": "De omzettingsorder verliep voordat de volgende stap werd voorgesteld. Annuleer deze omzetting en begin opnieuw.",
           "fillHint": "De omzetting wordt tegen de marktkoers uitgevoerd; deze pagina controleert om de paar minuten.",
           "readyHint": "De order is uitgevoerd: de volgende transactie is afgestemd op wat binnenkwam."
         },

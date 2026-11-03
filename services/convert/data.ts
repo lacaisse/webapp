@@ -62,11 +62,19 @@ export async function listSafeConversions(
     const from = meta(row.fromAsset);
     const to = meta(row.toAsset);
     let orderUid: Hex | null = null;
+    let orderOpen = false;
     let progress: ProgressStep[] = [];
     try {
       const state = stateOf(row);
       orderUid = orderUidOf(state);
-      progress = conversionProgress(converterById(row.converterId).legs, state, row.status === "DONE");
+      const { legs } = converterById(row.converterId);
+      // A swap leg whose order is posted but not filled: its validity still
+      // binds what can be continued.
+      orderOpen = legs.some((leg, i) => {
+        const results = state.legs[i]?.results ?? [];
+        return !leg.exact && results.some((r) => r.kind === "api") && !results.some((r) => r.kind === "wait");
+      });
+      progress = conversionProgress(legs, state, row.status === "DONE");
     } catch {
       // a row with no leg state, or an unregistered converter: nothing to show
     }
@@ -83,6 +91,7 @@ export async function listSafeConversions(
         amount: row.amountOut ? formatAmount(BigInt(row.amountOut), to.decimals) : null,
       },
       orderUid,
+      orderOpen,
       progress,
       validUntil: row.validUntil?.toISOString() ?? null,
       errorMessage: row.errorMessage,

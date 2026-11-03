@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { formatUnits } from "viem";
+import { formatExtraAmount } from "@/services/token/extra-tokens";
 
 // Human amounts for quotes, summaries and cards. Raw units stay exact on the
 // rows and in the orders; what people read is cut (never rounded up) to two
 // decimals, like every other amount in the dashboard — so a minimum shown as
-// "0.55" is never more than what is enforced. Pure.
+// "0.55" is never more than what is enforced. The cut is the Accounts pages'
+// formatExtraAmount, only with a shorter default. Pure.
 
 export const DISPLAY_FRACTION_DIGITS = 2;
 
@@ -17,12 +18,7 @@ export function percentOf(part: bigint, whole: bigint): string {
   return frac ? `${whole100}.${frac}` : whole100.toString();
 }
 
-/** Raw units → "12.3456" (≤ `maxFraction` decimals, trailing zeros dropped). */
+/** Raw units → "12.34" (≤ `maxFraction` decimals, trailing zeros dropped). */
 export function formatAmount(units: bigint, decimals: number, maxFraction = DISPLAY_FRACTION_DIGITS): string {
-  const full = formatUnits(units, decimals);
-  const dot = full.indexOf(".");
-  if (dot === -1) return full;
-  const frac = full.slice(dot + 1, dot + 1 + maxFraction).replace(/0+$/, "");
-  const whole = full.slice(0, dot);
-  return frac ? `${whole}.${frac}` : whole;
+  return formatExtraAmount(units.toString(), decimals, maxFraction);
 }

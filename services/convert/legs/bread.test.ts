@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { decodeFunctionData, getAddress } from "viem";
+import { decodeFunctionData, getAddress, toFunctionSelector } from "viem";
 import { describe, expect, it } from "vitest";
 
 import { BREAD_CONTRACTS_BY_CHAIN, GNOSIS_ASSETS } from "../assets";
@@ -44,10 +44,19 @@ describe("BREAD legs", () => {
       const q = await leg.quote({ chainId: 100, holder: SAFE, amountIn: X, slippageBps: 50, validFor: 600, now: NOW });
       expect(q).toEqual({ amountIn: X, amountOut: X, minAmountOut: X, validUntil: new Date(NOW.getTime() + 600_000) });
       expect(leg.exact).toBe(true);
-      expect(leg.contracts(100)).toEqual([wxdai, bread]);
       await expect(leg.quote({ chainId: 100, holder: SAFE, amountIn: BigInt(0), slippageBps: 50, validFor: 600, now: NOW })).rejects.toMatchObject({ code: "amount" });
       await expect(leg.quote({ chainId: 1, holder: SAFE, amountIn: X, slippageBps: 50, validFor: 600, now: NOW })).rejects.toMatchObject({ code: "config" });
+      expect(() => leg.contracts(1)).toThrow(expect.objectContaining({ code: "config" }));
     }
+    // Each leg may only call the one function it uses on each contract.
+    expect(breadMint.contracts(100)).toEqual([
+      { address: wxdai, selectors: [toFunctionSelector("function withdraw(uint256)")] },
+      { address: bread, selectors: [toFunctionSelector("function mint(address)")] },
+    ]);
+    expect(breadBurn.contracts(100)).toEqual([
+      { address: bread, selectors: [toFunctionSelector("function burn(uint256,address)")] },
+      { address: wxdai, selectors: [toFunctionSelector("function deposit()")] },
+    ]);
     expect(breadMint.from).toBe(GNOSIS_ASSETS.WXDAI);
     expect(breadMint.to).toBe(GNOSIS_ASSETS.BREAD);
     expect(breadBurn.from).toBe(GNOSIS_ASSETS.BREAD);

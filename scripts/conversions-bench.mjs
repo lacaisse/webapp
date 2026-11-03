@@ -199,7 +199,10 @@ async function continueStep(page) {
   await button.waitFor({ timeout: 30_000 });
   await button.click();
   await answerStepUp(page);
-  const result = page.getByRole("alert").first();
+  // The proposal result (or its error) renders inside the conversions
+  // section; the first alert on the page may be the "Move to passkeys" banner.
+  const section = page.locator("section").filter({ has: page.getByRole("heading", { name: /^conversions/i }) });
+  const result = section.getByRole("alert").first();
   await result.waitFor({ timeout: 120_000 });
   log("result:", (await result.innerText()).replace(/\s+/g, " "));
   await settle(page);

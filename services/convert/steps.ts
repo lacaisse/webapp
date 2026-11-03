@@ -50,8 +50,8 @@ export function conversionProgress(
   let activeSeen = false;
   return out.map((s) => {
     if (s.done || done) return { key: s.key, state: "done", txHash: s.txHash };
-    const state: ProgressState = activeSeen ? "pending" : "active";
+    const progressState: ProgressState = activeSeen ? "pending" : "active";
     activeSeen = true;
-    return { key: s.key, state, txHash: s.txHash };
+    return { key: s.key, state: progressState, txHash: s.txHash };
   });
 }

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { getTranslations } from "next-intl/server";
 
 import { requireFundRole } from "@/services/auth/dal";
