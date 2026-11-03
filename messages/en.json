@@ -3736,6 +3736,22 @@
             "unknownPlace": "a terminal"
           }
         }
+      },
+      "holderClaims": {
+        "email": {
+          "staff": {
+            "subject": "Card {serial} claimed from the card wallet by {holder}",
+            "textBody": "Hello,\n\n{holder} claimed card {serial} from the card wallet on {date}, with their {fundName} login. Proof of possession: {proof}.\n\nThe card is now attached to that login: it is private on the wallet and can vote. If that is not right, an admin of {fundName} can detach it from the card page:\n\n{cardUrl}\n\nThe {fundName} team",
+            "ctaLabel": "Open the card",
+            "proof": {
+              "app": "already linked to their phone in the app",
+              "bound": "the card was assigned to them here",
+              "payment": "a recent payment made with the card",
+              "fund": "confirmed by the fund",
+              "unknown": "not stated"
+            }
+          }
+        }
       }
     }
   },

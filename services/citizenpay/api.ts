@@ -36,6 +36,29 @@ export class CitizenPayApiError extends Error {
 // Wire types (1:1 with OpenAPI schemas)
 // =============================================================================
 
+// GET /v2/treasury/cards/{serial}/holder (api PR A). Every field optional:
+// the route predates `holder_ref` (api#250 answered `app_owner_linked` only)
+// and the pending shape is not final — the normaliser accepts both a nested
+// `pending` object and flat `pending_holder_ref` / `state: "pending"`.
+export type CardHolderWire = {
+  serial?: string;
+  holder_ref?: string | null;
+  attached_at?: string | null;
+  proof?: string | null;
+  state?: string | null;
+  pending?: {
+    holder_ref?: string | null;
+    proof?: string | null;
+    requested_at?: string | null;
+  } | null;
+  pending_holder_ref?: string | null;
+  pending_proof?: string | null;
+  pending_since?: string | null;
+  app_owner_linked?: boolean | null;
+  app_linked_since?: string | null;
+  released?: boolean;
+};
+
 export type CardWire = {
   serial: string;
   project?: string;
@@ -897,6 +920,41 @@ export const cards = {
       { body: { holder_ref: holderRef }, timeoutMs: opts.timeoutMs ?? 5_000 },
     );
   },
+  // GET /cards/{serial}/holder — the card's holder state (api PR A):
+  // `holder_ref` / `attached_at` / `proof` of the attached login, a claim
+  // the fund must confirm (`pending {holder_ref, proof, requested_at}`), and
+  // the legacy `app_owner_linked`. The shape is tolerant: fields the api
+  // does not send are simply absent (live-client.ts `cardHolderFromWire`).
+  // 404 when the serial is not the treasury's (or the route is missing).
+  getHolder(
+    creds: CitizenPayApiCredentials,
+    serial: string,
+    opts: { timeoutMs?: number } = {},
+  ): Promise<CardHolderWire> {
+    return request(
+      creds,
+      "GET",
+      `/v2/treasury/cards/${encodeURIComponent(serial)}/holder`,
+      { timeoutMs: opts.timeoutMs ?? 5_000 },
+    );
+  },
+  // POST /cards/{serial}/holder/confirm — the fund confirms a wallet claim
+  // the api could not settle on its own (D13 `needs_proof`): attaches the
+  // card to `holder_ref`, event `attach` by `treasury`, webhook
+  // `card.attached {proof: "fund"}`.
+  confirmHolder(
+    creds: CitizenPayApiCredentials,
+    serial: string,
+    holderRef: string,
+    opts: { timeoutMs?: number } = {},
+  ): Promise<unknown> {
+    return request(
+      creds,
+      "POST",
+      `/v2/treasury/cards/${encodeURIComponent(serial)}/holder/confirm`,
+      { body: { holder_ref: holderRef }, timeoutMs: opts.timeoutMs ?? 5_000 },
+    );
+  },
   // DELETE /cards/{serial}/holder — detach (the card is public again).
   clearHolder(
     creds: CitizenPayApiCredentials,
@@ -956,6 +1014,42 @@ export const cards = {
 // =============================================================================
 // Places
 // =============================================================================
+
+// Treasury members (api PR A, plan D13): La Caisse declares which wallet
+// logins are its members — `PUT /v2/treasury/members/{holder_ref} {cards:
+// [serial…]}`, the serials being the fund's own issued cards bound to that
+// member — so a wallet claim from one of them needs no proof for a card the
+// fund bound, and `DELETE` when the login is removed. Table
+// `treasury_members(project, holder_ref, cards, updated_at)`. 404 while the
+// route is not deployed (services/member/api-sync.ts tolerates it). Short
+// timeout: best-effort traffic off the request path.
+export const members = {
+  put(
+    creds: CitizenPayApiCredentials,
+    holderRef: string,
+    cards: string[],
+    opts: { timeoutMs?: number } = {},
+  ): Promise<unknown> {
+    return request(
+      creds,
+      "PUT",
+      `/v2/treasury/members/${encodeURIComponent(holderRef)}`,
+      { body: { cards }, timeoutMs: opts.timeoutMs ?? 5_000 },
+    );
+  },
+  delete(
+    creds: CitizenPayApiCredentials,
+    holderRef: string,
+    opts: { timeoutMs?: number } = {},
+  ): Promise<unknown> {
+    return request(
+      creds,
+      "DELETE",
+      `/v2/treasury/members/${encodeURIComponent(holderRef)}`,
+      { timeoutMs: opts.timeoutMs ?? 5_000 },
+    );
+  },
+};
 
 export const places = {
   list(creds: CitizenPayApiCredentials): Promise<{ places: PlaceWire[] }> {

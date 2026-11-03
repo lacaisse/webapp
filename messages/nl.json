@@ -3660,6 +3660,22 @@
             "unknownPlace": "een terminal"
           }
         }
+      },
+      "holderClaims": {
+        "email": {
+          "staff": {
+            "subject": "Kaart {serial} opgeëist vanuit de kaartwallet door {holder}",
+            "textBody": "Hallo,\n\n{holder} heeft kaart {serial} op {date} opgeëist vanuit de kaartwallet, met zijn of haar {fundName}-login. Bewijs van bezit: {proof}.\n\nDe kaart is nu aan die login gekoppeld: ze is privé in de wallet en kan stemmen. Klopt dit niet, dan kan een beheerder van {fundName} ze loskoppelen op de kaartpagina:\n\n{cardUrl}\n\nHet {fundName}-team",
+            "ctaLabel": "Open de kaart",
+            "proof": {
+              "app": "al gekoppeld aan de telefoon in de app",
+              "bound": "de kaart was hier aan hen toegewezen",
+              "payment": "een recente betaling met de kaart",
+              "fund": "bevestigd door het fonds",
+              "unknown": "niet vermeld"
+            }
+          }
+        }
       }
     }
   },

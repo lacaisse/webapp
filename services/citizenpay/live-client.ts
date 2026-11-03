@@ -10,6 +10,7 @@ import {
   businesses as apiBusinesses,
   cards as apiCards,
   invites as apiInvites,
+  members as apiMembers,
   payments as apiPayments,
   orders as apiOrders,
   payouts as apiPayouts,
@@ -24,6 +25,7 @@ import {
   type InviteWire,
   type PaginatedCards,
   type CardChargeRefusalWire,
+  type CardHolderWire,
   type CardPinEventWire,
   type ManualDeductionWire,
   type PayoutDraftWire,
@@ -103,6 +105,7 @@ import type {
   TopUpOrderState,
   TopUpSignUrlInput,
   TreasuryStats,
+  CardHolderInfo,
 } from "./types";
 
 // Adapts the OpenAPI-shaped low-level api.ts to the high-level interface the
@@ -825,6 +828,22 @@ export class LiveCitizenPayClient implements CitizenPayClient {
     }
   }
 
+  async getCardHolder(serialNumber: string): Promise<CardHolderInfo> {
+    return cardHolderFromWire(await apiCards.getHolder(this.creds, serialNumber));
+  }
+
+  async confirmCardHolder(serialNumber: string, holderRef: string): Promise<void> {
+    await apiCards.confirmHolder(this.creds, serialNumber, holderRef);
+  }
+
+  async setTreasuryMember(holderRef: string, cards: string[]): Promise<void> {
+    await apiMembers.put(this.creds, holderRef, cards);
+  }
+
+  async removeTreasuryMember(holderRef: string): Promise<void> {
+    await apiMembers.delete(this.creds, holderRef);
+  }
+
   async setCardSourceLimit(
     serialNumber: string,
     limitCents: number | null,
@@ -1433,5 +1452,37 @@ function wireToProfile(wire: {
     imageMedium: wire.image_medium || null,
     imageSmall: wire.image_small || null,
     parent: wire.parent ?? null,
+  };
+}
+
+// `GET /v2/treasury/cards/{serial}/holder` → CardHolderInfo. Tolerant of the
+// route's generations: api#250's `{app_owner_linked, app_linked_since}`
+// alone (no holder), PR A's `holder_ref` / `attached_at` / `proof`, and a
+// pending claim as a nested `pending {holder_ref, proof, requested_at}` or
+// flat `pending_holder_ref` (+ `state: "pending"`). Empty strings read as
+// null. Exported for its unit test.
+export function cardHolderFromWire(w: CardHolderWire): CardHolderInfo {
+  const str = (v: string | null | undefined): string | null =>
+    typeof v === "string" && v.trim() !== "" ? v.trim() : null;
+  const pendingRef = str(w.pending?.holder_ref) ?? str(w.pending_holder_ref);
+  const holderRef = str(w.holder_ref);
+  const state = str(w.state)?.toLowerCase() ?? null;
+  // A `state: "pending"` on a row whose `holder_ref` names the claimant (one
+  // possible api shape) is a pending claim, not an attachment.
+  const pendingFromState = state === "pending" && holderRef && !pendingRef;
+  return {
+    holderRef: pendingFromState ? null : holderRef,
+    attachedAt: pendingFromState ? null : str(w.attached_at),
+    proof: pendingFromState ? null : str(w.proof),
+    pendingHolderRef: pendingFromState ? holderRef : pendingRef,
+    pendingProof: pendingFromState
+      ? (str(w.proof) ?? "pending")
+      : pendingRef
+        ? (str(w.pending?.proof) ?? str(w.pending_proof) ?? "pending")
+        : null,
+    pendingSince: pendingFromState
+      ? str(w.attached_at)
+      : (str(w.pending?.requested_at) ?? str(w.pending_since)),
+    appOwnerLinked: w.app_owner_linked === true,
   };
 }

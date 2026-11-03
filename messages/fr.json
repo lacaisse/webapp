@@ -3736,6 +3736,22 @@
             "unknownPlace": "un terminal"
           }
         }
+      },
+      "holderClaims": {
+        "email": {
+          "staff": {
+            "subject": "Carte {serial} revendiquée depuis le portefeuille par {holder}",
+            "textBody": "Bonjour,\n\n{holder} a revendiqué la carte {serial} depuis le portefeuille de carte le {date}, avec son accès {fundName}. Preuve de possession : {proof}.\n\nLa carte est désormais rattachée à cet accès : elle est privée sur le portefeuille et peut voter. Si ce n'est pas correct, un admin de {fundName} peut la détacher depuis la page de la carte :\n\n{cardUrl}\n\nL'équipe {fundName}",
+            "ctaLabel": "Ouvrir la carte",
+            "proof": {
+              "app": "déjà liée à son téléphone dans l'app",
+              "bound": "la carte lui était attribuée ici",
+              "payment": "un paiement récent effectué avec la carte",
+              "fund": "confirmée par la caisse",
+              "unknown": "non précisée"
+            }
+          }
+        }
       }
     }
   },

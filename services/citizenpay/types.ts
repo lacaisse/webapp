@@ -197,6 +197,28 @@ export type CardPinEvent = {
   at: string; // ISO 8601
 };
 
+// The holder state of one card at Citizen Pay (`GET
+// /v2/treasury/cards/{serial}/holder`, plan "Bread card-holder voting", api
+// PR A). `holderRef` is the La Caisse User id the card is attached to (the
+// wallet JWT's `sub`) — null = public. `proof` says how the attachment was
+// proven: `app` (already linked in the app), `bound` (the fund had assigned
+// the card to that member), `payment` (one recent card payment), `fund` (the
+// fund confirmed or attached it itself). `pendingHolderRef` names a claim the
+// api left for the fund to confirm (D13 `needs_proof`); null when none.
+// `appOwnerLinked` is the legacy phone claim (`cards.owner`). Fields the api
+// does not send are null / false.
+export type CardClaimProof = "app" | "bound" | "payment" | "fund" | "pending";
+
+export type CardHolderInfo = {
+  holderRef: string | null;
+  attachedAt: string | null; // ISO 8601
+  proof: CardClaimProof | string | null;
+  pendingHolderRef: string | null;
+  pendingProof: string | null;
+  pendingSince: string | null; // ISO 8601
+  appOwnerLinked: boolean;
+};
+
 // Detailed read for a single card, including its on-chain account address.
 // `account` is null when CP hasn't issued a wallet yet (rare — usually
 // happens between card create and the first balance call). The PIN fields

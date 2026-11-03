@@ -3651,6 +3651,22 @@
             "unknownPlace": "un terminal"
           }
         }
+      },
+      "holderClaims": {
+        "email": {
+          "staff": {
+            "subject": "Tarjeta {serial} reclamada desde el monedero por {holder}",
+            "textBody": "Hola,\n\n{holder} reclamó la tarjeta {serial} desde el monedero de tarjetas el {date}, con su acceso de {fundName}. Prueba de posesión: {proof}.\n\nLa tarjeta queda vinculada a ese acceso: es privada en el monedero y puede votar. Si no es correcto, un administrador de {fundName} puede desvincularla desde la página de la tarjeta:\n\n{cardUrl}\n\nEl equipo de {fundName}",
+            "ctaLabel": "Abrir la tarjeta",
+            "proof": {
+              "app": "ya vinculada a su teléfono en la app",
+              "bound": "la tarjeta se le había asignado aquí",
+              "payment": "un pago reciente hecho con la tarjeta",
+              "fund": "confirmada por el fondo",
+              "unknown": "no indicada"
+            }
+          }
+        }
       }
     }
   },
