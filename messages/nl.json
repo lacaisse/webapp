@@ -165,6 +165,7 @@
       "ACCOUNT_BURN": "Vernietiging",
       "ACCOUNT_TRANSFER": "Overdracht",
       "SAFE_TRANSFER": "Safe-overdracht",
+      "SAFE_CONVERSION": "Safe-conversie",
       "system": "Systeem",
       "by": "door {name}",
       "triggers": {
@@ -177,6 +178,7 @@
         "ACCOUNT_BURN": "Vernietiging op rekening",
         "ACCOUNT_TRANSFER": "Rekeningoverdracht",
         "SAFE_TRANSFER": "Safe-overdracht (multisig)",
+        "SAFE_CONVERSION": "Safe-conversie (multisig)",
         "ORDER_SETTLEMENT_MINT": "Orderafwikkeling (uitgifte)",
         "ORDER_SETTLEMENT_BURN": "Orderafwikkeling (vernietiging)",
         "PAYOUT_BURN": "Uitbetaling vernietigd",
@@ -437,6 +439,7 @@
           "SWAP_OWNER": "Ondertekenaar vervangen",
           "CHANGE_THRESHOLD": "Drempel wijzigen",
           "REJECTION": "Afwijzing",
+          "CONVERSION": "Omzetting",
           "UNKNOWN": "Transactie"
         },
         "summary": {
@@ -449,6 +452,8 @@
           "removeOwnerThresholdChange": "Ondertekenaar {owner} verwijderen, vereiste handtekeningen: {from} → {to}",
           "changeThresholdFromTo": "Drempel wijzigen van {from} naar {to, plural, one {# handtekening} other {# handtekeningen}}",
           "rejection": "Transactie nr. {nonce} afwijzen",
+          "conversion": "{from} omzetten naar minstens {to}",
+          "conversionStep": "{from} omzetten naar minstens {to} — stap {step} van {steps} ({label})",
           "swapToPasskey": "Sleutel van {owner} omzetten naar zijn of haar passkey {newOwner}",
           "swapReplacedPasskey": "Verloren passkey van {owner} vervangen door {newOwner}"
         },
@@ -489,7 +494,11 @@
           "threshold": "Vereiste handtekeningen",
           "unknownAddress": "Onbekend adres",
           "weakens": "Verzwakt de Safe",
-          "viewOnExplorer": "Bekijken in de explorer"
+          "viewOnExplorer": "Bekijken in de explorer",
+          "conversion": "Omzetting",
+          "step": "Stap",
+          "validUntil": "Geldig tot",
+          "orderExpired": "Order verlopen"
         },
         "reject": "Afwijzen",
         "rejectTitle": "Transactie nr. {nonce} afwijzen?",
@@ -523,6 +532,98 @@
         "lowGas": "Relayer heeft bijna geen gas meer",
         "lowGasBody": "De relayer van La Caisse heeft nog {balance} xDAI om uitvoeringen te betalen. Vul hem binnenkort aan:",
         "status": "Saldo van de relayer: {balance} xDAI. Stuur xDAI naar dit adres om deployments en uitvoeringen te betalen:"
+      },
+      "conversion": {
+        "trigger": "Omzetten",
+        "title": "Tokens omzetten",
+        "description": "Wissel een van de saldi van de Safe om naar een ander tegen de marktkoers. Elke on-chain stap is een Safe-transactie die loopt zodra {threshold, plural, one {# eigenaar heeft} other {# eigenaren hebben}} getekend.",
+        "pair": "Omzetting",
+        "pairOption": "{from} → {to}",
+        "amount": "Bedrag",
+        "balance": "Saldo: {balance} {symbol}",
+        "getQuote": "Prijsopgave ophalen",
+        "requote": "Opnieuw opvragen",
+        "quote": {
+          "expected": "Verwacht",
+          "minimum": "Minimum ({slippage} slippage)",
+          "rate": "Koers",
+          "validity": "De omzetting blijft 7 dagen open terwijl de eigenaren tekenen.",
+          "roundsOne": "Eén Safe-transactie.",
+          "roundsTwo": "Twee Safe-transacties: nu de omzetting, daarna de mint zodra ze is uitgevoerd.",
+          "cost": "Kosten van de omzetting: ongeveer {percent} %, in de prijs inbegrepen",
+          "costTiny": "Kosten van de omzetting: minder dan 0,01 %, in de prijs inbegrepen",
+          "costAmount": " ({amount} {symbol})"
+        },
+        "confirm": "Voorstellen",
+        "steps": {
+          "swap": "swap",
+          "mint": "mint",
+          "burn": "burn"
+        },
+        "calls": {
+          "approve": "Het om te zetten bedrag goedkeuren",
+          "presign": "De omzettingsorder bevestigen",
+          "unwrap": "WXDAI uitpakken",
+          "mint": "BREAD minten",
+          "burn": "BREAD verbranden",
+          "wrap": "xDAI inpakken"
+        },
+        "status": {
+          "PROPOSED": "Wacht op handtekeningen",
+          "READY": "Wacht op een eigenaar",
+          "FILLING": "Bezig met omzetten",
+          "DONE": "Klaar",
+          "EXPIRED": "Order verlopen",
+          "CANCELLED": "Geannuleerd",
+          "FAILED": "Mislukt"
+        },
+        "card": {
+          "title": "Omzettingen",
+          "line": "{from} → minstens {to}",
+          "lineDone": "{from} → {to}",
+          "order": "Orderdetails bekijken",
+          "by": "Gestart door {name}",
+          "continue": "Volgende stap voorstellen",
+          "cancel": "Annuleren",
+          "cancelTitle": "Deze omzetting annuleren?",
+          "cancelDescription": "Er loopt niets: geen open order, geen transactie in behandeling. Wat al is omgezet blijft in de Safe.",
+          "cancelConfirm": "Omzetting annuleren",
+          "proposalExpired": "De omzettingsorder verliep voordat de eigenaren tekenden. Wijs de openstaande transactie af en begin opnieuw.",
+          "readyExpired": "De omzettingsorder verliep voordat de volgende stap werd voorgesteld. Annuleer deze omzetting en begin opnieuw.",
+          "fillHint": "De omzetting wordt tegen de marktkoers uitgevoerd; deze pagina controleert om de paar minuten.",
+          "readyHint": "De order is uitgevoerd: de volgende transactie is afgestemd op wat binnenkwam."
+        },
+        "errors": {
+          "config": "Conversies zijn niet ingesteld voor dit netwerk.",
+          "cow_api": "De omzettingsdienst is niet bereikbaar. Probeer het zo opnieuw.",
+          "rate_limited": "De omzettingsdienst is momenteel overbelast. Probeer het over een paar minuten opnieuw.",
+          "no_pair": "Deze conversie is niet beschikbaar voor dit fonds. Schakel beide tokens in onder Instellingen → Token.",
+          "quote_failed": "Dit bedrag kon niet geprijsd worden.",
+          "quote_moved": "De prijs is veranderd. Bekijk de nieuwe prijsopgave.",
+          "amount": "Voer een positief bedrag in met hoogstens de decimalen van het token.",
+          "expired": "De order is verlopen voordat hij werd uitgevoerd.",
+          "fill_mismatch": "De uitvoering komt niet overeen met wat de keten toont.",
+          "funds_moved": "De Safe bezit niet meer genoeg van het token dat deze stap nodig heeft.",
+          "contract_refused": "Deze stap zou een contract aanroepen dat de converter niet gebruikt. Hij is geweigerd.",
+          "not_found": "Conversie niet gevonden.",
+          "invalid_state": "Deze conversie is niet in een toestand waarin dat kan."
+        },
+        "progress": {
+          "cow-swap": {
+            "api": "Omzettingsorder plaatsen",
+            "calls": "Omzetting goedkeuren en bevestigen (Safe-transactie)",
+            "wait": "Omzetting uitgevoerd tegen de marktkoers"
+          },
+          "bread-mint": {
+            "calls": "WXDAI uitpakken en BREAD minten (Safe-transactie)"
+          },
+          "bread-burn": {
+            "calls": "BREAD verbranden en inpakken (Safe-transactie)"
+          },
+          "bread-burn+cow-swap": {
+            "calls": "BREAD verbranden, inpakken en omzetting bevestigen (Safe-transactie)"
+          }
+        }
       },
       "errors": {
         "config": "Het fondstoken is nog niet ingesteld. Koppel eerst Citizen Pay.",

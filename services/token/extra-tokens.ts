@@ -82,13 +82,18 @@ const DISPLAY_FRACTION_DIGITS = 4;
 
 /**
  * Raw (hex or decimal) amount → human string, truncated (never rounded up)
- * to 4 decimals with trailing zeros dropped: "12.3456", "4.5", "0".
+ * to `maxFraction` decimals (4 unless told otherwise) with trailing zeros
+ * dropped: "12.3456", "4.5", "0".
  */
-export function formatExtraAmount(raw: string, decimals: number): string {
+export function formatExtraAmount(
+  raw: string,
+  decimals: number,
+  maxFraction = DISPLAY_FRACTION_DIGITS,
+): string {
   const full = formatTokenAmount(raw, decimals);
   const dot = full.indexOf(".");
   if (dot === -1) return full;
-  const frac = full.slice(dot + 1, dot + 1 + DISPLAY_FRACTION_DIGITS).replace(/0+$/, "");
+  const frac = full.slice(dot + 1, dot + 1 + maxFraction).replace(/0+$/, "");
   const whole = full.slice(0, dot);
   return frac ? `${whole}.${frac}` : whole;
 }

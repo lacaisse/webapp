@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import { onConversionProposalGone } from "@/services/convert/progress";
 import "server-only";
 
 import { getAddress } from "viem";
@@ -229,6 +230,16 @@ export async function syncSafe(a: {
                 : "nonce consumed by a transaction La Caisse did not record",
             },
       });
+      // A conversion step that lost its slot or reverted: the conversion
+      // waits to be proposed again (services/convert/progress.ts).
+      if (tx.kind === "CONVERSION" && tx.conversionId) {
+        try {
+          await onConversionProposalGone({ fundId: a.fundId, conversionId: tx.conversionId });
+        } catch (e) {
+          errors++;
+          problems.push(`conversion hand-back failed (${tx.conversionId}): ${messageOf(e)}`);
+        }
+      }
       continue;
     }
 

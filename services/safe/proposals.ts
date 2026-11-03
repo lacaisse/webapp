@@ -34,9 +34,12 @@ import {
   ensurePasskeySignerDeployed,
   type PasskeySignerRow,
 } from "./passkey-signers";
+import { onConversionProposalGone, onConversionTxExecuted } from "@/services/convert/progress";
+
 import {
   addOwnerWithThresholdData,
   assertAllowedOperation,
+  batchCall,
   buildSafeTx,
   changeThresholdData,
   erc20TransferData,
@@ -48,6 +51,7 @@ import {
   safeTxHash,
   sameAddress,
   swapOwnerData,
+  type SafeCall,
 } from "./safe-tx";
 import type {
   CreateSafeInput,
@@ -527,9 +531,10 @@ const ownerInclude = {
   },
 } satisfies Prisma.FundSafeInclude;
 
-type LoadedSafe = Prisma.FundSafeGetPayload<{ include: typeof ownerInclude }>;
+export type LoadedSafe = Prisma.FundSafeGetPayload<{ include: typeof ownerInclude }>;
 
-async function loadActiveSafe(fundId: string, safeId: string): Promise<LoadedSafe> {
+/** The Safe with its current owners — what a proposal needs; one read per action. */
+export async function loadActiveSafe(fundId: string, safeId: string): Promise<LoadedSafe> {
   const safe = await prisma.fundSafe.findFirst({
     where: { id: safeId, fundId, archivedAt: null },
     include: ownerInclude,
@@ -665,6 +670,7 @@ async function propose(a: {
   summary: SafeTxSummary;
   note?: string | null;
   nonce?: number; // REJECTION: the target's nonce
+  conversionId?: string; // CONVERSION: the FundConversion this is a step of
 }): Promise<ProposeResult> {
   const { safe } = a;
   const acting = await requireActingOwner(a.fundId, a.userId, safe.owners);
@@ -701,6 +707,7 @@ async function propose(a: {
         value: tx.value.toString(),
         data: tx.data,
         operation: tx.operation,
+        conversionId: a.conversionId ?? null,
         safeTxHash: hash,
         summary: a.summary as Prisma.InputJsonValue,
         note: a.note?.trim() || null,
@@ -872,6 +879,37 @@ export async function proposeTokenTransfer(a: {
       contract: tok.contract,
     },
     note: input.note,
+  });
+}
+
+/**
+ * One on-chain step of a token conversion (services/convert/engine.ts): the
+ * leg's calls as one Safe transaction — a MultiSendCallOnly batch when there
+ * are several (operation 1, allowed to that contract only). The engine has
+ * already loaded the Safe (loadActiveSafe) and checked every call against
+ * the converter's contracts; the summary tells signers what moves and lists
+ * the inner calls.
+ */
+export async function proposeConversionStep(a: {
+  fund: { id: string; tokenChainId: number };
+  safe: LoadedSafe;
+  userId: string;
+  conversionId: string;
+  calls: SafeCall[];
+  summary: Extract<SafeTxSummary, { kind: "CONVERSION" }>;
+}): Promise<ProposeResult> {
+  const { safe } = a;
+  if (safe.chainId !== a.fund.tokenChainId) {
+    throw new SafeError("unsupported_chain", "Safe and fund token are on different chains");
+  }
+  return propose({
+    fundId: a.fund.id,
+    safe,
+    userId: a.userId,
+    kind: "CONVERSION",
+    call: batchCall(safe.chainId, a.calls),
+    summary: a.summary,
+    conversionId: a.conversionId,
   });
 }
 
@@ -1106,7 +1144,7 @@ export async function withdrawProposal(a: {
   const safe = await loadActiveSafe(a.fundId, a.safeId);
   const tx = await prisma.fundSafeTransaction.findFirst({
     where: { id: a.transactionId, safeId: safe.id, safe: { fundId: a.fundId } },
-    select: { id: true, status: true, proposedById: true },
+    select: { id: true, status: true, proposedById: true, kind: true, conversionId: true },
   });
   if (!tx) throw new SafeError("not_found", "Transaction not found");
   if (tx.status !== "PENDING" && tx.status !== "FAILED") {
@@ -1123,6 +1161,15 @@ export async function withdrawProposal(a: {
     },
   });
   if (res.count === 0) throw new SafeError("invalid_state", "Transaction already changed");
+  // A conversion step withdrawn: the conversion waits to be proposed again
+  // (or cancelled). Best effort — the conversions cron repairs a miss.
+  if (tx.kind === "CONVERSION" && tx.conversionId) {
+    try {
+      await onConversionProposalGone({ fundId: a.fundId, conversionId: tx.conversionId });
+    } catch (e) {
+      console.error("[safe] conversion hand-back failed", tx.conversionId, e);
+    }
+  }
   return { mirrored: shouldMirror(safe.chainId, safe.owners) };
 }
 
@@ -1508,8 +1555,9 @@ export async function retryExecution(a: {
 // Mark a transaction EXECUTED (by our relayer or seen executed externally),
 // supersede the other open transactions at the same nonce, and for a
 // fund-token TOKEN_TRANSFER record the TokenOperation + annotation (xDAI /
-// EURe: the annotation only). Idempotent: a row
-// that is already EXECUTED is left alone.
+// EURe: the annotation only); a CONVERSION step gets the annotation and
+// moves its conversion on. Idempotent: a row that is already EXECUTED is
+// left alone.
 export async function recordExecuted(a: {
   fundId: string;
   transactionId: string;
@@ -1528,6 +1576,7 @@ export async function recordExecuted(a: {
       note: true,
       proposedById: true,
       tokenOperationId: true,
+      conversionId: true,
     },
   });
   if (!tx) throw new SafeError("not_found", "Transaction not found");
@@ -1560,6 +1609,28 @@ export async function recordExecuted(a: {
   });
 
   const summary = tx.summary as SafeTxSummary | null;
+  if (tx.kind === "CONVERSION" && tx.conversionId) {
+    // The batch's token movements show in the Safe's history with the same
+    // trigger column as a transfer. Never throws.
+    if (a.txHash) {
+      await annotateTransaction({
+        fundId: a.fundId,
+        txHash: a.txHash,
+        kind: ANNOTATION_KINDS.safeConversion,
+        note: tx.note,
+        trigger: ANNOTATION_TRIGGERS.safeConversion,
+        triggeredByUserId: tx.proposedById,
+      });
+    }
+    // The conversion moves on (an order is out → FILLING, a next step →
+    // READY, or DONE). Best effort: the conversions cron repairs a miss.
+    try {
+      await onConversionTxExecuted({ fundId: a.fundId, conversionId: tx.conversionId, txHash: a.txHash });
+    } catch (e) {
+      console.error("[safe] conversion advance failed", tx.conversionId, e);
+    }
+    return { recorded: true };
+  }
   if (tx.kind === "TOKEN_TRANSFER" && summary?.kind === "TOKEN_TRANSFER") {
     // TokenOperation is the fund-token ledger: xDAI / EURe / custom-token
     // transfers out of a Safe only get the annotation. A summary without `token` predates

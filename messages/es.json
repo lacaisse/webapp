@@ -165,6 +165,7 @@
       "ACCOUNT_BURN": "Quema",
       "ACCOUNT_TRANSFER": "Transferencia",
       "SAFE_TRANSFER": "Transferencia Safe",
+      "SAFE_CONVERSION": "Conversión Safe",
       "system": "Sistema",
       "by": "por {name}",
       "triggers": {
@@ -177,6 +178,7 @@
         "ACCOUNT_BURN": "Quema en cuenta",
         "ACCOUNT_TRANSFER": "Transferencia de cuenta",
         "SAFE_TRANSFER": "Transferencia Safe (multifirma)",
+        "SAFE_CONVERSION": "Conversión Safe (multifirma)",
         "ORDER_SETTLEMENT_MINT": "Liquidación de pedido (emisión)",
         "ORDER_SETTLEMENT_BURN": "Liquidación de pedido (quema)",
         "PAYOUT_BURN": "Quema de pago",
@@ -437,6 +439,7 @@
           "SWAP_OWNER": "Sustituir firmante",
           "CHANGE_THRESHOLD": "Cambiar umbral",
           "REJECTION": "Rechazo",
+          "CONVERSION": "Conversión",
           "UNKNOWN": "Transacción"
         },
         "summary": {
@@ -449,6 +452,8 @@
           "removeOwnerThresholdChange": "Quitar al firmante {owner}, firmas necesarias: {from} → {to}",
           "changeThresholdFromTo": "Cambiar el umbral de {from} a {to, plural, one {# firma} other {# firmas}}",
           "rejection": "Rechazar la transacción n.º {nonce}",
+          "conversion": "Convertir {from} en al menos {to}",
+          "conversionStep": "Convertir {from} en al menos {to} — paso {step} de {steps} ({label})",
           "swapToPasskey": "Pasar la clave de {owner} a su passkey {newOwner}",
           "swapReplacedPasskey": "Reemplazar la passkey perdida de {owner} por {newOwner}"
         },
@@ -489,7 +494,11 @@
           "threshold": "Firmas necesarias",
           "unknownAddress": "Dirección desconocida",
           "weakens": "Debilita el Safe",
-          "viewOnExplorer": "Ver en el explorador"
+          "viewOnExplorer": "Ver en el explorador",
+          "conversion": "Conversión",
+          "step": "Paso",
+          "validUntil": "Válida hasta",
+          "orderExpired": "Orden expirada"
         },
         "reject": "Rechazar",
         "rejectTitle": "¿Rechazar la transacción n.º {nonce}?",
@@ -523,6 +532,98 @@
         "lowGas": "Al relayer le queda poco gas",
         "lowGasBody": "Al relayer de La Caisse le quedan {balance} xDAI para pagar las ejecuciones. Recárgalo pronto:",
         "status": "Saldo del relayer: {balance} xDAI. Envía xDAI a esta dirección para pagar los despliegues y ejecuciones:"
+      },
+      "conversion": {
+        "trigger": "Convertir",
+        "title": "Convertir tokens",
+        "description": "Cambia uno de los saldos del Safe por otro al precio de mercado. Cada paso en cadena es una transacción del Safe que se ejecuta cuando {threshold, plural, one {# propietario ha} other {# propietarios han}} firmado.",
+        "pair": "Conversión",
+        "pairOption": "{from} → {to}",
+        "amount": "Importe",
+        "balance": "Saldo: {balance} {symbol}",
+        "getQuote": "Obtener cotización",
+        "requote": "Volver a cotizar",
+        "quote": {
+          "expected": "Esperado",
+          "minimum": "Mínimo (deslizamiento {slippage})",
+          "rate": "Tipo",
+          "validity": "La conversión queda abierta 7 días mientras firman los propietarios.",
+          "roundsOne": "Una transacción del Safe.",
+          "roundsTwo": "Dos transacciones del Safe: la conversión ahora y el mint cuando se ejecute.",
+          "cost": "Coste de la conversión: alrededor del {percent} %, incluido en el precio",
+          "costTiny": "Coste de la conversión: menos del 0,01 %, incluido en el precio",
+          "costAmount": " ({amount} {symbol})"
+        },
+        "confirm": "Proponer",
+        "steps": {
+          "swap": "intercambio",
+          "mint": "mint",
+          "burn": "burn"
+        },
+        "calls": {
+          "approve": "Aprobar el importe a convertir",
+          "presign": "Confirmar la orden de conversión",
+          "unwrap": "Desenvolver WXDAI",
+          "mint": "Mintear BREAD",
+          "burn": "Quemar BREAD",
+          "wrap": "Envolver xDAI"
+        },
+        "status": {
+          "PROPOSED": "Esperando firmas",
+          "READY": "Esperando a un propietario",
+          "FILLING": "Convirtiendo",
+          "DONE": "Hecha",
+          "EXPIRED": "Orden expirada",
+          "CANCELLED": "Cancelada",
+          "FAILED": "Fallida"
+        },
+        "card": {
+          "title": "Conversiones",
+          "line": "{from} → al menos {to}",
+          "lineDone": "{from} → {to}",
+          "order": "Ver detalles de la orden",
+          "by": "Iniciada por {name}",
+          "continue": "Proponer el siguiente paso",
+          "cancel": "Cancelar",
+          "cancelTitle": "¿Cancelar esta conversión?",
+          "cancelDescription": "No hay nada en curso: ninguna orden abierta ni transacción pendiente. Lo ya convertido se queda en el Safe.",
+          "cancelConfirm": "Cancelar conversión",
+          "proposalExpired": "La orden de conversión expiró antes de que firmaran los propietarios. Rechaza la transacción pendiente y vuelve a empezar.",
+          "readyExpired": "La orden de conversión expiró antes de que se propusiera el siguiente paso. Cancela esta conversión y vuelve a empezar.",
+          "fillHint": "La conversión se ejecuta al precio de mercado; esta página lo comprueba cada pocos minutos.",
+          "readyHint": "La orden se ejecutó: la siguiente transacción se ajusta a lo que llegó."
+        },
+        "errors": {
+          "config": "Las conversiones no están configuradas para esta red.",
+          "cow_api": "No se pudo contactar con el servicio de conversión. Inténtalo de nuevo en un momento.",
+          "rate_limited": "El servicio de conversión está saturado ahora mismo. Inténtalo de nuevo en unos minutos.",
+          "no_pair": "Esta conversión no está disponible para este fondo. Activa ambos tokens en Ajustes → Token.",
+          "quote_failed": "No se pudo cotizar este importe.",
+          "quote_moved": "El precio cambió. Revisa la nueva cotización.",
+          "amount": "Introduce un importe positivo con como máximo los decimales del token.",
+          "expired": "La orden expiró antes de ejecutarse.",
+          "fill_mismatch": "La ejecución no coincide con lo que muestra la cadena.",
+          "funds_moved": "El Safe ya no tiene suficiente del token que necesita este paso.",
+          "contract_refused": "Este paso llamaría a un contrato que el conversor no usa. Se rechazó.",
+          "not_found": "Conversión no encontrada.",
+          "invalid_state": "Esta conversión no está en un estado que lo permita."
+        },
+        "progress": {
+          "cow-swap": {
+            "api": "Colocar la orden de conversión",
+            "calls": "Aprobar y confirmar la conversión (transacción del Safe)",
+            "wait": "Conversión ejecutada al precio de mercado"
+          },
+          "bread-mint": {
+            "calls": "Desenvolver y mintear BREAD (transacción del Safe)"
+          },
+          "bread-burn": {
+            "calls": "Quemar BREAD y envolver (transacción del Safe)"
+          },
+          "bread-burn+cow-swap": {
+            "calls": "Quemar BREAD, envolver y confirmar la conversión (transacción del Safe)"
+          }
+        }
       },
       "errors": {
         "config": "El token del fondo aún no está configurado. Conecta primero Citizen Pay.",

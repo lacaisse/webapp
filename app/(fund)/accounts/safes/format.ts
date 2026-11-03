@@ -49,6 +49,7 @@ const KINDS = new Set([
   "SWAP_OWNER",
   "CHANGE_THRESHOLD",
   "REJECTION",
+  "CONVERSION",
 ]);
 
 /** Narrow the Prisma `Json` summary column; null when it isn't one. */
@@ -193,7 +194,30 @@ export function summaryLine(
     }
     case "REJECTION":
       return t("tx.summary.rejection", { nonce: summary.rejectsNonce });
+    case "CONVERSION": {
+      const from = `${summary.from.amount} ${summary.from.symbol}`;
+      const to = `${summary.to.minAmount} ${summary.to.symbol}`;
+      if (summary.steps > 1) {
+        return t("tx.summary.conversionStep", {
+          from,
+          to,
+          step: summary.step,
+          steps: summary.steps,
+          label: t(`conversion.steps.${summary.label}`),
+        });
+      }
+      return t("tx.summary.conversion", { from, to });
+    }
   }
+}
+
+/** A CONVERSION step whose order ran out: the proposal is moot and should be rejected. */
+export function conversionExpired(summary: SafeTxSummary | null, now: Date = new Date()): boolean {
+  if (summary?.kind !== "CONVERSION") return false;
+  const v: unknown = summary.validUntil;
+  if (typeof v !== "string") return false;
+  const until = new Date(v);
+  return !Number.isNaN(until.getTime()) && until.getTime() < now.getTime();
 }
 
 const LOW_GAS_WEI = BigInt("50000000000000000"); // 0.05 xDAI

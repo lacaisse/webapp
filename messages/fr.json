@@ -181,6 +181,7 @@
       "ACCOUNT_BURN": "Brûlage",
       "ACCOUNT_TRANSFER": "Transfert",
       "SAFE_TRANSFER": "Transfert Safe",
+      "SAFE_CONVERSION": "Conversion Safe",
       "system": "Système",
       "by": "par {name}",
       "triggers": {
@@ -193,6 +194,7 @@
         "ACCOUNT_BURN": "Brûlage sur compte",
         "ACCOUNT_TRANSFER": "Transfert de compte",
         "SAFE_TRANSFER": "Transfert Safe (multisignature)",
+        "SAFE_CONVERSION": "Conversion Safe (multisignature)",
         "ORDER_SETTLEMENT_MINT": "Règlement de commande (émission)",
         "ORDER_SETTLEMENT_BURN": "Règlement de commande (brûlage)",
         "PAYOUT_BURN": "Brûlage de virement",
@@ -454,6 +456,7 @@
           "SWAP_OWNER": "Remplacement de signataire",
           "CHANGE_THRESHOLD": "Changement de seuil",
           "REJECTION": "Rejet",
+          "CONVERSION": "Conversion",
           "UNKNOWN": "Transaction"
         },
         "summary": {
@@ -466,6 +469,8 @@
           "removeOwnerThresholdChange": "Retirer le signataire {owner}, signatures requises : {from} → {to}",
           "changeThresholdFromTo": "Passer le seuil de {from} à {to, plural, one {# signature} other {# signatures}}",
           "rejection": "Rejeter la transaction n° {nonce}",
+          "conversion": "Convertir {from} en au moins {to}",
+          "conversionStep": "Convertir {from} en au moins {to} — étape {step} sur {steps} ({label})",
           "swapToPasskey": "Migrer la clé de {owner} vers sa passkey {newOwner}",
           "swapReplacedPasskey": "Remplacer la passkey perdue de {owner} par {newOwner}"
         },
@@ -506,7 +511,11 @@
           "threshold": "Signatures requises",
           "unknownAddress": "Adresse inconnue",
           "weakens": "Affaiblit le Safe",
-          "viewOnExplorer": "Voir dans l'explorateur"
+          "viewOnExplorer": "Voir dans l'explorateur",
+          "conversion": "Conversion",
+          "step": "Étape",
+          "validUntil": "Valable jusqu'au",
+          "orderExpired": "Ordre expiré"
         },
         "reject": "Rejeter",
         "rejectTitle": "Rejeter la transaction n° {nonce} ?",
@@ -540,6 +549,98 @@
         "lowGas": "Relayeur bientôt à court de gas",
         "lowGasBody": "Il reste {balance} xDAI au relayeur de La Caisse pour payer les exécutions. Rechargez-le bientôt :",
         "status": "Solde du relayeur : {balance} xDAI. Envoyez des xDAI à cette adresse pour payer les déploiements et exécutions :"
+      },
+      "conversion": {
+        "trigger": "Convertir",
+        "title": "Convertir des jetons",
+        "description": "Échangez un des soldes du Safe contre un autre au cours du marché. Chaque étape on-chain est une transaction du Safe qui s'exécute dès que {threshold, plural, one {# propriétaire a} other {# propriétaires ont}} signé.",
+        "pair": "Conversion",
+        "pairOption": "{from} → {to}",
+        "amount": "Montant",
+        "balance": "Solde : {balance} {symbol}",
+        "getQuote": "Obtenir une cotation",
+        "requote": "Recoter",
+        "quote": {
+          "expected": "Attendu",
+          "minimum": "Minimum (glissement {slippage})",
+          "rate": "Taux",
+          "validity": "La conversion reste ouverte 7 jours, le temps que les propriétaires signent.",
+          "roundsOne": "Une transaction du Safe.",
+          "roundsTwo": "Deux transactions du Safe : la conversion maintenant, puis le mint une fois exécutée.",
+          "cost": "Coût de la conversion : environ {percent} %, inclus dans le prix",
+          "costTiny": "Coût de la conversion : moins de 0,01 %, inclus dans le prix",
+          "costAmount": " ({amount} {symbol})"
+        },
+        "confirm": "Proposer",
+        "steps": {
+          "swap": "échange",
+          "mint": "mint",
+          "burn": "burn"
+        },
+        "calls": {
+          "approve": "Approuver le montant à convertir",
+          "presign": "Confirmer l'ordre de conversion",
+          "unwrap": "Déballer le WXDAI",
+          "mint": "Minter du BREAD",
+          "burn": "Brûler du BREAD",
+          "wrap": "Emballer le xDAI"
+        },
+        "status": {
+          "PROPOSED": "En attente de signatures",
+          "READY": "En attente d'un propriétaire",
+          "FILLING": "Conversion en cours",
+          "DONE": "Terminée",
+          "EXPIRED": "Ordre expiré",
+          "CANCELLED": "Annulée",
+          "FAILED": "Échouée"
+        },
+        "card": {
+          "title": "Conversions",
+          "line": "{from} → au moins {to}",
+          "lineDone": "{from} → {to}",
+          "order": "Voir le détail de l'ordre",
+          "by": "Lancée par {name}",
+          "continue": "Proposer l'étape suivante",
+          "cancel": "Annuler",
+          "cancelTitle": "Annuler cette conversion ?",
+          "cancelDescription": "Rien n'est en cours : aucun ordre ouvert, aucune transaction en attente. Ce qui a déjà été converti reste dans le Safe.",
+          "cancelConfirm": "Annuler la conversion",
+          "proposalExpired": "L'ordre de conversion a expiré avant que les propriétaires ne signent. Rejetez la transaction en attente, puis recommencez.",
+          "readyExpired": "L'ordre de conversion a expiré avant que l'étape suivante ne soit proposée. Annulez cette conversion, puis recommencez.",
+          "fillHint": "La conversion s'exécute au cours du marché ; cette page vérifie toutes les deux minutes environ.",
+          "readyHint": "L'ordre est exécuté : la prochaine transaction est dimensionnée sur ce qui est arrivé."
+        },
+        "errors": {
+          "config": "Les conversions ne sont pas configurées pour ce réseau.",
+          "cow_api": "Le service de conversion est injoignable. Réessayez dans un instant.",
+          "rate_limited": "Le service de conversion est saturé pour le moment. Réessayez dans quelques minutes.",
+          "no_pair": "Cette conversion n'est pas disponible pour cette caisse. Activez les deux jetons dans Paramètres → Jeton.",
+          "quote_failed": "Ce montant n'a pas pu être coté.",
+          "quote_moved": "Le prix a bougé. Vérifiez la nouvelle cotation.",
+          "amount": "Entrez un montant positif avec au plus les décimales du jeton.",
+          "expired": "L'ordre a expiré avant d'être exécuté.",
+          "fill_mismatch": "L'exécution ne correspond pas à ce que montre la chaîne.",
+          "funds_moved": "Le Safe ne détient plus assez du jeton requis pour cette étape.",
+          "contract_refused": "Cette étape appellerait un contrat que le convertisseur n'utilise pas. Elle a été refusée.",
+          "not_found": "Conversion introuvable.",
+          "invalid_state": "Cette conversion n'est pas dans un état qui le permet."
+        },
+        "progress": {
+          "cow-swap": {
+            "api": "Placer l'ordre de conversion",
+            "calls": "Approuver et confirmer la conversion (transaction du Safe)",
+            "wait": "Conversion exécutée au cours du marché"
+          },
+          "bread-mint": {
+            "calls": "Déballer et minter du BREAD (transaction du Safe)"
+          },
+          "bread-burn": {
+            "calls": "Brûler du BREAD et emballer (transaction du Safe)"
+          },
+          "bread-burn+cow-swap": {
+            "calls": "Brûler du BREAD, emballer et confirmer la conversion (transaction du Safe)"
+          }
+        }
       },
       "errors": {
         "config": "Le jeton de la caisse n'est pas encore configuré. Connectez d'abord Citizen Pay.",

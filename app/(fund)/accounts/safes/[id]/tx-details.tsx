@@ -7,6 +7,8 @@ import type { SafeTxSummary } from "@/services/safe/types";
 import { explorerAddressUrl } from "@/services/safe/config";
 
 import {
+  conversionExpired,
+  formatNative,
   thresholdChange,
   thresholdDeltaLabel,
   transferContract,
@@ -106,6 +108,59 @@ export function TxDetails({
       key: "new",
       label: t("tx.details.newOwner"),
       value: address(summary.newOwner, true),
+    });
+  } else if (summary?.kind === "CONVERSION") {
+    // What the conversion as a whole does, then every inner call of this
+    // step with the contract it targets — a batch is signed as one.
+    rows.push({
+      key: "conversion",
+      label: t("tx.details.conversion"),
+      value: (
+        <span className="font-medium tabular-nums">
+          {`${summary.from.amount} ${summary.from.symbol} → ≥ ${summary.to.minAmount} ${summary.to.symbol}`}
+        </span>
+      ),
+    });
+    if (summary.steps > 1) {
+      rows.push({
+        key: "step",
+        label: t("tx.details.step"),
+        value: `${summary.step} / ${summary.steps} · ${t(`conversion.steps.${summary.label}`)}`,
+      });
+    }
+    if (typeof summary.validUntil === "string") {
+      rows.push({
+        key: "validUntil",
+        label: t("tx.details.validUntil"),
+        value: (
+          <span className="flex flex-wrap items-center gap-1.5">
+            <time dateTime={summary.validUntil}>{summary.validUntil.slice(0, 10)}</time>
+            {conversionExpired(summary) && (
+              <Badge variant="destructive">
+                <AlertTriangle />
+                {t("tx.details.orderExpired")}
+              </Badge>
+            )}
+          </span>
+        ),
+      });
+    }
+    const calls = Array.isArray(summary.calls) ? summary.calls : [];
+    calls.forEach((call, i) => {
+      rows.push({
+        key: `call-${i}`,
+        label: `${i + 1}. ${t(`conversion.calls.${call.label}`)}`,
+        value: (
+          <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+            {address(call.to, false)}
+            {typeof call.value === "string" && call.value !== "0" && (
+              <span className="text-muted-foreground tabular-nums">
+                {`${formatNative(call.value)} xDAI`}
+              </span>
+            )}
+          </span>
+        ),
+      });
     });
   }
 
