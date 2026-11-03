@@ -2,8 +2,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // The explicit unblock: ADMIN only, refused on anything but a PIN-blocked
-// card, step-up before anything is written, the api's `unblock: true` PATCH,
-// then the local row and the audit line with the acting user.
+// card, step-up before anything is written, then the local row and the audit
+// line with the acting user BEFORE the api's `unblock: true` PATCH (so the
+// api's own card.unblocked webhook finds nothing to do), rolled back when the
+// api refuses or cannot be reached.
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next-intl/server", () => ({
@@ -22,7 +24,7 @@ vi.mock("@/services/citizenpay/client", () => ({ getCitizenPayClient: () => cp }
 
 const prisma = vi.hoisted(() => ({
   card: { findFirst: vi.fn(), update: vi.fn() },
-  cardEvent: { create: vi.fn() },
+  cardEvent: { create: vi.fn(), delete: vi.fn() },
 }));
 vi.mock("@/services/db/prisma", () => ({ prisma }));
 
@@ -32,12 +34,18 @@ import { unblockCardPinAction } from "./pin-block-actions";
 
 const fund = { id: "fund-1", citizenPayApiKeyId: "0xkey", citizenPayApiKeyEnc: "v1:enc" };
 const user = { id: "11111111-1111-1111-1111-111111111111" };
+const blockedAt = new Date("2026-11-03T09:12:00.000Z");
 const pinBlockedCard = {
   id: "card-1",
   serialNumber: "SER1",
   status: "BLOCKED",
   blockedReason: "PIN",
+  blockedAt,
   memberId: "m1",
+};
+const rollback = {
+  where: { id: "card-1" },
+  data: { status: "BLOCKED", blockedReason: "PIN", blockedAt },
 };
 
 beforeEach(() => {
@@ -46,7 +54,8 @@ beforeEach(() => {
   auth.hasRecentAuth.mockResolvedValue(true);
   prisma.card.findFirst.mockResolvedValue(pinBlockedCard);
   prisma.card.update.mockResolvedValue({});
-  prisma.cardEvent.create.mockResolvedValue({});
+  prisma.cardEvent.create.mockResolvedValue({ id: "ev-1" });
+  prisma.cardEvent.delete.mockResolvedValue({});
   cp.unblockCardPin.mockResolvedValue(undefined);
 });
 
@@ -73,11 +82,10 @@ describe("unblockCardPinAction", () => {
     expect(prisma.cardEvent.create).not.toHaveBeenCalled();
   });
 
-  it("lifts the block at the api, then locally, and records who did it", async () => {
+  it("claims the local row and the audit line, then lifts the block at the api", async () => {
     const res = await unblockCardPinAction({ cardId: "card-1" });
     expect(res).toEqual({ ok: true });
-    expect(cp.unblockCardPin).toHaveBeenCalledWith("SER1");
-    expect(prisma.card.update).toHaveBeenCalledWith({
+    expect(prisma.card.update).toHaveBeenCalledExactlyOnceWith({
       where: { id: "card-1" },
       data: { status: "ACTIVE", blockedReason: null, blockedAt: null },
     });
@@ -89,22 +97,30 @@ describe("unblockCardPinAction", () => {
         source: "ADMIN",
         actorUserId: user.id,
       },
+      select: { id: true },
     });
+    expect(cp.unblockCardPin).toHaveBeenCalledWith("SER1");
+    // Local first, api second.
+    expect(prisma.card.update.mock.invocationCallOrder[0]).toBeLessThan(
+      cp.unblockCardPin.mock.invocationCallOrder[0],
+    );
+    expect(prisma.cardEvent.delete).not.toHaveBeenCalled();
   });
 
-  it("keeps the local block when the api refuses (an enrolled fund is not the issuer)", async () => {
+  it("rolls the claim back when the api refuses (an enrolled fund is not the issuer)", async () => {
     cp.unblockCardPin.mockRejectedValue(new CitizenPayApiError("not the issuer", 409, null));
     const res = await unblockCardPinAction({ cardId: "card-1" });
     expect(res).toEqual({ error: "cards.admin.pinBlock.errors.apiRefused" });
-    expect(prisma.card.update).not.toHaveBeenCalled();
-    expect(prisma.cardEvent.create).not.toHaveBeenCalled();
+    expect(prisma.card.update).toHaveBeenLastCalledWith(rollback);
+    expect(prisma.cardEvent.delete).toHaveBeenCalledWith({ where: { id: "ev-1" } });
   });
 
-  it("keeps the local block when the api is unreachable", async () => {
+  it("rolls the claim back when the api is unreachable", async () => {
     cp.unblockCardPin.mockRejectedValue(new Error("timeout"));
     const res = await unblockCardPinAction({ cardId: "card-1" });
     expect(res).toEqual({ error: "cards.admin.pinBlock.errors.failed" });
-    expect(prisma.card.update).not.toHaveBeenCalled();
+    expect(prisma.card.update).toHaveBeenLastCalledWith(rollback);
+    expect(prisma.cardEvent.delete).toHaveBeenCalledWith({ where: { id: "ev-1" } });
   });
 
   it("answers not found for a card of another fund", async () => {

@@ -44,6 +44,7 @@ export async function unblockCardPinAction(input: {
       serialNumber: true,
       status: true,
       blockedReason: true,
+      blockedAt: true,
       memberId: true,
     },
   });
@@ -56,23 +57,18 @@ export async function unblockCardPinAction(input: {
     return { error: t("auth.errors.reauthRequired" as never), code: REAUTH_REQUIRED };
   }
 
-  try {
-    await getCitizenPayClient(fund).unblockCardPin(card.serialNumber);
-  } catch (e) {
-    if (e instanceof CitizenPayApiError && e.status === 409) {
-      // An enrolled fund cannot lift the issuer's block.
-      return { error: t("cards.admin.pinBlock.errors.apiRefused" as never) };
-    }
-    console.error("[card.pin-block] unblock failed", card.id, e);
-    return { error: t("cards.admin.pinBlock.errors.failed" as never) };
-  }
-
+  // The local row is claimed BEFORE the api is asked: the api fires
+  // `card.unblocked` the moment it lifts the block, and that webhook can land
+  // before this action's own write. With the row already ACTIVE and the
+  // ADMIN audit line in place, the webhook finds nothing to change and
+  // writes no second event. An api failure rolls both back.
   await prisma.card.update({
     where: { id: card.id },
     data: { status: "ACTIVE", blockedReason: null, blockedAt: null },
   });
+  let event: { id: string } | null = null;
   try {
-    await prisma.cardEvent.create({
+    event = await prisma.cardEvent.create({
       data: {
         fundId: fund.id,
         cardId: card.id,
@@ -80,9 +76,30 @@ export async function unblockCardPinAction(input: {
         source: "ADMIN",
         actorUserId: user.id,
       },
+      select: { id: true },
     });
   } catch (e) {
     console.error("[card.pin-block] CardEvent write failed", card.id, e);
+  }
+
+  try {
+    await getCitizenPayClient(fund).unblockCardPin(card.serialNumber);
+  } catch (e) {
+    try {
+      await prisma.card.update({
+        where: { id: card.id },
+        data: { status: "BLOCKED", blockedReason: "PIN", blockedAt: card.blockedAt },
+      });
+      if (event) await prisma.cardEvent.delete({ where: { id: event.id } });
+    } catch (re) {
+      console.error("[card.pin-block] unblock rollback failed", card.id, re);
+    }
+    if (e instanceof CitizenPayApiError && e.status === 409) {
+      // An enrolled fund cannot lift the issuer's block.
+      return { error: t("cards.admin.pinBlock.errors.apiRefused" as never) };
+    }
+    console.error("[card.pin-block] unblock failed", card.id, e);
+    return { error: t("cards.admin.pinBlock.errors.failed" as never) };
   }
 
   revalidatePath("/cards");

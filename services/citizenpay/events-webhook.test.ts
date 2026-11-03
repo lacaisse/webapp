@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// Registering the events webhook with the api: the secret is minted once and
-// kept across re-registrations (rotated on request), the outcome lands on the
-// fund row, a non-https url never reaches the live api.
+// Registering the events webhook with the api: the secret is minted once,
+// stored before it is sent and kept across re-registrations, the outcome
+// lands on the fund row, a non-https url never reaches the live api.
 vi.mock("server-only", () => ({}));
 vi.mock("next/server", () => ({ after: (fn: () => Promise<void>) => void fn() }));
 vi.mock("@/services/crypto/secret", () => ({
@@ -46,7 +46,7 @@ describe("registerTreasuryEventsWebhook", () => {
     expect(cp.setTreasuryEventsWebhook).not.toHaveBeenCalled();
   });
 
-  it("mints a 32-byte secret, registers the receiver url and stores the secret encrypted", async () => {
+  it("mints a 32-byte secret, stores it encrypted BEFORE sending it, then marks the registration", async () => {
     const res = await registerTreasuryEventsWebhook(fund);
     expect(res).toEqual({
       status: "registered",
@@ -55,31 +55,38 @@ describe("registerTreasuryEventsWebhook", () => {
     const [{ url, secret }] = cp.setTreasuryEventsWebhook.mock.calls[0];
     expect(url).toBe("https://acme.lacaisse.eu/api/citizenpay/events");
     expect(secret).toMatch(/^[0-9a-f]{64}$/);
-    expect(prisma.fund.update).toHaveBeenCalledWith({
+    expect(prisma.fund.update).toHaveBeenNthCalledWith(1, {
+      where: { id: "fund-1" },
+      data: { citizenPayEventsSecretEnc: `enc:${secret}` },
+    });
+    expect(prisma.fund.update.mock.invocationCallOrder[0]).toBeLessThan(
+      cp.setTreasuryEventsWebhook.mock.invocationCallOrder[0],
+    );
+    expect(prisma.fund.update).toHaveBeenNthCalledWith(2, {
       where: { id: "fund-1" },
       data: {
-        citizenPayEventsSecretEnc: `enc:${secret}`,
         citizenPayEventsWebhookRegisteredAt: expect.any(Date),
         citizenPayEventsWebhookError: null,
       },
     });
   });
 
-  it("keeps the existing secret on a re-registration, rotates on request", async () => {
-    const existing = { ...fund, citizenPayEventsSecretEnc: "enc:oldsecret" };
-    await registerTreasuryEventsWebhook(existing);
-    expect(cp.setTreasuryEventsWebhook).toHaveBeenLastCalledWith({
+  it("re-sends the stored secret on a re-registration", async () => {
+    await registerTreasuryEventsWebhook({ ...fund, citizenPayEventsSecretEnc: "enc:oldsecret" });
+    expect(cp.setTreasuryEventsWebhook).toHaveBeenCalledExactlyOnceWith({
       url: "https://acme.lacaisse.eu/api/citizenpay/events",
       secret: "oldsecret",
     });
-
-    await registerTreasuryEventsWebhook(existing, { rotate: true });
-    const [{ secret }] = cp.setTreasuryEventsWebhook.mock.calls[1];
-    expect(secret).not.toBe("oldsecret");
-    expect(secret).toMatch(/^[0-9a-f]{64}$/);
+    expect(prisma.fund.update).toHaveBeenCalledExactlyOnceWith({
+      where: { id: "fund-1" },
+      data: {
+        citizenPayEventsWebhookRegisteredAt: expect.any(Date),
+        citizenPayEventsWebhookError: null,
+      },
+    });
   });
 
-  it("records a refusal on the fund and keeps the old secret", async () => {
+  it("records a refusal on the fund and keeps the stored secret", async () => {
     cp.setTreasuryEventsWebhook.mockRejectedValue(new Error("feePercentageBps is required"));
     const res = await registerTreasuryEventsWebhook({ ...fund, citizenPayEventsSecretEnc: "enc:oldsecret" });
     expect(res).toEqual({
@@ -90,6 +97,20 @@ describe("registerTreasuryEventsWebhook", () => {
     expect(prisma.fund.update).toHaveBeenCalledExactlyOnceWith({
       where: { id: "fund-1" },
       data: { citizenPayEventsWebhookError: "feePercentageBps is required" },
+    });
+  });
+
+  it("holds a minted secret the api refused, so the retry sends the same one", async () => {
+    cp.setTreasuryEventsWebhook.mockRejectedValue(new Error("down"));
+    await registerTreasuryEventsWebhook(fund);
+    const [{ secret }] = cp.setTreasuryEventsWebhook.mock.calls[0];
+    expect(prisma.fund.update).toHaveBeenNthCalledWith(1, {
+      where: { id: "fund-1" },
+      data: { citizenPayEventsSecretEnc: `enc:${secret}` },
+    });
+    expect(prisma.fund.update).toHaveBeenNthCalledWith(2, {
+      where: { id: "fund-1" },
+      data: { citizenPayEventsWebhookError: "down" },
     });
   });
 

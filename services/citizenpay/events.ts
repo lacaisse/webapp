@@ -5,9 +5,9 @@ import { z } from "zod";
 
 import {
   applyRemoteCardState,
+  RECONCILABLE_CARD_SELECT,
   resolvePlaceName,
 } from "@/services/card/pin-block";
-import { sendCardPinBlockedEmails } from "@/services/card/pin-block-emails";
 import { prisma } from "@/services/db/prisma";
 
 import { getCitizenPayClient } from "./client";
@@ -22,11 +22,14 @@ import { getCitizenPayClient } from "./client";
 // The payload is a notification, never a fact: deliveries retry and can
 // arrive out of order, so on any `card.*` event the card is re-read from the
 // api (`GET /v2/treasury/cards/{serial}`) and that read is applied
-// (services/card/pin-block.ts). The payload only lends the place and
-// terminal for the audit line and the emails.
+// (services/card/pin-block.ts, which also sends the notifications for a
+// block it imports). The payload only lends the place and terminal for the
+// audit line and the emails.
 
 export const CitizenPayEventPayloadSchema = z.looseObject({
-  id: z.string().min(1).max(200),
+  // The api serialises its event id as a JSON number (api#251
+  // `CardEvent.ID int64`); a string is accepted too. Kept as a string here.
+  id: z.union([z.string().min(1).max(200), z.number().int()]).transform(String),
   type: z.string().min(1).max(100),
   project: z.string().min(1).max(200).nullish(),
   serial: z.string().min(1).max(100).nullish(),
@@ -68,37 +71,29 @@ export type EventFund = {
 };
 
 /**
- * The fund an event is for: the one whose cached treasury slug is the
- * payload's `project`. The api posts to the fund's own host, so the proxy's
- * `x-fund-id` must agree when both are known; a fund whose slug was never
- * cached is taken from the host alone. Null = unknown (404), before any
- * signature work — nothing about the payload is trusted yet, and a wrong
- * fund would only fail the signature anyway.
+ * The fund an event is for: the host's. The api posts to the url the fund
+ * registered, on the fund's own host, so the proxy's `x-fund-id` (which it
+ * strips from every inbound request before setting it) names the fund; the
+ * payload's `project` (treasury slug) is only cross-checked against the
+ * cached slug when both are known. Nothing is looked up from the payload,
+ * so a caller cannot probe which treasuries are La Caisse funds. Null =
+ * unknown, answered before any signature work with the same generic 401 as
+ * everything else that precedes the check.
  */
 export async function resolveEventFund(
-  project: string | null,
   hostFundId: string | null,
+  project: string | null,
 ): Promise<EventFund | null> {
-  const bySlug = project
-    ? await prisma.fund.findFirst({
-        where: { citizenPayTreasurySlug: project },
-        select: EVENT_FUND_SELECT,
-      })
-    : null;
-  if (bySlug) {
-    if (hostFundId && hostFundId !== bySlug.id) return null;
-    return bySlug;
-  }
   if (!hostFundId) return null;
-  const byHost = await prisma.fund.findUnique({
+  const fund = await prisma.fund.findUnique({
     where: { id: hostFundId },
     select: EVENT_FUND_SELECT,
   });
-  if (!byHost) return null;
-  if (byHost.citizenPayTreasurySlug && project && byHost.citizenPayTreasurySlug !== project) {
+  if (!fund) return null;
+  if (fund.citizenPayTreasurySlug && project && fund.citizenPayTreasurySlug !== project) {
     return null;
   }
-  return byHost;
+  return fund;
 }
 
 export type CitizenPayEventOutcome = {
@@ -121,23 +116,19 @@ export async function handleCitizenPayEvent(
   if (!payload.serial) {
     return { outcome: "IGNORED", detail: "no serial on the event" };
   }
+  // A fund that disconnected from Citizen Pay but still has the webhook
+  // registered cannot re-read anything: ignored, not failed (a FAILED
+  // answer would only make the api retry).
+  if (!fund.citizenPayApiKeyId || !fund.citizenPayApiKeyEnc) {
+    return { outcome: "IGNORED", detail: "fund not connected to Citizen Pay" };
+  }
 
   const card = await prisma.card.findFirst({
     where: {
       fundId: fund.id,
       serialNumber: { equals: payload.serial, mode: "insensitive" },
     },
-    select: {
-      id: true,
-      serialNumber: true,
-      status: true,
-      blockedReason: true,
-      blockedAt: true,
-      number: true,
-      holderName: true,
-      memberId: true,
-      member: { select: { firstName: true, lastName: true, email: true } },
-    },
+    select: RECONCILABLE_CARD_SELECT,
   });
   if (!card) {
     return { outcome: "IGNORED", detail: "card not on file for this fund" };
@@ -154,8 +145,8 @@ export async function handleCitizenPayEvent(
   const terminalId = str(payload.terminal_id) ?? blockedEvent?.terminalId ?? null;
   const placeName = await resolvePlaceName(fund.id, placeId);
 
-  const transition = await applyRemoteCardState({
-    fundId: fund.id,
+  const { transition, notified } = await applyRemoteCardState({
+    fund,
     card,
     remote: { status: detail.status, pinBlockedAt: detail.pinBlockedAt },
     source: "WEBHOOK",
@@ -163,19 +154,11 @@ export async function handleCitizenPayEvent(
   });
 
   switch (transition.kind) {
-    case "pin_block": {
-      const sent = await sendCardPinBlockedEmails({
-        fund,
-        card,
-        eventId: payload.id,
-        placeName,
-        blockedAt: transition.data.blockedAt,
-      });
+    case "pin_block":
       return {
         outcome: "APPLIED",
-        detail: `PIN block imported; ${sent.staff} staff email(s), holder ${sent.holder ? "emailed" : "not emailed"}`,
+        detail: `PIN block imported; ${notified?.staff ?? 0} staff email(s), holder ${notified?.holder ? "emailed" : "not emailed"}`,
       };
-    }
     case "pin_release":
       return {
         outcome: "APPLIED",

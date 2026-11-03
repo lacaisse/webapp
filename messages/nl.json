@@ -3317,7 +3317,8 @@
         "apply": "Toepassen",
         "applying": "Toepassen…",
         "errors": {
-          "none": "Geen overeenkomende kaarten geselecteerd."
+          "none": "Geen overeenkomende kaarten geselecteerd.",
+          "pinBlocked": "{count, plural, one {# van de geselecteerde kaarten is door Citizen Pay geblokkeerd na foute pincodes. Deselecteer ze eerst.} other {# van de geselecteerde kaarten zijn door Citizen Pay geblokkeerd na foute pincodes. Deselecteer ze eerst.}}"
         }
       },
       "errors": {
@@ -3330,7 +3331,8 @@
         "amountPositive": "Het bedrag moet groter zijn dan nul.",
         "tokenNotConfigured": "Deze caisse heeft nog geen token geconfigureerd — verbind eerst met Citizen Pay.",
         "submitFailed": "On-chain-indiening mislukt. Bekijk het log van tokenbewerkingen voor details.",
-        "pinBlocked": "Citizen Pay heeft deze kaart geblokkeerd na 3 foute pincodes. De status kan hier niet worden gewijzigd: een beheerder heft de blokkering op met Deblokkeren op de kaartpagina."
+        "pinBlocked": "Citizen Pay heeft deze kaart geblokkeerd na 3 foute pincodes. De status kan hier niet worden gewijzigd: een beheerder heft de blokkering op met Deblokkeren op de kaartpagina.",
+        "pinBlockedAtApi": "Citizen Pay weigerde de wijziging: deze kaart is daar geblokkeerd na 3 foute pincodes. De uitgevende kas deblokkeert ze op de kaartpagina, of de houder stelt een nieuwe pincode in in de kaartwallet."
       },
       "sync": {
         "trigger": "Synchroniseren met Citizen Pay",
@@ -3342,7 +3344,7 @@
           "push": "{count, plural, one {# kaart pushen naar Citizen Pay} other {# kaarten pushen naar Citizen Pay}}",
           "import": "{count, plural, one {# kaart importeren van Citizen Pay} other {# kaarten importeren van Citizen Pay}}",
           "statusUpdate": "{count, plural, one {# kaartstatus bijwerken op Citizen Pay} other {# kaartstatussen bijwerken op Citizen Pay}}",
-          "pinBlockSync": "{count, plural, one {# pinblokkering afgestemd met Citizen Pay} other {# pinblokkeringen afgestemd met Citizen Pay}}"
+          "pinBlockSync": "{count, plural, one {# pinblokkering af te stemmen met Citizen Pay} other {# pinblokkeringen af te stemmen met Citizen Pay}}"
         },
         "nothingToSync": "Alles is al gesynchroniseerd.",
         "confirm": "Nu synchroniseren",

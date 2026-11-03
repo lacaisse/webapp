@@ -3377,7 +3377,8 @@
         "apply": "Apply",
         "applying": "Applying…",
         "errors": {
-          "none": "No matching cards selected."
+          "none": "No matching cards selected.",
+          "pinBlocked": "{count, plural, one {# of the selected cards is blocked by Citizen Pay after wrong PIN entries. Deselect it first.} other {# of the selected cards are blocked by Citizen Pay after wrong PIN entries. Deselect them first.}}"
         }
       },
       "errors": {
@@ -3390,7 +3391,8 @@
         "amountPositive": "Amount must be greater than zero.",
         "tokenNotConfigured": "This fund has no token configured yet — connect to Citizen Pay first.",
         "submitFailed": "On-chain submission failed. Check the token operations log for details.",
-        "pinBlocked": "Citizen Pay blocked this card after 3 wrong PIN entries. Its status can't be changed here: an admin lifts the block with Unblock on the card page."
+        "pinBlocked": "Citizen Pay blocked this card after 3 wrong PIN entries. Its status can't be changed here: an admin lifts the block with Unblock on the card page.",
+        "pinBlockedAtApi": "Citizen Pay refused the change: this card is blocked there after 3 wrong PIN entries. The issuing fund unblocks it from the card page, or the holder sets a new PIN in the card wallet."
       },
       "sync": {
         "trigger": "Sync with Citizen Pay",
@@ -3404,7 +3406,7 @@
           "requestEnrollment": "{count, plural, one {# card was issued by another fund ({issuers}) and needs the issuer's acceptance — a request will be sent} other {# cards were issued by another fund ({issuers}) and need the issuer's acceptance — requests will be sent}}",
           "awaitingIssuer": "{count, plural, one {# card is waiting on another fund ({issuers}) — request {statuses}, nothing to send} other {# cards are waiting on another fund ({issuers}) — requests {statuses}, nothing to send}}",
           "statusUpdate": "{count, plural, one {Update # card status on Citizen Pay} other {Update # card statuses on Citizen Pay}}",
-          "pinBlockSync": "{count, plural, one {# PIN block reconciled with Citizen Pay} other {# PIN blocks reconciled with Citizen Pay}}"
+          "pinBlockSync": "{count, plural, one {# PIN block to reconcile with Citizen Pay} other {# PIN blocks to reconcile with Citizen Pay}}"
         },
         "nothingToSync": "Everything is already in sync.",
         "confirm": "Sync now",

@@ -217,8 +217,9 @@ describe("computeCardSyncPlan — serials issued by another fund", () => {
 
 // The status rule (services/card/pin-block-rules.ts) in the plan: local is
 // authoritative and pushed on a mismatch, except a PIN block, which is the
-// api's — applied while computing the plan, like the source-serial heal, and
-// reported under `pinBlockSync`, never queued as a push.
+// api's — listed under `pinBlockSync` for the run's status step to apply
+// (pushOneCardStatusAction re-reads the card), never queued as a push. The
+// preview itself writes nothing.
 describe("computeCardSyncPlan — PIN blocks belong to the api", () => {
   const blockedAtIso = "2026-11-03T09:12:00.000Z";
   const localCard = (over: Record<string, unknown>) => ({
@@ -240,7 +241,7 @@ describe("computeCardSyncPlan — PIN blocks belong to the api", () => {
     });
   };
 
-  it("imports a PIN block the api reports instead of pushing ACTIVE over it", async () => {
+  it("lists a PIN block the api reports to import, instead of pushing ACTIVE over it", async () => {
     prisma.card.findMany.mockResolvedValue([localCard({ status: "ACTIVE" })]);
     listed({ status: "BLOCKED", pinBlockedAt: blockedAtIso });
 
@@ -250,23 +251,8 @@ describe("computeCardSyncPlan — PIN blocks belong to the api", () => {
     expect(plan.pinBlockSync).toEqual([
       { cardId: "card-1", serialNumber: "SER1", kind: "pin_block" },
     ]);
-    expect(prisma.card.update).toHaveBeenCalledWith({
-      where: { id: "card-1" },
-      data: {
-        status: "BLOCKED",
-        blockedReason: "PIN",
-        blockedAt: new Date(blockedAtIso),
-      },
-    });
-    expect(prisma.cardEvent.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        fundId: "fund-1",
-        cardId: "card-1",
-        kind: "PIN_BLOCKED",
-        source: "SYNC",
-        at: new Date(blockedAtIso),
-      }),
-    });
+    expect(prisma.card.update).not.toHaveBeenCalled();
+    expect(prisma.cardEvent.create).not.toHaveBeenCalled();
   });
 
   it("leaves a PIN block already on file alone", async () => {
@@ -282,7 +268,7 @@ describe("computeCardSyncPlan — PIN blocks belong to the api", () => {
     expect(prisma.card.update).not.toHaveBeenCalled();
   });
 
-  it("pulls a PIN-blocked local row back to ACTIVE when the api is active", async () => {
+  it("lists a PIN-blocked local row to pull back when the api is active", async () => {
     prisma.card.findMany.mockResolvedValue([
       localCard({ status: "BLOCKED", blockedReason: "PIN", blockedAt: new Date(blockedAtIso) }),
     ]);
@@ -294,13 +280,7 @@ describe("computeCardSyncPlan — PIN blocks belong to the api", () => {
     expect(plan.pinBlockSync).toEqual([
       { cardId: "card-1", serialNumber: "SER1", kind: "pin_release" },
     ]);
-    expect(prisma.card.update).toHaveBeenCalledWith({
-      where: { id: "card-1" },
-      data: { status: "ACTIVE", blockedReason: null, blockedAt: null },
-    });
-    expect(prisma.cardEvent.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ kind: "PIN_UNBLOCKED", source: "SYNC" }),
-    });
+    expect(prisma.card.update).not.toHaveBeenCalled();
   });
 
   it("still pushes a fund block (reason FUND, and a legacy row without a reason)", async () => {

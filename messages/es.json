@@ -3317,7 +3317,8 @@
         "apply": "Aplicar",
         "applying": "Aplicando…",
         "errors": {
-          "none": "No hay tarjetas coincidentes seleccionadas."
+          "none": "No hay tarjetas coincidentes seleccionadas.",
+          "pinBlocked": "{count, plural, one {# de las tarjetas seleccionadas está bloqueada por Citizen Pay tras códigos PIN incorrectos. Deselecciónela primero.} other {# de las tarjetas seleccionadas están bloqueadas por Citizen Pay tras códigos PIN incorrectos. Deselecciónelas primero.}}"
         }
       },
       "errors": {
@@ -3330,7 +3331,8 @@
         "amountPositive": "El importe debe ser mayor que cero.",
         "tokenNotConfigured": "Este fondo aún no tiene un token configurado — conéctate primero a Citizen Pay.",
         "submitFailed": "El envío a la cadena falló. Consulta el registro de operaciones de tokens para más detalles.",
-        "pinBlocked": "Citizen Pay bloqueó esta tarjeta tras 3 códigos PIN incorrectos. Su estado no puede cambiarse aquí: un administrador levanta el bloqueo con Desbloquear en la página de la tarjeta."
+        "pinBlocked": "Citizen Pay bloqueó esta tarjeta tras 3 códigos PIN incorrectos. Su estado no puede cambiarse aquí: un administrador levanta el bloqueo con Desbloquear en la página de la tarjeta.",
+        "pinBlockedAtApi": "Citizen Pay rechazó el cambio: esta tarjeta está bloqueada allí tras 3 códigos PIN incorrectos. La caja emisora la desbloquea desde la página de la tarjeta, o la persona titular define un nuevo PIN en el monedero de la tarjeta."
       },
       "sync": {
         "trigger": "Sincronizar con Citizen Pay",
@@ -3342,7 +3344,7 @@
           "push": "{count, plural, one {Enviar # tarjeta a Citizen Pay} other {Enviar # tarjetas a Citizen Pay}}",
           "import": "{count, plural, one {Importar # tarjeta de Citizen Pay} other {Importar # tarjetas de Citizen Pay}}",
           "statusUpdate": "{count, plural, one {Actualizar el estado de # tarjeta en Citizen Pay} other {Actualizar el estado de # tarjetas en Citizen Pay}}",
-          "pinBlockSync": "{count, plural, one {# bloqueo PIN conciliado con Citizen Pay} other {# bloqueos PIN conciliados con Citizen Pay}}"
+          "pinBlockSync": "{count, plural, one {# bloqueo PIN por conciliar con Citizen Pay} other {# bloqueos PIN por conciliar con Citizen Pay}}"
         },
         "nothingToSync": "Todo ya está sincronizado.",
         "confirm": "Sincronizar ahora",

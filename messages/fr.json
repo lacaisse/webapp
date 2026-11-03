@@ -3377,7 +3377,8 @@
         "apply": "Appliquer",
         "applying": "Application…",
         "errors": {
-          "none": "Aucune carte correspondante sélectionnée."
+          "none": "Aucune carte correspondante sélectionnée.",
+          "pinBlocked": "{count, plural, one {# des cartes sélectionnées est bloquée par Citizen Pay après des codes PIN erronés. Désélectionnez-la d'abord.} other {# des cartes sélectionnées sont bloquées par Citizen Pay après des codes PIN erronés. Désélectionnez-les d'abord.}}"
         }
       },
       "errors": {
@@ -3390,7 +3391,8 @@
         "amountPositive": "Le montant doit être supérieur à zéro.",
         "tokenNotConfigured": "Cette caisse n'a pas encore de jeton configuré — connectez-vous d'abord à Citizen Pay.",
         "submitFailed": "L'envoi on-chain a échoué. Consultez le journal des opérations pour plus de détails.",
-        "pinBlocked": "Citizen Pay a bloqué cette carte après 3 codes PIN erronés. Son statut ne peut pas être changé ici : un admin lève le blocage avec Débloquer sur la page de la carte."
+        "pinBlocked": "Citizen Pay a bloqué cette carte après 3 codes PIN erronés. Son statut ne peut pas être changé ici : un admin lève le blocage avec Débloquer sur la page de la carte.",
+        "pinBlockedAtApi": "Citizen Pay a refusé le changement : cette carte y est bloquée après 3 codes PIN erronés. La caisse émettrice la débloque depuis la page de la carte, ou le ou la titulaire définit un nouveau code PIN dans le portefeuille de la carte."
       },
       "sync": {
         "trigger": "Synchroniser avec Citizen Pay",
@@ -3404,7 +3406,7 @@
           "requestEnrollment": "{count, plural, one {# carte a été émise par une autre caisse ({issuers}) et doit être acceptée par celle-ci — une demande sera envoyée} other {# cartes ont été émises par une autre caisse ({issuers}) et doivent être acceptées par celle-ci — des demandes seront envoyées}}",
           "awaitingIssuer": "{count, plural, one {# carte est en attente d’une autre caisse ({issuers}) — demande : {statuses}, rien à envoyer} other {# cartes sont en attente d’une autre caisse ({issuers}) — demandes : {statuses}, rien à envoyer}}",
           "statusUpdate": "{count, plural, one {Mettre à jour # statut de carte sur Citizen Pay} other {Mettre à jour # statuts de cartes sur Citizen Pay}}",
-          "pinBlockSync": "{count, plural, one {# blocage PIN réconcilié avec Citizen Pay} other {# blocages PIN réconciliés avec Citizen Pay}}"
+          "pinBlockSync": "{count, plural, one {# blocage PIN à réconcilier avec Citizen Pay} other {# blocages PIN à réconcilier avec Citizen Pay}}"
         },
         "nothingToSync": "Tout est déjà synchronisé.",
         "confirm": "Synchroniser maintenant",

@@ -62,6 +62,11 @@ export function planCardStateSync(
   local: LocalCardState,
   remote: RemoteCardState,
   now: Date = new Date(),
+  // `apiRefused`: the api answered the fund's push with its PIN-block 409
+  // (the card's own block, or — for an enrolled fund — the issuer's). There
+  // is nothing left to push: the api's block is imported even over a local
+  // fund block.
+  opts: { apiRefused?: boolean } = {},
 ): CardStateTransition {
   const localPin = isPinBlocked(local);
 
@@ -69,7 +74,7 @@ export function planCardStateSync(
     // A fund block supersedes (see header): the api clears pin_blocked_at on
     // the issuer's PATCH blocked, so push the fund's block when it has not
     // landed yet. Rows blocked before `blockedReason` existed read as FUND.
-    if (local.status === "BLOCKED" && !localPin) {
+    if (!opts.apiRefused && local.status === "BLOCKED" && !localPin) {
       return remote.status === "BLOCKED" ? { kind: "none" } : { kind: "push" };
     }
     const at = parseBlockedAt(remote.pinBlockedAt, now);

@@ -8,11 +8,13 @@ import {
   sendCardPinBlockedHolder,
 } from "@/services/email/transactional";
 import { getFundUrl } from "@/services/fund/host";
+import { staffRecipients } from "@/services/fund-team/staff-recipients";
 
 // The two notifications a PIN block sends (D12), both through the queued
 // Email rows of services/email/transactional.ts and both linked to the card
 // (Card.emails): CARD_PIN_BLOCKED to the fund's OWNER/ADMIN staff — the
-// recipients `notifyIssuerStaff` (enrollment requests) uses — and
+// recipients `notifyIssuerStaff` (enrollment requests) uses, from
+// services/fund-team/staff-recipients.ts — and
 // CARD_PIN_BLOCKED_HOLDER to the bound member when they have an email, with
 // a link to the card wallet where they can set a new PIN to unblock the card
 // themselves. Idempotent per api event: the Email rows are keyed on the event
@@ -130,16 +132,6 @@ export async function sendCardPinBlockedEmails(args: {
   }
 
   return { staff, holder: holderSent };
-}
-
-// The fund's OWNER/ADMIN staff emails, deduplicated — the same set
-// `notifyIssuerStaff` (services/card/enrollment-requests.ts) mails.
-export async function staffRecipients(fundId: string): Promise<string[]> {
-  const staff = await prisma.fundMember.findMany({
-    where: { fundId, role: { in: ["OWNER", "ADMIN"] } },
-    select: { user: { select: { email: true } } },
-  });
-  return [...new Set(staff.map((s) => s.user.email).filter(Boolean))];
 }
 
 // Queue the Email row, or answer null when its idempotency key is already on

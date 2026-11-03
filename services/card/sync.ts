@@ -14,7 +14,6 @@ import type {
 import type { CardEnrollmentRequestStatus } from "@/services/db/generated/enums";
 import { prisma } from "@/services/db/prisma";
 
-import { applyRemoteCardState } from "./pin-block";
 import { planCardStateSync } from "./pin-block-rules";
 
 // Shared helpers for the card-sync flow. Both the preview action (used to
@@ -66,11 +65,12 @@ export type CardSyncPlan = {
     localStatus: CpCardStatus;
     remoteStatus: CpCardStatus;
   }>;
-  // PIN blocks reconciled FROM the api while computing the plan — already
-  // applied, like the source-serial heal: a block the api reports is
-  // imported (`pin_block`), a block the api no longer reports (the holder
-  // set a new PIN in the wallet, the webhook was missed) is lifted
-  // (`pin_release`). Shown for information; nothing to run.
+  // PIN blocks the api owns, found while computing the plan: a block the api
+  // reports that the row does not carry (`pin_block`), or a block the row
+  // carries that the api no longer reports — the holder set a new PIN in the
+  // wallet, the webhook was missed (`pin_release`). Nothing is written here
+  // (the preview is read-only): the run's status step
+  // (`pushOneCardStatusAction`) re-reads each card and applies the rule.
   pinBlockSync: Array<{
     cardId: string;
     serialNumber: string;
@@ -211,12 +211,14 @@ export async function computeCardSyncPlan(
       continue;
     }
     // Status: local-authoritative, pushed on a mismatch — except a PIN block,
-    // which belongs to the api and is applied here the way the source serial
-    // is (services/card/pin-block-rules.ts holds the rule). A card the api
-    // PIN-blocked is never pushed ACTIVE; a local PIN block the api no longer
-    // reports is pulled back to the api's status.
-    const remote = { status: r.status, pinBlockedAt: r.pinBlockedAt };
-    const transition = planCardStateSync(l, remote);
+    // which belongs to the api (services/card/pin-block-rules.ts holds the
+    // rule). A card the api PIN-blocked is never pushed ACTIVE; a local PIN
+    // block the api no longer reports is pulled back to the api's status.
+    // Both go to `pinBlockSync` for the run to apply.
+    const transition = planCardStateSync(l, {
+      status: r.status,
+      pinBlockedAt: r.pinBlockedAt,
+    });
     if (transition.kind === "push") {
       plan.statusUpdate.push({
         cardId: l.id,
@@ -225,12 +227,6 @@ export async function computeCardSyncPlan(
         remoteStatus: r.status,
       });
     } else if (transition.kind !== "none") {
-      await applyRemoteCardState({
-        fundId: fund.id,
-        card: l,
-        remote,
-        source: "SYNC",
-      });
       plan.pinBlockSync.push({
         cardId: l.id,
         serialNumber: l.serialNumber,

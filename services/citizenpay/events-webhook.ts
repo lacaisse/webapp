@@ -3,11 +3,14 @@ import "server-only";
 
 import { randomBytes } from "node:crypto";
 
-import { after } from "next/server";
-
 import { decryptSecret, encryptSecret } from "@/services/crypto/secret";
 import { prisma } from "@/services/db/prisma";
 
+import {
+  isLiveCitizenPay,
+  scheduleAfterResponse,
+  warnInsecureUrlOnce,
+} from "./after-response";
 import { getCitizenPayClient, type FundCredentials } from "./client";
 import {
   eventsWebhookUrlFor,
@@ -17,10 +20,11 @@ import {
 // Registration of the treasury events webhook with Citizen Pay (api PR P):
 // `PATCH /v2/treasury { eventsWebhookUrl, eventsWebhookSecret }` with the
 // receiver's url on the fund's host and the HMAC secret the api will sign
-// deliveries with. The secret is minted here (32 random bytes), stored
-// encrypted like the api key (`Fund.citizenPayEventsSecretEnc`) and kept
-// across re-registrations so a url refresh never invalidates deliveries in
-// flight; `rotate` mints a new one. The outcome lands on the fund row
+// deliveries with. The secret is minted here (32 random bytes) and stored
+// encrypted like the api key (`Fund.citizenPayEventsSecretEnc`) BEFORE it is
+// sent, so the api never signs with a secret La Caisse does not hold; a
+// later registration re-sends the stored secret (a url refresh never
+// invalidates deliveries in flight). The outcome lands on the fund row
 // (`citizenPayEventsWebhookRegisteredAt` / `…Error`) for the settings page.
 //
 // Runs from the connect callback (fund setup, off the response path) and
@@ -39,32 +43,31 @@ export type EventsWebhookRegistration =
   | { status: "registered"; url: string }
   | { status: "failed"; url: string; error: string };
 
-let warnedInsecure = false;
-
 export async function registerTreasuryEventsWebhook(
   fund: EventsWebhookFund,
-  opts: { rotate?: boolean } = {},
 ): Promise<EventsWebhookRegistration> {
   if (!fund.citizenPayApiKeyId || !fund.citizenPayApiKeyEnc) {
     return { status: "skipped", reason: "not_connected" };
   }
   const url = eventsWebhookUrlFor(fund);
-  const live = Boolean(process.env.CITIZENPAY_API_BASE_URL);
-  if (live && !isPublishableEventsWebhookUrl(url)) {
-    if (!warnedInsecure) {
-      console.warn(
-        "[citizenpay] not registering a non-https events webhook with the live API (check NODE_ENV / APP_DOMAIN)",
-        url,
-      );
-      warnedInsecure = true;
-    }
+  if (isLiveCitizenPay() && !isPublishableEventsWebhookUrl(url)) {
+    warnInsecureUrlOnce("events webhook url", url);
     return { status: "skipped", reason: "insecure_url" };
   }
 
-  const secret =
-    !opts.rotate && fund.citizenPayEventsSecretEnc
-      ? decryptSecret(fund.citizenPayEventsSecretEnc)
-      : randomBytes(32).toString("hex");
+  let secret: string;
+  if (fund.citizenPayEventsSecretEnc) {
+    secret = decryptSecret(fund.citizenPayEventsSecretEnc);
+  } else {
+    // Persisted first: a stored secret the api does not know yet is only a
+    // failed registration (shown, retried by hand); a secret the api holds
+    // and La Caisse lost would refuse every delivery until re-registration.
+    secret = randomBytes(32).toString("hex");
+    await prisma.fund.update({
+      where: { id: fund.id },
+      data: { citizenPayEventsSecretEnc: encryptSecret(secret) },
+    });
+  }
 
   try {
     await getCitizenPayClient(fund).setTreasuryEventsWebhook({ url, secret });
@@ -83,7 +86,6 @@ export async function registerTreasuryEventsWebhook(
   await prisma.fund.update({
     where: { id: fund.id },
     data: {
-      citizenPayEventsSecretEnc: encryptSecret(secret),
       citizenPayEventsWebhookRegisteredAt: new Date(),
       citizenPayEventsWebhookError: null,
     },
@@ -91,19 +93,11 @@ export async function registerTreasuryEventsWebhook(
   return { status: "registered", url };
 }
 
-/**
- * Run `registerTreasuryEventsWebhook` after the current response is sent
- * (Next's `after`), so a slow Citizen Pay never stalls the connect redirect.
- * Never throws.
- */
+/** `registerTreasuryEventsWebhook` after the response is sent; never throws. */
 export function scheduleTreasuryEventsWebhookRegistration(
   fund: EventsWebhookFund,
 ): void {
-  try {
-    after(async () => {
-      await registerTreasuryEventsWebhook(fund);
-    });
-  } catch (e) {
-    console.warn("[citizenpay] could not schedule events webhook registration", fund.id, e);
-  }
+  scheduleAfterResponse("events webhook registration", fund.id, () =>
+    registerTreasuryEventsWebhook(fund),
+  );
 }

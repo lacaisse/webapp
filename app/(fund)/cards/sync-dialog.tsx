@@ -36,7 +36,8 @@ type CardSyncItemResultLike = CardSyncItemResult;
 //   1. import   — pull CP-only cards into local
 //   2. request  — CP-only cards another fund issued: ask the issuer to
 //                 accept (no local row until they do)
-//   3. status   — push local status to CP for mismatches
+//   3. status   — re-read each mismatched card from CP: import a PIN block
+//                 it reports (the api's), else push the local status
 //   4. push     — push local-only cards to CP
 //
 // The preview action returns the full plan (item lists, not just counts).
@@ -79,7 +80,7 @@ function emptySteps(plan: CardSyncPlanWire): Record<StepKey, StepState> {
       phase: "pending",
     },
     status: {
-      total: plan.statusUpdate.length,
+      total: plan.statusUpdate.length + plan.pinBlockSync.length,
       done: 0,
       errors: 0,
       phase: "pending",
@@ -165,7 +166,7 @@ export function CardSyncDialog() {
     await runStep("request", plan.requestEnrollment, (i) =>
       requestOneCardEnrollmentAction({ serialNumber: i.serialNumber }),
     );
-    await runStep("status", plan.statusUpdate, (i) =>
+    await runStep("status", [...plan.statusUpdate, ...plan.pinBlockSync], (i) =>
       pushOneCardStatusAction({ cardId: i.cardId }),
     );
     await runStep("push", plan.push, (i) =>
@@ -188,6 +189,7 @@ export function CardSyncDialog() {
       ? state.plan.import.length +
         state.plan.requestEnrollment.length +
         state.plan.statusUpdate.length +
+        state.plan.pinBlockSync.length +
         state.plan.push.length
       : 0;
 
@@ -228,9 +230,7 @@ export function CardSyncDialog() {
                 <AlertDescription>{t("nothingToSync")}</AlertDescription>
               </Alert>
             )}
-            {(planTotal > 0 ||
-              state.plan.awaitingIssuer.length > 0 ||
-              state.plan.pinBlockSync.length > 0) && (
+            {(planTotal > 0 || state.plan.awaitingIssuer.length > 0) && (
               <ul className="space-y-1.5 text-sm">
                 {state.plan.import.length > 0 && (
                   <SummaryRow
@@ -263,7 +263,6 @@ export function CardSyncDialog() {
                 )}
                 {state.plan.pinBlockSync.length > 0 && (
                   <SummaryRow
-                    muted
                     label={t("summary.pinBlockSync", {
                       count: state.plan.pinBlockSync.length,
                     })}

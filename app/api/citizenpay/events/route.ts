@@ -20,7 +20,10 @@ import { prisma } from "@/services/db/prisma";
 // registered secret: `X-CitizenPay-Signature = HMAC-SHA256(secret,
 // X-CitizenPay-Timestamp + "." + body)`, constant-time compared, timestamp
 // within five minutes (services/citizenpay/events-signature.ts). The fund is
-// the one whose treasury slug is the payload's `project`, on its own host.
+// the host's (the proxy's `x-fund-id`); the payload's `project` is only
+// cross-checked. Everything that goes wrong before the signature is checked
+// — no fund host, unknown fund, another fund's treasury, no secret — is one
+// generic 401, so nothing can be learned about which funds exist.
 //
 // Idempotent on the event id: every delivery is written to CitizenPayEvent
 // first (unique per fund), so a redelivery is answered from that row without
@@ -45,17 +48,11 @@ export async function POST(request: NextRequest) {
   const payload = parsed.data;
 
   const fund = await resolveEventFund(
-    payload.project ?? null,
     request.headers.get("x-fund-id"),
+    payload.project ?? null,
   );
-  if (!fund) {
-    return NextResponse.json({ error: "unknown treasury" }, { status: 404 });
-  }
-  if (!fund.citizenPayEventsSecretEnc) {
-    return NextResponse.json(
-      { error: "events webhook not registered" },
-      { status: 404 },
-    );
+  if (!fund?.citizenPayEventsSecretEnc) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
   const check = verifyEventsSignature({

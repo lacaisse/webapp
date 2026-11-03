@@ -13,7 +13,7 @@ vi.mock("@/services/crypto/secret", () => ({
 }));
 
 const prisma = vi.hoisted(() => ({
-  fund: { findFirst: vi.fn(), findUnique: vi.fn() },
+  fund: { findUnique: vi.fn() },
   citizenPayEvent: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
   card: { findFirst: vi.fn(), update: vi.fn() },
   cardEvent: { create: vi.fn() },
@@ -77,7 +77,8 @@ const ts = () => String(Math.floor(Date.now() / 1000));
 
 function payload(over: Record<string, unknown> = {}) {
   return JSON.stringify({
-    id: "evt_1",
+    // The api sends a JSON number; see the schema.
+    id: 1,
     type: "card.blocked",
     project: "acme",
     serial: "SER1",
@@ -101,7 +102,9 @@ function post(
   const headers: Record<string, string> = { "content-type": "application/json" };
   if (timestamp !== null) headers["x-citizenpay-timestamp"] = timestamp;
   if (signature !== null) headers["x-citizenpay-signature"] = signature;
-  if (opts.fundHeader) headers["x-fund-id"] = opts.fundHeader;
+  // The proxy sets x-fund-id on the fund's host; "" = not a fund host.
+  const fundHeader = opts.fundHeader === undefined ? "fund-1" : opts.fundHeader;
+  if (fundHeader) headers["x-fund-id"] = fundHeader;
   return POST(
     new NextRequest("https://acme.lacaisse.eu/api/citizenpay/events", {
       method: "POST",
@@ -115,7 +118,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers();
   vi.setSystemTime(NOW);
-  prisma.fund.findFirst.mockResolvedValue(fund);
   prisma.fund.findUnique.mockResolvedValue(fund);
   prisma.citizenPayEvent.create.mockImplementation(async ({ data }) => ({
     id: "row-1",
@@ -138,29 +140,37 @@ describe("POST /api/citizenpay/events — the door", () => {
     expect(prisma.citizenPayEvent.create).not.toHaveBeenCalled();
   });
 
-  it("404 for a treasury no fund carries", async () => {
-    prisma.fund.findFirst.mockResolvedValue(null);
-    const res = await post(payload());
-    expect(res.status).toBe(404);
+  it("answers one generic 401 before the signature: no fund host, unknown fund, another fund's treasury, no secret", async () => {
+    const generic = { error: "unauthorized" };
+    const noHost = await post(payload(), { fundHeader: "" });
+    expect(noHost.status).toBe(401);
+    expect(await noHost.json()).toEqual(generic);
+
+    prisma.fund.findUnique.mockResolvedValueOnce(null);
+    const unknown = await post(payload());
+    expect(unknown.status).toBe(401);
+    expect(await unknown.json()).toEqual(generic);
+
+    const other = await post(payload({ project: "other-fund" }));
+    expect(other.status).toBe(401);
+    expect(await other.json()).toEqual(generic);
+
+    prisma.fund.findUnique.mockResolvedValueOnce({ ...fund, citizenPayEventsSecretEnc: null });
+    const noSecret = await post(payload());
+    expect(noSecret.status).toBe(401);
+    expect(await noSecret.json()).toEqual(generic);
+
+    expect(prisma.citizenPayEvent.create).not.toHaveBeenCalled();
+    expect(cp.getCitizenPayCard).not.toHaveBeenCalled();
   });
 
-  it("404 when the host's fund is not the payload's treasury", async () => {
-    const res = await post(payload(), { fundHeader: "fund-2" });
-    expect(res.status).toBe(404);
-  });
-
-  it("falls back to the host's fund when its slug was never cached", async () => {
-    prisma.fund.findFirst.mockResolvedValue(null);
+  it("never looks a fund up from the payload: the host's fund is the fund, its slug only cross-checked", async () => {
     prisma.fund.findUnique.mockResolvedValue({ ...fund, citizenPayTreasurySlug: null });
-    const res = await post(payload(), { fundHeader: "fund-1" });
+    const res = await post(payload({ project: "anything" }));
     expect(res.status).toBe(200);
-  });
-
-  it("404 before any signature work when the fund has no secret", async () => {
-    prisma.fund.findFirst.mockResolvedValue({ ...fund, citizenPayEventsSecretEnc: null });
-    const res = await post(payload());
-    expect(res.status).toBe(404);
-    expect(await res.json()).toEqual({ error: "events webhook not registered" });
+    expect(prisma.fund.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "fund-1" } }),
+    );
   });
 
   it("401 on a wrong secret, a tampered body, a missing header", async () => {
@@ -184,13 +194,13 @@ describe("POST /api/citizenpay/events — the door", () => {
 });
 
 describe("POST /api/citizenpay/events — idempotency", () => {
-  it("claims the event id first and answers a redelivery without re-reading", async () => {
+  it("claims the event id first (the api's number, kept as a string) and answers a redelivery without re-reading", async () => {
     const first = await post(payload());
     expect(first.status).toBe(200);
     expect(prisma.citizenPayEvent.create).toHaveBeenCalledWith({
       data: {
         fundId: "fund-1",
-        eventId: "evt_1",
+        eventId: "1",
         type: "card.blocked",
         serial: "SER1",
         occurredAt: new Date(BLOCKED_AT),
@@ -203,11 +213,19 @@ describe("POST /api/citizenpay/events — idempotency", () => {
     prisma.citizenPayEvent.create.mockRejectedValue({ code: "P2002" });
     prisma.citizenPayEvent.findUnique.mockResolvedValue({ id: "row-1", outcome: "APPLIED" });
 
-    const again = await post(payload());
+    const again = await post(payload({ id: "1" }));
     expect(again.status).toBe(200);
     expect(await again.json()).toEqual({ ok: true, duplicate: true, outcome: "APPLIED" });
     expect(cp.getCitizenPayCard).not.toHaveBeenCalled();
     expect(emails.sendCardPinBlockedEmails).not.toHaveBeenCalled();
+  });
+
+  it("ignores an event for a fund that disconnected from Citizen Pay", async () => {
+    prisma.fund.findUnique.mockResolvedValue({ ...fund, citizenPayApiKeyEnc: null });
+    const res = await post(payload());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ outcome: "IGNORED" });
+    expect(cp.getCitizenPayCard).not.toHaveBeenCalled();
   });
 
   it("handles a redelivery of an event whose first attempt FAILED", async () => {
@@ -250,7 +268,7 @@ describe("POST /api/citizenpay/events — re-read, then apply", () => {
         kind: "PIN_BLOCKED",
         source: "WEBHOOK",
         actorUserId: null,
-        citizenPayEventId: "evt_1",
+        citizenPayEventId: "1",
         placeId: "place-9",
         placeName: "Bar Central",
         terminalId: "t-1",
@@ -261,7 +279,7 @@ describe("POST /api/citizenpay/events — re-read, then apply", () => {
     expect(emails.sendCardPinBlockedEmails).toHaveBeenCalledWith({
       fund,
       card: localCard,
-      eventId: "evt_1",
+      eventId: "1",
       placeName: "Bar Central",
       blockedAt: new Date(BLOCKED_AT),
     });
