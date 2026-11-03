@@ -41,7 +41,8 @@ if (!clientSecret) {
   process.exit(1);
 }
 
-const log = (step, detail = "") => console.log(`✓ ${step}${detail ? ` — ${detail}` : ""}`);
+const clean = (s) => String(s).replace(/[\r\n\t]+/g, " ");
+const log = (step, detail = "") => console.log(`✓ ${step}${detail ? ` — ${clean(detail)}` : ""}`);
 const fail = (step, err) => {
   console.error(`✗ ${step}`);
   console.error(err);
