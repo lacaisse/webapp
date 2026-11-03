@@ -2,7 +2,10 @@
 
 import type { FundConversionStatus } from "@/services/db/generated/enums";
 
+import type { ProgressStep } from "./steps";
 import type { Hex } from "./types";
+
+export type { ProgressStep } from "./steps";
 
 // What the Safe page shows of a conversion. Pure (no server-only): the
 // client cards import the type and the link helper; services/convert/data.ts
@@ -16,6 +19,7 @@ export type ConversionView = {
   from: { symbol: string; amount: string }; // human amounts
   to: { symbol: string; expected: string; min: string; amount: string | null };
   orderUid: Hex | null; // the CoW order of the swap leg, once posted
+  progress: ProgressStep[]; // every step of the conversion, done / active / pending
   validUntil: string | null; // ISO
   errorMessage: string | null;
   createdAt: string; // ISO

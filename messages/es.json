@@ -495,7 +495,7 @@
           "viewOnExplorer": "Ver en el explorador",
           "conversion": "Conversión",
           "step": "Paso",
-          "validUntil": "Orden válida hasta",
+          "validUntil": "Válida hasta",
           "orderExpired": "Orden expirada"
         },
         "reject": "Rechazar",
@@ -534,7 +534,7 @@
       "conversion": {
         "trigger": "Convertir",
         "title": "Convertir tokens",
-        "description": "Cambia uno de los saldos del Safe por otro a través de CoW Swap. Cada paso en cadena es una transacción del Safe que se ejecuta cuando {threshold, plural, one {# propietario ha} other {# propietarios han}} firmado.",
+        "description": "Cambia uno de los saldos del Safe por otro al precio de mercado. Cada paso en cadena es una transacción del Safe que se ejecuta cuando {threshold, plural, one {# propietario ha} other {# propietarios han}} firmado.",
         "pair": "Conversión",
         "pairOption": "{from} → {to}",
         "amount": "Importe",
@@ -545,10 +545,11 @@
           "expected": "Esperado",
           "minimum": "Mínimo (deslizamiento {slippage})",
           "rate": "Tipo",
-          "fee": "La comisión de CoW Swap está incluida en el precio.",
-          "validity": "La orden queda abierta 7 días mientras firman los propietarios.",
+          "validity": "La conversión queda abierta 7 días mientras firman los propietarios.",
           "roundsOne": "Una transacción del Safe.",
-          "roundsTwo": "Dos transacciones del Safe: el intercambio ahora y el mint cuando se ejecute la orden."
+          "roundsTwo": "Dos transacciones del Safe: la conversión ahora y el mint cuando se ejecute.",
+          "cost": "Coste de la conversión: alrededor del {percent} %, incluido en el precio",
+          "costAmount": " ({amount} {symbol})"
         },
         "confirm": "Proponer",
         "steps": {
@@ -557,8 +558,8 @@
           "burn": "burn"
         },
         "calls": {
-          "approve": "Aprobar para CoW Swap",
-          "presign": "Prefirmar la orden",
+          "approve": "Aprobar el importe a convertir",
+          "presign": "Confirmar la orden de conversión",
           "unwrap": "Desenvolver WXDAI",
           "mint": "Mintear BREAD",
           "burn": "Quemar BREAD",
@@ -567,7 +568,7 @@
         "status": {
           "PROPOSED": "Esperando firmas",
           "READY": "Esperando a un propietario",
-          "FILLING": "Esperando la ejecución",
+          "FILLING": "Convirtiendo",
           "DONE": "Hecha",
           "EXPIRED": "Orden expirada",
           "CANCELLED": "Cancelada",
@@ -577,22 +578,22 @@
           "title": "Conversiones",
           "line": "{from} → al menos {to}",
           "lineDone": "{from} → {to}",
-          "order": "Ver orden",
+          "order": "Ver detalles de la orden",
           "by": "Iniciada por {name}",
           "continue": "Proponer el siguiente paso",
           "cancel": "Cancelar",
           "cancelTitle": "¿Cancelar esta conversión?",
           "cancelDescription": "No hay nada en curso: ninguna orden abierta ni transacción pendiente. Lo ya convertido se queda en el Safe.",
           "cancelConfirm": "Cancelar conversión",
-          "proposalExpired": "La orden de CoW expiró antes de que firmaran los propietarios. Rechaza la transacción pendiente y vuelve a empezar.",
-          "fillHint": "Los solvers ejecutan la orden cuando el precio lo permite; esta página lo comprueba cada pocos minutos.",
+          "proposalExpired": "La orden de conversión expiró antes de que firmaran los propietarios. Rechaza la transacción pendiente y vuelve a empezar.",
+          "fillHint": "La conversión se ejecuta al precio de mercado; esta página lo comprueba cada pocos minutos.",
           "readyHint": "La orden se ejecutó: la siguiente transacción se ajusta a lo que llegó."
         },
         "errors": {
           "config": "Las conversiones no están configuradas para esta red.",
-          "cow_api": "No se pudo contactar con CoW Swap. Inténtalo de nuevo en un momento.",
+          "cow_api": "No se pudo contactar con el servicio de conversión. Inténtalo de nuevo en un momento.",
           "no_pair": "Esta conversión no está disponible para este fondo. Activa ambos tokens en Ajustes → Token.",
-          "quote_failed": "CoW Swap no pudo cotizar este importe.",
+          "quote_failed": "No se pudo cotizar este importe.",
           "quote_moved": "El precio cambió. Revisa la nueva cotización.",
           "amount": "Introduce un importe positivo con como máximo los decimales del token.",
           "expired": "La orden expiró antes de ejecutarse.",
@@ -601,6 +602,22 @@
           "contract_refused": "Este paso llamaría a un contrato que el conversor no usa. Se rechazó.",
           "not_found": "Conversión no encontrada.",
           "invalid_state": "Esta conversión no está en un estado que lo permita."
+        },
+        "progress": {
+          "cow-swap": {
+            "api": "Colocar la orden de conversión",
+            "calls": "Aprobar y confirmar la conversión (transacción del Safe)",
+            "wait": "Conversión ejecutada al precio de mercado"
+          },
+          "bread-mint": {
+            "calls": "Desenvolver y mintear BREAD (transacción del Safe)"
+          },
+          "bread-burn": {
+            "calls": "Quemar BREAD y envolver (transacción del Safe)"
+          },
+          "bread-burn+cow-swap": {
+            "calls": "Quemar BREAD, envolver y confirmar la conversión (transacción del Safe)"
+          }
         }
       },
       "errors": {

@@ -8,6 +8,8 @@ import { getDisplayTokens, type DisplayTokensFund } from "@/services/token/displ
 import { formatAmount } from "./amounts";
 import { displayTokenAsset } from "./assets";
 import { stateOf } from "./progress";
+import { converterById } from "./registry";
+import { conversionProgress, type ProgressStep } from "./steps";
 import type { AssetId, Hex } from "./types";
 import type { ConversionView } from "./views";
 
@@ -60,10 +62,13 @@ export async function listSafeConversions(
     const from = meta(row.fromAsset);
     const to = meta(row.toAsset);
     let orderUid: Hex | null = null;
+    let progress: ProgressStep[] = [];
     try {
-      orderUid = orderUidOf(stateOf(row));
+      const state = stateOf(row);
+      orderUid = orderUidOf(state);
+      progress = conversionProgress(converterById(row.converterId).legs, state, row.status === "DONE");
     } catch {
-      // a row with no leg state: nothing to link
+      // a row with no leg state, or an unregistered converter: nothing to show
     }
     return {
       id: row.id,
@@ -78,6 +83,7 @@ export async function listSafeConversions(
         amount: row.amountOut ? formatAmount(BigInt(row.amountOut), to.decimals) : null,
       },
       orderUid,
+      progress,
       validUntil: row.validUntil?.toISOString() ?? null,
       errorMessage: row.errorMessage,
       createdAt: row.createdAt.toISOString(),

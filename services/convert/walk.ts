@@ -125,6 +125,11 @@ export type ChainQuote = {
   // The minimum the conversion as a whole enforces: an exact leg passes its
   // input through, a swap leg's quote carries the slippage.
   minOut: bigint;
+  // What the conversion costs, in units of ITS input asset: the fees of the
+  // legs reached only through exact (1:1) legs, so a fee quoted in WXDAI on
+  // a BREAD → EURe conversion counts as BREAD. Null when a fee sits behind a
+  // swap (another unit) — not the case for the converters registered today.
+  fee: bigint | null;
   validUntil: Date;
 };
 
@@ -139,14 +144,20 @@ export async function quoteChain(converter: Converter, req: QuoteRequest): Promi
   const legs: LegQuote[] = [];
   let amountIn = req.amountIn;
   let minOut = req.amountIn;
+  let fee: bigint | null = BigInt(0);
+  let inputUnits = true; // still 1:1 with the conversion's input asset
   let validUntil: Date | null = null;
   for (const leg of converter.legs) {
     const q = await leg.quote({ ...req, amountIn });
     legs.push(q);
+    if (q.fee !== undefined && q.fee > BigInt(0)) {
+      fee = inputUnits && fee !== null ? fee + q.fee : null;
+    }
+    if (!leg.exact) inputUnits = false;
     amountIn = q.amountOut;
     minOut = leg.exact ? minOut : q.minAmountOut;
     validUntil = validUntil && validUntil < q.validUntil ? validUntil : q.validUntil;
   }
   if (!validUntil) throw new ConvertError("invalid_state", "Converter has no legs");
-  return { legs, expectedOut: amountIn, minOut, validUntil };
+  return { legs, expectedOut: amountIn, minOut, fee, validUntil };
 }

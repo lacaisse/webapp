@@ -9,7 +9,7 @@ import type { SafeTxSummary } from "@/services/safe/types";
 import type { DisplayTokensFund } from "@/services/token/display-tokens";
 import type { ExtraToken } from "@/services/token/extra-tokens";
 
-import { formatAmount } from "./amounts";
+import { formatAmount, percentOf } from "./amounts";
 import { COW_CONTRACTS_BY_CHAIN, assetAddress } from "./assets";
 import { holderBalance } from "./chain";
 import { ERC20_APPROVE_ABI } from "./cow-order";
@@ -95,6 +95,10 @@ export type ConversionQuote = {
   expectedOut: string;
   minOut: string;
   slippageBps: number;
+  // What the conversion costs, paid inside the price: the swap's network fee
+  // as a share of the input ("0.06"), and as a human amount of the input
+  // token. Null when a converter's fee is not expressible in its input.
+  cost: { feePercent: string; fee: string } | null;
   rounds: number; // Safe proposals the conversion takes
   validUntil: string; // ISO: the order's validTo
 };
@@ -132,6 +136,10 @@ export async function quoteConversion(a: {
     expectedOut: q.expectedOut.toString(),
     minOut: q.minOut.toString(),
     slippageBps: a.slippageBps,
+    cost:
+      q.fee === null
+        ? null
+        : { feePercent: percentOf(q.fee, units), fee: formatAmount(q.fee, pair.from.decimals) },
     rounds: signingRounds(pair.converter),
     validUntil: q.validUntil.toISOString(),
   };

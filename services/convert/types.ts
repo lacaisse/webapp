@@ -29,9 +29,14 @@ export type LegQuote = {
   amountIn: bigint;
   amountOut: bigint; // expected
   minAmountOut: bigint; // what the leg enforces (slippage applied)
+  // What the leg costs, in units of its input asset, when it has a price
+  // (a swap's network fee, paid inside the price). Absent = free.
+  fee?: bigint;
   validUntil: Date;
   data?: unknown; // leg-private, JSON-serialisable (a CoW quote, an order…)
 };
+
+export type StepKind = Step["kind"];
 
 // What a leg asks for next. `api`: the server calls an outside service
 // (leg.run). `calls`: the holder executes these, as one batch (one Safe
@@ -80,6 +85,9 @@ export type Leg = {
   // Output equals input and is known up front (a 1:1 mint / burn). The walk
   // folds such a leg's calls into the next leg's first batch.
   exact: boolean;
+  // The kinds of its steps, in order — what `next` will ask for. Drives the
+  // progress shown to people (steps.ts); `next` stays the source of truth.
+  steps: readonly StepKind[];
   // Every address this leg's calls may target: the engine refuses anything
   // else before it reaches a Safe.
   contracts(chainId: number): Address[];
@@ -102,6 +110,7 @@ export type JsonLegQuote = {
   amountIn: string;
   amountOut: string;
   minAmountOut: string;
+  fee?: string;
   validUntil: string; // ISO
   data?: unknown;
 };
@@ -113,6 +122,7 @@ export function legQuoteToJson(q: LegQuote): JsonLegQuote {
     amountIn: q.amountIn.toString(),
     amountOut: q.amountOut.toString(),
     minAmountOut: q.minAmountOut.toString(),
+    ...(q.fee === undefined ? {} : { fee: q.fee.toString() }),
     validUntil: q.validUntil.toISOString(),
     ...(q.data === undefined ? {} : { data: q.data }),
   };
@@ -123,6 +133,7 @@ export function legQuoteFromJson(j: JsonLegQuote): LegQuote {
     amountIn: BigInt(j.amountIn),
     amountOut: BigInt(j.amountOut),
     minAmountOut: BigInt(j.minAmountOut),
+    ...(j.fee === undefined ? {} : { fee: BigInt(j.fee) }),
     validUntil: new Date(j.validUntil),
     ...(j.data === undefined ? {} : { data: j.data }),
   };

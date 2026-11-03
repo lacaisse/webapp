@@ -30,6 +30,7 @@ function swapLeg(from: Erc20AssetId, to: Erc20AssetId): Leg {
     from,
     to,
     exact: false,
+    steps: ["api", "calls", "wait"],
     contracts: () => [SELL, SETTLE],
     quote: async (r) => ({
       amountIn: r.amountIn,

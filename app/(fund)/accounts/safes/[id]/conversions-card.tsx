@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 "use client";
 
-import { AlertTriangle, ExternalLink, Loader2, Play, Repeat, X } from "lucide-react";
+import { AlertTriangle, Check, Circle, ExternalLink, Loader2, Play, Repeat, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useFormatter, useNow, useTranslations } from "next-intl";
 import { useState, useTransition } from "react";
@@ -22,7 +22,9 @@ import { cancelConversionAction, continueConversionAction } from "@/services/con
 import { cowExplorerOrderUrl, type ConversionView } from "@/services/convert/views";
 import type { FundConversionStatus } from "@/services/db/generated/enums";
 import type { SigningPasskeyHandle } from "@/services/safe/action-types";
+import { explorerTxUrl } from "@/services/safe/config";
 
+import { shortAddress } from "../format";
 import { useStepUp } from "@/components/reauth-dialog";
 import { useProposeAndSign, type ProposalOutcome } from "../passkey-hooks";
 import { ProposalResult } from "./proposal-result";
@@ -197,6 +199,34 @@ function ConversionRow({
                 </>
               )}
             </p>
+            {c.progress.length > 0 && (
+              <ol className="mt-1.5 space-y-1 text-xs">
+                {c.progress.map((s) => (
+                  <li key={s.key} className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                    {s.state === "done" ? (
+                      <Check className="size-3.5 shrink-0 text-success" aria-hidden />
+                    ) : s.state === "active" ? (
+                      <Loader2 className="size-3.5 shrink-0 animate-spin text-info" aria-hidden />
+                    ) : (
+                      <Circle className="size-3.5 shrink-0 text-muted-foreground/40" aria-hidden />
+                    )}
+                    <span className={s.state === "pending" ? "text-muted-foreground" : undefined}>
+                      {t(`progress.${s.key}` as never)}
+                    </span>
+                    {s.txHash && (
+                      <a
+                        href={explorerTxUrl(chainId, s.txHash)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono text-muted-foreground hover:text-foreground"
+                      >
+                        {shortAddress(s.txHash)}
+                      </a>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            )}
             {c.status === "FILLING" && <p className="text-xs text-muted-foreground">{t("card.fillHint")}</p>}
             {c.status === "READY" && c.round > 0 && c.to.amount === null && (
               <p className="text-xs text-muted-foreground">{t("card.readyHint")}</p>

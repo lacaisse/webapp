@@ -512,7 +512,7 @@
           "viewOnExplorer": "View on explorer",
           "conversion": "Conversion",
           "step": "Step",
-          "validUntil": "Order valid until",
+          "validUntil": "Valid until",
           "orderExpired": "Order expired"
         },
         "reject": "Reject",
@@ -551,7 +551,7 @@
       "conversion": {
         "trigger": "Convert",
         "title": "Convert tokens",
-        "description": "Swap one of the Safe's balances for another through CoW Swap. Each on-chain step is a Safe transaction that runs once {threshold, plural, one {# owner has} other {# owners have}} signed.",
+        "description": "Swap one of the Safe's balances for another at the market rate. Each on-chain step is a Safe transaction that runs once {threshold, plural, one {# owner has} other {# owners have}} signed.",
         "pair": "Conversion",
         "pairOption": "{from} → {to}",
         "amount": "Amount",
@@ -562,10 +562,11 @@
           "expected": "Expected",
           "minimum": "Minimum ({slippage} slippage)",
           "rate": "Rate",
-          "fee": "CoW Swap's fee is included in the price.",
-          "validity": "The order stays open for 7 days while the owners sign.",
+          "validity": "The conversion stays open for 7 days while the owners sign.",
           "roundsOne": "One Safe transaction.",
-          "roundsTwo": "Two Safe transactions: the swap now, then the mint once the order fills."
+          "roundsTwo": "Two Safe transactions: the conversion now, then the mint once it has filled.",
+          "cost": "Conversion cost: about {percent} %, included in the price",
+          "costAmount": " ({amount} {symbol})"
         },
         "confirm": "Propose",
         "steps": {
@@ -574,8 +575,8 @@
           "burn": "burn"
         },
         "calls": {
-          "approve": "Approve for CoW Swap",
-          "presign": "Pre-sign the order",
+          "approve": "Approve the amount to convert",
+          "presign": "Confirm the conversion order",
           "unwrap": "Unwrap WXDAI",
           "mint": "Mint BREAD",
           "burn": "Burn BREAD",
@@ -584,7 +585,7 @@
         "status": {
           "PROPOSED": "Waiting for signatures",
           "READY": "Waiting for an owner",
-          "FILLING": "Waiting for the fill",
+          "FILLING": "Converting",
           "DONE": "Done",
           "EXPIRED": "Order expired",
           "CANCELLED": "Cancelled",
@@ -594,22 +595,22 @@
           "title": "Conversions",
           "line": "{from} → at least {to}",
           "lineDone": "{from} → {to}",
-          "order": "View order",
+          "order": "View order details",
           "by": "Started by {name}",
           "continue": "Propose next step",
           "cancel": "Cancel",
           "cancelTitle": "Cancel this conversion?",
           "cancelDescription": "Nothing is in flight: no order is open and no transaction is pending. What was converted so far stays in the Safe.",
           "cancelConfirm": "Cancel conversion",
-          "proposalExpired": "The CoW order expired before the owners signed. Reject the pending transaction, then start again.",
-          "fillHint": "Solvers fill the order when the price allows; this page checks every couple of minutes.",
+          "proposalExpired": "The conversion order expired before the owners signed. Reject the pending transaction, then start again.",
+          "fillHint": "The conversion fills at the market rate; this page checks every couple of minutes.",
           "readyHint": "The order filled: the next transaction is sized to what arrived."
         },
         "errors": {
           "config": "Conversions are not configured for this network.",
-          "cow_api": "CoW Swap could not be reached. Try again in a moment.",
+          "cow_api": "The conversion service could not be reached. Try again in a moment.",
           "no_pair": "This conversion is not available for this fund. Enable both tokens under Settings → Token.",
-          "quote_failed": "CoW Swap could not quote this amount.",
+          "quote_failed": "This amount could not be quoted.",
           "quote_moved": "The price moved. Review the new quote.",
           "amount": "Enter a positive amount with at most the token's decimals.",
           "expired": "The order expired before it filled.",
@@ -618,6 +619,22 @@
           "contract_refused": "This step would call a contract the converter does not use. It was refused.",
           "not_found": "Conversion not found.",
           "invalid_state": "This conversion is not in a state where that is possible."
+        },
+        "progress": {
+          "cow-swap": {
+            "api": "Place the conversion order",
+            "calls": "Approve and confirm the conversion (Safe transaction)",
+            "wait": "Conversion fills at the market rate"
+          },
+          "bread-mint": {
+            "calls": "Unwrap and mint BREAD (Safe transaction)"
+          },
+          "bread-burn": {
+            "calls": "Burn BREAD and wrap (Safe transaction)"
+          },
+          "bread-burn+cow-swap": {
+            "calls": "Burn BREAD, wrap and confirm the conversion (Safe transaction)"
+          }
         }
       },
       "errors": {

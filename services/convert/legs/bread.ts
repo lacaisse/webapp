@@ -74,6 +74,7 @@ const exactLeg = (
 ): Leg => ({
   ...a,
   exact: true,
+  steps: ["calls"],
   contracts: (chainId) => {
     const c = contractsFor(chainId);
     return [c.wxdai, c.bread];

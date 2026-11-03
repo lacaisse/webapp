@@ -240,7 +240,13 @@ export function ConvertDialog({
                       </>
                     )}
                   </dl>
-                  <p className="text-xs text-muted-foreground">{t("quote.fee")}</p>
+                  {quote.cost && (
+                    <p className="text-xs text-muted-foreground">
+                      {t("quote.cost", { percent: quote.cost.feePercent })}
+                      {quote.cost.fee !== "0" &&
+                        t("quote.costAmount", { amount: quote.cost.fee, symbol: quote.from.symbol })}
+                    </p>
+                  )}
                   <p className="text-xs text-muted-foreground">{t("quote.validity")}</p>
                   <p className="text-xs text-muted-foreground">
                     {quote.rounds > 1 ? t("quote.roundsTwo") : t("quote.roundsOne")}

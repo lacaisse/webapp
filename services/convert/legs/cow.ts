@@ -74,6 +74,7 @@ export function cowLeg(from: Erc20AssetId, to: Erc20AssetId): Leg {
     from,
     to,
     exact: false,
+    steps: ["api", "calls", "wait"],
     contracts: (c) => [sellToken, cowFor(c).settlement],
 
     quote: async (r) => {
@@ -99,6 +100,7 @@ export function cowLeg(from: Erc20AssetId, to: Erc20AssetId): Leg {
         amountIn: r.amountIn,
         amountOut: q.buyAmount,
         minAmountOut: applySlippage(q.buyAmount, r.slippageBps),
+        fee: q.feeAmount, // the network fee, in the sell token, paid inside the price
         validUntil: new Date(r.now.getTime() + r.validFor * 1000),
         data,
       };

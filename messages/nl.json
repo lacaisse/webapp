@@ -495,7 +495,7 @@
           "viewOnExplorer": "Bekijken in de explorer",
           "conversion": "Omzetting",
           "step": "Stap",
-          "validUntil": "Order geldig tot",
+          "validUntil": "Geldig tot",
           "orderExpired": "Order verlopen"
         },
         "reject": "Afwijzen",
@@ -534,7 +534,7 @@
       "conversion": {
         "trigger": "Omzetten",
         "title": "Tokens omzetten",
-        "description": "Wissel een van de saldi van de Safe om naar een ander via CoW Swap. Elke on-chain stap is een Safe-transactie die loopt zodra {threshold, plural, one {# eigenaar heeft} other {# eigenaren hebben}} getekend.",
+        "description": "Wissel een van de saldi van de Safe om naar een ander tegen de marktkoers. Elke on-chain stap is een Safe-transactie die loopt zodra {threshold, plural, one {# eigenaar heeft} other {# eigenaren hebben}} getekend.",
         "pair": "Omzetting",
         "pairOption": "{from} → {to}",
         "amount": "Bedrag",
@@ -545,10 +545,11 @@
           "expected": "Verwacht",
           "minimum": "Minimum ({slippage} slippage)",
           "rate": "Koers",
-          "fee": "De vergoeding van CoW Swap zit in de prijs.",
-          "validity": "De order blijft 7 dagen open terwijl de eigenaren tekenen.",
+          "validity": "De omzetting blijft 7 dagen open terwijl de eigenaren tekenen.",
           "roundsOne": "Eén Safe-transactie.",
-          "roundsTwo": "Twee Safe-transacties: nu de swap, daarna de mint zodra de order is uitgevoerd."
+          "roundsTwo": "Twee Safe-transacties: nu de omzetting, daarna de mint zodra ze is uitgevoerd.",
+          "cost": "Kosten van de omzetting: ongeveer {percent} %, in de prijs inbegrepen",
+          "costAmount": " ({amount} {symbol})"
         },
         "confirm": "Voorstellen",
         "steps": {
@@ -557,8 +558,8 @@
           "burn": "burn"
         },
         "calls": {
-          "approve": "Goedkeuren voor CoW Swap",
-          "presign": "Order voortekenen",
+          "approve": "Het om te zetten bedrag goedkeuren",
+          "presign": "De omzettingsorder bevestigen",
           "unwrap": "WXDAI uitpakken",
           "mint": "BREAD minten",
           "burn": "BREAD verbranden",
@@ -567,7 +568,7 @@
         "status": {
           "PROPOSED": "Wacht op handtekeningen",
           "READY": "Wacht op een eigenaar",
-          "FILLING": "Wacht op uitvoering",
+          "FILLING": "Bezig met omzetten",
           "DONE": "Klaar",
           "EXPIRED": "Order verlopen",
           "CANCELLED": "Geannuleerd",
@@ -577,22 +578,22 @@
           "title": "Omzettingen",
           "line": "{from} → minstens {to}",
           "lineDone": "{from} → {to}",
-          "order": "Order bekijken",
+          "order": "Orderdetails bekijken",
           "by": "Gestart door {name}",
           "continue": "Volgende stap voorstellen",
           "cancel": "Annuleren",
           "cancelTitle": "Deze omzetting annuleren?",
           "cancelDescription": "Er loopt niets: geen open order, geen transactie in behandeling. Wat al is omgezet blijft in de Safe.",
           "cancelConfirm": "Omzetting annuleren",
-          "proposalExpired": "De CoW-order verliep voordat de eigenaren tekenden. Wijs de openstaande transactie af en begin opnieuw.",
-          "fillHint": "Solvers voeren de order uit zodra de prijs het toelaat; deze pagina controleert om de paar minuten.",
+          "proposalExpired": "De omzettingsorder verliep voordat de eigenaren tekenden. Wijs de openstaande transactie af en begin opnieuw.",
+          "fillHint": "De omzetting wordt tegen de marktkoers uitgevoerd; deze pagina controleert om de paar minuten.",
           "readyHint": "De order is uitgevoerd: de volgende transactie is afgestemd op wat binnenkwam."
         },
         "errors": {
           "config": "Conversies zijn niet ingesteld voor dit netwerk.",
-          "cow_api": "CoW Swap is niet bereikbaar. Probeer het zo opnieuw.",
+          "cow_api": "De omzettingsdienst is niet bereikbaar. Probeer het zo opnieuw.",
           "no_pair": "Deze conversie is niet beschikbaar voor dit fonds. Schakel beide tokens in onder Instellingen → Token.",
-          "quote_failed": "CoW Swap kon dit bedrag niet prijzen.",
+          "quote_failed": "Dit bedrag kon niet geprijsd worden.",
           "quote_moved": "De prijs is veranderd. Bekijk de nieuwe prijsopgave.",
           "amount": "Voer een positief bedrag in met hoogstens de decimalen van het token.",
           "expired": "De order is verlopen voordat hij werd uitgevoerd.",
@@ -601,6 +602,22 @@
           "contract_refused": "Deze stap zou een contract aanroepen dat de converter niet gebruikt. Hij is geweigerd.",
           "not_found": "Conversie niet gevonden.",
           "invalid_state": "Deze conversie is niet in een toestand waarin dat kan."
+        },
+        "progress": {
+          "cow-swap": {
+            "api": "Omzettingsorder plaatsen",
+            "calls": "Omzetting goedkeuren en bevestigen (Safe-transactie)",
+            "wait": "Omzetting uitgevoerd tegen de marktkoers"
+          },
+          "bread-mint": {
+            "calls": "WXDAI uitpakken en BREAD minten (Safe-transactie)"
+          },
+          "bread-burn": {
+            "calls": "BREAD verbranden en inpakken (Safe-transactie)"
+          },
+          "bread-burn+cow-swap": {
+            "calls": "BREAD verbranden, inpakken en omzetting bevestigen (Safe-transactie)"
+          }
         }
       },
       "errors": {
