@@ -538,6 +538,7 @@
         "invalid_signature": "Una firma no es válida.",
         "not_found": "Safe o transacción no encontrados.",
         "invalid_state": "Esta acción no es posible en el estado actual.",
+        "operation_refused": "Esta transacción ejecutaría el código de otro contrato como el Safe (delegatecall). Solo se permiten lotes a través de MultiSendCallOnly.",
         "unknown": "Algo salió mal. Inténtalo de nuevo.",
         "tokenNotEnabled": "Este token no está activado para este fondo (Ajustes → Token).",
         "nameRequired": "Introduce un nombre.",

@@ -555,6 +555,7 @@
         "invalid_signature": "Une signature est invalide.",
         "not_found": "Safe ou transaction introuvable.",
         "invalid_state": "Cette action n'est pas possible dans l'état actuel.",
+        "operation_refused": "Cette transaction exécuterait le code d'un autre contrat au nom du Safe (delegatecall). Seuls les lots via MultiSendCallOnly sont autorisés.",
         "unknown": "Une erreur s'est produite. Réessayez.",
         "tokenNotEnabled": "Ce jeton n'est pas activé pour cette caisse (Paramètres → Jeton).",
         "nameRequired": "Saisissez un nom.",

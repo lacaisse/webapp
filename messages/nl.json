@@ -538,6 +538,7 @@
         "invalid_signature": "Een handtekening is ongeldig.",
         "not_found": "Safe of transactie niet gevonden.",
         "invalid_state": "Deze actie is in de huidige toestand niet mogelijk.",
+        "operation_refused": "Deze transactie zou de code van een ander contract als de Safe uitvoeren (delegatecall). Alleen batches via MultiSendCallOnly zijn toegestaan.",
         "unknown": "Er ging iets mis. Probeer het opnieuw.",
         "tokenNotEnabled": "Deze token is niet ingeschakeld voor dit fonds (Instellingen → Token).",
         "nameRequired": "Voer een naam in.",
