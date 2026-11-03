@@ -549,6 +549,7 @@
           "roundsOne": "Una transacción del Safe.",
           "roundsTwo": "Dos transacciones del Safe: la conversión ahora y el mint cuando se ejecute.",
           "cost": "Coste de la conversión: alrededor del {percent} %, incluido en el precio",
+          "costTiny": "Coste de la conversión: menos del 0,01 %, incluido en el precio",
           "costAmount": " ({amount} {symbol})"
         },
         "confirm": "Proponer",

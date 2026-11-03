@@ -566,6 +566,7 @@
           "roundsOne": "One Safe transaction.",
           "roundsTwo": "Two Safe transactions: the conversion now, then the mint once it has filled.",
           "cost": "Conversion cost: about {percent} %, included in the price",
+          "costTiny": "Conversion cost: under 0.01 %, included in the price",
           "costAmount": " ({amount} {symbol})"
         },
         "confirm": "Propose",

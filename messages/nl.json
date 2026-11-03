@@ -549,6 +549,7 @@
           "roundsOne": "Eén Safe-transactie.",
           "roundsTwo": "Twee Safe-transacties: nu de omzetting, daarna de mint zodra ze is uitgevoerd.",
           "cost": "Kosten van de omzetting: ongeveer {percent} %, in de prijs inbegrepen",
+          "costTiny": "Kosten van de omzetting: minder dan 0,01 %, in de prijs inbegrepen",
           "costAmount": " ({amount} {symbol})"
         },
         "confirm": "Voorstellen",

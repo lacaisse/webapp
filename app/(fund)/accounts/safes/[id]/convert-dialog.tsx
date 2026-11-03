@@ -149,10 +149,6 @@ export function ConvertDialog({
   };
 
   const validAmount = amount.trim() !== "" && Number(amount) > 0;
-  const rate =
-    quote && Number(quote.from.amount) > 0
-      ? (Number(quote.to.expected) / Number(quote.from.amount)).toFixed(4)
-      : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -233,16 +229,14 @@ export function ConvertDialog({
                       {t("quote.minimum", { slippage: `${quote.slippageBps / 100} %` })}
                     </dt>
                     <dd className="font-medium tabular-nums">{`${quote.to.min} ${quote.to.symbol}`}</dd>
-                    {rate && (
-                      <>
-                        <dt className="text-muted-foreground">{t("quote.rate")}</dt>
-                        <dd className="tabular-nums">{`1 ${quote.from.symbol} ≈ ${rate} ${quote.to.symbol}`}</dd>
-                      </>
-                    )}
+                    <dt className="text-muted-foreground">{t("quote.rate")}</dt>
+                    <dd className="tabular-nums">{`1 ${quote.from.symbol} ≈ ${quote.rate} ${quote.to.symbol}`}</dd>
                   </dl>
                   {quote.cost && (
                     <p className="text-xs text-muted-foreground">
-                      {t("quote.cost", { percent: quote.cost.feePercent })}
+                      {quote.cost.feePercent === "0"
+                        ? t("quote.costTiny")
+                        : t("quote.cost", { percent: quote.cost.feePercent })}
                       {quote.cost.fee !== "0" &&
                         t("quote.costAmount", { amount: quote.cost.fee, symbol: quote.from.symbol })}
                     </p>

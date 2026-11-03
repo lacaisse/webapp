@@ -99,6 +99,7 @@ export type ConversionQuote = {
   // as a share of the input ("0.06"), and as a human amount of the input
   // token. Null when a converter's fee is not expressible in its input.
   cost: { feePercent: string; fee: string } | null;
+  rate: string; // output per 1 input at the expected price, 4 decimals, from the raw units
   rounds: number; // Safe proposals the conversion takes
   validUntil: string; // ISO: the order's validTo
 };
@@ -140,6 +141,12 @@ export async function quoteConversion(a: {
       q.fee === null
         ? null
         : { feePercent: percentOf(q.fee, units), fee: formatAmount(q.fee, pair.from.decimals) },
+    // expectedOut / amountIn, kept in the output token's fixed point.
+    rate: formatAmount(
+      (q.expectedOut * BigInt(10) ** BigInt(pair.from.decimals)) / units,
+      pair.to.decimals,
+      4,
+    ),
     rounds: signingRounds(pair.converter),
     validUntil: q.validUntil.toISOString(),
   };
