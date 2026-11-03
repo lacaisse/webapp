@@ -35,7 +35,7 @@ import { isConvertError } from "./types";
 // proposal itself → the Safe strings.
 function convertErrorFor(t: T, e: unknown, context: string): string {
   if (isConvertError(e)) {
-    if (e.code !== "quote_moved" && e.code !== "no_pair" && e.code !== "amount") {
+    if (e.code !== "quote_moved" && e.code !== "no_pair" && e.code !== "amount" && e.code !== "rate_limited") {
       console.warn(`[convert] ${context}:`, e.code, e.message);
     }
     return t(`fund.safes.conversion.errors.${e.code}` as never);

@@ -20,6 +20,10 @@ import { ConvertError, type Address, type Hex } from "./types";
 // hosted orderbook for the chain. 10 s timeout per request.
 
 const TIMEOUT_MS = 10_000;
+// The hosted orderbook throttles order creation (HTTP 429, keyed on more than
+// the IP — seen on Gnosis after a burst of quotes and one order). One short
+// retry covers a transient bucket; a second 429 is reported as rate_limited.
+const RETRY_429_AFTER_MS = 2_000;
 
 const COW_API_BY_CHAIN: Record<number, string> = {
   100: "https://api.cow.fi/xdai",
@@ -207,14 +211,22 @@ export async function postPreSignOrder(a: {
   uid: Hex;
 }): Promise<void> {
   const path = "/api/v1/orders";
-  const r = await send(a.chainId, "POST", path, {
+  const body = {
     ...orderToJson(a.order),
     appData: a.appDataDoc,
     appDataHash: a.order.appData,
     from: a.owner,
     signingScheme: "presign",
     signature: a.owner,
-  });
+  };
+  let r = await send(a.chainId, "POST", path, body);
+  if (r.status === 429) {
+    await new Promise((resolve) => setTimeout(resolve, RETRY_429_AFTER_MS));
+    r = await send(a.chainId, "POST", path, body);
+    if (r.status === 429) {
+      throw new ConvertError("rate_limited", `POST ${path} HTTP 429: ${r.text.slice(0, 200)}`);
+    }
+  }
   if (r.status >= 200 && r.status < 300) {
     const json = parseJson("POST", path, r);
     const answered = shaped("order uid", () => hex(json, "uid"));

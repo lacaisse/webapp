@@ -593,6 +593,7 @@
         "errors": {
           "config": "Conversies zijn niet ingesteld voor dit netwerk.",
           "cow_api": "De omzettingsdienst is niet bereikbaar. Probeer het zo opnieuw.",
+          "rate_limited": "De omzettingsdienst is momenteel overbelast. Probeer het over een paar minuten opnieuw.",
           "no_pair": "Deze conversie is niet beschikbaar voor dit fonds. Schakel beide tokens in onder Instellingen → Token.",
           "quote_failed": "Dit bedrag kon niet geprijsd worden.",
           "quote_moved": "De prijs is veranderd. Bekijk de nieuwe prijsopgave.",

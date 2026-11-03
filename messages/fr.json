@@ -610,6 +610,7 @@
         "errors": {
           "config": "Les conversions ne sont pas configurées pour ce réseau.",
           "cow_api": "Le service de conversion est injoignable. Réessayez dans un instant.",
+          "rate_limited": "Le service de conversion est saturé pour le moment. Réessayez dans quelques minutes.",
           "no_pair": "Cette conversion n'est pas disponible pour cette caisse. Activez les deux jetons dans Paramètres → Jeton.",
           "quote_failed": "Ce montant n'a pas pu être coté.",
           "quote_moved": "Le prix a bougé. Vérifiez la nouvelle cotation.",

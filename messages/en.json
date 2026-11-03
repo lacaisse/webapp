@@ -610,6 +610,7 @@
         "errors": {
           "config": "Conversions are not configured for this network.",
           "cow_api": "The conversion service could not be reached. Try again in a moment.",
+          "rate_limited": "The conversion service is busy right now. Try again in a few minutes.",
           "no_pair": "This conversion is not available for this fund. Enable both tokens under Settings → Token.",
           "quote_failed": "This amount could not be quoted.",
           "quote_moved": "The price moved. Review the new quote.",
