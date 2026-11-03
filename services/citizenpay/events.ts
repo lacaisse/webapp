@@ -4,6 +4,10 @@ import "server-only";
 import { z } from "zod";
 
 import {
+  handleCardHolderEvent,
+  isHolderEventType,
+} from "@/services/card/holder-claims";
+import {
   applyRemoteCardState,
   RECONCILABLE_CARD_SELECT,
   resolvePlaceName,
@@ -25,6 +29,15 @@ import { getCitizenPayClient } from "./client";
 // (services/card/pin-block.ts, which also sends the notifications for a
 // block it imports). The payload only lends the place and terminal for the
 // audit line and the emails.
+//
+// The holder events (plan "Bread card-holder voting", api PR A) take the same
+// road: `card.attached {holder_ref, proof}` when a holder claimed one of the
+// fund's cards from the card wallet, `card.detached`, and a claim left for
+// the fund to confirm (`card.claim_pending`, or `card.attached` with
+// `proof: "pending"`). They are routed to services/card/holder-claims.ts
+// BEFORE the "card not on file" check — a card claimed from the wallet may
+// have no local row yet — which re-reads `GET
+// /v2/treasury/cards/{serial}/holder` and applies that.
 
 export const CitizenPayEventPayloadSchema = z.looseObject({
   // The api serialises its event id as a JSON number (api#251
@@ -38,6 +51,11 @@ export const CitizenPayEventPayloadSchema = z.looseObject({
   terminal_id: z.union([z.string(), z.number()]).nullish(),
   pin_block_count: z.number().int().nullish(),
   by: z.string().max(100).nullish(),
+  // Holder events (api PR A): the claimant's login (La Caisse User id) and
+  // the api's proof word. Only a fallback for a pending claim the holder
+  // re-read does not show yet; never applied otherwise.
+  holder_ref: z.string().min(1).max(200).nullish(),
+  proof: z.string().max(50).nullish(),
 });
 
 export type CitizenPayEventPayload = z.infer<typeof CitizenPayEventPayloadSchema>;
@@ -54,6 +72,7 @@ export const EVENT_FUND_SELECT = {
   citizenPayApiKeyEnc: true,
   citizenPayEventsSecretEnc: true,
   citizenPayTreasurySlug: true,
+  memberLoginEnabled: true,
 } as const;
 
 export type EventFund = {
@@ -68,6 +87,7 @@ export type EventFund = {
   citizenPayApiKeyEnc: string | null;
   citizenPayEventsSecretEnc: string | null;
   citizenPayTreasurySlug: string | null;
+  memberLoginEnabled: boolean;
 };
 
 /**
@@ -115,6 +135,11 @@ export async function handleCitizenPayEvent(
   }
   if (!payload.serial) {
     return { outcome: "IGNORED", detail: "no serial on the event" };
+  }
+  // Wallet claims and detachments: their own re-read (the holder route) and
+  // their own rules, including for a card the fund has no row for yet.
+  if (isHolderEventType(payload.type)) {
+    return handleCardHolderEvent(fund, payload);
   }
   // A fund that disconnected from Citizen Pay but still has the webhook
   // registered cannot re-read anything: ignored, not failed (a FAILED

@@ -10,6 +10,7 @@ import { isValidWeeklyLimitCents } from "@/lib/weekly-limit";
 import { requireFundRole } from "@/services/auth/dal";
 import { holderDisplayName } from "@/services/card/holder-name";
 import { scheduleCardHolderSync } from "@/services/card/holder-sync";
+import { scheduleMemberApiSync } from "@/services/member/api-sync";
 import { reconcileCardWithCitizenPay } from "@/services/card/pin-block";
 import { isPinBlocked } from "@/services/card/pin-block-rules";
 import { scheduleCardHolderNamePublish } from "@/services/card/publish-holder-name";
@@ -1243,9 +1244,11 @@ export async function unassignCardAction(input: {
   ]);
 
   // Reset the public wallet name to CP's default — the card is no longer
-  // held — and detach it from the holder's login (public again, D3).
+  // held — and detach it from the holder's login (public again, D3). The
+  // former member's declaration at the api no longer lists it.
   scheduleCardHolderNamePublish(fund, card.id);
   scheduleCardHolderSync(card.id);
+  scheduleMemberApiSync(memberId);
 
   revalidatePath("/cards");
   revalidatePath(`/cards/${card.id}`);

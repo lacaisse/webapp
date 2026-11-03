@@ -1026,7 +1026,8 @@
         "status": "Status",
         "tier": "Tier",
         "cards": "Cards",
-        "joined": "Joined"
+        "joined": "Joined",
+        "login": "Login"
       },
       "contribution": {
         "target": "Target",
@@ -1148,6 +1149,11 @@
           "joinedAt": "Joined",
           "notes": "Notes"
         }
+      },
+      "login": {
+        "yes": "Login",
+        "unverified": "Login · unverified",
+        "none": "No login"
       }
     },
     "cards": {
@@ -1307,6 +1313,35 @@
         "forMember": "For {name}",
         "holder": "Holder: {name}",
         "viewCard": "View card"
+      },
+      "holderClaims": {
+        "title": "Claims from the card wallet",
+        "description": "Holders who claimed one of your cards with their login. Confirm when you know the card is theirs; refuse otherwise — the card stays public.",
+        "anchor": "Wallet claims",
+        "columns": {
+          "serial": "Serial",
+          "number": "Number",
+          "member": "Member",
+          "proof": "Proof",
+          "requested": "Requested",
+          "status": "Status"
+        },
+        "status": {
+          "PENDING": "Pending",
+          "CONFIRMED": "Confirmed",
+          "REFUSED": "Refused",
+          "ATTACHED": "Attached",
+          "SUPERSEDED": "Superseded"
+        },
+        "notMember": "Not a member of this fund",
+        "confirm": "Confirm",
+        "confirming": "Confirming…",
+        "refuse": "Refuse",
+        "refusing": "Refusing…",
+        "refuseTitle": "Refuse this claim?",
+        "refuseDescription": "Card {serial} stays public on the wallet and is not attached to {member}'s login. They can claim it again later.",
+        "confirmRefuse": "Refuse claim",
+        "dismiss": "Back"
       }
     },
     "allocations": {
@@ -3751,6 +3786,52 @@
               "unknown": "not stated"
             }
           }
+        },
+        "proof": {
+          "app": "Linked in the app",
+          "bound": "Assigned here",
+          "payment": "Recent payment",
+          "fund": "Confirmed by the fund",
+          "pending": "Pending",
+          "unknown": "Not stated"
+        },
+        "errors": {
+          "notFound": "This claim no longer exists.",
+          "notPending": "This claim was already decided.",
+          "notMember": "That login is not a member of this fund.",
+          "loginRemoved": "That member no longer has a verified login.",
+          "notAttached": "This card is not attached to a login.",
+          "apiNotDeployed": "Citizen Pay does not offer this yet. Try again after the next api release.",
+          "apiRefused": "Citizen Pay refused it: there is no pending claim for that login any more.",
+          "failed": "Something went wrong. Try again."
+        },
+        "card": {
+          "title": "Holder login",
+          "description": "Which member login holds this card on the wallet.",
+          "login": "Login",
+          "attached": "Attached at Citizen Pay",
+          "proof": "Proof",
+          "pendingClaim": "A wallet login is waiting for your confirmation.",
+          "pendingClaimLink": "Open the claims",
+          "noMember": "No member",
+          "noLogin": "No login",
+          "loginVerified": "Login · verified",
+          "loginUnverified": "Login · email unverified",
+          "attachedSince": "Yes · since {date}",
+          "attachedOther": "Attached to another login",
+          "claimPending": "Claim pending · {date}",
+          "notAttached": "No",
+          "notAvailable": "Not available yet",
+          "assignedHere": "Assigned here (fund)",
+          "adminOnly": "Only an admin of the fund can detach it."
+        },
+        "detach": {
+          "button": "Detach",
+          "title": "Detach this card from the login?",
+          "description": "{holderLabel}'s card leaves their login: it becomes public on the wallet again and is unassigned from the member here. You'll be asked to confirm it's you.",
+          "cancel": "Cancel",
+          "confirm": "Detach card",
+          "detaching": "Detaching…"
         }
       }
     }

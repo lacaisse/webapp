@@ -29,6 +29,8 @@ const publish = vi.hoisted(() => ({ scheduleCardHolderNamePublish: vi.fn() }));
 vi.mock("@/services/card/publish-holder-name", () => publish);
 const holderSync = vi.hoisted(() => ({ scheduleCardHolderSync: vi.fn() }));
 vi.mock("@/services/card/holder-sync", () => holderSync);
+const apiSync = vi.hoisted(() => ({ scheduleMemberApiSync: vi.fn() }));
+vi.mock("@/services/member/api-sync", () => apiSync);
 
 const cp = vi.hoisted(() => ({ registerCard: vi.fn(), submitMint: vi.fn() }));
 vi.mock("@/services/citizenpay/client", () => ({ getCitizenPayClient: () => cp }));
@@ -99,6 +101,7 @@ describe("activateMemberAction", () => {
     expect(publish.scheduleCardHolderNamePublish).toHaveBeenCalledWith(fund, "card-1");
     // …and the holder login sync (plan "Bread card-holder voting", D3).
     expect(holderSync.scheduleCardHolderSync).toHaveBeenCalledWith("card-1");
+    expect(apiSync.scheduleMemberApiSync).toHaveBeenCalledWith("m1");
   });
 });
 
@@ -126,6 +129,7 @@ describe("addCardAction", () => {
     expect(await addCardAction({ memberId: "m1", cardSerial: "S2", holderName: "Tom Doe" })).toEqual({ ok: true });
     expect(publish.scheduleCardHolderNamePublish).toHaveBeenCalledWith(fund, "card-2");
     expect(holderSync.scheduleCardHolderSync).toHaveBeenCalledWith("card-2");
+    expect(apiSync.scheduleMemberApiSync).toHaveBeenCalledWith("m1");
   });
 
   it("schedules the publish for a newly registered card", async () => {
@@ -136,6 +140,7 @@ describe("addCardAction", () => {
     expect(await addCardAction({ memberId: "m1", cardSerial: "S3" })).toEqual({ ok: true });
     expect(publish.scheduleCardHolderNamePublish).toHaveBeenCalledWith(fund, "card-3");
     expect(holderSync.scheduleCardHolderSync).toHaveBeenCalledWith("card-3");
+    expect(apiSync.scheduleMemberApiSync).toHaveBeenCalledWith("m1");
   });
 
   it("files an enrollment request for a serial issued by another fund", async () => {

@@ -13,6 +13,8 @@ vi.mock("@/services/auth/better-auth", () => ({
 }));
 const holderSync = vi.hoisted(() => ({ syncMemberCardHolders: vi.fn() }));
 vi.mock("@/services/card/holder-sync", () => holderSync);
+const apiSync = vi.hoisted(() => ({ syncMemberAtApi: vi.fn() }));
+vi.mock("@/services/member/api-sync", () => apiSync);
 const emails = vi.hoisted(() => ({ sendMemberLoginVerification: vi.fn() }));
 vi.mock("@/services/email/transactional", () => emails);
 const core = vi.hoisted(() => ({
@@ -243,6 +245,7 @@ describe("removeMemberLogin", () => {
     expect(db.members[0].userId).toBeNull();
     expect(db.users).toHaveLength(0);
     expect(holderSync.syncMemberCardHolders).toHaveBeenCalledWith("member-1");
+    expect(apiSync.syncMemberAtApi).toHaveBeenCalledWith("member-1", { removedHolderRef: "user-1" });
   });
 
   it("keeps a User who is a member elsewhere or staff", async () => {

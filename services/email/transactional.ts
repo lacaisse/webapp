@@ -373,6 +373,58 @@ export async function sendCardPinBlockedHolder(args: {
   });
 }
 
+// The proof words the api sends on a wallet claim (`card.attached`), each with
+// its own phrase in `cards.admin.holderClaims.email.staff.proof`; anything
+// else reads as "not stated".
+const WALLET_CLAIM_PROOFS = new Set(["app", "bound", "payment", "fund"]);
+
+// A holder claimed one of the fund's cards from the card wallet and Citizen
+// Pay attached it to their login (plan "Bread card-holder voting", events
+// webhook `card.attached`). To the fund's OWNER/ADMIN staff, with the card
+// page where an admin can detach it if the claim is wrong; sent by
+// services/card/holder-claim-emails.ts. No member on the row (staff are not
+// the recipient's member), so the fund's default locale and the platform
+// sender. `proof` is the api's raw word, phrased here in the email's locale.
+export async function sendCardClaimedFromWallet(args: {
+  emailId: string;
+  fundId: string;
+  toEmail: string;
+  fund: FundBranding;
+  serial: string;
+  holder: string;
+  proof: string | null;
+  claimedAt: string; // ISO 8601
+  timeZone: string;
+  cardUrl: string;
+}): Promise<void> {
+  await dispatchTemplate({
+    emailId: args.emailId,
+    fund: args.fund,
+    render: async (locale) => {
+      const t = await getTranslations({
+        locale,
+        namespace: "cards.admin.holderClaims.email.staff",
+      });
+      const known = args.proof !== null && WALLET_CLAIM_PROOFS.has(args.proof);
+      const proof = t(`proof.${known ? args.proof : "unknown"}` as never);
+      return {
+        subject: t("subject", { serial: args.serial, holder: args.holder }),
+        // The bare-URL paragraph renders as the primary CTA button.
+        text: t("textBody", {
+          holder: args.holder,
+          serial: args.serial,
+          date: formatEmailDateTime(args.claimedAt, locale, args.timeZone),
+          fundName: args.fund.name,
+          proof,
+          cardUrl: args.cardUrl,
+        }),
+        ctaLabel: t("ctaLabel"),
+      };
+    },
+    to: args.toEmail,
+  });
+}
+
 // Sent (in place of PAYMENT_CONFIRMATION) when a matched deposit is below the
 // member's tier minimum contribution: confirms receipt but flags the shortfall
 // and the top-up deadline. Like the confirmation, `occurredAt` arrives as a raw

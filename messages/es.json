@@ -1004,7 +1004,8 @@
         "status": "Estado",
         "tier": "Nivel",
         "cards": "Tarjetas",
-        "joined": "Se unió"
+        "joined": "Se unió",
+        "login": "Acceso"
       },
       "contribution": {
         "target": "Objetivo",
@@ -1126,6 +1127,11 @@
           "joinedAt": "Fecha de alta",
           "notes": "Notas"
         }
+      },
+      "login": {
+        "yes": "Acceso",
+        "unverified": "Acceso · sin verificar",
+        "none": "Sin acceso"
       }
     },
     "cards": {
@@ -1246,6 +1252,35 @@
         "skipped": "{count} serial(es) no creado(s)",
         "serialColumn": "Columna de serial",
         "numberColumn": "Columna de número"
+      },
+      "holderClaims": {
+        "title": "Solicitudes desde el monedero de tarjetas",
+        "description": "Titulares que reclamaron una de sus tarjetas con su acceso. Confirme si sabe que la tarjeta es suya; si no, rechácela — la tarjeta sigue siendo pública.",
+        "anchor": "Solicitudes",
+        "columns": {
+          "serial": "Número de serie",
+          "number": "N.º tarjeta",
+          "member": "Miembro",
+          "proof": "Prueba",
+          "requested": "Solicitada",
+          "status": "Estado"
+        },
+        "status": {
+          "PENDING": "Pendiente",
+          "CONFIRMED": "Confirmada",
+          "REFUSED": "Rechazada",
+          "ATTACHED": "Vinculada",
+          "SUPERSEDED": "Reemplazada"
+        },
+        "notMember": "No es miembro de este caja",
+        "confirm": "Confirmar",
+        "confirming": "Confirmando…",
+        "refuse": "Rechazar",
+        "refusing": "Rechazando…",
+        "refuseTitle": "¿Rechazar esta solicitud?",
+        "refuseDescription": "La tarjeta {serial} sigue siendo pública en el monedero y no se vincula al acceso de {member}. Podrá reclamarla de nuevo más adelante.",
+        "confirmRefuse": "Rechazar solicitud",
+        "dismiss": "Volver"
       }
     },
     "allocations": {
@@ -3662,10 +3697,56 @@
               "app": "ya vinculada a su teléfono en la app",
               "bound": "la tarjeta se le había asignado aquí",
               "payment": "un pago reciente hecho con la tarjeta",
-              "fund": "confirmada por el fondo",
+              "fund": "confirmada por la caja",
               "unknown": "no indicada"
             }
           }
+        },
+        "proof": {
+          "app": "Vinculada en la app",
+          "bound": "Asignada aquí",
+          "payment": "Pago reciente",
+          "fund": "Confirmada por la caja",
+          "pending": "Pendiente",
+          "unknown": "No indicada"
+        },
+        "errors": {
+          "notFound": "Esta solicitud ya no existe.",
+          "notPending": "Esta solicitud ya se resolvió.",
+          "notMember": "Ese acceso no pertenece a ningún miembro de este caja.",
+          "loginRemoved": "Ese miembro ya no tiene un acceso verificado.",
+          "notAttached": "Esta tarjeta no está vinculada a ningún acceso.",
+          "apiNotDeployed": "Citizen Pay aún no ofrece esto. Inténtelo de nuevo tras la próxima versión de la api.",
+          "apiRefused": "Citizen Pay lo rechazó: ya no hay ninguna solicitud pendiente para ese acceso.",
+          "failed": "Algo salió mal. Inténtelo de nuevo."
+        },
+        "card": {
+          "title": "Acceso del titular",
+          "description": "Qué acceso de miembro tiene esta tarjeta en el monedero.",
+          "login": "Acceso",
+          "attached": "Vinculada en Citizen Pay",
+          "proof": "Prueba",
+          "pendingClaim": "Un acceso del monedero espera su confirmación.",
+          "pendingClaimLink": "Ver las solicitudes",
+          "noMember": "Sin miembro",
+          "noLogin": "Sin acceso",
+          "loginVerified": "Acceso · verificado",
+          "loginUnverified": "Acceso · correo sin verificar",
+          "attachedSince": "Sí · desde el {date}",
+          "attachedOther": "Vinculada a otro acceso",
+          "claimPending": "Solicitud pendiente · {date}",
+          "notAttached": "No",
+          "notAvailable": "Aún no disponible",
+          "assignedHere": "Asignada aquí (caja)",
+          "adminOnly": "Solo un administrador de la caja puede desvincularla."
+        },
+        "detach": {
+          "button": "Desvincular",
+          "title": "¿Desvincular esta tarjeta del acceso?",
+          "description": "La tarjeta de {holderLabel} deja su acceso: vuelve a ser pública en el monedero y deja de estar asignada al miembro aquí. Se le pedirá confirmar su identidad.",
+          "cancel": "Cancelar",
+          "confirm": "Desvincular tarjeta",
+          "detaching": "Desvinculando…"
         }
       }
     }

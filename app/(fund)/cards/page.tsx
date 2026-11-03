@@ -8,6 +8,7 @@ import { requireCurrentFund } from "@/services/fund/server";
 
 import { CardsTable } from "./cards-table";
 import { CardEnrollmentRequestsPanel } from "./enrollment-requests-panel";
+import { HolderClaimsPanel } from "./holder-claims-panel";
 import { CardSyncDialog } from "./sync-dialog";
 import { NumberImportDialog } from "./number-import-dialog";
 import { TableSkeleton } from "../token/skeleton";
@@ -57,6 +58,10 @@ export default async function CardsPage({
 
       <Suspense fallback={null}>
         <CardEnrollmentRequestsPanel fundId={fund.id} />
+      </Suspense>
+
+      <Suspense fallback={null}>
+        <HolderClaimsPanel fundId={fund.id} />
       </Suspense>
 
       <Suspense

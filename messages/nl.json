@@ -1009,7 +1009,8 @@
         "status": "Status",
         "tier": "Niveau",
         "cards": "Kaarten",
-        "joined": "Lid sinds"
+        "joined": "Lid sinds",
+        "login": "Login"
       },
       "contribution": {
         "target": "Doel",
@@ -1131,6 +1132,11 @@
           "joinedAt": "Aangemeld op",
           "notes": "Notities"
         }
+      },
+      "login": {
+        "yes": "Login",
+        "unverified": "Login · niet geverifieerd",
+        "none": "Geen login"
       }
     },
     "cards": {
@@ -1251,6 +1257,35 @@
         "skipped": "{count} serienummer(s) niet aangemaakt",
         "serialColumn": "Serienummerkolom",
         "numberColumn": "Nummerkolom"
+      },
+      "holderClaims": {
+        "title": "Claims vanuit de kaartportemonnee",
+        "description": "Houders die een van uw kaarten hebben geclaimd met hun login. Bevestig als u weet dat de kaart van hen is; weiger anders — de kaart blijft openbaar.",
+        "anchor": "Claims",
+        "columns": {
+          "serial": "Serie",
+          "number": "Kaartnr.",
+          "member": "Lid",
+          "proof": "Bewijs",
+          "requested": "Aangevraagd",
+          "status": "Status"
+        },
+        "status": {
+          "PENDING": "In afwachting",
+          "CONFIRMED": "Bevestigd",
+          "REFUSED": "Geweigerd",
+          "ATTACHED": "Gekoppeld",
+          "SUPERSEDED": "Vervangen"
+        },
+        "notMember": "Geen lid van dit kas",
+        "confirm": "Bevestigen",
+        "confirming": "Bevestigen…",
+        "refuse": "Weigeren",
+        "refusing": "Weigeren…",
+        "refuseTitle": "Deze claim weigeren?",
+        "refuseDescription": "Kaart {serial} blijft openbaar in de portemonnee en wordt niet gekoppeld aan de login van {member}. Die kan de kaart later opnieuw claimen.",
+        "confirmRefuse": "Claim weigeren",
+        "dismiss": "Terug"
       }
     },
     "allocations": {
@@ -3671,10 +3706,56 @@
               "app": "al gekoppeld aan de telefoon in de app",
               "bound": "de kaart was hier aan hen toegewezen",
               "payment": "een recente betaling met de kaart",
-              "fund": "bevestigd door het fonds",
+              "fund": "bevestigd door de kas",
               "unknown": "niet vermeld"
             }
           }
+        },
+        "proof": {
+          "app": "Gekoppeld in de app",
+          "bound": "Hier toegewezen",
+          "payment": "Recente betaling",
+          "fund": "Bevestigd door de kas",
+          "pending": "In afwachting",
+          "unknown": "Niet vermeld"
+        },
+        "errors": {
+          "notFound": "Deze claim bestaat niet meer.",
+          "notPending": "Over deze claim is al beslist.",
+          "notMember": "Die login hoort bij geen lid van dit kas.",
+          "loginRemoved": "Dat lid heeft geen geverifieerde login meer.",
+          "notAttached": "Deze kaart is aan geen login gekoppeld.",
+          "apiNotDeployed": "Citizen Pay biedt dit nog niet aan. Probeer het opnieuw na de volgende api-release.",
+          "apiRefused": "Citizen Pay weigerde: er is geen openstaande claim meer voor die login.",
+          "failed": "Er ging iets mis. Probeer het opnieuw."
+        },
+        "card": {
+          "title": "Login van de houder",
+          "description": "Welke ledenlogin deze kaart in de portemonnee heeft.",
+          "login": "Login",
+          "attached": "Gekoppeld bij Citizen Pay",
+          "proof": "Bewijs",
+          "pendingClaim": "Een login uit de portemonnee wacht op uw bevestiging.",
+          "pendingClaimLink": "Claims bekijken",
+          "noMember": "Geen lid",
+          "noLogin": "Geen login",
+          "loginVerified": "Login · geverifieerd",
+          "loginUnverified": "Login · e-mail niet geverifieerd",
+          "attachedSince": "Ja · sinds {date}",
+          "attachedOther": "Gekoppeld aan een andere login",
+          "claimPending": "Claim in afwachting · {date}",
+          "notAttached": "Nee",
+          "notAvailable": "Nog niet beschikbaar",
+          "assignedHere": "Hier toegewezen (kas)",
+          "adminOnly": "Alleen een beheerder van de kas kan de kaart loskoppelen."
+        },
+        "detach": {
+          "button": "Loskoppelen",
+          "title": "Deze kaart loskoppelen van de login?",
+          "description": "De kaart van {holderLabel} verlaat hun login: ze wordt weer openbaar in de portemonnee en is hier niet langer aan het lid toegewezen. U wordt gevraagd te bevestigen dat u het bent.",
+          "cancel": "Annuleren",
+          "confirm": "Kaart loskoppelen",
+          "detaching": "Loskoppelen…"
         }
       }
     }

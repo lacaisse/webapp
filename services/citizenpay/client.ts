@@ -499,19 +499,19 @@ class MockCitizenPayClient implements CitizenPayClient {
     // CITIZENPAY_MOCK_PENDING_HOLDER_REF, unless this process already holds a
     // state for it. They let a signed `card.attached` / `card.claim_pending`
     // be posted at the local receiver without first attaching the card.
-    const claimEnv = process.env.CITIZENPAY_MOCK_CLAIM_HOLDER_REF;
-    if (!mockCardHolders.has(key) && claimEnv && /CLAIMED$/i.test(key)) {
-      mockCardHolders.set(key, claimEnv);
-      mockCardHolderMeta.set(key, { attachedAt: MOCK_CLAIM_AT, proof: "payment" });
-    }
-    const pendingEnv = process.env.CITIZENPAY_MOCK_PENDING_HOLDER_REF;
-    if (
-      !mockCardHolders.has(key) &&
-      !mockPendingClaims.has(key) &&
-      pendingEnv &&
-      /PENDING$/i.test(key)
-    ) {
-      mockPendingClaims.set(key, { holderRef: pendingEnv, requestedAt: MOCK_CLAIM_AT });
+    // Each knob seeds a serial once per process: after the fund's own
+    // DELETE (Detach, Refuse) the card stays public, as at the real api.
+    if (!mockKnobSeeded.has(key)) {
+      const claimEnv = process.env.CITIZENPAY_MOCK_CLAIM_HOLDER_REF;
+      const pendingEnv = process.env.CITIZENPAY_MOCK_PENDING_HOLDER_REF;
+      if (claimEnv && /CLAIMED$/i.test(key)) {
+        mockKnobSeeded.add(key);
+        mockCardHolders.set(key, claimEnv);
+        mockCardHolderMeta.set(key, { attachedAt: MOCK_CLAIM_AT, proof: "payment" });
+      } else if (pendingEnv && /PENDING$/i.test(key)) {
+        mockKnobSeeded.add(key);
+        mockPendingClaims.set(key, { holderRef: pendingEnv, requestedAt: MOCK_CLAIM_AT });
+      }
     }
     const holderRef = mockCardHolders.get(key) ?? null;
     const meta = mockCardHolderMeta.get(key);
@@ -1472,6 +1472,9 @@ export const mockTreasuryMembers: Map<string, string[]> = ((
   globalThis as { __cpMockTreasuryMembers?: Map<string, string[]> }
 ).__cpMockTreasuryMembers ??= new Map());
 const MOCK_CLAIM_AT = "2026-11-03T11:30:00.000Z";
+const mockKnobSeeded: Set<string> = ((
+  globalThis as { __cpMockKnobSeeded?: Set<string> }
+).__cpMockKnobSeeded ??= new Set());
 
 // Next Monday 00:00 Europe/Brussels — where CP's weekly source cap resets.
 function nextBrusselsMonday(now: Date): Date {

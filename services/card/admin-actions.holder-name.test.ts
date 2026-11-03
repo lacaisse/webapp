@@ -24,6 +24,8 @@ const publish = vi.hoisted(() => ({ scheduleCardHolderNamePublish: vi.fn() }));
 vi.mock("@/services/card/publish-holder-name", () => publish);
 const holderSync = vi.hoisted(() => ({ scheduleCardHolderSync: vi.fn() }));
 vi.mock("@/services/card/holder-sync", () => holderSync);
+const apiSync = vi.hoisted(() => ({ scheduleMemberApiSync: vi.fn() }));
+vi.mock("@/services/member/api-sync", () => apiSync);
 
 const cp = vi.hoisted(() => ({ registerCard: vi.fn() }));
 vi.mock("@/services/citizenpay/client", () => ({ getCitizenPayClient: () => cp }));
@@ -62,6 +64,8 @@ describe("unassignCardAction", () => {
     expect(publish.scheduleCardHolderNamePublish).toHaveBeenCalledWith(fund, "card-1");
     // The card is public again at Citizen Pay (holder sync → DELETE).
     expect(holderSync.scheduleCardHolderSync).toHaveBeenCalledWith("card-1");
+    // …and the former member's declaration at the api drops it.
+    expect(apiSync.scheduleMemberApiSync).toHaveBeenCalledWith("m1");
   });
 
   it("does not publish when the card wasn't assigned", async () => {

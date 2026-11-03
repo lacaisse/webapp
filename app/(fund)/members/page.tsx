@@ -180,6 +180,8 @@ async function MembersContent({
   const privacy = await getPrivacyMode();
 
   const status = statusFilterFor(active);
+  // Member login on: a Login column after Email. Off = today's table.
+  const showLogin = fund.memberLoginEnabled;
   const [members, tiers, statusCounts] = await Promise.all([
     prisma.member.findMany({
       where: {
@@ -283,6 +285,7 @@ async function MembersContent({
             </TableHead>
             <TableHead>{t("columns.name")}</TableHead>
             <TableHead>{t("columns.email")}</TableHead>
+            {showLogin && <TableHead>{t("columns.login")}</TableHead>}
             <TableHead>{t("columns.status")}</TableHead>
             <TableHead>{t("columns.tier")}</TableHead>
             <TableHead>{t("columns.cards")}</TableHead>
@@ -292,7 +295,7 @@ async function MembersContent({
         </TableHeader>
         <TableBody>
           {members.length === 0 ? (
-            <TableEmpty colSpan={8}>{t("empty")}</TableEmpty>
+            <TableEmpty colSpan={showLogin ? 9 : 8}>{t("empty")}</TableEmpty>
           ) : (
             members.map((m) => {
               const fullName = `${m.firstName} ${m.lastName}`.trim();
@@ -322,6 +325,22 @@ async function MembersContent({
                       </div>
                     )}
                   </TableCell>
+                  {showLogin && (
+                    <TableCell>
+                      {m.userId && m.emailVerifiedAt ? (
+                        <Badge variant="success">{t("login.yes")}</Badge>
+                      ) : m.userId ? (
+                        <Badge variant="warning">{t("login.unverified")}</Badge>
+                      ) : (
+                        <span
+                          className="text-sm text-muted-foreground"
+                          title={t("login.none")}
+                        >
+                          —
+                        </span>
+                      )}
+                    </TableCell>
+                  )}
                   <TableCell>
                     <StatusBadge status={m.status} label={tStatus(m.status)} />
                   </TableCell>

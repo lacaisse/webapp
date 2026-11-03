@@ -16,6 +16,7 @@ import { prisma } from "@/services/db/prisma";
 import { nextCardNumber } from "@/services/card/numbering";
 import { scheduleCardHolderSync } from "@/services/card/holder-sync";
 import { scheduleCardHolderNamePublish } from "@/services/card/publish-holder-name";
+import { scheduleMemberApiSync } from "@/services/member/api-sync";
 import { normalizeSerial } from "@/services/card/serial";
 import {
   sendMemberActivated,
@@ -208,9 +209,11 @@ export async function activateMemberAction(input: {
 
   // Show the new holder's name on the card's public wallet (best-effort),
   // and tell Citizen Pay who holds it when the member has a verified login
-  // (services/card/holder-sync.ts).
+  // (services/card/holder-sync.ts). The member's declaration at the api
+  // lists their cards, so it changes too (services/member/api-sync.ts).
   scheduleCardHolderNamePublish(fund, card.id);
   scheduleCardHolderSync(card.id);
+  scheduleMemberApiSync(member.id);
 
   // Submit the referral mint to CitizenPay outside the transaction. On
   // success we stamp the tx hash; on failure the op stays PENDING and the
@@ -387,6 +390,7 @@ export async function addCardAction(input: {
     });
     scheduleCardHolderNamePublish(fund, card.id);
     scheduleCardHolderSync(card.id);
+    scheduleMemberApiSync(member.id);
     await sendAddCardEmail(fund, card, member);
     revalidatePath("/members");
     return { ok: true };
@@ -449,6 +453,7 @@ export async function addCardAction(input: {
   // the holder login, which the register call doesn't know about either.
   scheduleCardHolderNamePublish(fund, card.id);
   scheduleCardHolderSync(card.id);
+  scheduleMemberApiSync(member.id);
   await sendAddCardEmail(fund, card, member);
 
   revalidatePath("/members");

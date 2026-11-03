@@ -16,6 +16,7 @@ import {
   type EnsureMinterRolesResult,
 } from "@/services/citizenpay/token-roles";
 import { prisma } from "@/services/db/prisma";
+import { scheduleFundMemberApiSync } from "@/services/member/api-sync";
 import { isSupportedLocale } from "@/services/i18n/config";
 import { Erc20MetadataError, readErc20Metadata } from "@/services/token/erc20-metadata";
 import { EXTRA_TOKENS_BY_CHAIN } from "@/services/token/extra-tokens";
@@ -60,6 +61,8 @@ export async function updateOnboardingSettingsAction(
     data.memberLoginEnabled !== fund.memberLoginEnabled
   ) {
     scheduleFundCardHolderSync(fund.id);
+    // Same for the member declarations (services/member/api-sync.ts).
+    scheduleFundMemberApiSync(fund.id);
   }
   revalidatePath("/settings");
   return { ok: true };
