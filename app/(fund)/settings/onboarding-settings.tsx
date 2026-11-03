@@ -6,37 +6,38 @@ import { useState, useTransition } from "react";
 
 import { updateOnboardingSettingsAction } from "@/services/fund/settings-actions";
 
-type Toggle = "requireMemberEmailVerification" | "requireMerchantEmailVerification";
+type Toggle =
+  | "requireMemberEmailVerification"
+  | "requireMerchantEmailVerification"
+  | "memberLoginEnabled";
 
 export function OnboardingSettings({
   initialRequireMemberEmailVerification,
   initialRequireMerchantEmailVerification,
+  initialMemberLoginEnabled,
 }: {
   initialRequireMemberEmailVerification: boolean;
   initialRequireMerchantEmailVerification: boolean;
+  initialMemberLoginEnabled: boolean;
 }) {
   const t = useTranslations("fund.settings.onboarding");
-  const [requireMember, setRequireMember] = useState(
-    initialRequireMemberEmailVerification,
-  );
-  const [requireMerchant, setRequireMerchant] = useState(
-    initialRequireMerchantEmailVerification,
-  );
+  const [values, setValues] = useState<Record<Toggle, boolean>>({
+    requireMemberEmailVerification: initialRequireMemberEmailVerification,
+    requireMerchantEmailVerification: initialRequireMerchantEmailVerification,
+    memberLoginEnabled: initialMemberLoginEnabled,
+  });
   const [pending, startTransition] = useTransition();
 
   const onToggle = (key: Toggle, value: boolean) => {
     // Optimistic update — flip locally first, then send. Revert on error.
-    if (key === "requireMemberEmailVerification") setRequireMember(value);
-    else setRequireMerchant(value);
-
+    setValues((v) => ({ ...v, [key]: value }));
     startTransition(async () => {
       const result = await updateOnboardingSettingsAction({ [key]: value });
-      if ("error" in result) {
-        if (key === "requireMemberEmailVerification") setRequireMember(!value);
-        else setRequireMerchant(!value);
-      }
+      if ("error" in result) setValues((v) => ({ ...v, [key]: !value }));
     });
   };
+  const requireMember = values.requireMemberEmailVerification;
+  const requireMerchant = values.requireMerchantEmailVerification;
 
   return (
     <div className="space-y-3">
@@ -53,6 +54,13 @@ export function OnboardingSettings({
         checked={requireMerchant}
         disabled={pending}
         onChange={(v) => onToggle("requireMerchantEmailVerification", v)}
+      />
+      <Row
+        label={t("memberLogin.label")}
+        description={t("memberLogin.description")}
+        checked={values.memberLoginEnabled}
+        disabled={pending}
+        onChange={(v) => onToggle("memberLoginEnabled", v)}
       />
     </div>
   );

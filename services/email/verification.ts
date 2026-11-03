@@ -25,7 +25,16 @@ export function verificationExpiry(): Date {
 }
 
 export type VerifyEmailResult =
-  | { ok: true; entity: "member"; memberId: string; fundId: string }
+  | {
+      ok: true;
+      entity: "member";
+      memberId: string;
+      fundId: string;
+      // Set when this verification came from the member LOGIN sign-up and
+      // the member is now linked to (or confirmed as) that User — the
+      // caller syncs the member's card holders and sends them to /login.
+      linkedUserId: string | null;
+    }
   | { ok: true; entity: "merchant"; merchantId: string; fundId: string }
   | { error: "not_found" | "expired" | "consumed" | "email_mismatch" };
 
@@ -44,8 +53,9 @@ export async function consumeVerificationToken(
     const v = await tx.emailVerification.findUnique({
       where: { token },
       include: {
-        member: { select: { id: true, email: true, fundId: true } },
+        member: { select: { id: true, email: true, fundId: true, userId: true } },
         merchant: { select: { id: true, email: true, fundId: true } },
+        user: { select: { id: true, email: true } },
       },
     });
     if (!v) return { error: "not_found" as const };
@@ -80,15 +90,39 @@ export async function consumeVerificationToken(
         where: { token },
         data: { consumedAt: new Date() },
       });
+
+      // Member LOGIN verification (services/member/auth.ts): the token was
+      // minted for exactly `v.user`, whose address must still be the one it
+      // proves. The link lands when the member has no login yet or already
+      // has this one; a member linked to another user meanwhile keeps that
+      // login — this token then only verifies the member's address, and the
+      // other User stays unverified (and can't attach anything).
+      const linkUser =
+        v.user &&
+        v.user.email.toLowerCase() === v.email.toLowerCase() &&
+        (v.member.userId === null || v.member.userId === v.user.id)
+          ? v.user
+          : null;
+
       await tx.member.update({
         where: { id: v.member.id },
-        data: { emailVerifiedAt: new Date() },
+        data: {
+          emailVerifiedAt: new Date(),
+          ...(linkUser ? { userId: linkUser.id } : {}),
+        },
       });
+      if (linkUser) {
+        await tx.user.update({
+          where: { id: linkUser.id },
+          data: { emailVerified: true },
+        });
+      }
       return {
         ok: true as const,
         entity: "member" as const,
         memberId: v.member.id,
         fundId: v.member.fundId,
+        linkedUserId: linkUser?.id ?? null,
       };
     }
 

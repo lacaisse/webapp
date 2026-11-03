@@ -72,6 +72,38 @@ export async function sendMemberEmailVerification(args: {
   });
 }
 
+// The member LOGIN sign-up's verification (services/member/auth.ts). Same
+// Email type as the /join verification, different wording: the reader
+// confirms that they created a login, not that they applied.
+export async function sendMemberLoginVerification(args: {
+  emailId: string;
+  toEmail: string;
+  fund: FundBranding;
+  firstName: string;
+  verifyUrl: string;
+}): Promise<void> {
+  await dispatchTemplate({
+    emailId: args.emailId,
+    fund: args.fund,
+    render: async (locale) => {
+      const t = await getTranslations({
+        locale,
+        namespace: "memberLogin.emails.verify",
+      });
+      return {
+        subject: t("subject", { fundName: args.fund.name }),
+        text: t("textBody", {
+          firstName: args.firstName,
+          fundName: args.fund.name,
+          verifyUrl: args.verifyUrl,
+        }),
+        ctaLabel: t("ctaLabel"),
+      };
+    },
+    to: args.toEmail,
+  });
+}
+
 export async function sendMemberActivated(args: {
   emailId: string;
   fundId: string;

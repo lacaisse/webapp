@@ -14,6 +14,7 @@ import {
 import { getCitizenPayClient } from "@/services/citizenpay/client";
 import { prisma } from "@/services/db/prisma";
 import { nextCardNumber } from "@/services/card/numbering";
+import { scheduleCardHolderSync } from "@/services/card/holder-sync";
 import { scheduleCardHolderNamePublish } from "@/services/card/publish-holder-name";
 import { normalizeSerial } from "@/services/card/serial";
 import {
@@ -205,8 +206,11 @@ export async function activateMemberAction(input: {
     };
   });
 
-  // Show the new holder's name on the card's public wallet (best-effort).
+  // Show the new holder's name on the card's public wallet (best-effort),
+  // and tell Citizen Pay who holds it when the member has a verified login
+  // (services/card/holder-sync.ts).
   scheduleCardHolderNamePublish(fund, card.id);
+  scheduleCardHolderSync(card.id);
 
   // Submit the referral mint to CitizenPay outside the transaction. On
   // success we stamp the tx hash; on failure the op stays PENDING and the
@@ -382,6 +386,7 @@ export async function addCardAction(input: {
       select: { id: true, serialNumber: true, number: true },
     });
     scheduleCardHolderNamePublish(fund, card.id);
+    scheduleCardHolderSync(card.id);
     await sendAddCardEmail(fund, card, member);
     revalidatePath("/members");
     return { ok: true };
@@ -440,8 +445,10 @@ export async function addCardAction(input: {
     select: { id: true, serialNumber: true, number: true },
   });
 
-  // registerCard doesn't carry the name — publish it separately.
+  // registerCard doesn't carry the name — publish it separately. Same for
+  // the holder login, which the register call doesn't know about either.
   scheduleCardHolderNamePublish(fund, card.id);
+  scheduleCardHolderSync(card.id);
   await sendAddCardEmail(fund, card, member);
 
   revalidatePath("/members");

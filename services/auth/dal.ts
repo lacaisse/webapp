@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import "server-only";
 import { headers } from "next/headers";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 import { prisma } from "@/services/db/prisma";
 import { FundRole } from "@/services/db/generated/enums";
@@ -85,4 +85,43 @@ export async function requireFundRole(minRole: FundRole) {
     redirect("/unauthorized");
   }
   return { user, fund, membership };
+}
+
+// =============================================================================
+// Member authorization (plan "Bread card-holder voting", PR W-1)
+// =============================================================================
+// A card holder's login is a plain `User` linked to one `Member` per fund
+// through `Member.userId`. It is NOT staff: a member has no `FundMember` row,
+// so `requireFundRole` (and with it the whole `(fund)` dashboard) never
+// accepts a member session — services/auth/dal.member.test.ts pins that.
+// Member pages gate on the two things below instead: the fund opted in
+// (`Fund.memberLoginEnabled`, else 404 like every member route) and the
+// signed-in user is a member of THIS fund.
+
+/** The current user's Member row at the current fund, or null. */
+export const getCurrentMember = cache(async () => {
+  const [user, fund] = await Promise.all([getCurrentUser(), requireCurrentFund()]);
+  if (!fund.memberLoginEnabled) notFound();
+  if (!user) return { user: null, fund, member: null };
+  const member = await prisma.member.findFirst({
+    where: { fundId: fund.id, userId: user.id },
+  });
+  return { user, fund, member };
+});
+
+/**
+ * Require a signed-in member of the current fund. Anonymous → the fund's
+ * member /login (with a return path); signed in but not a member here →
+ * /login too, which explains it. 404 when the fund has member login off.
+ */
+export async function requireMember() {
+  const { user, fund, member } = await getCurrentMember();
+  if (!user) {
+    const h = await headers();
+    const path = h.get("x-pathname") ?? "/account";
+    const search = h.get("x-search") ?? "";
+    redirect(`/login?return_to=${encodeURIComponent(`${path}${search}`)}`);
+  }
+  if (!member) redirect("/login?notice=no_membership");
+  return { user, fund, member };
 }

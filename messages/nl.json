@@ -43,7 +43,12 @@
       "passkeyWaiting": "Wachten op passkey…",
       "passkeyEmailRequired": "Voer uw e-mail in om met een passkey in te loggen.",
       "waitlistPrompt": "Heeft u nog geen account?",
-      "joinWaitlist": "Aanmelden voor de wachtlijst"
+      "joinWaitlist": "Aanmelden voor de wachtlijst",
+      "memberHint": {
+        "title": "Lid van {fundName}?",
+        "description": "Log in met uw ledenlogin om uw kaarten in de Citizen Pay-wallet te openen.",
+        "createLogin": "Maak uw {fundName}-login aan"
+      }
     },
     "forgotPassword": {
       "title": "Wachtwoord opnieuw instellen",
@@ -2421,6 +2426,10 @@
             "field": "Veld",
             "format": "Waarden"
           }
+        },
+        "memberLogin": {
+          "label": "Ledenlogin",
+          "description": "Laat kaarthouders een login voor hun lidmaatschap aanmaken (registratie-, login- en accountpagina's op de site van dit fonds). Een lid met bevestigd e-mailadres heeft privékaarten in de Citizen Pay-wallet en kan meestemmen."
         }
       },
       "terms": {
@@ -4471,6 +4480,122 @@
     "map": {
       "empty": "Nog geen handelaarslocaties om te tonen.",
       "loading": "Kaart laden…"
+    }
+  },
+  "memberLogin": {
+    "shell": {
+      "tagline": "Ledenruimte",
+      "poweredBy": "Mogelijk gemaakt door La Caisse"
+    },
+    "login": {
+      "title": "Inloggen bij {fundName}",
+      "description": "Met uw ledenlogin opent u uw kaarten in de Citizen Pay-wallet.",
+      "email": "E-mail",
+      "password": "Wachtwoord",
+      "forgotLink": "Wachtwoord vergeten?",
+      "submit": "Inloggen",
+      "submitting": "Inloggen…",
+      "passkeyButton": "Inloggen met passkey",
+      "passkeyWaiting": "Wachten op passkey…",
+      "noLogin": "Nog geen login?",
+      "createLogin": "Maak uw login aan",
+      "signedInAs": "U bent ingelogd als {email}.",
+      "noMembership": "Deze login is geen lid van {fundName}. Log uit om een andere te gebruiken, of maak een login voor dit fonds aan.",
+      "signOut": "Uitloggen",
+      "notices": {
+        "check_email": "Bijna klaar: open de e-mail die we u net stuurden en klik op de link om uw login te bevestigen. Log daarna hier in.",
+        "verified": "Uw e-mail is bevestigd. Log in om verder te gaan.",
+        "password_reset": "Uw wachtwoord is gewijzigd. Log in met het nieuwe wachtwoord.",
+        "login_removed": "Uw login is verwijderd. Uw lidmaatschap blijft bij het fonds; u kunt wanneer u wilt een nieuwe login aanmaken.",
+        "unlinked": "Uw login is niet langer gekoppeld aan dit lidmaatschap.",
+        "no_membership": "Deze login is geen lid van dit fonds."
+      }
+    },
+    "signup": {
+      "title": "Maak uw {fundName}-login aan",
+      "description": "Eén login voor uw lidmaatschap: daarmee worden uw {fundName}-kaarten privé en kunt u vanuit de Citizen Pay-wallet meestemmen. Al lid? Gebruik het e-mailadres dat het fonds van u kent; we koppelen uw login aan uw lidmaatschap zodra u het bevestigt.",
+      "password": "Wachtwoord",
+      "confirmPassword": "Bevestig wachtwoord",
+      "passwordHint": "Minstens 8 tekens. U kunt later een passkey toevoegen.",
+      "submit": "Mijn login aanmaken",
+      "submitting": "Login aanmaken…",
+      "haveLogin": "Heeft u al een login?",
+      "signIn": "Inloggen"
+    },
+    "forgot": {
+      "title": "Wachtwoord opnieuw instellen",
+      "description": "We e-mailen u een link om een nieuw wachtwoord te kiezen.",
+      "email": "E-mail",
+      "submit": "Link versturen",
+      "submitting": "Versturen…",
+      "checkEmail": "Als er een login bestaat voor dit e-mailadres, is er een link onderweg. Controleer uw inbox.",
+      "backToLogin": "Terug naar inloggen"
+    },
+    "reset": {
+      "title": "Nieuw wachtwoord kiezen",
+      "description": "Kies iets dat u onthoudt. Door de wijziging wordt u overal uitgelogd.",
+      "invalid": "Deze link is ongeldig of verlopen.",
+      "password": "Nieuw wachtwoord",
+      "confirmPassword": "Bevestig wachtwoord",
+      "submit": "Wachtwoord bijwerken",
+      "submitting": "Bijwerken…",
+      "backToLogin": "Terug naar inloggen",
+      "requestAgain": "Nieuwe link aanvragen"
+    },
+    "account": {
+      "title": "Uw account",
+      "description": "Uw login bij {fundName}. Uw kaarten, hun pincode en de stemmingen vindt u in de Citizen Pay-wallet.",
+      "identity": {
+        "name": "Naam",
+        "email": "E-mail"
+      },
+      "verification": {
+        "verified": "E-mail bevestigd — uw kaarten zijn privé en kunnen stemmen.",
+        "pending": "E-mail nog niet bevestigd.",
+        "pendingHelp": "Zolang u niet op de link in de bevestigingsmail klikt, blijven uw kaarten publiek en kunnen ze niet stemmen.",
+        "resend": "Bevestigingsmail opnieuw versturen",
+        "resending": "Versturen…",
+        "sent": "Bevestigingsmail verstuurd. Controleer uw inbox.",
+        "alreadyVerified": "Uw e-mail is al bevestigd."
+      },
+      "cards": {
+        "title": "Uw kaarten",
+        "description": "Tik een kaart aan of open de wallet en log in met deze login om uw {fundName}-kaarten te zien, hun pincode in te stellen en te stemmen.",
+        "open": "Citizen Pay-wallet openen"
+      },
+      "passkeys": {
+        "title": "Passkeys",
+        "description": "Log in zonder wachtwoord met een vingerafdruk, gezichtsscan of beveiligingssleutel.",
+        "customDomainNote": "Passkeys beheert u op de site van La Caisse zelf, zodat ze in al uw fondsen werken.",
+        "manageOnApex": "Passkeys beheren"
+      },
+      "remove": {
+        "title": "Mijn login verwijderen",
+        "description": "Uw lidmaatschap blijft bij het fonds; alleen de login verdwijnt. Uw kaarten worden weer publiek en stemmen niet meer.",
+        "button": "Mijn login verwijderen",
+        "confirmTitle": "Uw login verwijderen?",
+        "confirmDescription": "U wordt uitgelogd. Uw kaarten worden weer publiek en kunnen niet meer stemmen tot u een nieuwe login aanmaakt en uw e-mail bevestigt.",
+        "confirm": "Login verwijderen",
+        "removing": "Verwijderen…"
+      },
+      "signOut": "Uitloggen"
+    },
+    "errors": {
+      "disabled": "Dit fonds heeft ledenlogins niet ingeschakeld.",
+      "invalidCredentials": "Ongeldig e-mailadres of wachtwoord.",
+      "tooMany": "Te veel pogingen. Wacht even voordat u het opnieuw probeert.",
+      "emailInvalid": "Voer een geldig e-mailadres in.",
+      "accountExists": "Er bestaat al een login voor dit e-mailadres. Log in, of stel uw wachtwoord opnieuw in.",
+      "membershipHasLogin": "Dit lidmaatschap heeft al een login. Log in, of stel uw wachtwoord opnieuw in als het de uwe is.",
+      "resetExpired": "Deze link is ongeldig of verlopen. Vraag een nieuwe aan.",
+      "generic": "Er ging iets mis. Probeer het opnieuw."
+    },
+    "emails": {
+      "verify": {
+        "subject": "Bevestig uw {fundName}-login",
+        "textBody": "Hallo {firstName},\n\nU heeft een ledenlogin aangemaakt bij {fundName}. Bevestig uw e-mailadres om de login te activeren — de link is 24 uur geldig:\n\n  {verifyUrl}\n\nHeeft u deze login niet aangemaakt? Negeer deze e-mail: zonder bevestiging wordt niets geactiveerd.\n\nHet {fundName}-team",
+        "ctaLabel": "Mijn login bevestigen"
+      }
     }
   }
 }

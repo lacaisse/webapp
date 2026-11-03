@@ -34,6 +34,24 @@ const AUTH_SUBDOMAIN = "auth";
 // for routing purposes (app code can still 404 on a per-route basis).
 const RESERVED_HOSTS = new Set(["www", "api", "admin", "app"]);
 
+// Member login pages (app/(fund-member), plan "Bread card-holder voting").
+// On a fund host that opted in (`Fund.memberLoginEnabled`) these public
+// paths are the MEMBER pages: `/login`, `/signup`, `/forgot`, `/reset`,
+// `/account`. The same paths exist for other hosts (`(auth-host)/login`, the
+// apex `/account`), and Next refuses two route groups resolving to one URL,
+// so the member pages live under `/member/*` and the proxy rewrites to them
+// — the browser keeps the short URL. A fund with the flag off gets today's
+// behaviour on these paths (404 / apex bounce), so flipping it on is the
+// only thing that makes member pages appear.
+const MEMBER_PAGE_SEGMENTS = new Set(["login", "signup", "forgot", "reset", "account"]);
+const MEMBER_PAGE_PREFIX = "/member";
+
+function memberPageRewrite(pathname: string): string | null {
+  const [, first] = pathname.split("/");
+  if (!first || !MEMBER_PAGE_SEGMENTS.has(first)) return null;
+  return `${MEMBER_PAGE_PREFIX}${pathname}`;
+}
+
 export async function proxy(request: NextRequest) {
   // Always strip inbound proxy-controlled headers — clients must never spoof
   // host classification or fund context.
@@ -79,6 +97,8 @@ export async function proxy(request: NextRequest) {
   // Domains allowed to frame this fund's widgets. Stays empty for non-fund
   // hosts, which have no widgets to frame.
   let embedAllowedDomains: string[] = [];
+  // Whether this fund host serves the member login pages (see above).
+  let memberLoginEnabled = false;
 
   if (!host || host === baseDomain) {
     hostType = "apex";
@@ -101,12 +121,18 @@ export async function proxy(request: NextRequest) {
       where: { domain: lookupHost },
       // `embedAllowedDomains` rides along on the lookup we already do — a
       // scalar column, so no join and no extra round-trip on the hot path.
-      select: { id: true, domain: true, embedAllowedDomains: true },
+      select: {
+        id: true,
+        domain: true,
+        embedAllowedDomains: true,
+        memberLoginEnabled: true,
+      },
     });
     if (fund) {
       request.headers.set("x-fund-id", fund.id);
       request.headers.set("x-fund-domain", fund.domain);
       embedAllowedDomains = fund.embedAllowedDomains;
+      memberLoginEnabled = fund.memberLoginEnabled;
       hostType = "fund";
     }
     // Unknown host → no hostType set; downstream helpers default to apex/404.
@@ -116,7 +142,19 @@ export async function proxy(request: NextRequest) {
     request.headers.set("x-host-type", hostType);
   }
 
-  const response = NextResponse.next({ request });
+  // Member pages: an internal rewrite, URL unchanged. Only on an opted-in
+  // fund host — everywhere else these paths keep their existing meaning.
+  // The forwarded headers (fund, x-pathname = the public path) ride along.
+  const memberPath =
+    hostType === "fund" && memberLoginEnabled
+      ? memberPageRewrite(request.nextUrl.pathname)
+      : null;
+  const response = memberPath
+    ? NextResponse.rewrite(
+        new URL(`${memberPath}${request.nextUrl.search}`, request.url),
+        { request },
+      )
+    : NextResponse.next({ request });
 
   // Embeddable widgets (services/embed): the fund's allowlist decides which
   // sites may frame them, and the browser is what enforces it. `'self'` is

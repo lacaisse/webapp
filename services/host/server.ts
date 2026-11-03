@@ -36,3 +36,16 @@ function buildHostUrl(host: string): string {
   const port = isProd ? "" : `:${process.env.PORT ?? 3000}`;
   return `${protocol}://${host}${port}`;
 }
+
+/**
+ * True while rendering as part of a Server Action request (Next re-renders
+ * the current page inside the action's response). A `redirect()` thrown in
+ * that re-render is resolved by an internal fetch against the server's own
+ * origin — the apex, not the fund host the browser is on — so host-routed
+ * pages (the member pages behind proxy.ts' rewrite) must not redirect
+ * there: the form navigates with `window.location` once the action answers,
+ * and the re-rendered payload is discarded.
+ */
+export async function isServerActionRequest(): Promise<boolean> {
+  return (await headers()).has("next-action");
+}

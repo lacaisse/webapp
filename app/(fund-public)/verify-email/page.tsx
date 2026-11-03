@@ -2,6 +2,7 @@
 import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 
+import { scheduleMemberCardHolderSync } from "@/services/card/holder-sync";
 import { prisma } from "@/services/db/prisma";
 import {
   sendMemberWelcome,
@@ -53,6 +54,15 @@ export default async function VerifyEmailPage({
     if (code !== "P2002") {
       console.error("[verify-email] welcome dispatch failed", e);
     }
+  }
+
+  // A member LOGIN verification: the member is now linked to their User, so
+  // their cards become attached at Citizen Pay (services/card/holder-sync.ts)
+  // and the member can sign in — the fund's marketing redirect is for
+  // applicants, not for someone who just activated a login.
+  if (result.entity === "member" && result.linkedUserId && fund.memberLoginEnabled) {
+    scheduleMemberCardHolderSync(result.memberId);
+    redirect("/login?notice=verified");
   }
 
   const successUrl =

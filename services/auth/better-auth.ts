@@ -10,8 +10,10 @@ import { passkey } from "@better-auth/passkey";
 import { getTranslations } from "next-intl/server";
 import { prisma } from "@/services/db/prisma";
 import { sendEmail } from "@/services/email/resend";
-import { MCP_SCOPES, mcpResourceForOrigin } from "@/services/mcp/resource";
+import { mcpResourceForOrigin } from "@/services/mcp/resource";
+import { oauthProviderOptions } from "@/services/auth/oauth-provider-config";
 import { buildRecentAuthCookie } from "@/services/auth/recent-auth";
+import { ensureWalletOauthClient } from "@/services/member/wallet-client";
 
 // Better Auth replaces Supabase Auth as the identity layer. Postgres stays —
 // Supabase is only the host; queries still go through Prisma. Each host gets
@@ -147,6 +149,15 @@ export const auth = betterAuth({
   },
 
   hooks: {
+    // The card wallet's OAuth client is a static row written from the
+    // environment (services/member/wallet-client.ts). Make sure it exists —
+    // once per process — before the provider looks it up, so a fresh deploy
+    // or a rotated secret needs no migration step.
+    before: createAuthMiddleware(async (ctx) => {
+      if (ctx.path !== "/oauth2/authorize" && ctx.path !== "/oauth2/token") return;
+      await ensureWalletOauthClient();
+    }),
+
     // Step-up by passkey (review S4). The plugin's assertion endpoint
     // creates a new session for the passkey's user on this host; when it
     // did, also record that authentication as a step-up proof bound to
@@ -177,34 +188,22 @@ export const auth = betterAuth({
     // option stops it from also stamping a JWT on every session response.
     jwt({ disableSettingJwtHeader: true }),
 
-    // OAuth 2.1 authorization server for MCP clients (agents operating the
-    // dashboard through /api/mcp) — @better-auth/mcp on top of the OAuth
-    // provider plugin. Clients self-register via dynamic client registration
-    // (the open, unauthenticated kind: MCP clients have no credentials
-    // before they register), PKCE is mandatory for them, and the user
-    // authorizes on THIS host: the plugin sends the browser to /login with
-    // a signed copy of the authorize query, the login action hands it back
-    // as `oauth_query` (see app/(auth-host)/actions.ts), then /consent asks
-    // for the grant. Tokens are deliberately short-lived: access tokens last
-    // an hour and refresh tokens a day, so an agent's authorization decays
-    // quickly unless the user re-approves.
-    mcp({
-      loginPage: "/login",
-      consentPage: "/consent",
-      resource: MCP_RESOURCE,
-      // Prisma can't store a resource without allowedScopes (null list).
-      resources: [{ identifier: MCP_RESOURCE, allowedScopes: MCP_SCOPES }],
-      scopes: MCP_SCOPES,
-      enforcePerClientResources: false,
-      accessTokenExpiresIn: 60 * 60, // 1 h — the "short session"
-      refreshTokenExpiresIn: 60 * 60 * 24, // 1 day, then re-authorize
-      codeExpiresIn: 600,
-      allowDynamicClientRegistration: true,
-      allowUnauthenticatedClientRegistration: true,
-      // Cursor / older Claude Code omit application_type; their loopback
-      // redirect URIs make them native clients, not web ones.
-      clientRegistrationDefaultApplicationType: "infer",
-    }),
+    // OAuth 2.1 authorization server — @better-auth/mcp on top of the OAuth
+    // provider plugin — for two kinds of clients. MCP agents operating the
+    // dashboard through /api/mcp self-register via dynamic client
+    // registration (the open, unauthenticated kind: MCP clients have no
+    // credentials before they register), PKCE is mandatory for them, and
+    // the user authorizes on THIS host: the plugin sends the browser to
+    // /login with a signed copy of the authorize query, the login action
+    // hands it back as `oauth_query` (see app/(auth-host)/actions.ts), then
+    // /consent asks for the grant; their tokens stay short-lived (1 h access,
+    // 1 day refresh through the per-resource TTL). The Citizen Pay card
+    // wallet is a static first-party client that logs fund MEMBERS in
+    // (consent skipped, 15 min access tokens bound to the api's audience,
+    // 30 day rotating refresh tokens) — services/auth/oauth-provider-config.ts
+    // holds the options and the token contract, services/member/wallet-
+    // client.ts the registration.
+    mcp(oauthProviderOptions({ mcpResource: MCP_RESOURCE })),
     passkey({
       rpName: "La Caisse",
       // rpID = apex, so a passkey registered on acme.lacaisse.eu works

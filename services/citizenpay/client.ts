@@ -381,6 +381,16 @@ class MockCitizenPayClient implements CitizenPayClient {
     this.log("setCardHolderName", { serialNumber, reset: name === null });
   }
 
+  async setCardHolder(
+    serialNumber: string,
+    holderRef: string | null,
+  ): Promise<void> {
+    // The holder ref is a user id — fine to log; it is not personal data.
+    this.log("setCardHolder", { serialNumber, holderRef });
+    if (holderRef === null) mockCardHolders.delete(serialNumber);
+    else mockCardHolders.set(serialNumber, holderRef);
+  }
+
   async setCardSourceLimit(
     serialNumber: string,
     limitCents: number | null,
@@ -1263,6 +1273,11 @@ function mockBurnClaim(payoutId: string): PayoutBurnClaim | null {
 const mockCardSources = new Map<string, string>();
 // Card → weekly source cap (cents), same lifetime as mockCardSources.
 const mockCardSourceLimits = new Map<string, number>();
+// Serial → holder ref (La Caisse user id) the mock treasury considers
+// attached. Lets the local bench observe PUT/DELETE holder calls.
+export const mockCardHolders: Map<string, string> = ((
+  globalThis as { __cpMockCardHolders?: Map<string, string> }
+).__cpMockCardHolders ??= new Map());
 
 // Next Monday 00:00 Europe/Brussels — where CP's weekly source cap resets.
 function nextBrusselsMonday(now: Date): Date {

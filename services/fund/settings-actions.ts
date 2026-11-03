@@ -26,6 +26,9 @@ export type SettingsResult = { ok: true } | { error: string };
 export type UpdateOnboardingSettingsInput = {
   requireMemberEmailVerification?: boolean;
   requireMerchantEmailVerification?: boolean;
+  // Member login (plan "Bread card-holder voting"): the per-fund opt-in for
+  // the member sign-up / login / account pages and the card attachments.
+  memberLoginEnabled?: boolean;
 };
 
 export async function updateOnboardingSettingsAction(
@@ -40,6 +43,9 @@ export async function updateOnboardingSettingsAction(
   if (typeof input.requireMerchantEmailVerification === "boolean") {
     data.requireMerchantEmailVerification =
       input.requireMerchantEmailVerification;
+  }
+  if (typeof input.memberLoginEnabled === "boolean") {
+    data.memberLoginEnabled = input.memberLoginEnabled;
   }
 
   if (Object.keys(data).length === 0) return { ok: true };

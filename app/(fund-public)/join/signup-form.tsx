@@ -12,6 +12,7 @@ import {
   type FieldErrors,
   type Resolver,
 } from "react-hook-form";
+import { z } from "zod";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -26,10 +27,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { signupMemberAction } from "@/services/member/actions";
+import { signupMemberAction, type SignupMemberResult } from "@/services/member/actions";
+import { MemberPasswordSchema, PASSWORD_MIN_LENGTH } from "@/services/member/auth-schema";
 import type { SignupPrefill } from "@/services/member/prefill";
 import {
   SignupFormSchema,
+  type BuiltinSignupInput,
+  type ExtraValue,
   type SignupFormInput,
 } from "@/services/member/schema";
 import { buildExtrasSchema } from "@/services/onboarding/extras-schema";
@@ -48,6 +52,16 @@ import {
 
 type StepField = OnboardingFieldDef & { position: number; stepId: string | null };
 
+// What the form hands its server action: the /join application
+// (signupMemberAction) or, with a password, the member LOGIN sign-up
+// (signUpMemberAction in services/member/auth-actions.ts).
+export type SignupActionInput = {
+  builtins: BuiltinSignupInput;
+  applicationData?: Record<string, ExtraValue>;
+  referralCode?: string | null;
+  password?: string;
+};
+
 export function SignupForm({
   steps,
   referralCode,
@@ -55,6 +69,9 @@ export function SignupForm({
   tierMinimums,
   prefill,
   cancelUrl,
+  withPassword = false,
+  action = signupMemberAction,
+  labels,
 }: {
   steps: FormStep<StepField>[];
   referralCode: string | null;
@@ -65,6 +82,13 @@ export function SignupForm({
   tierMinimums: Record<string, number>;
   prefill: SignupPrefill;
   cancelUrl: string | null;
+  // Member login sign-up: asks for a password (confirmed) on the first page
+  // and submits to `action` instead of the application action.
+  withPassword?: boolean;
+  action?: (input: SignupActionInput) => Promise<SignupMemberResult>;
+  // Submit button wording when the default "Apply" doesn't fit (the login
+  // sign-up says "Create my login"); translated by the server page.
+  labels?: { submit: string; submitting: string; password: string; confirmPassword: string; passwordHint: string };
 }) {
   const t = useTranslations("members.signup");
   const tRoot = useTranslations();
@@ -88,8 +112,22 @@ export function SignupForm({
   // can't carry.
   const resolverSchema = useMemo(
     () =>
-      SignupFormSchema.extend({ extras: buildExtrasSchema(allFields) }).superRefine(
+      SignupFormSchema.extend({
+        extras: buildExtrasSchema(allFields),
+        // The login sign-up requires the password (min length) and its
+        // confirmation; the application form never renders them.
+        ...(withPassword
+          ? { password: MemberPasswordSchema, confirmPassword: z.string() }
+          : {}),
+      }).superRefine(
         (data, ctx) => {
+          if (withPassword && data.password !== data.confirmPassword) {
+            ctx.addIssue({
+              code: "custom",
+              path: ["confirmPassword"],
+              message: "auth.errors.passwordsDontMatch",
+            });
+          }
           const extras = data.extras as Record<string, unknown> | undefined;
           const tierId = extras?.tierId;
           if (typeof tierId !== "string" || !tierId) return;
@@ -117,7 +155,7 @@ export function SignupForm({
           }
         },
       ),
-    [allFields, tierMinimums, tRoot],
+    [allFields, tierMinimums, tRoot, withPassword],
   );
 
   const form = useForm<SignupFormInput>({
@@ -131,6 +169,7 @@ export function SignupForm({
       lastName: prefill.lastName,
       email: prefill.email,
       contributionAmount: prefill.contributionAmount,
+      ...(withPassword ? { password: "", confirmPassword: "" } : {}),
       extras: Object.fromEntries(
         allFields.map((f) => [
           f.key,
@@ -175,7 +214,10 @@ export function SignupForm({
   // commitment amount and reminder opt-out always close the last one.
   const namesForStep = (index: number): (keyof SignupFormInput | `extras.${string}`)[] => {
     const names: (keyof SignupFormInput | `extras.${string}`)[] = [];
-    if (index === 0) names.push("firstName", "lastName", "email");
+    if (index === 0) {
+      names.push("firstName", "lastName", "email");
+      if (withPassword) names.push("password", "confirmPassword");
+    }
     for (const field of steps[index].fields) {
       names.push(`extras.${field.key}`);
     }
@@ -198,11 +240,14 @@ export function SignupForm({
 
   const onSubmit = (data: SignupFormInput) =>
     startTransition(async () => {
-      const { extras, ...builtins } = data;
-      const result = await signupMemberAction({
+      // The confirmation never leaves the browser: it only guards the typo.
+      const { extras, password, confirmPassword, ...builtins } = data;
+      void confirmPassword;
+      const result = await action({
         builtins,
         applicationData: extras,
         referralCode,
+        ...(withPassword ? { password } : {}),
       });
       if ("error" in result) {
         // A terminal failure carries the fund's configured error URL; anything
@@ -256,7 +301,13 @@ export function SignupForm({
   const firstStepWithError = (
     formErrors: FieldErrors<SignupFormInput>,
   ): number | null => {
-    if (formErrors.firstName || formErrors.lastName || formErrors.email) {
+    if (
+      formErrors.firstName ||
+      formErrors.lastName ||
+      formErrors.email ||
+      formErrors.password ||
+      formErrors.confirmPassword
+    ) {
       return 0;
     }
     const extras = formErrors.extras as Record<string, unknown> | undefined;
@@ -273,7 +324,9 @@ export function SignupForm({
   const errors = form.formState.errors;
   const translateError = (msg: string | undefined) => {
     if (!msg) return null;
-    if (msg.startsWith("members.")) return tRoot(msg as never);
+    if (msg.startsWith("members.") || msg.startsWith("auth.")) {
+      return tRoot(msg as never, { min: PASSWORD_MIN_LENGTH } as never);
+    }
     return msg;
   };
 
@@ -383,6 +436,50 @@ export function SignupForm({
               </p>
             )}
           </div>
+
+          {withPassword && labels && (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="password">
+                  {labels.password}
+                  <span className="ml-1 text-destructive" aria-hidden>
+                    *
+                  </span>
+                </Label>
+                <Input
+                  id="password"
+                  type="password"
+                  autoComplete="new-password"
+                  {...form.register("password")}
+                />
+                <p className="text-xs text-muted-foreground">{labels.passwordHint}</p>
+                {errors.password && (
+                  <p className="text-sm text-destructive">
+                    {translateError(errors.password.message)}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">
+                  {labels.confirmPassword}
+                  <span className="ml-1 text-destructive" aria-hidden>
+                    *
+                  </span>
+                </Label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  autoComplete="new-password"
+                  {...form.register("confirmPassword")}
+                />
+                {errors.confirmPassword && (
+                  <p className="text-sm text-destructive">
+                    {translateError(errors.confirmPassword.message)}
+                  </p>
+                )}
+              </div>
+            </>
+          )}
         </>
       )}
 
@@ -445,7 +542,7 @@ export function SignupForm({
 
         {isLast ? (
           <Button key="submit" type="submit" className="flex-1" disabled={pending}>
-            {pending ? t("submitting") : t("submit")}
+            {pending ? (labels?.submitting ?? t("submitting")) : (labels?.submit ?? t("submit"))}
           </Button>
         ) : (
           <Button
