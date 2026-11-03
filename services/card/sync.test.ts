@@ -16,6 +16,7 @@ vi.mock("@/services/citizenpay/client", () => ({ getCitizenPayClient: () => cp }
 
 const prisma = vi.hoisted(() => ({
   card: { findMany: vi.fn(), update: vi.fn() },
+  cardEvent: { create: vi.fn() },
   fundTokenAccount: { findMany: vi.fn() },
   cardEnrollmentRequest: { findMany: vi.fn() },
 }));
@@ -38,6 +39,7 @@ function remote(serialNumber: string) {
     status: "INACTIVE" as const,
     owner: null,
     sourceSerial: null,
+    pinBlockedAt: null,
     createdAt: "2026-10-21T00:00:00Z",
     lastActivity: null,
   };
@@ -210,5 +212,108 @@ describe("computeCardSyncPlan — serials issued by another fund", () => {
     expect(enrollment.findForeignCards).toHaveBeenCalledWith("fund-1", ["NEW1"]);
     expect(plan.import.map((i) => i.serialNumber)).toEqual(["NEW1"]);
     expect(plan.push).toEqual([]);
+  });
+});
+
+// The status rule (services/card/pin-block-rules.ts) in the plan: local is
+// authoritative and pushed on a mismatch, except a PIN block, which is the
+// api's — listed under `pinBlockSync` for the run's status step to apply
+// (pushOneCardStatusAction re-reads the card), never queued as a push. The
+// preview itself writes nothing.
+describe("computeCardSyncPlan — PIN blocks belong to the api", () => {
+  const blockedAtIso = "2026-11-03T09:12:00.000Z";
+  const localCard = (over: Record<string, unknown>) => ({
+    id: "card-1",
+    serialNumber: "SER1",
+    status: "ACTIVE",
+    blockedReason: null,
+    blockedAt: null,
+    account: null,
+    holderName: null,
+    sourceSerial: null,
+    member: null,
+    ...over,
+  });
+  const listed = (over: Record<string, unknown>) => {
+    cp.listCitizenPayCards.mockResolvedValue({
+      cards: [{ ...remote("SER1"), ...over }],
+      pagination: { page: 1, limit: 100, total: 1, totalPages: 1 },
+    });
+  };
+
+  it("lists a PIN block the api reports to import, instead of pushing ACTIVE over it", async () => {
+    prisma.card.findMany.mockResolvedValue([localCard({ status: "ACTIVE" })]);
+    listed({ status: "BLOCKED", pinBlockedAt: blockedAtIso });
+
+    const plan = await computeCardSyncPlan(fund);
+
+    expect(plan.statusUpdate).toEqual([]);
+    expect(plan.pinBlockSync).toEqual([
+      { cardId: "card-1", serialNumber: "SER1", kind: "pin_block" },
+    ]);
+    expect(prisma.card.update).not.toHaveBeenCalled();
+    expect(prisma.cardEvent.create).not.toHaveBeenCalled();
+  });
+
+  it("leaves a PIN block already on file alone", async () => {
+    prisma.card.findMany.mockResolvedValue([
+      localCard({ status: "BLOCKED", blockedReason: "PIN", blockedAt: new Date(blockedAtIso) }),
+    ]);
+    listed({ status: "BLOCKED", pinBlockedAt: blockedAtIso });
+
+    const plan = await computeCardSyncPlan(fund);
+
+    expect(plan.statusUpdate).toEqual([]);
+    expect(plan.pinBlockSync).toEqual([]);
+    expect(prisma.card.update).not.toHaveBeenCalled();
+  });
+
+  it("lists a PIN-blocked local row to pull back when the api is active", async () => {
+    prisma.card.findMany.mockResolvedValue([
+      localCard({ status: "BLOCKED", blockedReason: "PIN", blockedAt: new Date(blockedAtIso) }),
+    ]);
+    listed({ status: "ACTIVE", pinBlockedAt: null });
+
+    const plan = await computeCardSyncPlan(fund);
+
+    expect(plan.statusUpdate).toEqual([]);
+    expect(plan.pinBlockSync).toEqual([
+      { cardId: "card-1", serialNumber: "SER1", kind: "pin_release" },
+    ]);
+    expect(prisma.card.update).not.toHaveBeenCalled();
+  });
+
+  it("still pushes a fund block (reason FUND, and a legacy row without a reason)", async () => {
+    prisma.card.findMany.mockResolvedValue([
+      localCard({ status: "BLOCKED", blockedReason: "FUND", blockedAt: new Date() }),
+      localCard({ id: "card-2", serialNumber: "SER2", status: "BLOCKED", blockedReason: null, blockedAt: new Date() }),
+    ]);
+    cp.listCitizenPayCards.mockResolvedValue({
+      cards: [
+        { ...remote("SER1"), status: "ACTIVE" },
+        { ...remote("SER2"), status: "BLOCKED", pinBlockedAt: blockedAtIso },
+      ],
+      pagination: { page: 1, limit: 100, total: 2, totalPages: 1 },
+    });
+
+    const plan = await computeCardSyncPlan(fund);
+
+    expect(plan.statusUpdate).toEqual([
+      { cardId: "card-1", serialNumber: "SER1", localStatus: "BLOCKED", remoteStatus: "ACTIVE" },
+    ]);
+    expect(plan.pinBlockSync).toEqual([]);
+    expect(prisma.card.update).not.toHaveBeenCalled();
+  });
+
+  it("pushes an ordinary mismatch as before", async () => {
+    prisma.card.findMany.mockResolvedValue([localCard({ status: "INACTIVE" })]);
+    listed({ status: "ACTIVE", pinBlockedAt: null });
+
+    const plan = await computeCardSyncPlan(fund);
+
+    expect(plan.statusUpdate).toEqual([
+      { cardId: "card-1", serialNumber: "SER1", localStatus: "INACTIVE", remoteStatus: "ACTIVE" },
+    ]);
+    expect(plan.pinBlockSync).toEqual([]);
   });
 });

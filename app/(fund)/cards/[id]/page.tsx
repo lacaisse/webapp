@@ -18,6 +18,10 @@ import {
 import { CopyButton } from "@/components/copy-button";
 import { maskValue } from "@/lib/privacy";
 import { getBalances } from "@/services/alchemy/balances";
+import { requireFundRole } from "@/services/auth/dal";
+import { userHasPasskey } from "@/services/auth/passkeys";
+import { hasMinFundRole } from "@/services/auth/roles";
+import { isPinBlocked } from "@/services/card/pin-block-rules";
 import { formatTokenAmount, shortAddress } from "@/services/alchemy/format";
 import { getCitizenPayClient } from "@/services/citizenpay/client";
 import type { CardSourceInfo } from "@/services/citizenpay/types";
@@ -27,7 +31,6 @@ import {
 } from "@/services/db/generated/enums";
 import { prisma } from "@/services/db/prisma";
 import { buildCardLink } from "@/services/email/templates";
-import { requireCurrentFund } from "@/services/fund/server";
 import { getPrivacyMode } from "@/services/privacy/server";
 
 import { CardRowActions } from "../card-row-actions";
@@ -37,6 +40,7 @@ import { CardSourcePicker, type SourceOption } from "./source-picker";
 import { CardTransfersTable } from "./transfers-table";
 import { CardWeeklyLimitInput } from "./weekly-limit";
 import { NotifyCardButton } from "./notify-card-button";
+import { PinBlockBanner } from "./pin-block-banner";
 import { ChargeCardDialog } from "./charge-card-dialog";
 import { TransferDialog } from "./transfer-dialog";
 import { UnassignCardButton } from "../unassign-card-button";
@@ -52,7 +56,8 @@ export default async function CardDetailPage({
   const tList = await getTranslations("fund.cards");
   const tNotify = await getTranslations("cards.admin.notify");
   const format = await getFormatter();
-  const fund = await requireCurrentFund();
+  // OPERATOR like the layout; the role decides who sees the PIN Unblock.
+  const { user, fund, membership } = await requireFundRole("OPERATOR");
   const privacy = await getPrivacyMode();
   const { id } = await params;
   const sp = await searchParams;
@@ -98,6 +103,20 @@ export default async function CardDetailPage({
   const notifyName = privacy ? maskValue("name") : memberName || holderLabel;
   const isPrimary = card.member?.primaryCardId === card.id;
   const isLost = card.reportedLostAt !== null;
+  // Blocked by Citizen Pay after three wrong PIN entries: the banner says
+  // where and when (the imported event) and offers the Unblock to ADMIN,
+  // behind the step-up (the re-auth dialog offers a passkey only to users
+  // who registered one).
+  const pinBlocked = isPinBlocked(card);
+  const canUnblock = pinBlocked && hasMinFundRole(membership.role, "ADMIN");
+  const hasPasskey = canUnblock ? await userHasPasskey(user.id) : false;
+  const lastPinBlock = pinBlocked
+    ? await prisma.cardEvent.findFirst({
+        where: { cardId: card.id, kind: "PIN_BLOCKED" },
+        orderBy: { at: "desc" },
+        select: { at: true, placeName: true },
+      })
+    : null;
   const canShowBalance =
     fund.tokenAddress != null &&
     fund.tokenDecimals != null &&
@@ -159,6 +178,7 @@ export default async function CardDetailPage({
             cardId={card.id}
             status={card.status}
             isLost={isLost}
+            pinBlocked={pinBlocked}
             holderLabel={holderDisplay}
             hasAccount={card.account !== null}
             tokenSymbol={fund.tokenSymbol}
@@ -167,12 +187,34 @@ export default async function CardDetailPage({
         </div>
       </div>
 
+      {pinBlocked && (
+        <PinBlockBanner
+          fund={{
+            id: fund.id,
+            citizenPayApiKeyId: fund.citizenPayApiKeyId,
+            citizenPayApiKeyEnc: fund.citizenPayApiKeyEnc,
+          }}
+          card={{
+            id: card.id,
+            serialNumber: card.serialNumber,
+            blockedAt: lastPinBlock?.at ?? card.blockedAt,
+            placeName: lastPinBlock?.placeName ?? null,
+          }}
+          holderLabel={holderDisplay}
+          canUnblock={canUnblock}
+          hasPasskey={hasPasskey}
+        />
+      )}
+
       <header className="space-y-2">
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="font-heading text-2xl font-medium">
             <Sensitive kind="name">{holderLabel}</Sensitive>
           </h1>
           <StatusBadge status={card.status} />
+          {pinBlocked && (
+            <Badge variant="destructive">{tList("badges.pinBlocked")}</Badge>
+          )}
           {isLost && <Badge variant="warning">{tList("badges.lost")}</Badge>}
           {isPrimary && <Badge variant="outline">{tList("primary")}</Badge>}
         </div>

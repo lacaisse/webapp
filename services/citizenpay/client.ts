@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import "server-only";
 
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 
 import { decryptSecret } from "@/services/crypto/secret";
 import {
@@ -26,10 +26,12 @@ import type {
   BankTransactionsPage,
   CardChargeCardInput,
   CardChargeOnPlaceInput,
+  CardChargeRefusal,
   CardChargeResult,
   CardOperationInput,
   CardOperationResult,
   CitizenPayBank,
+  CardPinEvent,
   CardSourceInfo,
   CitizenPayCardDetail,
   CitizenPayInvite,
@@ -125,6 +127,49 @@ const mockSeededPlaces: Set<string> = ((
 const mockOrderIds: { next: number } = ((
   globalThis as { __cpMockOrderIds?: { next: number } }
 ).__cpMockOrderIds ??= { next: 90_000 });
+
+// Mock PIN blocks (api PR P): a serial ending in `PINBLOCKED` reads as blocked
+// by Citizen Pay after three wrong PIN entries — `getCitizenPayCard` answers
+// status BLOCKED with `pinBlockedAt`, the last PIN events and a few refused
+// taps — until `unblockCardPin` lifts it in this process (then ACTIVE with an
+// `unblocked` event). A plain `setCardStatus(ACTIVE)` on it is the api's 409;
+// a fund block (BLOCKED) supersedes the PIN block, as on the api. Drives the
+// local bench of the events webhook, the card-page banner and the Unblock
+// button. On globalThis like the rest of the mock state.
+type MockPinCard = {
+  pinBlocked: boolean;
+  status: "ACTIVE" | "INACTIVE" | "BLOCKED";
+  events: CardPinEvent[];
+};
+const mockPinCards: Map<string, MockPinCard> = ((
+  globalThis as { __cpMockPinCards?: Map<string, MockPinCard> }
+).__cpMockPinCards ??= new Map());
+const MOCK_PIN_PLACE_ID = "mock-place-pin";
+const MOCK_PIN_BLOCKED_AT = "2026-11-03T09:12:00.000Z";
+
+function mockPinCard(serial: string): MockPinCard | null {
+  if (!/PINBLOCKED$/i.test(serial)) return null;
+  const key = serial.toUpperCase();
+  let card = mockPinCards.get(key);
+  if (!card) {
+    card = {
+      pinBlocked: true,
+      status: "BLOCKED",
+      events: [
+        {
+          action: "blocked",
+          by: "system",
+          byRef: null,
+          placeId: MOCK_PIN_PLACE_ID,
+          terminalId: "mock-terminal-1",
+          at: MOCK_PIN_BLOCKED_AT,
+        },
+      ],
+    };
+    mockPinCards.set(key, card);
+  }
+  return card;
+}
 
 function mockSeedOpenOrders(placeId: string): void {
   if (mockSeededPlaces.has(placeId)) return;
@@ -362,6 +407,52 @@ class MockCitizenPayClient implements CitizenPayClient {
     status: "ACTIVE" | "INACTIVE" | "BLOCKED",
   ): Promise<void> {
     this.log("setCardStatus", { serialNumber, status });
+    const pin = mockPinCard(serialNumber);
+    if (!pin) return;
+    if (pin.pinBlocked && status === "ACTIVE") {
+      throw new CitizenPayApiError("card is blocked after wrong PIN entries; unblock explicitly", 409, {
+        error: "card is blocked after wrong PIN entries; unblock explicitly",
+      });
+    }
+    pin.status = status;
+    // The issuer's block supersedes the PIN block, as on the api.
+    if (status === "BLOCKED") pin.pinBlocked = false;
+  }
+
+  async unblockCardPin(serialNumber: string): Promise<void> {
+    this.log("unblockCardPin", { serialNumber });
+    const pin = mockPinCard(serialNumber);
+    if (!pin) return;
+    pin.pinBlocked = false;
+    pin.status = "ACTIVE";
+    pin.events.unshift({
+      action: "unblocked",
+      by: "treasury",
+      byRef: this.fundId,
+      placeId: null,
+      terminalId: null,
+      at: new Date().toISOString(),
+    });
+  }
+
+  async listCardRefusals(serialNumber: string, limit = 20): Promise<CardChargeRefusal[]> {
+    this.log("listCardRefusals", { serialNumber, limit });
+    if (!mockPinCard(serialNumber)) return [];
+    const base = Date.parse(MOCK_PIN_BLOCKED_AT);
+    const refusal = (reason: string, minutesBefore: number, amountCents: number): CardChargeRefusal => ({
+      placeId: MOCK_PIN_PLACE_ID,
+      orderId: null,
+      reason,
+      amountCents,
+      spentCents: null,
+      limitCents: null,
+      createdAt: new Date(base - minutesBefore * 60_000).toISOString(),
+    });
+    return [
+      refusal("pin_blocked", 0, 450),
+      refusal("pin_invalid", 1, 450),
+      refusal("pin_invalid", 2, 450),
+    ].slice(0, limit);
   }
 
   async setCardSource(
@@ -419,12 +510,31 @@ class MockCitizenPayClient implements CitizenPayClient {
     serialNumber: string,
   ): Promise<CitizenPayCardDetail | null> {
     this.log("getCitizenPayCard", { serialNumber });
-    return null;
+    const pin = mockPinCard(serialNumber);
+    if (!pin) return null;
+    return {
+      serialNumber,
+      status: pin.status,
+      owner: null,
+      sourceSerial: mockCardSources.get(serialNumber) ?? null,
+      pinBlockedAt: pin.pinBlocked ? MOCK_PIN_BLOCKED_AT : null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      lastActivity: MOCK_PIN_BLOCKED_AT,
+      account: `0x${createHash("sha256").update(serialNumber.toUpperCase()).digest("hex").slice(0, 40)}`,
+      pinFailedAttempts: pin.pinBlocked ? 3 : 0,
+      pinBlockCount: 1,
+      pinEvents: pin.events.slice(0, 3),
+    };
   }
 
   async getTreasurySlug(): Promise<string | null> {
     this.log("getTreasurySlug", {});
     return "mock-network";
+  }
+
+  async setTreasuryEventsWebhook(webhook: { url: string; secret: string }): Promise<void> {
+    // Never log the secret — only that one was set.
+    this.log("setTreasuryEventsWebhook", { url: webhook.url, secretSet: webhook.secret.length > 0 });
   }
 
   async listPayoutDrafts(

@@ -13,6 +13,7 @@ import {
   buildRegistrationPrefill,
   type RegistrationPrefill,
 } from "./register-prefill";
+import { scheduleTreasuryEventsWebhookRegistration } from "./events-webhook";
 import { fetchTokenInfo } from "./sync";
 import { scheduleTreasuryTopUpUrlSync } from "./sync-top-up-url";
 import { scheduleEnsureMinterRoles } from "./token-roles";
@@ -431,6 +432,12 @@ export async function consumeConnect(args: {
   // after the redirect is sent; never throws. Both flows (register a
   // treasury, mint a key) finish here, so both publish the link.
   if (connectedFund) scheduleTreasuryTopUpUrlSync(connectedFund);
+
+  // Register the treasury events webhook (card.blocked / card.unblocked, see
+  // events-webhook.ts) with the key just minted, so a PIN block reaches the
+  // fund from day one. Same deferral; a fund that already has a secret keeps
+  // it. The settings page offers the same registration by hand.
+  if (connectedFund) scheduleTreasuryEventsWebhookRegistration(connectedFund);
 
   return { treasuryId: creds.treasury_id, apiKeyId: creds.api_key_id };
 }

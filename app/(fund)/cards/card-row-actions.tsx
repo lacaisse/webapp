@@ -4,6 +4,8 @@
 import { useTranslations } from "next-intl";
 import { useState, useTransition } from "react";
 
+import { ShieldAlert } from "lucide-react";
+
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,11 +31,16 @@ import {
 // Top-up / withdraw available on any non-blocked card with a CP-issued account
 // — including INACTIVE ones, since a top-up is exactly what flips a factory
 // INACTIVE card to ACTIVE on its first charge. Only BLOCKED is excluded.
+//
+// `pinBlocked`: Citizen Pay blocked the card after three wrong PIN entries.
+// That block is the api's — the status dialog explains and refuses, the
+// card page's Unblock (ADMIN + step-up) is the way out.
 
 export function CardRowActions({
   cardId,
   status,
   isLost,
+  pinBlocked = false,
   holderLabel,
   hasAccount,
   tokenSymbol,
@@ -42,6 +49,7 @@ export function CardRowActions({
   cardId: string;
   status: "ACTIVE" | "INACTIVE" | "BLOCKED";
   isLost: boolean;
+  pinBlocked?: boolean;
   holderLabel: string;
   hasAccount: boolean;
   tokenSymbol: string | null;
@@ -69,6 +77,7 @@ export function CardRowActions({
         cardId={cardId}
         status={status}
         isLost={isLost}
+        pinBlocked={pinBlocked}
         holderLabel={holderLabel}
       />
     </div>
@@ -81,14 +90,17 @@ function ChangeStatusDialog({
   cardId,
   status,
   isLost,
+  pinBlocked,
   holderLabel,
 }: {
   cardId: string;
   status: "ACTIVE" | "INACTIVE" | "BLOCKED";
   isLost: boolean;
+  pinBlocked: boolean;
   holderLabel: string;
 }) {
   const t = useTranslations("cards.admin.status");
+  const tPin = useTranslations("cards.admin.pinBlock");
   const [open, setOpen] = useState(false);
   const [nextStatus, setNextStatus] = useState(status);
   const [reportedLost, setReportedLost] = useState(isLost);
@@ -135,7 +147,13 @@ function ChangeStatusDialog({
             {t("description", { holderLabel })}
           </DialogDescription>
         </DialogHeader>
-        <fieldset className="space-y-2">
+        {pinBlocked && (
+          <Alert variant="destructive">
+            <ShieldAlert />
+            <AlertDescription>{tPin("statusDialog.notice")}</AlertDescription>
+          </Alert>
+        )}
+        <fieldset className="space-y-2" disabled={pinBlocked}>
           <legend className="sr-only">{t("statusLabel")}</legend>
           {STATUS_OPTIONS.map((opt) => (
             <label
@@ -188,7 +206,7 @@ function ChangeStatusDialog({
           >
             {t("cancel")}
           </Button>
-          <Button onClick={onSubmit} disabled={pending || !dirty}>
+          <Button onClick={onSubmit} disabled={pending || !dirty || pinBlocked}>
             {pending ? t("saving") : t("confirm")}
           </Button>
         </DialogFooter>

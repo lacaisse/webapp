@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import "server-only";
 
-import { after } from "next/server";
-
 import type { AllocationMode } from "@/services/db/generated/enums";
 
+import {
+  isLiveCitizenPay,
+  scheduleAfterResponse,
+  warnInsecureUrlOnce,
+} from "./after-response";
 import { getCitizenPayClient, type FundCredentials } from "./client";
 import { isOwnTopUpUrl, isPublishableTopUpUrl, topUpUrlFor } from "./top-up-url";
 
@@ -20,8 +23,6 @@ export type TopUpUrlSyncResult =
     }
   | { status: "synced"; url: string | null }
   | { status: "failed"; url: string | null; error: unknown };
-
-let warnedInsecure = false;
 
 /**
  * Push the fund's top-up URL (see top-up-url.ts) to its CitizenPay treasury:
@@ -52,15 +53,8 @@ export async function syncTreasuryTopUpUrl(
     return { status: "skipped", reason: "not_connected" };
   }
   const url = topUpUrlFor(fund);
-  const live = Boolean(process.env.CITIZENPAY_API_BASE_URL);
-  if (live && !isPublishableTopUpUrl(url)) {
-    if (!warnedInsecure) {
-      console.warn(
-        "[citizenpay] not pushing a non-https top-up URL to the live API (check NODE_ENV / APP_DOMAIN)",
-        url,
-      );
-      warnedInsecure = true;
-    }
+  if (isLiveCitizenPay() && !isPublishableTopUpUrl(url)) {
+    warnInsecureUrlOnce("top-up URL", url ?? "");
     return { status: "skipped", reason: "insecure_url" };
   }
   try {
@@ -92,12 +86,7 @@ export async function syncTreasuryTopUpUrl(
  * local write has landed. Never throws.
  */
 export function scheduleTreasuryTopUpUrlSync(fund: TopUpUrlFund): void {
-  try {
-    after(async () => {
-      await syncTreasuryTopUpUrl(fund);
-    });
-  } catch (e) {
-    // `after` throws outside a request scope — nothing to defer to then.
-    console.warn("[citizenpay] could not schedule top-up URL sync", fund.id, e);
-  }
+  scheduleAfterResponse("top-up URL sync", fund.id, () =>
+    syncTreasuryTopUpUrl(fund),
+  );
 }

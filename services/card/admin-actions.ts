@@ -9,7 +9,10 @@ import { z } from "zod";
 import { isValidWeeklyLimitCents } from "@/lib/weekly-limit";
 import { requireFundRole } from "@/services/auth/dal";
 import { holderDisplayName } from "@/services/card/holder-name";
+import { reconcileCardWithCitizenPay } from "@/services/card/pin-block";
+import { isPinBlocked } from "@/services/card/pin-block-rules";
 import { scheduleCardHolderNamePublish } from "@/services/card/publish-holder-name";
+import { CitizenPayApiError } from "@/services/citizenpay/api";
 import { getCitizenPayClient } from "@/services/citizenpay/client";
 import { Prisma } from "@/services/db/generated/client";
 import type {
@@ -264,6 +267,15 @@ export async function withdrawFromCardAction(input: {
 // quick actions can't reach). `reportedLost` mirrors the internal lost flag:
 // omit to leave it untouched, true/false to set/clear it. CP is kept in sync;
 // local stays authoritative and a future sync reconciles a CP failure.
+//
+// A block is the fund's (`blockedReason` FUND). A card Citizen Pay blocked
+// after three wrong PIN entries (`blockedReason` PIN) is refused here: that
+// block is the api's, and lifting it is the explicit, ADMIN + step-up unblock
+// of services/card/pin-block-actions.ts. Should the api refuse the push with
+// its PIN-block 409 (it blocked the card since the row was last synced, or
+// this fund only enrolled a card its issuer has blocked), the api's state is
+// imported over the status just written and the operator told — nothing
+// was pushed.
 export async function setCardStatusAction(input: {
   cardId: string;
   status: CardStatus;
@@ -282,15 +294,20 @@ export async function setCardStatusAction(input: {
       id: true,
       serialNumber: true,
       status: true,
+      blockedReason: true,
       blockedAt: true,
       reportedLostAt: true,
     },
   });
   if (!card) return { error: t("cards.admin.errors.notFound" as never) };
+  if (isPinBlocked(card)) {
+    return { error: t("cards.admin.errors.pinBlocked" as never) };
+  }
 
   const now = new Date();
   const blockedAt =
     input.status === "BLOCKED" ? (card.blockedAt ?? now) : null;
+  const blockedReason = input.status === "BLOCKED" ? "FUND" : null;
   const reportedLostAt =
     input.reportedLost === undefined
       ? card.reportedLostAt
@@ -300,7 +317,7 @@ export async function setCardStatusAction(input: {
 
   await prisma.card.update({
     where: { id: card.id },
-    data: { status: input.status, blockedAt, reportedLostAt },
+    data: { status: input.status, blockedAt, blockedReason, reportedLostAt },
   });
 
   try {
@@ -309,6 +326,25 @@ export async function setCardStatusAction(input: {
       input.status,
     );
   } catch (e) {
+    if (e instanceof CitizenPayApiError && e.status === 409) {
+      // Refused: the card is PIN-blocked at the api. Its state wins over the
+      // status just written (never thrown — a failed re-read is left to the
+      // sync), and the operator is told rather than shown a success.
+      try {
+        await reconcileCardWithCitizenPay({
+          fund,
+          cardId: card.id,
+          source: "SYNC",
+          apiRefused: true,
+        });
+      } catch (re) {
+        console.error("[citizenpay] setCardStatus 409 reconcile failed", card.id, re);
+      }
+      revalidatePath("/cards");
+      revalidatePath(`/cards/${card.id}`);
+      revalidatePath("/members");
+      return { error: t("cards.admin.errors.pinBlockedAtApi" as never) };
+    }
     console.error("[citizenpay] setCardStatus failed", e);
   }
 
@@ -327,7 +363,10 @@ export type SetCardsStatusResult =
 // nuance (bulk is status-only): blockedAt is set when blocking, cleared
 // otherwise; reportedLostAt is left untouched. All cards are fund-scoped, and
 // each is mirrored to CitizenPay fail-soft (a CP miss is logged; local stays
-// authoritative and a future sync reconciles).
+// authoritative and a future sync reconciles). Refused as a whole when the
+// selection holds a card Citizen Pay PIN-blocked: that block is the api's
+// (see setCardStatusAction), and a silently narrowed bulk edit would read
+// as a full success in the dialog.
 export async function setCardsStatusAction(input: {
   cardIds: string[];
   status: CardStatus;
@@ -346,10 +385,19 @@ export async function setCardsStatusAction(input: {
 
   const cards = await prisma.card.findMany({
     where: { id: { in: ids }, fundId: fund.id },
-    select: { id: true, serialNumber: true },
+    select: { id: true, serialNumber: true, status: true, blockedReason: true },
   });
   if (cards.length === 0) {
     return { error: t("cards.admin.bulk.errors.none" as never) };
+  }
+  const pinBlocked = cards.filter(isPinBlocked).length;
+  if (pinBlocked > 0) {
+    return {
+      error: t(
+        "cards.admin.bulk.errors.pinBlocked" as never,
+        { count: pinBlocked } as never,
+      ),
+    };
   }
 
   const now = new Date();
@@ -358,6 +406,7 @@ export async function setCardsStatusAction(input: {
     data: {
       status: input.status,
       blockedAt: input.status === "BLOCKED" ? now : null,
+      blockedReason: input.status === "BLOCKED" ? "FUND" : null,
     },
   });
 
@@ -416,6 +465,14 @@ export type CardSyncPlanWire = {
     issuerFundName: string;
     status: CardEnrollmentRequestStatus;
   }>;
+  // PIN blocks to reconcile from the api (imported, or lifted after a
+  // wallet unblock) — run by the status step like `statusUpdate`; see
+  // sync.ts and pushOneCardStatusAction.
+  pinBlockSync: Array<{
+    cardId: string;
+    serialNumber: string;
+    kind: "pin_block" | "pin_release";
+  }>;
 };
 
 export type CardSyncPreviewResult =
@@ -448,6 +505,11 @@ export async function previewCardSyncAction(): Promise<CardSyncPreviewResult> {
           serialNumber: i.serialNumber,
           issuerFundName: i.card.fund.name,
           status: i.requestStatus,
+        })),
+        pinBlockSync: plan.pinBlockSync.map((i) => ({
+          cardId: i.cardId,
+          serialNumber: i.serialNumber,
+          kind: i.kind,
         })),
       },
     };
@@ -569,6 +631,14 @@ async function requestEnrollmentFor(
   }
 }
 
+// The run's status step, for `statusUpdate` and `pinBlockSync` items alike.
+// The card is re-read from the api first and the rule applied
+// (services/card/pin-block.ts): a PIN block the api reports is imported —
+// with the notifications — and one it no longer reports is lifted; only
+// when the rule says "push" is the local status sent. A push the api
+// refuses with its PIN-block 409 (it blocked the card meanwhile) is answered
+// by importing its state — "import, don't push" — and counted as a failure,
+// since the local status did not land.
 export async function pushOneCardStatusAction(input: {
   cardId: string;
 }): Promise<CardSyncItemResult> {
@@ -576,17 +646,36 @@ export async function pushOneCardStatusAction(input: {
 
   const card = await prisma.card.findFirst({
     where: { id: input.cardId, fundId: fund.id },
-    select: { serialNumber: true, status: true },
+    select: { id: true, serialNumber: true, status: true },
   });
   if (!card) return { error: input.cardId };
 
   try {
+    const { transition } = await reconcileCardWithCitizenPay({
+      fund,
+      cardId: card.id,
+      source: "SYNC",
+    });
+    if (transition.kind !== "push") return { ok: true };
     await getCitizenPayClient(fund).setCardStatus(
       card.serialNumber,
       card.status,
     );
     return { ok: true };
   } catch (e) {
+    if (e instanceof CitizenPayApiError && e.status === 409) {
+      try {
+        await reconcileCardWithCitizenPay({
+          fund,
+          cardId: card.id,
+          source: "SYNC",
+          apiRefused: true,
+        });
+      } catch (re) {
+        console.error("[card.sync] 409 reconcile failed", card.serialNumber, re);
+      }
+      return { error: card.serialNumber };
+    }
     console.error("[card.sync] pushStatus failed", card.serialNumber, e);
     return { error: card.serialNumber };
   }

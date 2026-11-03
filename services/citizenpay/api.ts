@@ -51,8 +51,37 @@ export type CardWire = {
   last_activity?: string | null;
   limits?: Record<string, unknown> | null;
   notes?: string | null;
+  // PIN block after three wrong entries (api PR P). `pin_blocked_at` set =
+  // blocked by the api; the counter and the block count ride along, and the
+  // single-card read carries the last few `card_pin_events`. All missing on
+  // an api that predates them.
+  pin_blocked_at?: string | null;
+  pin_failed_attempts?: number | null;
+  pin_block_count?: number | null;
+  pin_events?: CardPinEventWire[] | null;
   created_at: string;
   updated_at: string;
+};
+
+export type CardPinEventWire = {
+  action: string; // blocked | unblocked | pin_set
+  by: string; // system | treasury | member
+  by_ref?: string | null;
+  place_id?: string | null;
+  terminal_id?: string | null;
+  at: string;
+};
+
+// One row of `card_charge_refusals` (migration 162) as
+// GET /v2/treasury/cards/{serial}/refusals lists them, newest first.
+export type CardChargeRefusalWire = {
+  place_id: string;
+  order_id: number | null;
+  reason: string;
+  amount: number; // cents
+  spent: number | null;
+  limit: number | null;
+  created_at: string;
 };
 
 // CP returns `cards: null` (not `[]`) when the treasury has no cards, and
@@ -537,6 +566,9 @@ export type FeeCollectionFrequencyWire = "per_payment" | "monthly";
 
 // Budget for the best-effort top-up URL sync (its GET + PATCH /v2/treasury).
 export const TOP_UP_URL_TIMEOUT_MS = 3_000;
+// Budget for registering the events webhook (PATCH /v2/treasury) — off the
+// response path too, but a settings button waits for it.
+export const EVENTS_WEBHOOK_TIMEOUT_MS = 5_000;
 
 // Token roles of one account on the treasury's token, as
 // `GET /v2/treasury/token/roles?account=` answers them. `admin_account` is
@@ -646,6 +678,20 @@ export const treasury = {
     return request(creds, "PATCH", "/v2/treasury", {
       body: { topUpUrl },
       timeoutMs: TOP_UP_URL_TIMEOUT_MS,
+    });
+  },
+  // Register (or rotate) the treasury events webhook: where the api posts
+  // `card.blocked` / `card.unblocked` and the HMAC secret it signs them with
+  // (api PR P; receiver at app/api/citizenpay/events). Same PATCH as the fee
+  // and the top-up URL, camelCase like them. The api accepts https only, no
+  // credentials in the url, host = the La Caisse apex or the fund's domain.
+  setEventsWebhook(
+    creds: CitizenPayApiCredentials,
+    webhook: { url: string; secret: string },
+  ): Promise<unknown> {
+    return request(creds, "PATCH", "/v2/treasury", {
+      body: { eventsWebhookUrl: webhook.url, eventsWebhookSecret: webhook.secret },
+      timeoutMs: EVENTS_WEBHOOK_TIMEOUT_MS,
     });
   },
   // Read `account`'s minter/burner roles on the treasury's token, on chain.
@@ -776,12 +822,16 @@ export const cards = {
   },
   // PATCH accepts `status`, `source_serial` (empty string clears the source)
   // and/or `source_weekly_limit` (cents, `0` clears the cap) — any subset in
-  // one call; an omitted field is left unchanged.
+  // one call; an omitted field is left unchanged. `status: "active"` on a
+  // PIN-blocked card (`pin_blocked_at` set) is a 409 unless `unblock: true`
+  // travels with it — the explicit unblock, which also clears the counter
+  // and writes the api's `unblocked` event (api PR P).
   update(
     creds: CitizenPayApiCredentials,
     serial: string,
     body: {
       status?: "active" | "inactive" | "blocked";
+      unblock?: boolean;
       source_serial?: string;
       source_weekly_limit?: number;
     },
@@ -793,6 +843,21 @@ export const cards = {
     return request(creds, "PATCH", `/v2/treasury/cards/${encodeURIComponent(serial)}`, {
       body,
     });
+  },
+  // The card's refused taps in this treasury's view, newest first. `limit`
+  // defaults to 50 on the api, at most 200. 404 when the treasury has no
+  // relationship to the serial; a blocked card still answers.
+  refusals(
+    creds: CitizenPayApiCredentials,
+    serial: string,
+    query: { limit?: number } = {},
+  ): Promise<{ refusals: CardChargeRefusalWire[] | null }> {
+    return request(
+      creds,
+      "GET",
+      `/v2/treasury/cards/${encodeURIComponent(serial)}/refusals`,
+      { query },
+    );
   },
   // PUT /cards/{serial}/profile — the display name CP keeps for the card's
   // on-chain account (`account_profiles`), shown on the public card wallet.

@@ -1149,7 +1149,8 @@
       },
       "primary": "Primaire kaart",
       "badges": {
-        "lost": "Verloren"
+        "lost": "Verloren",
+        "pinBlocked": "PIN"
       },
       "empty": "Geen kaarten om te tonen.",
       "prev": "Vorige",
@@ -2570,6 +2571,32 @@
             "registrationPending": "Een Citizen Pay-registratie die minder dan 30 minuten geleden is gestart, is nog open. Hervat ze om terug te keren naar het Citizen Pay-formulier, of begin opnieuw om ze te annuleren en een nieuwe te starten.",
             "forbidden": "Deze actie kan alleen vanaf de instellingenpagina van het fonds worden gestart."
           }
+        },
+        "events": {
+          "title": "Gebeurtenissen-webhook",
+          "description": "Citizen Pay verwittigt deze kas wanneer het een kaart blokkeert na 3 foute pincodes, en wanneer de blokkering wordt opgeheven. Het adres hieronder wordt bij Citizen Pay geregistreerd wanneer de kas verbindt; registreer het handmatig voor een kas die eerder verbond, of na een mislukte poging.",
+          "registeredAt": "Geregistreerd bij Citizen Pay op {date}",
+          "notRegistered": "Nog niet geregistreerd bij Citizen Pay",
+          "urlLabel": "Adres",
+          "lastDeliveryLabel": "Laatste levering",
+          "lastDelivery": "{type} · kaart {serial} · {date} · {outcome}",
+          "noDelivery": "Nog geen gebeurtenis ontvangen",
+          "outcome": {
+            "RECEIVED": "ontvangen",
+            "APPLIED": "toegepast",
+            "IGNORED": "genegeerd",
+            "FAILED": "mislukt"
+          },
+          "registrationError": "De laatste registratie is mislukt: {message}",
+          "register": "Registreren bij Citizen Pay",
+          "reregister": "Opnieuw registreren",
+          "registering": "Registreren…",
+          "connectFirst": "Verbind de kas eerst met Citizen Pay.",
+          "errors": {
+            "notConnected": "Verbind de kas eerst met Citizen Pay.",
+            "insecureUrl": "Het adres van deze omgeving is geen https; Citizen Pay aanvaardt alleen https-webhooks.",
+            "failed": "Citizen Pay weigerde de registratie: {message}"
+          }
         }
       },
       "fees": {
@@ -3392,7 +3419,8 @@
         "apply": "Toepassen",
         "applying": "Toepassen…",
         "errors": {
-          "none": "Geen overeenkomende kaarten geselecteerd."
+          "none": "Geen overeenkomende kaarten geselecteerd.",
+          "pinBlocked": "{count, plural, one {# van de geselecteerde kaarten is door Citizen Pay geblokkeerd na foute pincodes. Deselecteer ze eerst.} other {# van de geselecteerde kaarten zijn door Citizen Pay geblokkeerd na foute pincodes. Deselecteer ze eerst.}}"
         }
       },
       "errors": {
@@ -3404,7 +3432,9 @@
         "amountInvalid": "Het bedrag moet een getal zijn met maximaal 2 decimalen.",
         "amountPositive": "Het bedrag moet groter zijn dan nul.",
         "tokenNotConfigured": "Deze caisse heeft nog geen token geconfigureerd — verbind eerst met Citizen Pay.",
-        "submitFailed": "On-chain-indiening mislukt. Bekijk het log van tokenbewerkingen voor details."
+        "submitFailed": "On-chain-indiening mislukt. Bekijk het log van tokenbewerkingen voor details.",
+        "pinBlocked": "Citizen Pay heeft deze kaart geblokkeerd na 3 foute pincodes. De status kan hier niet worden gewijzigd: een beheerder heft de blokkering op met Deblokkeren op de kaartpagina.",
+        "pinBlockedAtApi": "Citizen Pay weigerde de wijziging: deze kaart is daar geblokkeerd na 3 foute pincodes. De uitgevende kas deblokkeert ze op de kaartpagina, of de houder stelt een nieuwe pincode in in de kaartwallet."
       },
       "sync": {
         "trigger": "Synchroniseren met Citizen Pay",
@@ -3415,7 +3445,8 @@
         "summary": {
           "push": "{count, plural, one {# kaart pushen naar Citizen Pay} other {# kaarten pushen naar Citizen Pay}}",
           "import": "{count, plural, one {# kaart importeren van Citizen Pay} other {# kaarten importeren van Citizen Pay}}",
-          "statusUpdate": "{count, plural, one {# kaartstatus bijwerken op Citizen Pay} other {# kaartstatussen bijwerken op Citizen Pay}}"
+          "statusUpdate": "{count, plural, one {# kaartstatus bijwerken op Citizen Pay} other {# kaartstatussen bijwerken op Citizen Pay}}",
+          "pinBlockSync": "{count, plural, one {# pinblokkering af te stemmen met Citizen Pay} other {# pinblokkeringen af te stemmen met Citizen Pay}}"
         },
         "nothingToSync": "Alles is al gesynchroniseerd.",
         "confirm": "Nu synchroniseren",
@@ -3554,6 +3585,71 @@
           "noDestination": "De handelaar heeft nog geen rekening om de betaling te ontvangen.",
           "placeNotFound": "Citizen Pay kent deze handelaar niet voor deze kas.",
           "unknown": "Er kwam geen antwoord terug. Opnieuw afrekenen is veilig: dezelfde verkoop wordt hergebruikt in plaats van twee keer afgerekend."
+        }
+      },
+      "pinBlock": {
+        "banner": {
+          "title": "Geblokkeerd na 3 foute pincodes",
+          "atPlaceOn": "bij {place}, {date}",
+          "atPlace": "bij {place}",
+          "on": "{date}",
+          "description": "Citizen Pay weigert deze kaart aan elke terminal tot ze is gedeblokkeerd. Deblokkeren laat wie de kaart heeft opnieuw de pincode invoeren; de houder kan de kaart ook zelf deblokkeren door een nieuwe pincode in te stellen in de kaartwallet.",
+          "adminOnly": "Alleen een beheerder van de kas kan de kaart deblokkeren.",
+          "loading": "Pingeschiedenis van de kaart laden…",
+          "loadFailed": "De pingeschiedenis van de kaart kon niet van Citizen Pay worden geladen.",
+          "events": {
+            "title": "Laatste pingebeurtenissen",
+            "action": {
+              "blocked": "Geblokkeerd",
+              "unblocked": "Gedeblokkeerd",
+              "pin_set": "Pincode ingesteld"
+            },
+            "by": {
+              "system": "na 3 foute pogingen",
+              "treasury": "door de kas",
+              "member": "door de houder"
+            }
+          },
+          "refusals": {
+            "title": "Geweigerde betalingen",
+            "reason": {
+              "insufficient": "Onvoldoende saldo",
+              "source_insufficient": "Bronkaart ontoereikend",
+              "weekly_limit": "Weeklimiet bereikt",
+              "pin_invalid": "Foute pincode",
+              "pin_blocked": "Kaart geblokkeerd (PIN)"
+            }
+          }
+        },
+        "unblock": {
+          "button": "Deblokkeren",
+          "title": "Deze kaart deblokkeren?",
+          "description": "De kaart van {holderLabel} accepteert meteen weer pincodes en betaalt weer aan de terminals. U wordt gevraagd te bevestigen dat u het bent.",
+          "cancel": "Annuleren",
+          "confirm": "Kaart deblokkeren",
+          "unblocking": "Deblokkeren…"
+        },
+        "statusDialog": {
+          "notice": "Citizen Pay heeft deze kaart geblokkeerd na 3 foute pincodes. De status kan hier niet worden gewijzigd: een beheerder heft de blokkering op met Deblokkeren op de kaartpagina."
+        },
+        "errors": {
+          "notPinBlocked": "Deze kaart is niet geblokkeerd wegens foute pincodes.",
+          "apiRefused": "Citizen Pay weigerde de deblokkering: alleen de kas die de kaart uitgaf kan ze opheffen.",
+          "failed": "Citizen Pay is niet bereikbaar. Probeer het zo meteen opnieuw."
+        },
+        "email": {
+          "staff": {
+            "subject": "Kaart {serial} geblokkeerd na 3 foute pincodes",
+            "textBody": "Hallo,\n\nCitizen Pay heeft kaart {serial} ({holder}) geblokkeerd na 3 foute pincodes bij {place} op {date}. Ze wordt aan elke terminal geweigerd tot ze is gedeblokkeerd.\n\nEen beheerder van {fundName} kan de kaart deblokkeren op de kaartpagina:\n\n{cardUrl}\n\nDe houder kan de kaart ook zelf deblokkeren door een nieuwe pincode in te stellen in de kaartwallet.\n\nHet {fundName}-team",
+            "ctaLabel": "Kaart openen",
+            "unknownPlace": "een terminal"
+          },
+          "holder": {
+            "subject": "Uw {fundName}-kaart is geblokkeerd",
+            "textBody": "Hallo {firstName},\n\nUw {fundName}-kaart is geblokkeerd na 3 foute pincodes bij {place} op {date}. Ze wordt aan de terminals geweigerd tot ze is gedeblokkeerd.\n\nStel een nieuwe pincode in op uw kaartpagina om ze te deblokkeren:\n\n{walletUrl}\n\nHebt u niet geprobeerd met uw kaart te betalen, verwittig dan meteen {fundName}.\n\nHet {fundName}-team",
+            "ctaLabel": "Mijn kaart openen",
+            "unknownPlace": "een terminal"
+          }
         }
       }
     }

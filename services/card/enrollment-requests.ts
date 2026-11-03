@@ -12,6 +12,7 @@ import type { CardEnrollmentRequestStatus } from "@/services/db/generated/enums"
 import { prisma } from "@/services/db/prisma";
 import { sendEmail } from "@/services/email/resend";
 import { getFundUrl } from "@/services/fund/host";
+import { staffRecipients } from "@/services/fund-team/staff-recipients";
 
 // Cross-fund card enrollment. A physical card (NFC serial) is issued by one
 // fund — the fund holding the original Card row — and other funds may use it
@@ -205,13 +206,7 @@ async function notifyIssuerStaff(
   requesterFund: { name: string },
 ): Promise<void> {
   try {
-    const staff = await prisma.fundMember.findMany({
-      where: { fundId: card.fundId, role: { in: ["OWNER", "ADMIN"] } },
-      select: { user: { select: { email: true } } },
-    });
-    const recipients = [
-      ...new Set(staff.map((s) => s.user.email).filter(Boolean)),
-    ];
+    const recipients = await staffRecipients(card.fundId);
     if (recipients.length === 0) return;
 
     const t = await getTranslations();
