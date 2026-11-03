@@ -72,6 +72,7 @@ export function SignupForm({
   withPassword = false,
   action = signupMemberAction,
   labels,
+  checkEmail,
 }: {
   steps: FormStep<StepField>[];
   referralCode: string | null;
@@ -88,7 +89,18 @@ export function SignupForm({
   action?: (input: SignupActionInput) => Promise<SignupMemberResult>;
   // Submit button wording when the default "Apply" doesn't fit (the login
   // sign-up says "Create my login"); translated by the server page.
-  labels?: { submit: string; submitting: string; password: string; confirmPassword: string; passwordHint: string };
+  labels?: {
+    submit: string;
+    submitting: string;
+    password: string;
+    confirmPassword: string;
+    passwordHint: string;
+    linkHint: string;
+  };
+  // Login sign-up: asked once the email is typed. When the address is already
+  // a member's, the form drops the application questions (link mode) — only
+  // the password matters, the membership record is the fund's.
+  checkEmail?: (input: { email: string }) => Promise<{ existing: boolean }>;
 }) {
   const t = useTranslations("members.signup");
   const tRoot = useTranslations();
@@ -100,8 +112,26 @@ export function SignupForm({
     () => steps.flatMap((s) => s.fields),
     [steps],
   );
-  const isMultiStep = steps.length > 1;
-  const lastIndex = steps.length - 1;
+  // Link mode (see `checkEmail`): one page, identity + password, no extras.
+  const [linkMode, setLinkMode] = useState(false);
+  const linkOnly = withPassword && linkMode;
+  const isMultiStep = !linkOnly && steps.length > 1;
+  const lastIndex = linkOnly ? 0 : steps.length - 1;
+  const showExtras = !linkOnly;
+  const showContributionInput = showContribution && !linkOnly;
+
+  const onEmailBlur = async (email: string) => {
+    if (!withPassword || !checkEmail) return;
+    const trimmed = email.trim();
+    if (!trimmed.includes("@")) return;
+    try {
+      const { existing } = await checkEmail({ email: trimmed });
+      setLinkMode(existing);
+      if (existing) goToStep(0);
+    } catch {
+      setLinkMode(false);
+    }
+  };
 
   // The static schema can't know which extras this fund asks for, so the
   // per-field `required` rules are compiled from the runtime definitions.
@@ -113,7 +143,9 @@ export function SignupForm({
   const resolverSchema = useMemo(
     () =>
       SignupFormSchema.extend({
-        extras: buildExtrasSchema(allFields),
+        extras: linkOnly
+          ? z.record(z.string(), z.unknown()).optional()
+          : buildExtrasSchema(allFields),
         // The login sign-up requires the password (min length) and its
         // confirmation; the application form never renders them.
         ...(withPassword
@@ -155,7 +187,7 @@ export function SignupForm({
           }
         },
       ),
-    [allFields, tierMinimums, tRoot, withPassword],
+    [allFields, tierMinimums, tRoot, withPassword, linkOnly],
   );
 
   const form = useForm<SignupFormInput>({
@@ -218,10 +250,12 @@ export function SignupForm({
       names.push("firstName", "lastName", "email");
       if (withPassword) names.push("password", "confirmPassword");
     }
-    for (const field of steps[index].fields) {
-      names.push(`extras.${field.key}`);
+    if (showExtras) {
+      for (const field of steps[index].fields) {
+        names.push(`extras.${field.key}`);
+      }
     }
-    if (index === lastIndex && showContribution) names.push("contributionAmount");
+    if (index === lastIndex && showContributionInput) names.push("contributionAmount");
     return names;
   };
 
@@ -245,8 +279,8 @@ export function SignupForm({
       void confirmPassword;
       const result = await action({
         builtins,
-        applicationData: extras,
-        referralCode,
+        applicationData: linkOnly ? undefined : extras,
+        referralCode: linkOnly ? null : referralCode,
         ...(withPassword ? { password } : {}),
       });
       if ("error" in result) {
@@ -338,9 +372,10 @@ export function SignupForm({
   // re-checks visibility server-side regardless — this is UX only.
   const extrasValues = (useWatch({ control: form.control, name: "extras" }) ??
     {}) as Record<string, unknown>;
-  const visibleFields = current.fields.filter((field) =>
-    isFieldVisible(field.visibleIf, extrasValues),
-  );
+  const visibleFields = showExtras
+    ? current.fields.filter((field) => isFieldVisible(field.visibleIf, extrasValues))
+    : [];
+  const emailField = form.register("email");
 
   return (
     <form
@@ -428,12 +463,21 @@ export function SignupForm({
               type="email"
               autoComplete="email"
               defaultValue={prefill.email}
-              {...form.register("email")}
+              {...emailField}
+              onBlur={(e) => {
+                void emailField.onBlur(e);
+                void onEmailBlur(e.target.value);
+              }}
             />
             {errors.email && (
               <p className="text-sm text-destructive">
                 {translateError(errors.email.message)}
               </p>
+            )}
+            {linkOnly && labels && (
+              <Alert>
+                <AlertDescription>{labels.linkHint}</AlertDescription>
+              </Alert>
             )}
           </div>
 
@@ -499,7 +543,7 @@ export function SignupForm({
         />
       ))}
 
-      {isLast && showContribution && (
+      {isLast && showContributionInput && (
         <div className="space-y-2">
           <Label htmlFor="contributionAmount">{t("contributionAmount")}</Label>
           <Input

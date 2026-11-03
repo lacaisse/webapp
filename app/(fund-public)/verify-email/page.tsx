@@ -2,14 +2,24 @@
 import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 
-import { scheduleMemberCardHolderSync } from "@/services/card/holder-sync";
-import { prisma } from "@/services/db/prisma";
+import { Button } from "@/components/ui/button";
 import {
-  sendMemberWelcome,
-  sendMerchantWelcome,
-} from "@/services/email/transactional";
-import { consumeVerificationToken } from "@/services/email/verification";
-import { requireCurrentFund } from "@/services/fund/server";
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { getCurrentUser } from "@/services/auth/dal";
+import { prisma } from "@/services/db/prisma";
+import { dispatchMemberWelcomeSafe } from "@/services/email/member-welcome";
+import { sendMerchantWelcome } from "@/services/email/transactional";
+import {
+  consumeVerificationToken,
+  peekVerificationToken,
+} from "@/services/email/verification";
+import { getFundUrl, requireCurrentFund } from "@/services/fund/server";
+import { ConfirmLoginVerification } from "./confirm-login-verification";
 
 // Token-consuming page. Refresh-safe: a token already consumed (e.g. by an
 // email-scanner pre-fetch) shows the success page, not an error — we don't
@@ -17,6 +27,12 @@ import { requireCurrentFund } from "@/services/fund/server";
 //
 // Polymorphic over Member and Merchant: the verification row knows which
 // entity it belongs to, we just dispatch the matching welcome email.
+//
+// Member LOGIN tokens (services/member/auth.ts, `EmailVerification.userId`)
+// are different: the click must prove ownership of that login, so the
+// token is consumed by a POST (confirmMemberVerificationAction) from the
+// signed-in user it was minted for — never on this GET, which a scanner
+// pre-fetch or a link landing in the wrong inbox could trigger.
 
 export default async function VerifyEmailPage({
   searchParams,
@@ -28,41 +44,82 @@ export default async function VerifyEmailPage({
 
   if (!token) redirect("/verify-email/error?reason=missing");
 
+  const peek = await peekVerificationToken(token);
+  if ("error" in peek) {
+    // Already-consumed tokens land on the in-app success page — we can't
+    // tell which entity it belonged to, so we don't honor the configured
+    // redirect URL on this branch.
+    if (peek.error === "consumed") redirect("/verify-email/success");
+    redirect(`/verify-email/error?reason=${peek.error}`);
+  }
+
+  if (peek.userId) {
+    if (!fund.memberLoginEnabled) redirect("/verify-email/error?reason=login_disabled");
+    const user = await getCurrentUser();
+    const here = `/verify-email?token=${encodeURIComponent(token)}`;
+    if (!user) {
+      redirect(`/login?return_to=${encodeURIComponent(here)}&notice=confirm_login`);
+    }
+    const t = await getTranslations("memberLogin.verify");
+    if (user.id !== peek.userId) {
+      // Someone else's session on this browser: no redirect loop through
+      // /login (which would send a member straight back here) — sign out
+      // and come back with the right login.
+      return (
+        <div className="w-full max-w-md">
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("title")}</CardTitle>
+              <CardDescription>{t("wrongAccount", { email: user.email })}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form
+                action={`/auth/logout?return_to=${encodeURIComponent(`${getFundUrl(fund.domain)}${here}`)}`}
+                method="post"
+              >
+                <Button type="submit" variant="outline">
+                  {t("signOut")}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+    return (
+      <div className="w-full max-w-md">
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("title")}</CardTitle>
+            <CardDescription>{t("description", { fundName: fund.name })}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ConfirmLoginVerification token={token} />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   const result = await consumeVerificationToken(token);
 
   if ("error" in result) {
-    if (result.error === "consumed") {
-      // Already-consumed tokens land on the in-app success page — we can't
-      // tell which entity it belonged to, so we don't honor the configured
-      // redirect URL on this branch.
-      redirect("/verify-email/success");
-    }
+    if (result.error === "consumed") redirect("/verify-email/success");
     redirect(`/verify-email/error?reason=${result.error}`);
   }
 
   // Verification succeeded — dispatch the welcome email idempotently. Any
   // exception (besides P2002 on the idempotency key) is logged but doesn't
   // affect the verification outcome.
-  try {
-    if (result.entity === "merchant") {
+  if (result.entity === "merchant") {
+    try {
       await dispatchMerchantWelcome(fund, result.merchantId);
-    } else {
-      await dispatchMemberWelcome(fund, result.memberId);
+    } catch (e) {
+      const code = (e as { code?: string }).code;
+      if (code !== "P2002") console.error("[verify-email] welcome dispatch failed", e);
     }
-  } catch (e) {
-    const code = (e as { code?: string }).code;
-    if (code !== "P2002") {
-      console.error("[verify-email] welcome dispatch failed", e);
-    }
-  }
-
-  // A member LOGIN verification: the member is now linked to their User, so
-  // their cards become attached at Citizen Pay (services/card/holder-sync.ts)
-  // and the member can sign in — the fund's marketing redirect is for
-  // applicants, not for someone who just activated a login.
-  if (result.entity === "member" && result.linkedUserId && fund.memberLoginEnabled) {
-    scheduleMemberCardHolderSync(result.memberId);
-    redirect("/login?notice=verified");
+  } else {
+    await dispatchMemberWelcomeSafe(fund, result.memberId);
   }
 
   const successUrl =
@@ -110,48 +167,5 @@ async function dispatchMerchantWelcome(
       logoUrl: fund.logoUrl,
     },
     merchantName: merchant.name,
-  });
-}
-
-async function dispatchMemberWelcome(
-  fund: FundContext,
-  memberId: string,
-) {
-  // Signup-flow email: deliberately ignores the member-email pause — the
-  // member just verified. The welcome no longer carries a payment reference
-  // (the member has no card yet; the reference is the card UID, delivered with
-  // the card).
-  const member = await prisma.member.findUnique({
-    where: { id: memberId },
-    select: {
-      id: true,
-      email: true,
-      firstName: true,
-    },
-  });
-  if (!member?.email) return;
-
-  const t = await getTranslations("members.signup.emailTemplates.welcome");
-  const subject = t("subject", { fundName: fund.name });
-  const emailRow = await prisma.email.create({
-    data: {
-      fundId: fund.id,
-      type: "MEMBER_WELCOME",
-      toEmail: member.email,
-      memberId: member.id,
-      idempotencyKey: `MEMBER_WELCOME:member:${member.id}`,
-      subject,
-    },
-  });
-  await sendMemberWelcome({
-    emailId: emailRow.id,
-    fundId: fund.id,
-    toEmail: member.email,
-    fund: {
-      name: fund.name,
-      primaryColor: fund.primaryColor,
-      logoUrl: fund.logoUrl,
-    },
-    firstName: member.firstName,
   });
 }

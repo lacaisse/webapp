@@ -5,6 +5,7 @@ import { auth } from "@/services/auth/better-auth";
 import { consumeExchangeCode } from "@/services/auth/exchange";
 import { getApexUrl } from "@/services/fund/server";
 import { getHostType } from "@/services/host/server";
+import { sameOriginPath } from "@/services/http/same-origin-path";
 
 // Single-use session bridge from `auth.<APP_DOMAIN>` to any other host. The
 // auth host mints an `AuthExchange` code bound to (userId, targetHost) and
@@ -67,7 +68,11 @@ export async function GET(request: NextRequest) {
   // path with a scheme is rejected — we always stay on the host that just
   // received the exchange. The browser already navigated here; cross-host
   // redirects would require another exchange round-trip.
-  const safePath = sanitizePath(rawReturnTo);
+  // Only a same-origin path from return_to. An absolute URL, a scheme or a
+  // protocol-relative form (`//host`, `/\host`) is rejected — we always stay
+  // on the host that just received the exchange. The browser already
+  // navigated here; cross-host redirects would require another exchange.
+  const safePath = sameOriginPath(rawReturnTo, new URL(request.url).origin, "/");
   const dest = new URL(safePath, request.url);
   const res = NextResponse.redirect(dest);
 
@@ -110,14 +115,6 @@ function writeSessionCookie(
     path: "/",
     maxAge: ctx.sessionConfig.expiresIn,
   });
-}
-
-function sanitizePath(rawReturnTo: string | null): string {
-  if (!rawReturnTo) return "/";
-  // Reject anything that could redirect off-host. `//foo.example/x` is a
-  // protocol-relative URL and must be blocked too.
-  if (!rawReturnTo.startsWith("/") || rawReturnTo.startsWith("//")) return "/";
-  return rawReturnTo;
 }
 
 function errorRedirect(reason: string) {

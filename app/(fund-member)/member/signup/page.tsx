@@ -14,7 +14,7 @@ import {
 import { SignupForm } from "@/app/(fund-public)/join/signup-form";
 import { getCurrentMember } from "@/services/auth/dal";
 import { isServerActionRequest } from "@/services/host/server";
-import { signUpMemberAction } from "@/services/member/auth-actions";
+import { memberEmailStatusAction, signUpMemberAction } from "@/services/member/auth-actions";
 import { loadMemberSignupForm } from "@/services/member/signup-form-data";
 
 // Member LOGIN sign-up: the /join application form (same fields, steps and
@@ -54,12 +54,14 @@ export default async function MemberSignupPage({
           cancelUrl={null}
           withPassword
           action={signUpMemberAction}
+          checkEmail={memberEmailStatusAction}
           labels={{
             submit: t("submit"),
             submitting: t("submitting"),
             password: t("password"),
             confirmPassword: t("confirmPassword"),
             passwordHint: t("passwordHint"),
+            linkHint: t("linkHint", { fundName: fund.name }),
           }}
         />
       </CardContent>

@@ -205,6 +205,9 @@ describe("signUpMember — existing Member at the fund", () => {
     const result = await signUpMember(fund, input, t);
     expect(result).toEqual({ ok: true, userId: "user-1", mode: "link" });
     expect(prisma.member.create).not.toHaveBeenCalled();
+    // The application answers are the fund's business, not asked nor checked.
+    expect(core.resolveMemberSignup).not.toHaveBeenCalled();
+    expect(db.referrals).toHaveLength(0);
     expect(db.members[0].userId).toBeNull();
     expect(db.verifications[0]).toMatchObject({
       memberId: "member-9",

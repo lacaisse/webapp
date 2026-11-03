@@ -7,13 +7,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { requireUser } from "@/services/auth/dal";
+import { requireFundCreator } from "@/services/auth/dal";
 import { CreateFundForm } from "./create-fund-form";
 
 export default async function NewFundPage() {
   // (apex) layout already bounced any non-apex host here, so there's no fund
-  // context to worry about — getCurrentFund would always be null.
-  await requireUser();
+  // context to worry about — getCurrentFund would always be null. Only
+  // existing staff (or a platform admin) may open a fund: a member login is
+  // a User too and must not become a fund OWNER this way.
+  await requireFundCreator();
 
   const t = await getTranslations("funds.create");
 

@@ -16,7 +16,7 @@ const cp = vi.hoisted(() => ({ setCardHolder: vi.fn() }));
 vi.mock("@/services/citizenpay/client", () => ({ getCitizenPayClient: () => cp }));
 
 const prisma = vi.hoisted(() => ({
-  card: { findUnique: vi.fn(), update: vi.fn() },
+  card: { findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn() },
   fund: { findUnique: vi.fn() },
   member: { findUnique: vi.fn() },
 }));
@@ -28,6 +28,7 @@ import {
   desiredHolderState,
   scheduleCardHolderSync,
   syncCardHolder,
+  syncFundCardHolders,
   syncMemberCardHolders,
 } from "./holder-sync";
 
@@ -116,10 +117,15 @@ describe("syncCardHolder", () => {
     warn.mockRestore();
   });
 
-  it("skips funds without member login or CP key, enrolled copies and unknown cards", async () => {
+  it("DELETEs for a fund that turned member login off, even with a verified login", async () => {
     prisma.card.findUnique.mockResolvedValue(card());
     prisma.fund.findUnique.mockResolvedValue({ ...fund, memberLoginEnabled: false });
-    expect(await syncCardHolder("card-1")).toBe("skipped");
+    expect(await syncCardHolder("card-1")).toBe("ok");
+    expect(cp.setCardHolder).toHaveBeenLastCalledWith("S1", null);
+  });
+
+  it("skips funds without a CP key, enrolled copies and unknown cards", async () => {
+    prisma.card.findUnique.mockResolvedValue(card());
     prisma.fund.findUnique.mockResolvedValue({ ...fund, citizenPayApiKeyEnc: null });
     expect(await syncCardHolder("card-1")).toBe("skipped");
     prisma.fund.findUnique.mockResolvedValue(fund);
@@ -128,6 +134,22 @@ describe("syncCardHolder", () => {
     prisma.card.findUnique.mockResolvedValue(null);
     expect(await syncCardHolder("card-1")).toBe("skipped");
     expect(cp.setCardHolder).not.toHaveBeenCalled();
+  });
+});
+
+describe("syncFundCardHolders (the member-login toggle)", () => {
+  it("detaches every card that may have been attached when the flag goes off", async () => {
+    prisma.fund.findUnique.mockResolvedValue({ ...fund, memberLoginEnabled: false });
+    prisma.card.findMany.mockResolvedValue([card(), card({ id: "card-2", serialNumber: "S2", memberId: null, member: null })]);
+    expect(await syncFundCardHolders("fund-1")).toEqual(["ok", "ok"]);
+    expect(prisma.card.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: [{ member: { userId: { not: null } } }, { holderSyncedAt: { not: null } }],
+        }),
+      }),
+    );
+    expect(cp.setCardHolder.mock.calls).toEqual([["S1", null], ["S2", null]]);
   });
 });
 

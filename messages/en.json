@@ -3791,7 +3791,9 @@
         "missing": "No verification token was provided.",
         "not_found": "This verification link isn't valid.",
         "expired": "This verification link has expired.",
-        "email_mismatch": "The email address has changed since this link was issued."
+        "email_mismatch": "The email address has changed since this link was issued.",
+        "login_required": "Sign in with the login you created to confirm this email.",
+        "login_disabled": "This fund has not enabled member logins; the login cannot be confirmed."
       },
       "nextSteps": "Contact the fund admin or apply again to get a fresh verification email."
     }
@@ -4584,8 +4586,10 @@
         "password_reset": "Your password has been changed. Sign in with the new one.",
         "login_removed": "Your login has been removed. Your membership stays with the fund; you can create a new login whenever you like.",
         "unlinked": "Your login is no longer linked to this membership.",
-        "no_membership": "This login is not a member of this fund."
-      }
+        "no_membership": "This login is not a member of this fund.",
+        "confirm_login": "Sign in to confirm your email address."
+      },
+      "pendingVerification": "Your {fundName} login is waiting for its email confirmation. Open the link in the email, or ask for it again."
     },
     "signup": {
       "title": "Create your {fundName} login",
@@ -4596,7 +4600,8 @@
       "submit": "Create my login",
       "submitting": "Creating your login…",
       "haveLogin": "Already have a login?",
-      "signIn": "Sign in"
+      "signIn": "Sign in",
+      "linkHint": "This email belongs to a member of {fundName}. Only a password is needed: your login is linked to that membership once you confirm your email."
     },
     "forgot": {
       "title": "Reset your password",
@@ -4664,7 +4669,11 @@
       "accountExists": "A login already exists for this email. Sign in instead, or reset your password.",
       "membershipHasLogin": "This membership already has a login. Sign in, or reset your password if it is yours.",
       "resetExpired": "This reset link is invalid or has expired. Request a new one.",
-      "generic": "Something went wrong. Please try again."
+      "generic": "Something went wrong. Please try again.",
+      "notMember": "This login is not a member of this fund.",
+      "sessionExpired": "Your session has expired. Sign in again.",
+      "notYourLink": "This confirmation link belongs to another login. Sign in with the login you created.",
+      "linkInvalid": "This confirmation link is invalid or has expired. Ask for a new one."
     },
     "emails": {
       "verify": {
@@ -4672,6 +4681,14 @@
         "textBody": "Hi {firstName},\n\nYou created a member login at {fundName}. Confirm your email address to activate it — the link is valid for 24 hours:\n\n  {verifyUrl}\n\nIf you didn't create this login, ignore this email: nothing is activated without it.\n\nThe {fundName} team",
         "ctaLabel": "Confirm my login"
       }
+    },
+    "verify": {
+      "title": "Confirm your email",
+      "description": "Confirm that you created this login at {fundName}. Your membership is linked to it from then on.",
+      "confirm": "Confirm my email",
+      "confirming": "Confirming…",
+      "wrongAccount": "You are signed in as {email}, but this confirmation link belongs to another login. Sign out, then open the link again.",
+      "signOut": "Sign out"
     }
   }
 }

@@ -3715,7 +3715,9 @@
         "missing": "Er is geen verificatietoken meegegeven.",
         "not_found": "Deze verificatielink is niet geldig.",
         "expired": "Deze verificatielink is verlopen.",
-        "email_mismatch": "Het e-mailadres is gewijzigd sinds deze link werd verstuurd."
+        "email_mismatch": "Het e-mailadres is gewijzigd sinds deze link werd verstuurd.",
+        "login_required": "Log in met de login die u heeft aangemaakt om dit e-mailadres te bevestigen.",
+        "login_disabled": "Dit fonds heeft ledenlogins niet ingeschakeld; de login kan niet worden bevestigd."
       },
       "nextSteps": "Neem contact op met de beheerder van het fonds of dien een nieuwe aanvraag in om een nieuwe verificatie-e-mail te ontvangen."
     }
@@ -4508,8 +4510,10 @@
         "password_reset": "Uw wachtwoord is gewijzigd. Log in met het nieuwe wachtwoord.",
         "login_removed": "Uw login is verwijderd. Uw lidmaatschap blijft bij het fonds; u kunt wanneer u wilt een nieuwe login aanmaken.",
         "unlinked": "Uw login is niet langer gekoppeld aan dit lidmaatschap.",
-        "no_membership": "Deze login is geen lid van dit fonds."
-      }
+        "no_membership": "Deze login is geen lid van dit fonds.",
+        "confirm_login": "Log in om uw e-mailadres te bevestigen."
+      },
+      "pendingVerification": "Uw {fundName}-login wacht op de bevestiging van uw e-mail. Open de link in de e-mail of vraag hem opnieuw aan."
     },
     "signup": {
       "title": "Maak uw {fundName}-login aan",
@@ -4520,7 +4524,8 @@
       "submit": "Mijn login aanmaken",
       "submitting": "Login aanmaken…",
       "haveLogin": "Heeft u al een login?",
-      "signIn": "Inloggen"
+      "signIn": "Inloggen",
+      "linkHint": "Dit e-mailadres is van een lid van {fundName}. Alleen een wachtwoord is nodig: uw login wordt aan dat lidmaatschap gekoppeld zodra u uw e-mail bevestigt."
     },
     "forgot": {
       "title": "Wachtwoord opnieuw instellen",
@@ -4588,7 +4593,11 @@
       "accountExists": "Er bestaat al een login voor dit e-mailadres. Log in, of stel uw wachtwoord opnieuw in.",
       "membershipHasLogin": "Dit lidmaatschap heeft al een login. Log in, of stel uw wachtwoord opnieuw in als het de uwe is.",
       "resetExpired": "Deze link is ongeldig of verlopen. Vraag een nieuwe aan.",
-      "generic": "Er ging iets mis. Probeer het opnieuw."
+      "generic": "Er ging iets mis. Probeer het opnieuw.",
+      "notMember": "Deze login is geen lid van dit fonds.",
+      "sessionExpired": "Uw sessie is verlopen. Log opnieuw in.",
+      "notYourLink": "Deze bevestigingslink hoort bij een andere login. Log in met de login die u heeft aangemaakt.",
+      "linkInvalid": "Deze bevestigingslink is ongeldig of verlopen. Vraag een nieuwe aan."
     },
     "emails": {
       "verify": {
@@ -4596,6 +4605,14 @@
         "textBody": "Hallo {firstName},\n\nU heeft een ledenlogin aangemaakt bij {fundName}. Bevestig uw e-mailadres om de login te activeren — de link is 24 uur geldig:\n\n  {verifyUrl}\n\nHeeft u deze login niet aangemaakt? Negeer deze e-mail: zonder bevestiging wordt niets geactiveerd.\n\nHet {fundName}-team",
         "ctaLabel": "Mijn login bevestigen"
       }
+    },
+    "verify": {
+      "title": "Bevestig uw e-mail",
+      "description": "Bevestig dat u deze login bij {fundName} heeft aangemaakt. Uw lidmaatschap wordt er vanaf dan aan gekoppeld.",
+      "confirm": "Mijn e-mail bevestigen",
+      "confirming": "Bevestigen…",
+      "wrongAccount": "U bent ingelogd als {email}, maar deze bevestigingslink hoort bij een andere login. Log uit en open de link opnieuw.",
+      "signOut": "Uitloggen"
     }
   }
 }

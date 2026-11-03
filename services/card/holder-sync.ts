@@ -42,9 +42,8 @@ export type HolderState =
 
 export type HolderSyncOutcome =
   | "ok"
-  // Nothing to do: the fund has member login off, no CP key, the card is
-  // not the fund's, or the card is an enrolled copy (only the issuer
-  // attaches, Q11) — nothing is sent.
+  // Nothing to do: the fund has no CP key, the card is unknown, or the card
+  // is an enrolled copy (only the issuer attaches, Q11) — nothing is sent.
   | "skipped"
   // The api does not have the route yet (404). Nothing is marked synced.
   | "not_deployed"
@@ -154,9 +153,10 @@ async function syncOne(
   fund: HolderSyncFund,
   card: CardForHolderSync,
 ): Promise<HolderSyncOutcome> {
-  // A fund without member login never attached anything, so there is
-  // nothing to detach either: don't spend a CP call per unassign.
-  if (!fund.memberLoginEnabled || !isConnected(fund)) return "skipped";
+  // A fund with member login OFF still syncs — as "detached": turning the
+  // flag off is itself a transition (every card attached while it was on
+  // becomes public again), and the toggle schedules a fund-wide sync.
+  if (!isConnected(fund)) return "skipped";
   if (card.enrolledFromRequest) return "skipped";
 
   const state = desiredHolderState(fund, card);
@@ -188,6 +188,28 @@ async function syncOne(
 }
 
 /**
+ * Push every card of a fund that may be attached, or may have been: cards
+ * bound to a member with a login, and cards Citizen Pay accepted a holder
+ * state for before (`holderSyncedAt`). Used when the fund's member-login
+ * flag flips: on → attach the verified logins, off → detach them all. The
+ * rest of the fund's cards never held a login and are left alone.
+ */
+export async function syncFundCardHolders(fundId: string): Promise<HolderSyncOutcome[]> {
+  const fund = await loadFund(fundId);
+  if (!fund) return [];
+  const cards = await prisma.card.findMany({
+    where: {
+      fundId,
+      OR: [{ member: { userId: { not: null } } }, { holderSyncedAt: { not: null } }],
+    },
+    select: cardSelect,
+  });
+  const out: HolderSyncOutcome[] = [];
+  for (const card of cards) out.push(await syncOne(fund, card));
+  return out;
+}
+
+/**
  * Sync the given cards after the response is sent (`after()`), so a slow or
  * missing api route never delays the user's action. Call from server
  * actions and route handlers. Failures are logged by `syncCardHolder`.
@@ -204,5 +226,12 @@ export function scheduleCardHolderSync(cardIds: string | Iterable<string>): void
 export function scheduleMemberCardHolderSync(memberId: string): void {
   after(async () => {
     await syncMemberCardHolders(memberId);
+  });
+}
+
+/** Same, for a whole fund (the member-login toggle). */
+export function scheduleFundCardHolderSync(fundId: string): void {
+  after(async () => {
+    await syncFundCardHolders(fundId);
   });
 }

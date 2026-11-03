@@ -96,19 +96,6 @@ export async function signUpMember(
 ): Promise<SignUpMemberResult> {
   if (!fund.memberLoginEnabled) return { ok: false, error: "disabled" };
 
-  const resolution = await resolveMemberSignup({
-    fund,
-    builtins: input.builtins,
-    applicationData: input.applicationData,
-    referralCode: input.referralCode,
-    t,
-  });
-  if (!resolution.ok) {
-    return { ok: false, error: "invalid", message: resolution.error, field: resolution.field };
-  }
-  const { contributionAmount, builtinColumns, applicationData, sponsor } =
-    resolution.resolved;
-
   // Better Auth lowercases on sign-in (`findUserByEmail(email.toLowerCase())`),
   // so the stored address is lowercase too — exactly like the invite path.
   const email = input.builtins.email.trim().toLowerCase();
@@ -127,6 +114,27 @@ export async function signUpMember(
   ]);
   if (existingUser) return { ok: false, error: "account_exists" };
   if (existingMember?.userId) return { ok: false, error: "membership_has_login" };
+
+  // Link mode (an existing member creates a login): the membership record is
+  // the fund's — none of the application answers apply, so none are asked
+  // (the form drops them once the address is known to be a member's,
+  // memberEmailStatusAction) and none are validated here.
+  const resolved = existingMember
+    ? { contributionAmount: null, builtinColumns: {}, applicationData: null, sponsor: null }
+    : await (async () => {
+        const resolution = await resolveMemberSignup({
+          fund,
+          builtins: input.builtins,
+          applicationData: input.applicationData,
+          referralCode: input.referralCode,
+          t,
+        });
+        return resolution.ok ? resolution.resolved : resolution;
+      })();
+  if ("ok" in resolved) {
+    return { ok: false, error: "invalid", message: resolved.error, field: resolved.field };
+  }
+  const { contributionAmount, builtinColumns, applicationData, sponsor } = resolved;
 
   const ctx = await auth.$context;
   const passwordHash = await ctx.password.hash(input.password);
@@ -242,6 +250,19 @@ export async function signUpMember(
     return { ok: true, userId: created.userId, mode: existingMember ? "link" : "created" };
   }
   return { ok: false, error: "generic" };
+}
+
+/**
+ * Whether an address is already a member's at the fund — what the member
+ * sign-up form uses to drop the application questions (link mode). Leaks no
+ * more than the sign-up itself does ("this membership already has a login").
+ */
+export async function memberEmailExists(fundId: string, email: string): Promise<boolean> {
+  const member = await prisma.member.findFirst({
+    where: { fundId, email: { equals: email.trim(), mode: "insensitive" } },
+    select: { id: true },
+  });
+  return member !== null;
 }
 
 /**

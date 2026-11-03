@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import "server-only";
 import { betterAuth } from "better-auth";
-import { createAuthMiddleware } from "better-auth/api";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
 import { jwt } from "better-auth/plugins";
@@ -11,7 +11,12 @@ import { getTranslations } from "next-intl/server";
 import { prisma } from "@/services/db/prisma";
 import { sendEmail } from "@/services/email/resend";
 import { mcpResourceForOrigin } from "@/services/mcp/resource";
-import { oauthProviderOptions } from "@/services/auth/oauth-provider-config";
+import {
+  clientIdFromTokenRequest,
+  oauthProviderOptions,
+  resourceAllowedForClient,
+  walletClientConfigFromEnv,
+} from "@/services/auth/oauth-provider-config";
 import { buildRecentAuthCookie } from "@/services/auth/recent-auth";
 import { ensureWalletOauthClient } from "@/services/member/wallet-client";
 
@@ -156,6 +161,24 @@ export const auth = betterAuth({
     before: createAuthMiddleware(async (ctx) => {
       if (ctx.path !== "/oauth2/authorize" && ctx.path !== "/oauth2/token") return;
       await ensureWalletOauthClient();
+      // The api audience is the wallet's alone (see resourceAllowedForClient):
+      // refused before the provider looks at the request. The token endpoint
+      // is covered for a refresh or exchange that names the api outright;
+      // a code only ever carries resources the authorize step allowed.
+      const audience = walletClientConfigFromEnv()?.audience;
+      const body = (ctx.body ?? {}) as Record<string, unknown>;
+      const query = (ctx.query ?? {}) as Record<string, unknown>;
+      const clientId =
+        ctx.path === "/oauth2/authorize"
+          ? ((query.client_id ?? body.client_id) as string | undefined)
+          : clientIdFromTokenRequest(body, ctx.request?.headers.get("authorization"));
+      const resource = ctx.path === "/oauth2/authorize" ? (query.resource ?? body.resource) : body.resource;
+      if (!resourceAllowedForClient(clientId, resource, audience)) {
+        throw new APIError("BAD_REQUEST", {
+          error: "invalid_target",
+          error_description: "this resource is reserved for the Citizen Pay wallet client",
+        });
+      }
     }),
 
     // Step-up by passkey (review S4). The plugin's assertion endpoint

@@ -19,6 +19,11 @@
 //
 // `--all` also re-sends cards already stamped (a full resync). `--verbose`
 // prints serials (never holder refs' owners — the ref is a user id).
+//
+// Funds with member login OFF are visited too, for the cards that could
+// have been attached while it was on (bound to a member with a login, or
+// stamped before): those are sent as DELETE. Their other cards never held a
+// login and are skipped.
 
 import "dotenv/config";
 import { createDecipheriv } from "node:crypto";
@@ -95,13 +100,18 @@ const prisma = new PrismaClient({
 async function main() {
   const funds = await prisma.fund.findMany({
     where: {
-      memberLoginEnabled: true,
       citizenPayApiKeyId: { not: null },
       citizenPayApiKeyEnc: { not: null },
     },
-    select: { id: true, name: true, citizenPayApiKeyId: true, citizenPayApiKeyEnc: true },
+    select: {
+      id: true,
+      name: true,
+      memberLoginEnabled: true,
+      citizenPayApiKeyId: true,
+      citizenPayApiKeyEnc: true,
+    },
   });
-  console.log(`${funds.length} fund(s) with member login and a CP key${APPLY ? "" : " (dry run)"}`);
+  console.log(`${funds.length} connected fund(s)${APPLY ? "" : " (dry run)"}`);
 
   let attached = 0;
   let detached = 0;
@@ -115,6 +125,10 @@ async function main() {
         ...(ALL ? {} : { holderSyncedAt: null }),
         // Enrolled copies are never attached by this fund (only the issuer).
         enrolledFromRequest: null,
+        // Flag off: only what may have been attached (see the header).
+        ...(fund.memberLoginEnabled
+          ? {}
+          : { OR: [{ member: { userId: { not: null } } }, { holderSyncedAt: { not: null } }] }),
       },
       select: {
         id: true,
@@ -125,10 +139,12 @@ async function main() {
     const creds = APPLY
       ? { apiKeyId: fund.citizenPayApiKeyId!, apiKey: decryptSecret(fund.citizenPayApiKeyEnc!) }
       : null;
-    console.log(`- ${fund.name}: ${cards.length} card(s) to sync`);
+    console.log(`- ${fund.name}${fund.memberLoginEnabled ? "" : " (member login off)"}: ${cards.length} card(s) to sync`);
     for (const card of cards) {
       const holderRef =
-        card.member?.userId && card.member.emailVerifiedAt ? card.member.userId : null;
+        fund.memberLoginEnabled && card.member?.userId && card.member.emailVerifiedAt
+          ? card.member.userId
+          : null;
       if (holderRef) attached++;
       else detached++;
       if (VERBOSE) console.log(`    ${card.serialNumber} → ${holderRef ? "PUT" : "DELETE"}`);

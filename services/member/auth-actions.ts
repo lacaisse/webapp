@@ -7,11 +7,17 @@ import { getLocale, getTranslations } from "next-intl/server";
 
 import { AttemptLimiter } from "@/services/auth/attempt-limiter";
 import { auth } from "@/services/auth/better-auth";
-import { requireMember } from "@/services/auth/dal";
+import { getCurrentMember } from "@/services/auth/dal";
+import { scheduleMemberCardHolderSync } from "@/services/card/holder-sync";
+import { prisma } from "@/services/db/prisma";
+import { dispatchMemberWelcomeSafe } from "@/services/email/member-welcome";
+import { consumeVerificationToken } from "@/services/email/verification";
 import { requireCurrentFund } from "@/services/fund/server";
 import { getFundUrl } from "@/services/fund/host";
+import { sameOriginPath } from "@/services/http/same-origin-path";
 
 import {
+  memberEmailExists,
   removeMemberLogin,
   resendMemberVerification,
   signUpMember,
@@ -48,10 +54,12 @@ export type MemberAuthResult =
   | { ok: true; message?: string; redirectTo?: string };
 
 // 5 sign-ups per IP per hour; 10 failed logins per IP per 10 minutes; 5
-// reset emails per IP per hour.
+// reset / verification emails per IP per hour; 30 email look-ups per IP per
+// 10 minutes (the sign-up form's link-mode check).
 const signupLimiter = new AttemptLimiter(5, 60 * 60_000);
 const loginLimiter = new AttemptLimiter(10, 10 * 60_000);
 const forgotLimiter = new AttemptLimiter(5, 60 * 60_000);
+const emailCheckLimiter = new AttemptLimiter(30, 10 * 60_000);
 
 async function clientIp(): Promise<string> {
   const h = await headers();
@@ -59,11 +67,10 @@ async function clientIp(): Promise<string> {
   return forwarded?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown";
 }
 
-// Only same-host paths come back from `return_to`; anything else lands on
-// the account page.
-function safeReturnPath(raw: string | null | undefined): string {
-  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/account";
-  return raw;
+// Only a path on this fund's own origin comes back from `return_to`
+// (services/http/same-origin-path.ts); anything else lands on the account.
+function safeReturnPath(raw: string | null | undefined, fundDomain: string): string {
+  return sameOriginPath(raw, getFundUrl(fundDomain), "/account");
 }
 
 export async function signUpMemberAction(input: unknown): Promise<SignupMemberResult> {
@@ -138,7 +145,7 @@ export async function memberLoginAction(
     return { error: t("errors.invalidCredentials") };
   }
   loginLimiter.reset(key);
-  return { ok: true, redirectTo: safeReturnPath(returnTo) };
+  return { ok: true, redirectTo: safeReturnPath(returnTo, fund.domain) };
 }
 
 export async function memberForgotPasswordAction(
@@ -202,12 +209,78 @@ export async function memberResetPasswordAction(
   return { ok: true, redirectTo: "/login?notice=password_reset" };
 }
 
+/**
+ * Whether the address belongs to a member of this fund already — the member
+ * sign-up form drops the application questions then (link mode, finding
+ * that an existing member was asked a full application it never needed).
+ */
+export async function memberEmailStatusAction(input: {
+  email: string;
+}): Promise<{ existing: boolean }> {
+  const fund = await requireCurrentFund();
+  if (!fund.memberLoginEnabled) return { existing: false };
+  const parsed = MemberForgotSchema.safeParse(input);
+  if (!parsed.success) return { existing: false };
+  const ip = await clientIp();
+  if (!emailCheckLimiter.allowed(ip)) return { existing: false };
+  emailCheckLimiter.fail(ip);
+  return { existing: await memberEmailExists(fund.id, parsed.data.email) };
+}
+
+/**
+ * The POST that consumes a member-login verification token: the signed-in
+ * user must be the one the token was minted for (services/email/
+ * verification.ts refuses otherwise). Links the member, attaches their cards
+ * and, for a NEW member (not a link), sends the applicant welcome.
+ */
+export async function confirmMemberVerificationAction(token: string): Promise<MemberAuthResult> {
+  const t = await getTranslations();
+  const { user, fund } = await getCurrentMember();
+  if (!user) return { error: t("memberLogin.errors.sessionExpired") };
+  if (typeof token !== "string" || !token) return { error: t("memberLogin.errors.generic") };
+
+  const result = await consumeVerificationToken(token, { sessionUserId: user.id });
+  if ("error" in result) {
+    // Refresh-safe: a token already consumed just goes on to the account.
+    if (result.error === "consumed") return { ok: true, redirectTo: "/account" };
+    if (result.error === "login_required") return { error: t("memberLogin.errors.notYourLink") };
+    if (result.error === "login_disabled") return { error: t("memberLogin.errors.disabled") };
+    return { error: t("memberLogin.errors.linkInvalid") };
+  }
+  if (result.entity === "member") {
+    // An existing member who merely created a login is not a new applicant.
+    if (!result.wasLinked) await dispatchMemberWelcomeSafe(fund, result.memberId);
+    if (result.linkedUserId) scheduleMemberCardHolderSync(result.memberId);
+  }
+  return { ok: true, redirectTo: "/account" };
+}
+
+/**
+ * A fresh verification email. For a signed-in member whose login isn't
+ * verified yet (the account page), and — the link-mode recovery — for a
+ * signed-in User that is NOT a member here yet but has a pending
+ * verification at this fund (the login page's "no membership" state): the
+ * first email may never have arrived, and the sign-up refuses the address
+ * now that the User exists.
+ */
 export async function resendMemberVerificationAction(): Promise<MemberAuthResult> {
   const t = await getTranslations();
-  const { user, fund, member } = await requireMember();
-  if (member.emailVerifiedAt && user.emailVerified) {
+  const { user, fund, member: linked } = await getCurrentMember();
+  if (!user) return { error: t("memberLogin.errors.sessionExpired") };
+
+  if (linked?.emailVerifiedAt && user.emailVerified) {
     return { ok: true, message: t("memberLogin.account.verification.alreadyVerified") };
   }
+  let member: { id: string; email: string; firstName: string; userId: string | null } | null = linked;
+  if (!member) {
+    const pending = await prisma.emailVerification.findFirst({
+      where: { userId: user.id, consumedAt: null, member: { fundId: fund.id } },
+      orderBy: { createdAt: "desc" },
+      select: { member: { select: { id: true, email: true, firstName: true, userId: true } } },
+    });
+    member = pending?.member ?? null;
+  }
+  if (!member) return { error: t("memberLogin.errors.notMember") };
   const ip = await clientIp();
   if (!forgotLimiter.allowed(ip)) return { error: t("memberLogin.errors.tooMany") };
   forgotLimiter.fail(ip);
@@ -218,7 +291,10 @@ export async function resendMemberVerificationAction(): Promise<MemberAuthResult
 }
 
 export async function removeMemberLoginAction(): Promise<MemberAuthResult> {
-  const { user, member } = await requireMember();
+  const t = await getTranslations();
+  const { user, member } = await getCurrentMember();
+  if (!user) return { error: t("memberLogin.errors.sessionExpired") };
+  if (!member) return { error: t("memberLogin.errors.notMember") };
   const { userDeleted } = await removeMemberLogin({ memberId: member.id, userId: user.id });
   // Sign this host out (and every other session when the user is gone —
   // its rows cascaded). A surviving staff/other-fund user keeps their other

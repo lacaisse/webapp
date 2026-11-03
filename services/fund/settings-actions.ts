@@ -8,6 +8,7 @@ import { symbolCollides } from "@/services/token/symbol";
 import { z } from "zod";
 
 import { requireFundRole } from "@/services/auth/dal";
+import { scheduleFundCardHolderSync } from "@/services/card/holder-sync";
 import { getCitizenPayClient } from "@/services/citizenpay/client";
 import { scheduleTreasuryTopUpUrlSync } from "@/services/citizenpay/sync-top-up-url";
 import {
@@ -51,6 +52,15 @@ export async function updateOnboardingSettingsAction(
   if (Object.keys(data).length === 0) return { ok: true };
 
   await prisma.fund.update({ where: { id: fund.id }, data });
+  // The flag is itself an attachment transition for every card of the fund
+  // (on: attach the verified logins, off: detach them all) — push it to
+  // Citizen Pay off the response path (services/card/holder-sync.ts).
+  if (
+    typeof data.memberLoginEnabled === "boolean" &&
+    data.memberLoginEnabled !== fund.memberLoginEnabled
+  ) {
+    scheduleFundCardHolderSync(fund.id);
+  }
   revalidatePath("/settings");
   return { ok: true };
 }

@@ -64,6 +64,21 @@ export const requireAdmin = cache(async () => {
   return user;
 });
 
+/**
+ * Who may create a fund: a platform admin, or a user who is already staff
+ * of some fund (every staff account comes from an invite). A card holder's
+ * member login is a plain User too (services/member/auth.ts) and must not
+ * be able to open a fund of its own and become its OWNER — it has no
+ * FundMember row anywhere, so it is refused here.
+ */
+export const requireFundCreator = cache(async () => {
+  const user = await requireUser();
+  if (user.globalRole === "ADMIN") return user;
+  const staffRows = await prisma.fundMember.count({ where: { userId: user.id } });
+  if (staffRows === 0) redirect("/unauthorized");
+  return user;
+});
+
 // =============================================================================
 // Fund authorization
 // =============================================================================

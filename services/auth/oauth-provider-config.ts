@@ -208,3 +208,45 @@ export function withoutIdentity<T extends Record<string, unknown>, K extends key
   for (const key of keys) delete out[key];
   return out;
 }
+
+/**
+ * The api audience belongs to the wallet client alone. Dynamic registration
+ * stays open for MCP agents and `enforcePerClientResources` stays off (an
+ * agent may target any fund's `/api/mcp`), so without this rule any
+ * self-registered client could ask for `resource=<api>` and, after consent,
+ * hold a member token the api accepts. Returns false when `resource` names
+ * the audience and the client is not the wallet. `resource` is the raw
+ * authorize / token parameter (string, repeated, or absent).
+ */
+export function resourceAllowedForClient(
+  clientId: string | null | undefined,
+  resource: unknown,
+  audience: string | null | undefined,
+): boolean {
+  if (!audience) return true;
+  const list = Array.isArray(resource)
+    ? resource
+    : typeof resource === "string"
+      ? [resource]
+      : [];
+  const asksApi = list.some(
+    (r) => typeof r === "string" && r.replace(/\/+$/, "") === audience,
+  );
+  return !asksApi || clientId === WALLET_CLIENT_ID;
+}
+
+/** The client id a token request carries: body, or the Basic authorization header. */
+export function clientIdFromTokenRequest(
+  body: Record<string, unknown> | undefined,
+  authorization: string | null | undefined,
+): string | null {
+  if (typeof body?.client_id === "string") return body.client_id;
+  const m = authorization?.match(/^Basic +(.+)$/i);
+  if (!m) return null;
+  try {
+    const decoded = Buffer.from(m[1], "base64").toString("utf8");
+    return decodeURIComponent(decoded.split(":")[0] ?? "") || null;
+  } catch {
+    return null;
+  }
+}

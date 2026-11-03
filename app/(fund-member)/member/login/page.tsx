@@ -14,9 +14,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getCurrentMember } from "@/services/auth/dal";
+import { prisma } from "@/services/db/prisma";
 import { FUND_APEX, getFundUrl } from "@/services/fund/host";
 import { getAuthUrl, isServerActionRequest } from "@/services/host/server";
+import { sameOriginPath } from "@/services/http/same-origin-path";
 import { MemberLoginForm } from "./login-form";
+import { ResendPendingVerification } from "./resend-pending-verification";
 
 // Member sign-in on the fund host (password, or a passkey — the WebAuthn
 // rpID is the apex, so a fund on its own `<sub>.<apex>` host can run the
@@ -31,12 +34,9 @@ const NOTICES = new Set([
   "login_removed",
   "unlinked",
   "no_membership",
+  "confirm_login",
 ]);
 
-function safeReturnTo(raw: string | undefined): string | undefined {
-  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return undefined;
-  return raw;
-}
 
 export default async function MemberLoginPage({
   searchParams,
@@ -44,8 +44,9 @@ export default async function MemberLoginPage({
   searchParams: Promise<{ return_to?: string; notice?: string }>;
 }) {
   const { return_to, notice } = await searchParams;
-  const returnTo = safeReturnTo(return_to);
   const { user, fund, member } = await getCurrentMember();
+  // A path on this fund's own origin, or nothing (services/http/same-origin-path.ts).
+  const returnTo = sameOriginPath(return_to, getFundUrl(fund.domain), "") || undefined;
 
   if (user && member) {
     // Mid-action (the login action just set the cookie): the form navigates
@@ -68,6 +69,16 @@ export default async function MemberLoginPage({
   const t = await getTranslations("memberLogin.login");
   const noticeKey = notice && NOTICES.has(notice) ? notice : null;
 
+  // A signed-in User without a membership here may be a link-mode sign-up
+  // whose confirmation email never arrived: offer to send it again.
+  const pendingVerification =
+    user && !member
+      ? await prisma.emailVerification.findFirst({
+          where: { userId: user.id, consumedAt: null, member: { fundId: fund.id } },
+          select: { token: true },
+        })
+      : null;
+
   return (
     <Card>
       <CardHeader>
@@ -86,8 +97,11 @@ export default async function MemberLoginPage({
           <div className="space-y-3 text-sm">
             <p>{t("signedInAs", { email: user.email })}</p>
             <p className="text-muted-foreground">
-              {t("noMembership", { fundName: fund.name })}
+              {pendingVerification
+                ? t("pendingVerification", { fundName: fund.name })
+                : t("noMembership", { fundName: fund.name })}
             </p>
+            {pendingVerification && <ResendPendingVerification />}
             <div className="flex flex-wrap gap-2">
               {/* The logout route handler answers with a real redirect, so
                   the browser comes back through the proxy to this page. */}

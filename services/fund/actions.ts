@@ -2,7 +2,7 @@
 "use server";
 
 import { getLocale, getTranslations } from "next-intl/server";
-import { requireUser } from "@/services/auth/dal";
+import { requireFundCreator } from "@/services/auth/dal";
 import { prisma } from "@/services/db/prisma";
 import { registerFundMcpResource } from "@/services/mcp/auth";
 import { isSupportedLocale } from "@/services/i18n/config";
@@ -36,7 +36,7 @@ export async function createFundAction(
     };
   }
 
-  const user = await requireUser();
+  const user = await requireFundCreator();
   const domain = `${parsed.data.subdomain}.${FUND_APEX}`;
 
   // Inherit the creator's session locale as the fund's default. Most cases

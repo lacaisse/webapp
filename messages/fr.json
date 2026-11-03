@@ -3791,7 +3791,9 @@
         "missing": "Aucun jeton de vérification n'a été fourni.",
         "not_found": "Ce lien de vérification n'est pas valide.",
         "expired": "Ce lien de vérification a expiré.",
-        "email_mismatch": "L'adresse email a changé depuis l'envoi de ce lien."
+        "email_mismatch": "L'adresse email a changé depuis l'envoi de ce lien.",
+        "login_required": "Connectez-vous avec l'identifiant que vous avez créé pour confirmer cet email.",
+        "login_disabled": "Cette caisse n'a pas activé les identifiants de membres ; l'identifiant ne peut pas être confirmé."
       },
       "nextSteps": "Contactez l'administrateur de la caisse ou refaites une demande pour recevoir un nouveau lien de vérification."
     }
@@ -4584,8 +4586,10 @@
         "password_reset": "Votre mot de passe a été modifié. Connectez-vous avec le nouveau.",
         "login_removed": "Votre identifiant a été supprimé. Votre adhésion reste dans la caisse ; vous pouvez créer un nouvel identifiant quand vous voulez.",
         "unlinked": "Votre identifiant n'est plus lié à cette adhésion.",
-        "no_membership": "Cet identifiant n'est pas membre de cette caisse."
-      }
+        "no_membership": "Cet identifiant n'est pas membre de cette caisse.",
+        "confirm_login": "Connectez-vous pour confirmer votre adresse email."
+      },
+      "pendingVerification": "Votre identifiant {fundName} attend la confirmation de votre email. Ouvrez le lien de l'email, ou demandez-le à nouveau."
     },
     "signup": {
       "title": "Créer votre identifiant {fundName}",
@@ -4596,7 +4600,8 @@
       "submit": "Créer mon identifiant",
       "submitting": "Création de votre identifiant…",
       "haveLogin": "Vous avez déjà un identifiant ?",
-      "signIn": "Se connecter"
+      "signIn": "Se connecter",
+      "linkHint": "Cet email est celui d'un membre de {fundName}. Seul un mot de passe est nécessaire : votre identifiant sera lié à cette adhésion dès que vous aurez confirmé votre email."
     },
     "forgot": {
       "title": "Réinitialiser votre mot de passe",
@@ -4664,7 +4669,11 @@
       "accountExists": "Un identifiant existe déjà pour cet email. Connectez-vous, ou réinitialisez votre mot de passe.",
       "membershipHasLogin": "Cette adhésion a déjà un identifiant. Connectez-vous, ou réinitialisez votre mot de passe s'il est à vous.",
       "resetExpired": "Ce lien de réinitialisation n'est pas valide ou a expiré. Demandez-en un nouveau.",
-      "generic": "Une erreur est survenue. Veuillez réessayer."
+      "generic": "Une erreur est survenue. Veuillez réessayer.",
+      "notMember": "Cet identifiant n'est pas membre de cette caisse.",
+      "sessionExpired": "Votre session a expiré. Reconnectez-vous.",
+      "notYourLink": "Ce lien de confirmation appartient à un autre identifiant. Connectez-vous avec l'identifiant que vous avez créé.",
+      "linkInvalid": "Ce lien de confirmation n'est pas valide ou a expiré. Demandez-en un nouveau."
     },
     "emails": {
       "verify": {
@@ -4672,6 +4681,14 @@
         "textBody": "Bonjour {firstName},\n\nVous avez créé un identifiant de membre chez {fundName}. Confirmez votre adresse email pour l'activer — le lien est valable 24 heures :\n\n  {verifyUrl}\n\nSi vous n'avez pas créé cet identifiant, ignorez cet email : rien n'est activé sans lui.\n\nL'équipe {fundName}",
         "ctaLabel": "Confirmer mon identifiant"
       }
+    },
+    "verify": {
+      "title": "Confirmez votre email",
+      "description": "Confirmez que vous avez créé cet identifiant chez {fundName}. Votre adhésion y sera liée dès lors.",
+      "confirm": "Confirmer mon email",
+      "confirming": "Confirmation…",
+      "wrongAccount": "Vous êtes connecté·e en tant que {email}, mais ce lien de confirmation appartient à un autre identifiant. Déconnectez-vous, puis rouvrez le lien.",
+      "signOut": "Se déconnecter"
     }
   }
 }
