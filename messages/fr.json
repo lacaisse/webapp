@@ -43,7 +43,12 @@
       "passkeyWaiting": "En attente de la passkey…",
       "passkeyEmailRequired": "Saisissez votre email pour vous connecter avec une passkey.",
       "waitlistPrompt": "Vous n'avez pas encore de compte ?",
-      "joinWaitlist": "Rejoindre la liste d'attente"
+      "joinWaitlist": "Rejoindre la liste d'attente",
+      "memberHint": {
+        "title": "Membre de {fundName} ?",
+        "description": "Connectez-vous avec votre identifiant de membre pour ouvrir vos cartes dans le portefeuille Citizen Pay.",
+        "createLogin": "Créer votre identifiant {fundName}"
+      }
     },
     "consent": {
       "title": "Autoriser l'accès",
@@ -2581,6 +2586,10 @@
             "field": "Champ",
             "format": "Valeurs"
           }
+        },
+        "memberLogin": {
+          "label": "Identifiant des membres",
+          "description": "Permettre aux porteurs de carte de créer un identifiant pour leur adhésion (pages d'inscription, de connexion et de compte sur le site de cette caisse). Un membre dont l'email est confirmé a des cartes privées dans le portefeuille Citizen Pay et peut participer aux votes."
         }
       },
       "terms": {
@@ -3980,7 +3989,9 @@
         "missing": "Aucun jeton de vérification n'a été fourni.",
         "not_found": "Ce lien de vérification n'est pas valide.",
         "expired": "Ce lien de vérification a expiré.",
-        "email_mismatch": "L'adresse email a changé depuis l'envoi de ce lien."
+        "email_mismatch": "L'adresse email a changé depuis l'envoi de ce lien.",
+        "login_required": "Connectez-vous avec l'identifiant que vous avez créé pour confirmer cet email.",
+        "login_disabled": "Cette caisse n'a pas activé les identifiants de membres ; l'identifiant ne peut pas être confirmé."
       },
       "nextSteps": "Contactez l'administrateur de la caisse ou refaites une demande pour recevoir un nouveau lien de vérification."
     }
@@ -4745,6 +4756,137 @@
     "map": {
       "empty": "Aucune adresse de commerçant à afficher pour l'instant.",
       "loading": "Chargement de la carte…"
+    }
+  },
+  "memberLogin": {
+    "shell": {
+      "tagline": "Espace membre",
+      "poweredBy": "Propulsé par La Caisse"
+    },
+    "login": {
+      "title": "Connexion à {fundName}",
+      "description": "Votre identifiant de membre ouvre vos cartes dans le portefeuille Citizen Pay.",
+      "email": "Email",
+      "password": "Mot de passe",
+      "forgotLink": "Mot de passe oublié ?",
+      "submit": "Se connecter",
+      "submitting": "Connexion…",
+      "passkeyButton": "Se connecter avec une passkey",
+      "passkeyWaiting": "En attente de la passkey…",
+      "noLogin": "Pas encore d'identifiant ?",
+      "createLogin": "Créer votre identifiant",
+      "signedInAs": "Vous êtes connecté·e en tant que {email}.",
+      "noMembership": "Cet identifiant n'est pas membre de {fundName}. Déconnectez-vous pour en utiliser un autre, ou créez un identifiant pour cette caisse.",
+      "signOut": "Se déconnecter",
+      "notices": {
+        "check_email": "Presque fini : ouvrez l'email que nous venons de vous envoyer et cliquez sur le lien pour confirmer votre identifiant. Connectez-vous ensuite ici.",
+        "verified": "Votre email est confirmé. Connectez-vous pour continuer.",
+        "password_reset": "Votre mot de passe a été modifié. Connectez-vous avec le nouveau.",
+        "login_removed": "Votre identifiant a été supprimé. Votre adhésion reste dans la caisse ; vous pouvez créer un nouvel identifiant quand vous voulez.",
+        "unlinked": "Votre identifiant n'est plus lié à cette adhésion.",
+        "no_membership": "Cet identifiant n'est pas membre de cette caisse.",
+        "confirm_login": "Connectez-vous pour confirmer votre adresse email."
+      },
+      "pendingVerification": "Votre identifiant {fundName} attend la confirmation de votre email. Ouvrez le lien de l'email, ou demandez-le à nouveau."
+    },
+    "signup": {
+      "title": "Créer votre identifiant {fundName}",
+      "description": "Un identifiant pour votre adhésion : avec lui, vos cartes {fundName} deviennent privées et vous pouvez participer aux votes depuis le portefeuille Citizen Pay. Déjà membre ? Utilisez l'email connu de la caisse et nous lierons votre identifiant à votre adhésion dès que vous l'aurez confirmé.",
+      "password": "Mot de passe",
+      "confirmPassword": "Confirmer le mot de passe",
+      "passwordHint": "Au moins 8 caractères. Vous pourrez ajouter une passkey ensuite.",
+      "submit": "Créer mon identifiant",
+      "submitting": "Création de votre identifiant…",
+      "haveLogin": "Vous avez déjà un identifiant ?",
+      "signIn": "Se connecter",
+      "linkHint": "Cet email est celui d'un membre de {fundName}. Seul un mot de passe est nécessaire : votre identifiant sera lié à cette adhésion dès que vous aurez confirmé votre email."
+    },
+    "forgot": {
+      "title": "Réinitialiser votre mot de passe",
+      "description": "Nous vous enverrons un lien par email pour en choisir un nouveau.",
+      "email": "Email",
+      "submit": "Envoyer le lien",
+      "submitting": "Envoi…",
+      "checkEmail": "Si un identifiant existe pour cet email, un lien de réinitialisation est en route. Vérifiez votre boîte de réception.",
+      "backToLogin": "Retour à la connexion"
+    },
+    "reset": {
+      "title": "Choisir un nouveau mot de passe",
+      "description": "Choisissez quelque chose dont vous vous souviendrez. Le changement vous déconnecte partout.",
+      "invalid": "Ce lien de réinitialisation n'est pas valide ou a expiré.",
+      "password": "Nouveau mot de passe",
+      "confirmPassword": "Confirmer le mot de passe",
+      "submit": "Mettre à jour le mot de passe",
+      "submitting": "Mise à jour…",
+      "backToLogin": "Retour à la connexion",
+      "requestAgain": "Demander un nouveau lien"
+    },
+    "account": {
+      "title": "Votre compte",
+      "description": "Votre identifiant chez {fundName}. Vos cartes, leur code PIN et les votes se trouvent dans le portefeuille Citizen Pay.",
+      "identity": {
+        "name": "Nom",
+        "email": "Email"
+      },
+      "verification": {
+        "verified": "Email confirmé — vos cartes sont privées et peuvent voter.",
+        "pending": "Email pas encore confirmé.",
+        "pendingHelp": "Tant que vous n'avez pas cliqué sur le lien de l'email de confirmation, vos cartes restent publiques et ne peuvent pas voter.",
+        "resend": "Renvoyer l'email de confirmation",
+        "resending": "Envoi…",
+        "sent": "Email de confirmation envoyé. Vérifiez votre boîte de réception.",
+        "alreadyVerified": "Votre email est déjà confirmé."
+      },
+      "cards": {
+        "title": "Vos cartes",
+        "description": "Approchez une carte ou ouvrez le portefeuille et connectez-vous avec cet identifiant pour voir vos cartes {fundName}, définir leur code PIN et voter.",
+        "open": "Ouvrir le portefeuille Citizen Pay"
+      },
+      "passkeys": {
+        "title": "Passkeys",
+        "description": "Connectez-vous sans mot de passe avec une empreinte, votre visage ou une clé de sécurité.",
+        "customDomainNote": "Les passkeys se gèrent sur le site de La Caisse, pour qu'elles fonctionnent dans toutes vos caisses.",
+        "manageOnApex": "Gérer les passkeys"
+      },
+      "remove": {
+        "title": "Supprimer mon identifiant",
+        "description": "Votre adhésion reste dans la caisse ; seul l'identifiant disparaît. Vos cartes redeviennent publiques et ne votent plus.",
+        "button": "Supprimer mon identifiant",
+        "confirmTitle": "Supprimer votre identifiant ?",
+        "confirmDescription": "Vous serez déconnecté·e. Vos cartes redeviennent publiques et ne pourront plus voter tant que vous n'aurez pas créé un nouvel identifiant et confirmé votre email.",
+        "confirm": "Supprimer l'identifiant",
+        "removing": "Suppression…"
+      },
+      "signOut": "Se déconnecter"
+    },
+    "errors": {
+      "disabled": "Cette caisse n'a pas activé les identifiants de membres.",
+      "invalidCredentials": "Email ou mot de passe invalide.",
+      "tooMany": "Trop de tentatives. Patientez un peu avant de réessayer.",
+      "emailInvalid": "Saisissez une adresse email valide.",
+      "accountExists": "Un identifiant existe déjà pour cet email. Connectez-vous, ou réinitialisez votre mot de passe.",
+      "membershipHasLogin": "Cette adhésion a déjà un identifiant. Connectez-vous, ou réinitialisez votre mot de passe s'il est à vous.",
+      "resetExpired": "Ce lien de réinitialisation n'est pas valide ou a expiré. Demandez-en un nouveau.",
+      "generic": "Une erreur est survenue. Veuillez réessayer.",
+      "notMember": "Cet identifiant n'est pas membre de cette caisse.",
+      "sessionExpired": "Votre session a expiré. Reconnectez-vous.",
+      "notYourLink": "Ce lien de confirmation appartient à un autre identifiant. Connectez-vous avec l'identifiant que vous avez créé.",
+      "linkInvalid": "Ce lien de confirmation n'est pas valide ou a expiré. Demandez-en un nouveau."
+    },
+    "emails": {
+      "verify": {
+        "subject": "Confirmez votre identifiant {fundName}",
+        "textBody": "Bonjour {firstName},\n\nVous avez créé un identifiant de membre chez {fundName}. Confirmez votre adresse email pour l'activer — le lien est valable 24 heures :\n\n  {verifyUrl}\n\nSi vous n'avez pas créé cet identifiant, ignorez cet email : rien n'est activé sans lui.\n\nL'équipe {fundName}",
+        "ctaLabel": "Confirmer mon identifiant"
+      }
+    },
+    "verify": {
+      "title": "Confirmez votre email",
+      "description": "Confirmez que vous avez créé cet identifiant chez {fundName}. Votre adhésion y sera liée dès lors.",
+      "confirm": "Confirmer mon email",
+      "confirming": "Confirmation…",
+      "wrongAccount": "Vous êtes connecté·e en tant que {email}, mais ce lien de confirmation appartient à un autre identifiant. Déconnectez-vous, puis rouvrez le lien.",
+      "signOut": "Se déconnecter"
     }
   }
 }

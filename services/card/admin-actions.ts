@@ -9,6 +9,7 @@ import { z } from "zod";
 import { isValidWeeklyLimitCents } from "@/lib/weekly-limit";
 import { requireFundRole } from "@/services/auth/dal";
 import { holderDisplayName } from "@/services/card/holder-name";
+import { scheduleCardHolderSync } from "@/services/card/holder-sync";
 import { reconcileCardWithCitizenPay } from "@/services/card/pin-block";
 import { isPinBlocked } from "@/services/card/pin-block-rules";
 import { scheduleCardHolderNamePublish } from "@/services/card/publish-holder-name";
@@ -1241,8 +1242,10 @@ export async function unassignCardAction(input: {
     }),
   ]);
 
-  // Reset the public wallet name to CP's default — the card is no longer held.
+  // Reset the public wallet name to CP's default — the card is no longer
+  // held — and detach it from the holder's login (public again, D3).
   scheduleCardHolderNamePublish(fund, card.id);
+  scheduleCardHolderSync(card.id);
 
   revalidatePath("/cards");
   revalidatePath(`/cards/${card.id}`);

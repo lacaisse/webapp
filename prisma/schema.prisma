@@ -63,7 +63,8 @@ model User {
   passkeys          Passkey[]
   accounts          Account[]
   sessions          Session[]
-  memberRecords     Member[] // demand-side member rows linked to this auth user (rare)
+  memberRecords     Member[] // demand-side member rows linked to this auth user (one per fund)
+  emailVerifications EmailVerification[] // member-login sign-up verifications bound to this user
   reviewedMerchants Merchant[] // merchants this admin reviewed (approved or rejected)
 
   // Mint/burn audit: annotations whose underlying op this user triggered.
@@ -535,6 +536,14 @@ model Fund {
   // need it (e.g. closed-network funds where applicants are pre-vetted).
   requireMemberEmailVerification   Boolean @default(true)
   requireMerchantEmailVerification Boolean @default(true)
+
+  // Member login (plan "Bread card-holder voting", PR W-1). Off by default:
+  // while false the fund has no member sign-up / login / account pages (the
+  // proxy never rewrites to them and the route group answers 404), nothing
+  // links a Member to a User, and no card of the fund is ever reported as
+  // held to Citizen Pay — every card stays public. Flip it per fund in
+  // Settings → Onboarding once the fund wants card holders to have a login.
+  memberLoginEnabled Boolean @default(false)
 
   // When set, member-facing notification emails are skipped — not queued, so
   // resuming does not send them retroactively. Covers PAYMENT_CONFIRMATION
@@ -1365,8 +1374,16 @@ model Card {
   // Last time we pushed/refreshed the card's public profile via CitizenPay.
   profileSyncedAt DateTime?
 
-  issuedAt      DateTime?
-  blockedAt     DateTime?
+  // Last time Citizen Pay accepted this card's holder state (PUT or DELETE
+  // on /v2/treasury/cards/{serial}/holder — services/card/holder-sync.ts).
+  // Null until the first successful sync, and left null when the api
+  // answered 404 (route not deployed yet) so `scripts/sync-card-holders.ts`
+  // can replay it later. Not a "currently attached" flag: a successful
+  // DELETE stamps it too.
+  holderSyncedAt DateTime?
+
+  issuedAt  DateTime?
+  blockedAt DateTime?
   // Set with status BLOCKED — see CardBlockedReason. A PIN block carries the
   // api's `pin_blocked_at` in `blockedAt`.
   blockedReason CardBlockedReason?
@@ -1721,6 +1738,16 @@ model EmailVerification {
   merchantId String?
   merchant   Merchant? @relation(fields: [merchantId], references: [id], onDelete: Cascade)
 
+  // Set by the member LOGIN sign-up (services/member/auth.ts): the Better
+  // Auth User whose address this link proves. Consuming such a token marks
+  // `User.emailVerified` and `Member.emailVerifiedAt` together and, when the
+  // Member had no login yet, links `Member.userId` to exactly this user —
+  // never to "whichever User has that email", so an account somebody else
+  // pre-registered with the member's address cannot ride a later /join
+  // verification. Null on the classic /join and merchant verifications.
+  userId String? @db.Uuid
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   email String
 
   createdAt  DateTime  @default(now())
@@ -1729,6 +1756,7 @@ model EmailVerification {
 
   @@index([memberId])
   @@index([merchantId])
+  @@index([userId])
   @@index([expiresAt])
 }
 

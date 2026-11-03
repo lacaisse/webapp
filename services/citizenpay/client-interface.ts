@@ -282,6 +282,16 @@ export interface CitizenPayClient {
   setCardHolderName(serialNumber: string, name: string | null): Promise<void>;
 
   /**
+   * Attach the card to a member login at Citizen Pay (`holderRef` = the La
+   * Caisse User id, the wallet JWT's `sub`) or, with null, detach it. An
+   * attached card is private on the public wallet and can vote. Only the
+   * issuing fund's key may set it. Throws `CitizenPayApiError` on a non-2xx
+   * — 404 while the api route is not deployed (services/card/holder-sync.ts
+   * tolerates it).
+   */
+  setCardHolder(serialNumber: string, holderRef: string | null): Promise<void>;
+
+  /**
    * Set (or clear, with null or 0) the weekly cap in cents on what the card
    * may pull from its source. The week runs Monday–Sunday Europe/Brussels.
    * The cap only matters while a source is set.

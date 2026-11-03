@@ -25,9 +25,76 @@ export function verificationExpiry(): Date {
 }
 
 export type VerifyEmailResult =
-  | { ok: true; entity: "member"; memberId: string; fundId: string }
+  | {
+      ok: true;
+      entity: "member";
+      memberId: string;
+      fundId: string;
+      // Set when this verification came from the member LOGIN sign-up and
+      // the member is now linked to (or confirmed as) that User — the
+      // caller syncs the member's card holders.
+      linkedUserId: string | null;
+      // True when this consumption is what linked an EXISTING member to the
+      // login (the member had no User before): no applicant welcome then.
+      wasLinked: boolean;
+    }
   | { ok: true; entity: "merchant"; merchantId: string; fundId: string }
-  | { error: "not_found" | "expired" | "consumed" | "email_mismatch" };
+  | {
+      error:
+        | "not_found"
+        | "expired"
+        | "consumed"
+        | "email_mismatch"
+        // Member LOGIN tokens only: the clicker must be signed in as the
+        // User the token was minted for (proof of owning that login), and
+        // the fund must have member login on. Neither consumes the token.
+        | "login_required"
+        | "login_disabled";
+    };
+
+export type PeekEmailVerification =
+  | {
+      ok: true;
+      // The User a member-login sign-up minted this token for; null on the
+      // classic /join and merchant tokens.
+      userId: string | null;
+      memberId: string | null;
+      merchantId: string | null;
+      fundId: string | null;
+      memberLoginEnabled: boolean;
+    }
+  | { error: "not_found" | "expired" | "consumed" };
+
+/**
+ * What a token is for, without consuming it — so the verification page can
+ * decide whether it is a plain /join link (consumed on the GET) or a member
+ * LOGIN link (needs the signed-in owner and a POST).
+ */
+export async function peekVerificationToken(token: string): Promise<PeekEmailVerification> {
+  const v = await prisma.emailVerification.findUnique({
+    where: { token },
+    select: {
+      userId: true,
+      memberId: true,
+      merchantId: true,
+      consumedAt: true,
+      expiresAt: true,
+      member: { select: { fundId: true, fund: { select: { memberLoginEnabled: true } } } },
+      merchant: { select: { fundId: true } },
+    },
+  });
+  if (!v) return { error: "not_found" };
+  if (v.consumedAt) return { error: "consumed" };
+  if (v.expiresAt < new Date()) return { error: "expired" };
+  return {
+    ok: true,
+    userId: v.userId,
+    memberId: v.memberId,
+    merchantId: v.merchantId,
+    fundId: v.member?.fundId ?? v.merchant?.fundId ?? null,
+    memberLoginEnabled: v.member?.fund.memberLoginEnabled ?? false,
+  };
+}
 
 /**
  * Consume a verification token in a single transaction. Returns an error if
@@ -39,13 +106,29 @@ export type VerifyEmailResult =
  */
 export async function consumeVerificationToken(
   token: string,
+  opts: {
+    // The signed-in user, for member LOGIN tokens: the link is only ever
+    // made for the User the token was minted for, and only when that user
+    // is the one clicking (a session proves the password; a link landing in
+    // someone else's inbox, or a scanner pre-fetch, proves nothing).
+    sessionUserId?: string | null;
+  } = {},
 ): Promise<VerifyEmailResult> {
   return prisma.$transaction(async (tx) => {
     const v = await tx.emailVerification.findUnique({
       where: { token },
       include: {
-        member: { select: { id: true, email: true, fundId: true } },
+        member: {
+          select: {
+            id: true,
+            email: true,
+            fundId: true,
+            userId: true,
+            fund: { select: { memberLoginEnabled: true } },
+          },
+        },
         merchant: { select: { id: true, email: true, fundId: true } },
+        user: { select: { id: true, email: true } },
       },
     });
     if (!v) return { error: "not_found" as const };
@@ -76,19 +159,53 @@ export async function consumeVerificationToken(
       if (v.email !== v.member.email) {
         return { error: "email_mismatch" as const };
       }
+      // Member LOGIN verification (services/member/auth.ts): the token was
+      // minted for exactly `v.user`. Nothing is consumed unless the fund
+      // still has member login on and the clicker IS that user.
+      if (v.userId) {
+        if (!v.member.fund.memberLoginEnabled) return { error: "login_disabled" as const };
+        if (!opts.sessionUserId || opts.sessionUserId !== v.userId) {
+          return { error: "login_required" as const };
+        }
+      }
       await tx.emailVerification.update({
         where: { token },
         data: { consumedAt: new Date() },
       });
+
+      // The link lands when the member has no login yet or already has this
+      // one; a member linked to another user meanwhile keeps that login —
+      // this token then only verifies the member's address, and the other
+      // User stays unverified (and can't attach anything). The address must
+      // still be the one the token proves.
+      const linkUser =
+        v.user &&
+        v.user.email.toLowerCase() === v.email.toLowerCase() &&
+        (v.member.userId === null || v.member.userId === v.user.id)
+          ? v.user
+          : null;
+      const wasLinked = Boolean(linkUser) && v.member.userId === null;
+
       await tx.member.update({
         where: { id: v.member.id },
-        data: { emailVerifiedAt: new Date() },
+        data: {
+          emailVerifiedAt: new Date(),
+          ...(linkUser ? { userId: linkUser.id } : {}),
+        },
       });
+      if (linkUser) {
+        await tx.user.update({
+          where: { id: linkUser.id },
+          data: { emailVerified: true },
+        });
+      }
       return {
         ok: true as const,
         entity: "member" as const,
         memberId: v.member.id,
         fundId: v.member.fundId,
+        linkedUserId: linkUser?.id ?? null,
+        wasLinked,
       };
     }
 

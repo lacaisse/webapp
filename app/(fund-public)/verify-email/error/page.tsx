@@ -9,13 +9,21 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-type ErrorReason = "missing" | "not_found" | "expired" | "email_mismatch";
+type ErrorReason =
+  | "missing"
+  | "not_found"
+  | "expired"
+  | "email_mismatch"
+  | "login_required"
+  | "login_disabled";
 
 const ALLOWED: ErrorReason[] = [
   "missing",
   "not_found",
   "expired",
   "email_mismatch",
+  "login_required",
+  "login_disabled",
 ];
 
 function normaliseReason(raw: string | undefined): ErrorReason {

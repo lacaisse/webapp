@@ -90,6 +90,10 @@ export type ExtraValue = z.infer<typeof ExtraValueSchema>;
 
 export const SignupFormSchema = BuiltinSignupSchema.extend({
   extras: z.record(z.string(), ExtraValueSchema).optional(),
+  // Only on the member LOGIN sign-up (app/(fund-member)/member/signup): the
+  // form tightens these to required + matching when it renders them.
+  password: z.string().optional(),
+  confirmPassword: z.string().optional(),
 });
 
 export type BuiltinSignupInput = z.infer<typeof BuiltinSignupSchema>;

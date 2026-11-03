@@ -43,7 +43,12 @@
       "passkeyWaiting": "Waiting for passkey…",
       "passkeyEmailRequired": "Enter your email to sign in with a passkey.",
       "waitlistPrompt": "Don't have an account yet?",
-      "joinWaitlist": "Join the waitlist"
+      "joinWaitlist": "Join the waitlist",
+      "memberHint": {
+        "title": "Member of {fundName}?",
+        "description": "Sign in with your member login to open your cards in the Citizen Pay wallet.",
+        "createLogin": "Create your {fundName} login"
+      }
     },
     "consent": {
       "title": "Authorize access",
@@ -2581,6 +2586,10 @@
             "field": "Field",
             "format": "Values"
           }
+        },
+        "memberLogin": {
+          "label": "Member login",
+          "description": "Let card holders create a login for their membership (sign-up, login and account pages on this fund's site). A member whose email is confirmed has private cards in the Citizen Pay wallet and can take part in votes."
         }
       },
       "terms": {
@@ -3980,7 +3989,9 @@
         "missing": "No verification token was provided.",
         "not_found": "This verification link isn't valid.",
         "expired": "This verification link has expired.",
-        "email_mismatch": "The email address has changed since this link was issued."
+        "email_mismatch": "The email address has changed since this link was issued.",
+        "login_required": "Sign in with the login you created to confirm this email.",
+        "login_disabled": "This fund has not enabled member logins; the login cannot be confirmed."
       },
       "nextSteps": "Contact the fund admin or apply again to get a fresh verification email."
     }
@@ -4745,6 +4756,137 @@
     "map": {
       "empty": "No merchant locations to show yet.",
       "loading": "Loading map…"
+    }
+  },
+  "memberLogin": {
+    "shell": {
+      "tagline": "Member area",
+      "poweredBy": "Powered by La Caisse"
+    },
+    "login": {
+      "title": "Sign in to {fundName}",
+      "description": "Your member login opens your cards in the Citizen Pay wallet.",
+      "email": "Email",
+      "password": "Password",
+      "forgotLink": "Forgot password?",
+      "submit": "Sign in",
+      "submitting": "Signing in…",
+      "passkeyButton": "Sign in with a passkey",
+      "passkeyWaiting": "Waiting for passkey…",
+      "noLogin": "No login yet?",
+      "createLogin": "Create your login",
+      "signedInAs": "You are signed in as {email}.",
+      "noMembership": "This login is not a member of {fundName}. Sign out to use another one, or create a login for this fund.",
+      "signOut": "Sign out",
+      "notices": {
+        "check_email": "Almost there: open the email we just sent you and click the link to confirm your login. Then sign in here.",
+        "verified": "Your email is confirmed. Sign in to continue.",
+        "password_reset": "Your password has been changed. Sign in with the new one.",
+        "login_removed": "Your login has been removed. Your membership stays with the fund; you can create a new login whenever you like.",
+        "unlinked": "Your login is no longer linked to this membership.",
+        "no_membership": "This login is not a member of this fund.",
+        "confirm_login": "Sign in to confirm your email address."
+      },
+      "pendingVerification": "Your {fundName} login is waiting for its email confirmation. Open the link in the email, or ask for it again."
+    },
+    "signup": {
+      "title": "Create your {fundName} login",
+      "description": "One login for your membership: with it, your {fundName} cards become private and you can take part in votes from the Citizen Pay wallet. Already a member? Use the email the fund knows you by and we'll link your login to your membership once you confirm it.",
+      "password": "Password",
+      "confirmPassword": "Confirm password",
+      "passwordHint": "At least 8 characters. You can add a passkey later.",
+      "submit": "Create my login",
+      "submitting": "Creating your login…",
+      "haveLogin": "Already have a login?",
+      "signIn": "Sign in",
+      "linkHint": "This email belongs to a member of {fundName}. Only a password is needed: your login is linked to that membership once you confirm your email."
+    },
+    "forgot": {
+      "title": "Reset your password",
+      "description": "We'll email you a link to set a new one.",
+      "email": "Email",
+      "submit": "Send reset link",
+      "submitting": "Sending…",
+      "checkEmail": "If a login exists for that email, a reset link is on its way. Check your inbox.",
+      "backToLogin": "Back to sign in"
+    },
+    "reset": {
+      "title": "Set a new password",
+      "description": "Pick something you'll remember. Changing it signs you out everywhere.",
+      "invalid": "This reset link is invalid or has expired.",
+      "password": "New password",
+      "confirmPassword": "Confirm password",
+      "submit": "Update password",
+      "submitting": "Updating…",
+      "backToLogin": "Back to sign in",
+      "requestAgain": "Request a new link"
+    },
+    "account": {
+      "title": "Your account",
+      "description": "Your login at {fundName}. Your cards, their PIN and votes live in the Citizen Pay wallet.",
+      "identity": {
+        "name": "Name",
+        "email": "Email"
+      },
+      "verification": {
+        "verified": "Email confirmed — your cards are private and can vote.",
+        "pending": "Email not confirmed yet.",
+        "pendingHelp": "Until you click the link in the confirmation email, your cards stay public and cannot vote.",
+        "resend": "Send the confirmation email again",
+        "resending": "Sending…",
+        "sent": "Confirmation email sent. Check your inbox.",
+        "alreadyVerified": "Your email is already confirmed."
+      },
+      "cards": {
+        "title": "Your cards",
+        "description": "Tap a card or open the wallet and sign in with this login to see your {fundName} cards, set their PIN and vote.",
+        "open": "Open the Citizen Pay wallet"
+      },
+      "passkeys": {
+        "title": "Passkeys",
+        "description": "Sign in without a password using a fingerprint, face scan or security key.",
+        "customDomainNote": "Passkeys are managed on La Caisse's own site, so they work for every fund you belong to.",
+        "manageOnApex": "Manage passkeys"
+      },
+      "remove": {
+        "title": "Remove my login",
+        "description": "Your membership stays with the fund; only the login goes. Your cards become public again and stop voting.",
+        "button": "Remove my login",
+        "confirmTitle": "Remove your login?",
+        "confirmDescription": "You will be signed out. Your cards become public again and can no longer vote until you create a new login and confirm your email.",
+        "confirm": "Remove the login",
+        "removing": "Removing…"
+      },
+      "signOut": "Sign out"
+    },
+    "errors": {
+      "disabled": "This fund has not enabled member logins.",
+      "invalidCredentials": "Invalid email or password.",
+      "tooMany": "Too many attempts. Wait a little before trying again.",
+      "emailInvalid": "Enter a valid email address.",
+      "accountExists": "A login already exists for this email. Sign in instead, or reset your password.",
+      "membershipHasLogin": "This membership already has a login. Sign in, or reset your password if it is yours.",
+      "resetExpired": "This reset link is invalid or has expired. Request a new one.",
+      "generic": "Something went wrong. Please try again.",
+      "notMember": "This login is not a member of this fund.",
+      "sessionExpired": "Your session has expired. Sign in again.",
+      "notYourLink": "This confirmation link belongs to another login. Sign in with the login you created.",
+      "linkInvalid": "This confirmation link is invalid or has expired. Ask for a new one."
+    },
+    "emails": {
+      "verify": {
+        "subject": "Confirm your {fundName} login",
+        "textBody": "Hi {firstName},\n\nYou created a member login at {fundName}. Confirm your email address to activate it — the link is valid for 24 hours:\n\n  {verifyUrl}\n\nIf you didn't create this login, ignore this email: nothing is activated without it.\n\nThe {fundName} team",
+        "ctaLabel": "Confirm my login"
+      }
+    },
+    "verify": {
+      "title": "Confirm your email",
+      "description": "Confirm that you created this login at {fundName}. Your membership is linked to it from then on.",
+      "confirm": "Confirm my email",
+      "confirming": "Confirming…",
+      "wrongAccount": "You are signed in as {email}, but this confirmation link belongs to another login. Sign out, then open the link again.",
+      "signOut": "Sign out"
     }
   }
 }

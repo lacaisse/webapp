@@ -14,14 +14,15 @@ import { getCurrentUser } from "@/services/auth/dal";
 import { readSignedOAuthQuery } from "@/services/auth/oauth-resume";
 import { buildPostAuthRedirect } from "@/services/auth/redirects";
 import { getApexUrl } from "@/services/fund/server";
+import { resolveMemberFundHint } from "@/services/member/fund-hint";
 import { LoginForm } from "./login-form";
 
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ return_to?: string }>;
+  searchParams: Promise<{ return_to?: string; fund?: string }>;
 }) {
-  const { return_to } = await searchParams;
+  const { return_to, fund: fundParam } = await searchParams;
 
   // Mid-MCP-OAuth: the provider plugin sent the browser here with a signed
   // copy of the authorize query. The form hands it back to loginAction so
@@ -45,9 +46,44 @@ export default async function LoginPage({
 
   const t = await getTranslations("auth.login");
 
+  // Member login (plan "Bread card-holder voting"): the card wallet's
+  // authorize request carries `fund=<treasury slug>`, which the provider
+  // passes through into the signed query — so does a custom-domain fund's
+  // own /login when it hands members over here. Brand the page with that
+  // fund and point newcomers at its member sign-up.
+  const fundHint = await resolveMemberFundHint(
+    oauthQuery ? new URLSearchParams(oauthQuery).get("fund") : fundParam,
+  );
+
   return (
     <Card>
       <CardHeader>
+        {fundHint && (
+          <div className="mb-2 flex items-center gap-3">
+            {fundHint.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={fundHint.logoUrl}
+                alt={fundHint.name}
+                className="h-10 w-auto object-contain"
+              />
+            ) : (
+              <span
+                className="flex size-10 items-center justify-center rounded-full text-base font-semibold text-white"
+                style={{ backgroundColor: fundHint.primaryColor ?? "#1a1a1a" }}
+                aria-hidden
+              >
+                {fundHint.name.slice(0, 1).toUpperCase()}
+              </span>
+            )}
+            <div className="text-sm">
+              <div className="font-medium">
+                {t("memberHint.title", { fundName: fundHint.name })}
+              </div>
+              <div className="text-muted-foreground">{t("memberHint.description")}</div>
+            </div>
+          </div>
+        )}
         <CardTitle>{t("title")}</CardTitle>
         <CardDescription>{t("description")}</CardDescription>
       </CardHeader>
@@ -55,7 +91,15 @@ export default async function LoginPage({
         <LoginForm oauthQuery={oauthQuery ?? undefined} />
       </CardContent>
       <CardFooter className="text-sm text-muted-foreground">
-        {return_to ? (
+        {fundHint ? (
+          // A member without a login yet: the fund's own sign-up page.
+          <>
+            {t("noAccount")}&nbsp;
+            <a href={fundHint.signupUrl} className="text-foreground underline">
+              {t("memberHint.createLogin", { fundName: fundHint.name })}
+            </a>
+          </>
+        ) : return_to ? (
           // Invited users (e.g. a team-invite accept URL) can still create an
           // account — keep the path open for them.
           <>

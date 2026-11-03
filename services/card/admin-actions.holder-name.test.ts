@@ -22,6 +22,8 @@ vi.mock("@/services/auth/dal", () => ({
 
 const publish = vi.hoisted(() => ({ scheduleCardHolderNamePublish: vi.fn() }));
 vi.mock("@/services/card/publish-holder-name", () => publish);
+const holderSync = vi.hoisted(() => ({ scheduleCardHolderSync: vi.fn() }));
+vi.mock("@/services/card/holder-sync", () => holderSync);
 
 const cp = vi.hoisted(() => ({ registerCard: vi.fn() }));
 vi.mock("@/services/citizenpay/client", () => ({ getCitizenPayClient: () => cp }));
@@ -58,12 +60,15 @@ describe("unassignCardAction", () => {
       data: { memberId: null, formerMemberId: "m1" },
     });
     expect(publish.scheduleCardHolderNamePublish).toHaveBeenCalledWith(fund, "card-1");
+    // The card is public again at Citizen Pay (holder sync → DELETE).
+    expect(holderSync.scheduleCardHolderSync).toHaveBeenCalledWith("card-1");
   });
 
   it("does not publish when the card wasn't assigned", async () => {
     prisma.card.findFirst.mockResolvedValue({ id: "card-1", memberId: null });
     await unassignCardAction({ cardId: "card-1" });
     expect(publish.scheduleCardHolderNamePublish).not.toHaveBeenCalled();
+    expect(holderSync.scheduleCardHolderSync).not.toHaveBeenCalled();
   });
 });
 

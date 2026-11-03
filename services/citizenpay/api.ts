@@ -877,6 +877,39 @@ export const cards = {
       { body: { name }, timeoutMs: opts.timeoutMs ?? 3_000 },
     );
   },
+  // PUT /cards/{serial}/holder — attach the card to a member login
+  // (plan "Bread card-holder voting", api PR A): `holder_ref` is the La Caisse
+  // User id (the wallet JWT's `sub`), and an attached card is private on the
+  // public wallet. Treasury-scoped by `cards.project`, so only the issuing
+  // fund's key can set it. 404 while the api route is not deployed —
+  // services/card/holder-sync.ts treats that as "not yet", never as an error.
+  // Short timeout: best-effort traffic off the request path.
+  setHolder(
+    creds: CitizenPayApiCredentials,
+    serial: string,
+    holderRef: string,
+    opts: { timeoutMs?: number } = {},
+  ): Promise<unknown> {
+    return request(
+      creds,
+      "PUT",
+      `/v2/treasury/cards/${encodeURIComponent(serial)}/holder`,
+      { body: { holder_ref: holderRef }, timeoutMs: opts.timeoutMs ?? 5_000 },
+    );
+  },
+  // DELETE /cards/{serial}/holder — detach (the card is public again).
+  clearHolder(
+    creds: CitizenPayApiCredentials,
+    serial: string,
+    opts: { timeoutMs?: number } = {},
+  ): Promise<unknown> {
+    return request(
+      creds,
+      "DELETE",
+      `/v2/treasury/cards/${encodeURIComponent(serial)}/holder`,
+      { timeoutMs: opts.timeoutMs ?? 5_000 },
+    );
+  },
   balance(
     creds: CitizenPayApiCredentials,
     serial: string,

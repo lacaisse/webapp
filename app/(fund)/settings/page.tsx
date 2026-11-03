@@ -315,6 +315,7 @@ async function SettingsContent({
             requireMerchantEmailVerification={
               fund.requireMerchantEmailVerification
             }
+            memberLoginEnabled={fund.memberLoginEnabled}
             fundForForms={fundForForms}
           />
         </Suspense>
@@ -400,12 +401,14 @@ async function OnboardingTab({
   fundDomain,
   requireMemberEmailVerification,
   requireMerchantEmailVerification,
+  memberLoginEnabled,
   fundForForms,
 }: {
   fundId: string;
   fundDomain: string;
   requireMemberEmailVerification: boolean;
   requireMerchantEmailVerification: boolean;
+  memberLoginEnabled: boolean;
   fundForForms: React.ComponentProps<typeof SignupRedirectsForm>["fund"];
 }) {
   const t = await getTranslations("fund.settings");
@@ -494,6 +497,7 @@ async function OnboardingTab({
             initialRequireMerchantEmailVerification={
               requireMerchantEmailVerification
             }
+            initialMemberLoginEnabled={memberLoginEnabled}
           />
         </CardContent>
       </Card>

@@ -16,6 +16,8 @@ import { auth } from "@/services/auth/better-auth";
 import { prisma } from "@/services/db/prisma";
 import { getApexUrl, getCurrentFund, getFundUrl } from "@/services/fund/server";
 
+import { MCP_REFRESH_TOKEN_TTL } from "@/services/auth/oauth-provider-config";
+
 import { MCP_SCOPES, mcpResourceForOrigin } from "./resource";
 
 // The MCP endpoint is a per-host OAuth protected resource. Agents register a
@@ -108,6 +110,9 @@ export async function ensureMcpResource(
         identifier: resource,
         name,
         allowedScopes: MCP_SCOPES,
+        // Agents keep one-day refresh tokens; the provider default is the
+        // wallet's 30 days (services/auth/oauth-provider-config.ts).
+        refreshTokenTtl: MCP_REFRESH_TOKEN_TTL,
         createdAt: now,
         updatedAt: now,
       },

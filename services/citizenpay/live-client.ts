@@ -814,6 +814,17 @@ export class LiveCitizenPayClient implements CitizenPayClient {
     await apiCards.setHolderName(this.creds, serialNumber, name);
   }
 
+  async setCardHolder(
+    serialNumber: string,
+    holderRef: string | null,
+  ): Promise<void> {
+    if (holderRef === null) {
+      await apiCards.clearHolder(this.creds, serialNumber);
+    } else {
+      await apiCards.setHolder(this.creds, serialNumber, holderRef);
+    }
+  }
+
   async setCardSourceLimit(
     serialNumber: string,
     limitCents: number | null,
