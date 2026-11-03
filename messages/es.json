@@ -1047,7 +1047,8 @@
       },
       "primary": "Tarjeta principal",
       "badges": {
-        "lost": "Perdida"
+        "lost": "Perdida",
+        "pinBlocked": "PIN"
       },
       "empty": "No hay tarjetas que mostrar.",
       "prev": "Anterior",
@@ -2468,6 +2469,32 @@
             "registrationPending": "Un registro en Citizen Pay iniciado hace menos de 30 minutos sigue abierto. Reanúdelo para volver al formulario de Citizen Pay, o empiece de nuevo para cancelarlo e iniciar otro.",
             "forbidden": "Esta acción solo puede iniciarse desde la página de configuración del fondo."
           }
+        },
+        "events": {
+          "title": "Webhook de eventos",
+          "description": "Citizen Pay avisa a esta caja cuando bloquea una tarjeta tras 3 códigos PIN incorrectos, y cuando se levanta el bloqueo. La dirección de abajo se registra en Citizen Pay al conectar la caja; regístrela a mano para una caja conectada antes, o tras un intento fallido.",
+          "registeredAt": "Registrado en Citizen Pay el {date}",
+          "notRegistered": "Aún no registrado en Citizen Pay",
+          "urlLabel": "Dirección",
+          "lastDeliveryLabel": "Última entrega",
+          "lastDelivery": "{type} · tarjeta {serial} · {date} · {outcome}",
+          "noDelivery": "Aún no se ha recibido ningún evento",
+          "outcome": {
+            "RECEIVED": "recibido",
+            "APPLIED": "aplicado",
+            "IGNORED": "ignorado",
+            "FAILED": "fallido"
+          },
+          "registrationError": "El último registro falló: {message}",
+          "register": "Registrar en Citizen Pay",
+          "reregister": "Registrar de nuevo",
+          "registering": "Registrando…",
+          "connectFirst": "Conecte primero la caja a Citizen Pay.",
+          "errors": {
+            "notConnected": "Conecte primero la caja a Citizen Pay.",
+            "insecureUrl": "La dirección de este despliegue no es https; Citizen Pay solo acepta webhooks https.",
+            "failed": "Citizen Pay rechazó el registro: {message}"
+          }
         }
       },
       "fees": {
@@ -3302,7 +3329,8 @@
         "amountInvalid": "El importe debe ser un número con hasta 2 decimales.",
         "amountPositive": "El importe debe ser mayor que cero.",
         "tokenNotConfigured": "Este fondo aún no tiene un token configurado — conéctate primero a Citizen Pay.",
-        "submitFailed": "El envío a la cadena falló. Consulta el registro de operaciones de tokens para más detalles."
+        "submitFailed": "El envío a la cadena falló. Consulta el registro de operaciones de tokens para más detalles.",
+        "pinBlocked": "Citizen Pay bloqueó esta tarjeta tras 3 códigos PIN incorrectos. Su estado no puede cambiarse aquí: un administrador levanta el bloqueo con Desbloquear en la página de la tarjeta."
       },
       "sync": {
         "trigger": "Sincronizar con Citizen Pay",
@@ -3313,7 +3341,8 @@
         "summary": {
           "push": "{count, plural, one {Enviar # tarjeta a Citizen Pay} other {Enviar # tarjetas a Citizen Pay}}",
           "import": "{count, plural, one {Importar # tarjeta de Citizen Pay} other {Importar # tarjetas de Citizen Pay}}",
-          "statusUpdate": "{count, plural, one {Actualizar el estado de # tarjeta en Citizen Pay} other {Actualizar el estado de # tarjetas en Citizen Pay}}"
+          "statusUpdate": "{count, plural, one {Actualizar el estado de # tarjeta en Citizen Pay} other {Actualizar el estado de # tarjetas en Citizen Pay}}",
+          "pinBlockSync": "{count, plural, one {# bloqueo PIN conciliado con Citizen Pay} other {# bloqueos PIN conciliados con Citizen Pay}}"
         },
         "nothingToSync": "Todo ya está sincronizado.",
         "confirm": "Sincronizar ahora",
@@ -3452,6 +3481,71 @@
           "noDestination": "El comercio aún no tiene cuenta para recibir el pago.",
           "placeNotFound": "Citizen Pay no conoce este comercio para esta caja.",
           "unknown": "No llegó ninguna respuesta. Volver a cobrar es seguro: se reutilizará la misma venta en lugar de cobrarla dos veces."
+        }
+      },
+      "pinBlock": {
+        "banner": {
+          "title": "Bloqueada tras 3 códigos PIN incorrectos",
+          "atPlaceOn": "en {place}, el {date}",
+          "atPlace": "en {place}",
+          "on": "el {date}",
+          "description": "Citizen Pay rechaza esta tarjeta en todos los terminales hasta que se desbloquee. Desbloquear permite a quien tenga la tarjeta volver a introducir el PIN; la persona titular también puede desbloquearla definiendo un nuevo PIN en el monedero de la tarjeta.",
+          "adminOnly": "Solo un administrador de la caja puede desbloquearla.",
+          "loading": "Cargando el historial PIN de la tarjeta…",
+          "loadFailed": "No se pudo cargar el historial PIN de la tarjeta desde Citizen Pay.",
+          "events": {
+            "title": "Últimos eventos PIN",
+            "action": {
+              "blocked": "Bloqueada",
+              "unblocked": "Desbloqueada",
+              "pin_set": "PIN definido"
+            },
+            "by": {
+              "system": "tras 3 intentos incorrectos",
+              "treasury": "por la caja",
+              "member": "por la persona titular"
+            }
+          },
+          "refusals": {
+            "title": "Pagos rechazados",
+            "reason": {
+              "insufficient": "Saldo insuficiente",
+              "source_insufficient": "Tarjeta fuente insuficiente",
+              "weekly_limit": "Límite semanal alcanzado",
+              "pin_invalid": "PIN incorrecto",
+              "pin_blocked": "Tarjeta bloqueada (PIN)"
+            }
+          }
+        },
+        "unblock": {
+          "button": "Desbloquear",
+          "title": "¿Desbloquear esta tarjeta?",
+          "description": "La tarjeta de {holderLabel} volverá a aceptar el PIN y a pagar en los terminales de inmediato. Se le pedirá confirmar su identidad.",
+          "cancel": "Cancelar",
+          "confirm": "Desbloquear tarjeta",
+          "unblocking": "Desbloqueando…"
+        },
+        "statusDialog": {
+          "notice": "Citizen Pay bloqueó esta tarjeta tras 3 códigos PIN incorrectos. El estado no puede cambiarse aquí: un administrador levanta el bloqueo con Desbloquear en la página de la tarjeta."
+        },
+        "errors": {
+          "notPinBlocked": "Esta tarjeta no está bloqueada por códigos PIN incorrectos.",
+          "apiRefused": "Citizen Pay rechazó el desbloqueo: solo la caja que emitió la tarjeta puede levantarlo.",
+          "failed": "No se pudo contactar con Citizen Pay. Inténtelo de nuevo en un momento."
+        },
+        "email": {
+          "staff": {
+            "subject": "Tarjeta {serial} bloqueada tras 3 códigos PIN incorrectos",
+            "textBody": "Hola,\n\nCitizen Pay bloqueó la tarjeta {serial} ({holder}) tras 3 códigos PIN incorrectos en {place} el {date}. Será rechazada en todos los terminales hasta que se desbloquee.\n\nUn administrador de {fundName} puede desbloquearla desde la página de la tarjeta:\n\n{cardUrl}\n\nLa persona titular también puede desbloquearla definiendo un nuevo PIN en el monedero de la tarjeta.\n\nEl equipo de {fundName}",
+            "ctaLabel": "Abrir la tarjeta",
+            "unknownPlace": "un terminal"
+          },
+          "holder": {
+            "subject": "Su tarjeta {fundName} está bloqueada",
+            "textBody": "Hola {firstName},\n\nSu tarjeta {fundName} fue bloqueada tras 3 códigos PIN incorrectos en {place} el {date}. Será rechazada en los terminales hasta que se desbloquee.\n\nPara desbloquearla, defina un nuevo PIN desde la página de su tarjeta:\n\n{walletUrl}\n\nSi no intentó pagar con su tarjeta, avise a {fundName} cuanto antes.\n\nEl equipo de {fundName}",
+            "ctaLabel": "Abrir mi tarjeta",
+            "unknownPlace": "un terminal"
+          }
         }
       }
     }

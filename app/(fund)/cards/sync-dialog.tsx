@@ -228,7 +228,9 @@ export function CardSyncDialog() {
                 <AlertDescription>{t("nothingToSync")}</AlertDescription>
               </Alert>
             )}
-            {(planTotal > 0 || state.plan.awaitingIssuer.length > 0) && (
+            {(planTotal > 0 ||
+              state.plan.awaitingIssuer.length > 0 ||
+              state.plan.pinBlockSync.length > 0) && (
               <ul className="space-y-1.5 text-sm">
                 {state.plan.import.length > 0 && (
                   <SummaryRow
@@ -256,6 +258,14 @@ export function CardSyncDialog() {
                   <SummaryRow
                     label={t("summary.push", {
                       count: state.plan.push.length,
+                    })}
+                  />
+                )}
+                {state.plan.pinBlockSync.length > 0 && (
+                  <SummaryRow
+                    muted
+                    label={t("summary.pinBlockSync", {
+                      count: state.plan.pinBlockSync.length,
                     })}
                   />
                 )}

@@ -207,6 +207,7 @@ describe("previewCardSyncAction", () => {
         { serialNumber: "FOREIGN2", card: foreignCard2, requestStatus: "PENDING" },
       ],
       statusUpdate: [],
+      pinBlockSync: [{ cardId: "card-1", serialNumber: "SER1", kind: "pin_block" }],
     });
 
     const res = await previewCardSyncAction();
@@ -221,6 +222,7 @@ describe("previewCardSyncAction", () => {
         awaitingIssuer: [
           { serialNumber: "FOREIGN2", issuerFundName: "Other Fund", status: "PENDING" },
         ],
+        pinBlockSync: [{ serialNumber: "SER1", kind: "pin_block" }],
       },
     });
   });

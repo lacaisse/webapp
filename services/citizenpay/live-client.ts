@@ -23,6 +23,8 @@ import {
   CitizenPayApiError,
   type InviteWire,
   type PaginatedCards,
+  type CardChargeRefusalWire,
+  type CardPinEventWire,
   type ManualDeductionWire,
   type PayoutDraftWire,
   type PayoutBurnClaimWire,
@@ -51,12 +53,14 @@ import type {
   BankTransactionsPage,
   CardChargeCardInput,
   CardChargeOnPlaceInput,
+  CardChargeRefusal,
   CardChargeResult,
   CardOperationInput,
   CardOperationResult,
   CardStatus,
   CitizenPayBank,
   CardAllowance,
+  CardPinEvent,
   CardSourceInfo,
   CitizenPayCard,
   CitizenPayCardDetail,
@@ -336,6 +340,7 @@ function cardFromWire(w: {
   status: "active" | "inactive" | "blocked";
   owner?: string | null;
   source_serial?: string | null;
+  pin_blocked_at?: string | null;
   created_at: string;
   last_activity?: string | null;
 }): CitizenPayCard {
@@ -345,8 +350,48 @@ function cardFromWire(w: {
     owner: w.owner ?? null,
     // CP omits the field (or sends "") when no source is set.
     sourceSerial: w.source_serial || null,
+    // Missing (an api before PR P) or empty = not PIN-blocked.
+    pinBlockedAt: w.pin_blocked_at || null,
     createdAt: w.created_at,
     lastActivity: w.last_activity ?? null,
+  };
+}
+
+const PIN_EVENT_ACTIONS = new Set(["blocked", "unblocked", "pin_set"]);
+const PIN_EVENT_BY = new Set(["system", "treasury", "member"]);
+
+// The last few `card_pin_events` on the single-card read. An entry whose
+// action or author this build does not know is dropped rather than shown
+// with a label it has no words for.
+function pinEventsFromWire(
+  events: CardPinEventWire[] | null | undefined,
+): CardPinEvent[] {
+  if (!events) return [];
+  const out: CardPinEvent[] = [];
+  for (const e of events) {
+    if (!PIN_EVENT_ACTIONS.has(e.action) || !PIN_EVENT_BY.has(e.by)) continue;
+    if (typeof e.at !== "string" || Number.isNaN(Date.parse(e.at))) continue;
+    out.push({
+      action: e.action as CardPinEvent["action"],
+      by: e.by as CardPinEvent["by"],
+      byRef: e.by_ref ?? null,
+      placeId: e.place_id ?? null,
+      terminalId: e.terminal_id ?? null,
+      at: e.at,
+    });
+  }
+  return out;
+}
+
+function refusalFromWire(w: CardChargeRefusalWire): CardChargeRefusal {
+  return {
+    placeId: w.place_id,
+    orderId: w.order_id ?? null,
+    reason: w.reason,
+    amountCents: w.amount,
+    spentCents: w.spent ?? null,
+    limitCents: w.limit ?? null,
+    createdAt: w.created_at,
   };
 }
 
@@ -725,12 +770,31 @@ export class LiveCitizenPayClient implements CitizenPayClient {
   ): Promise<void> {
     const wire =
       status === "ACTIVE" ? "active" : status === "BLOCKED" ? "blocked" : "inactive";
+    // A 409 is the api refusing a plain ACTIVE on a PIN-blocked card (PR P)
+    // and reaches the caller as a CitizenPayApiError: the sync and the status
+    // action import the block instead of retrying (services/card/pin-block.ts).
+    await apiCards.update(this.creds, serialNumber, { status: wire });
+  }
+
+  async unblockCardPin(serialNumber: string): Promise<void> {
+    await apiCards.update(this.creds, serialNumber, {
+      status: "active",
+      unblock: true,
+    });
+  }
+
+  async listCardRefusals(
+    serialNumber: string,
+    limit = 20,
+  ): Promise<CardChargeRefusal[]> {
+    let res;
     try {
-      await apiCards.update(this.creds, serialNumber, { status: wire });
+      res = await apiCards.refusals(this.creds, serialNumber, { limit });
     } catch (e) {
-      if (e instanceof CitizenPayApiError && e.status === 409) return;
+      if (e instanceof CitizenPayApiError && e.status === 404) return [];
       throw e;
     }
+    return (res.refusals ?? []).map(refusalFromWire);
   }
 
   async setCardSource(
@@ -808,12 +872,22 @@ export class LiveCitizenPayClient implements CitizenPayClient {
     return {
       ...cardFromWire(cardWire),
       account,
+      pinFailedAttempts: cardWire.pin_failed_attempts ?? null,
+      pinBlockCount: cardWire.pin_block_count ?? null,
+      pinEvents: pinEventsFromWire(cardWire.pin_events),
     };
   }
 
   async getTreasurySlug(): Promise<string | null> {
     const wire = await apiTreasury.get(this.creds);
     return wire.slug ?? null;
+  }
+
+  async setTreasuryEventsWebhook(webhook: {
+    url: string;
+    secret: string;
+  }): Promise<void> {
+    await apiTreasury.setEventsWebhook(this.creds, webhook);
   }
 
   async deleteCard(serialNumber: string): Promise<void> {

@@ -1064,7 +1064,8 @@
       },
       "primary": "Carte principale",
       "badges": {
-        "lost": "Perdue"
+        "lost": "Perdue",
+        "pinBlocked": "PIN"
       },
       "empty": "Aucune carte à afficher.",
       "prev": "Précédent",
@@ -2525,6 +2526,32 @@
             "registrationPending": "Un enregistrement Citizen Pay commencé il y a moins de 30 minutes est encore ouvert. Reprenez-le pour revenir au formulaire Citizen Pay, ou recommencez pour l'annuler et en lancer un nouveau.",
             "forbidden": "Cette action ne peut être lancée que depuis la page des paramètres de la caisse."
           }
+        },
+        "events": {
+          "title": "Webhook d'événements",
+          "description": "Citizen Pay prévient cette caisse quand il bloque une carte après 3 codes PIN erronés, et quand le blocage est levé. L'adresse ci-dessous est enregistrée auprès de Citizen Pay à la connexion de la caisse ; enregistrez-la à la main pour une caisse connectée avant, ou après un échec.",
+          "registeredAt": "Enregistré auprès de Citizen Pay le {date}",
+          "notRegistered": "Pas encore enregistré auprès de Citizen Pay",
+          "urlLabel": "Adresse",
+          "lastDeliveryLabel": "Dernière livraison",
+          "lastDelivery": "{type} · carte {serial} · {date} · {outcome}",
+          "noDelivery": "Aucun événement reçu pour l'instant",
+          "outcome": {
+            "RECEIVED": "reçu",
+            "APPLIED": "appliqué",
+            "IGNORED": "ignoré",
+            "FAILED": "échoué"
+          },
+          "registrationError": "Le dernier enregistrement a échoué : {message}",
+          "register": "Enregistrer auprès de Citizen Pay",
+          "reregister": "Enregistrer à nouveau",
+          "registering": "Enregistrement…",
+          "connectFirst": "Connectez d'abord la caisse à Citizen Pay.",
+          "errors": {
+            "notConnected": "Connectez d'abord la caisse à Citizen Pay.",
+            "insecureUrl": "L'adresse de ce déploiement n'est pas en https ; Citizen Pay n'accepte que des webhooks https.",
+            "failed": "Citizen Pay a refusé l'enregistrement : {message}"
+          }
         }
       },
       "fees": {
@@ -3362,7 +3389,8 @@
         "amountInvalid": "Le montant doit être un nombre avec au maximum 2 décimales.",
         "amountPositive": "Le montant doit être supérieur à zéro.",
         "tokenNotConfigured": "Cette caisse n'a pas encore de jeton configuré — connectez-vous d'abord à Citizen Pay.",
-        "submitFailed": "L'envoi on-chain a échoué. Consultez le journal des opérations pour plus de détails."
+        "submitFailed": "L'envoi on-chain a échoué. Consultez le journal des opérations pour plus de détails.",
+        "pinBlocked": "Citizen Pay a bloqué cette carte après 3 codes PIN erronés. Son statut ne peut pas être changé ici : un admin lève le blocage avec Débloquer sur la page de la carte."
       },
       "sync": {
         "trigger": "Synchroniser avec Citizen Pay",
@@ -3375,7 +3403,8 @@
           "import": "{count, plural, one {Importer # carte depuis Citizen Pay} other {Importer # cartes depuis Citizen Pay}}",
           "requestEnrollment": "{count, plural, one {# carte a été émise par une autre caisse ({issuers}) et doit être acceptée par celle-ci — une demande sera envoyée} other {# cartes ont été émises par une autre caisse ({issuers}) et doivent être acceptées par celle-ci — des demandes seront envoyées}}",
           "awaitingIssuer": "{count, plural, one {# carte est en attente d’une autre caisse ({issuers}) — demande : {statuses}, rien à envoyer} other {# cartes sont en attente d’une autre caisse ({issuers}) — demandes : {statuses}, rien à envoyer}}",
-          "statusUpdate": "{count, plural, one {Mettre à jour # statut de carte sur Citizen Pay} other {Mettre à jour # statuts de cartes sur Citizen Pay}}"
+          "statusUpdate": "{count, plural, one {Mettre à jour # statut de carte sur Citizen Pay} other {Mettre à jour # statuts de cartes sur Citizen Pay}}",
+          "pinBlockSync": "{count, plural, one {# blocage PIN réconcilié avec Citizen Pay} other {# blocages PIN réconciliés avec Citizen Pay}}"
         },
         "nothingToSync": "Tout est déjà synchronisé.",
         "confirm": "Synchroniser maintenant",
@@ -3528,6 +3557,71 @@
           "noDestination": "Le commerçant n'a pas encore de compte pour recevoir le paiement.",
           "placeNotFound": "Citizen Pay ne connaît pas ce commerçant pour cette caisse.",
           "unknown": "Aucune réponse n'est revenue. Débiter à nouveau est sans risque : la même vente sera réutilisée plutôt que débitée deux fois."
+        }
+      },
+      "pinBlock": {
+        "banner": {
+          "title": "Bloquée après 3 codes PIN erronés",
+          "atPlaceOn": "chez {place}, le {date}",
+          "atPlace": "chez {place}",
+          "on": "le {date}",
+          "description": "Citizen Pay refuse cette carte à tous les terminaux tant qu'elle n'est pas débloquée. Débloquer permet à la personne qui tient la carte de ressaisir le code ; le ou la titulaire peut aussi la débloquer en définissant un nouveau code PIN dans le portefeuille de la carte.",
+          "adminOnly": "Seul un admin de la caisse peut la débloquer.",
+          "loading": "Chargement de l'historique PIN de la carte…",
+          "loadFailed": "Impossible de charger l'historique PIN de la carte depuis Citizen Pay.",
+          "events": {
+            "title": "Derniers événements PIN",
+            "action": {
+              "blocked": "Bloquée",
+              "unblocked": "Débloquée",
+              "pin_set": "PIN défini"
+            },
+            "by": {
+              "system": "après 3 codes erronés",
+              "treasury": "par la caisse",
+              "member": "par le/la titulaire"
+            }
+          },
+          "refusals": {
+            "title": "Paiements refusés",
+            "reason": {
+              "insufficient": "Solde insuffisant",
+              "source_insufficient": "Carte source insuffisante",
+              "weekly_limit": "Plafond hebdomadaire atteint",
+              "pin_invalid": "Code PIN erroné",
+              "pin_blocked": "Carte bloquée (PIN)"
+            }
+          }
+        },
+        "unblock": {
+          "button": "Débloquer",
+          "title": "Débloquer cette carte ?",
+          "description": "La carte de {holderLabel} acceptera à nouveau le code PIN et paiera aux terminaux immédiatement. Il vous sera demandé de confirmer votre identité.",
+          "cancel": "Annuler",
+          "confirm": "Débloquer la carte",
+          "unblocking": "Déblocage…"
+        },
+        "statusDialog": {
+          "notice": "Citizen Pay a bloqué cette carte après 3 codes PIN erronés. Le statut ne peut pas être changé ici : un admin lève le blocage avec Débloquer sur la page de la carte."
+        },
+        "errors": {
+          "notPinBlocked": "Cette carte n'est pas bloquée pour codes PIN erronés.",
+          "apiRefused": "Citizen Pay a refusé le déblocage : seule la caisse qui a émis la carte peut le lever.",
+          "failed": "Citizen Pay est injoignable. Réessayez dans un instant."
+        },
+        "email": {
+          "staff": {
+            "subject": "Carte {serial} bloquée après 3 codes PIN erronés",
+            "textBody": "Bonjour,\n\nCitizen Pay a bloqué la carte {serial} ({holder}) après 3 codes PIN erronés chez {place} le {date}. Elle est refusée à tous les terminaux tant qu'elle n'est pas débloquée.\n\nUn admin de {fundName} peut la débloquer depuis la page de la carte :\n\n{cardUrl}\n\nLe ou la titulaire peut aussi la débloquer en définissant un nouveau code PIN dans le portefeuille de la carte.\n\nL'équipe {fundName}",
+            "ctaLabel": "Ouvrir la carte",
+            "unknownPlace": "un terminal"
+          },
+          "holder": {
+            "subject": "Votre carte {fundName} est bloquée",
+            "textBody": "Bonjour {firstName},\n\nVotre carte {fundName} a été bloquée après 3 codes PIN erronés chez {place} le {date}. Elle sera refusée aux terminaux tant qu'elle n'est pas débloquée.\n\nPour la débloquer, définissez un nouveau code PIN depuis la page de votre carte :\n\n{walletUrl}\n\nSi vous n'avez pas essayé de payer avec votre carte, prévenez {fundName} sans attendre.\n\nL'équipe {fundName}",
+            "ctaLabel": "Ouvrir ma carte",
+            "unknownPlace": "un terminal"
+          }
         }
       }
     }

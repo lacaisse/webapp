@@ -175,15 +175,51 @@ export type CitizenPayCard = {
   // Serial of the card this card pulls from when its own balance can't
   // cover a charge ("source card"). Null when no source is configured.
   sourceSerial: string | null;
+  // When Citizen Pay blocked the card after three wrong PIN entries (the
+  // api's `pin_blocked_at`, ISO 8601). Null when not PIN-blocked — and on an
+  // api that predates the field. That block is the api's: see
+  // services/card/pin-block-rules.ts.
+  pinBlockedAt: string | null;
   createdAt: string; // ISO 8601
   lastActivity: string | null;
 };
 
+// One entry of the api's `card_pin_events` ledger, as the card read returns
+// the last few: who blocked, unblocked or set the PIN, and where.
+export type CardPinEventAction = "blocked" | "unblocked" | "pin_set";
+export type CardPinEventBy = "system" | "treasury" | "member";
+export type CardPinEvent = {
+  action: CardPinEventAction;
+  by: CardPinEventBy;
+  byRef: string | null; // treasury slug, holder ref
+  placeId: string | null;
+  terminalId: string | null;
+  at: string; // ISO 8601
+};
+
 // Detailed read for a single card, including its on-chain account address.
 // `account` is null when CP hasn't issued a wallet yet (rare — usually
-// happens between card create and the first balance call).
+// happens between card create and the first balance call). The PIN fields
+// are null / empty on an api that predates them.
 export type CitizenPayCardDetail = CitizenPayCard & {
   account: string | null;
+  pinFailedAttempts: number | null;
+  pinBlockCount: number | null;
+  pinEvents: CardPinEvent[];
+};
+
+// A refused terminal tap of the card (`GET /v2/treasury/cards/{serial}/refusals`,
+// newest first): why, for how much, where, and the weekly allowance at that
+// moment. Reasons include `insufficient`, `source_insufficient`,
+// `weekly_limit`, `pin_invalid` and `pin_blocked`; unknown ones are shown raw.
+export type CardChargeRefusal = {
+  placeId: string;
+  orderId: number | null;
+  reason: string;
+  amountCents: number;
+  spentCents: number | null;
+  limitCents: number | null;
+  createdAt: string; // ISO 8601
 };
 
 // This week's usage of a card's weekly source cap (cents). The week runs

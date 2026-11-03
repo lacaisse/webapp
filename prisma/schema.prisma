@@ -68,6 +68,7 @@ model User {
 
   // Mint/burn audit: annotations whose underlying op this user triggered.
   triggeredAnnotations        TransactionAnnotation[] @relation("AnnotationTriggeredBy")
+  cardEvents                  CardEvent[]             @relation("CardEventActor") // PIN unblocks this user did
   triggeredPendingAnnotations PendingAnnotation[]     @relation("PendingAnnotationTriggeredBy")
 
   // Safe multisig: this user's per-fund signer keys and what they signed/proposed.
@@ -501,6 +502,17 @@ model Fund {
   // Refreshed whenever the API key is (re)issued — see services/citizenpay/sync.ts.
   citizenPayTreasurySlug    String?
 
+  // Citizen Pay treasury events webhook — `POST /api/citizenpay/events` on
+  // the fund's host, registered with the api as `PATCH /v2/treasury
+  // { eventsWebhookUrl, eventsWebhookSecret }` from the connect callback and
+  // from Settings → Citizen Pay. The HMAC secret is encrypted like the api
+  // key; the timestamp is the last successful registration, the error the
+  // last failed one (cleared on success). See
+  // services/citizenpay/events-webhook.ts.
+  citizenPayEventsSecretEnc           String?
+  citizenPayEventsWebhookRegisteredAt DateTime?
+  citizenPayEventsWebhookError        String?
+
   // 4337 stack identity. Cached from CP's `GET /v2/treasury` response —
   // CP picks the entrypoint / factory / paymaster per treasury and we
   // shouldn't second-guess. `paymasterType` is the classifier passed in
@@ -605,6 +617,9 @@ model Fund {
   // fund issued (in), and requests this fund filed against other funds' cards (out).
   cardEnrollmentRequestsIn  CardEnrollmentRequest[] @relation("CardEnrollmentRequestsIn")
   cardEnrollmentRequestsOut CardEnrollmentRequest[] @relation("CardEnrollmentRequestsOut")
+
+  citizenPayEvents CitizenPayEvent[] // deliveries of the Citizen Pay events webhook
+  cardEvents       CardEvent[] // PIN-block audit trail across the fund's cards
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -769,9 +784,9 @@ model FundMember {
 // once no unarchived Safe of the fund lists the address any more. The row
 // itself stays: the address may still appear in signature history.
 model FundSigner {
-  id            String  @id @default(cuid())
+  id            String    @id @default(cuid())
   fundId        String
-  userId        String  @db.Uuid
+  userId        String    @db.Uuid
   address       String // EOA address (checksummed)
   privateKeyEnc String? // envelope from services/crypto/secret.ts; null once deleted
   retiredAt     DateTime? // first swap to a passkey owner executed
@@ -799,15 +814,15 @@ model FundSigner {
 // a lost device registers a replacement, which supersedes the old row and
 // is swapped in on every Safe through an ordinary proposal.
 model FundPasskeySigner {
-  id           String  @id @default(cuid())
-  fundId       String
-  userId       String  @db.Uuid
-  address      String // signer contract address (checksummed) — the Safe owner
-  credentialId String  @unique // WebAuthn credential id, base64url
-  publicKeyX   String // 0x-prefixed 32-byte hex
-  publicKeyY   String // 0x-prefixed 32-byte hex
-  verifiers    String // P256.Verifiers (uint176) used for the address, 0x-prefixed hex
-  counter      Int     @default(0) // authenticator signature counter from the last ceremony
+  id             String    @id @default(cuid())
+  fundId         String
+  userId         String    @db.Uuid
+  address        String // signer contract address (checksummed) — the Safe owner
+  credentialId   String    @unique // WebAuthn credential id, base64url
+  publicKeyX     String // 0x-prefixed 32-byte hex
+  publicKeyY     String // 0x-prefixed 32-byte hex
+  verifiers      String // P256.Verifiers (uint176) used for the address, 0x-prefixed hex
+  counter        Int       @default(0) // authenticator signature counter from the last ceremony
   // Backup flags from the LAST ceremony (registration or signature):
   // eligible = the credential can be synced (e.g. iCloud Keychain / Google
   // Password Manager); state = it currently is. A device-only credential
@@ -873,10 +888,10 @@ model FundSafe {
   saltNonce String
   address   String
 
-  threshold    Int // cached from chain (getThreshold), refreshed by sync
-  status       FundSafeStatus @default(DEPLOYING)
-  deployTxHash String?
-  errorMessage String? // last deployment / sync error
+  threshold     Int // cached from chain (getThreshold), refreshed by sync
+  status        FundSafeStatus @default(DEPLOYING)
+  deployTxHash  String?
+  errorMessage  String? // last deployment / sync error
   // Set by sync when the Safe's wiring is not canonical 1.4.1 (a module, a
   // guard, another singleton / fallback handler). Shown as a red banner and
   // blocks relayer execution until it clears (review S6).
@@ -908,9 +923,9 @@ enum FundSafeOwnerKind {
 // getOwners(); an owner that disappears on chain gets `removedAt` set (kept
 // so past signatures still resolve to a label).
 model FundSafeOwner {
-  id       String            @id @default(cuid())
-  safeId   String
-  address  String // checksummed
+  id        String            @id @default(cuid())
+  safeId    String
+  address   String // checksummed
   kind      FundSafeOwnerKind
   signerId  String? // set for MEMBER owners
   passkeyId String? // set for PASSKEY owners
@@ -1266,8 +1281,14 @@ model Card {
   // Last time we pushed/refreshed the card's public profile via CitizenPay.
   profileSyncedAt DateTime?
 
-  issuedAt  DateTime?
-  blockedAt DateTime?
+  issuedAt      DateTime?
+  blockedAt     DateTime?
+  // Set with status BLOCKED — see CardBlockedReason. A PIN block carries the
+  // api's `pin_blocked_at` in `blockedAt`.
+  blockedReason CardBlockedReason?
+
+  // PIN-block audit trail (blocks imported from Citizen Pay, admin unblocks).
+  events CardEvent[]
 
   // Inverse of Member.primaryCard (one-to-one).
   primaryOf Member? @relation("MemberPrimaryCard")
@@ -1348,10 +1369,99 @@ model CardEnrollmentRequest {
   @@index([requesterFundId, status])
 }
 
+// One delivery of the Citizen Pay treasury events webhook
+// (app/api/citizenpay/events), keyed by the api's event id: the api retries
+// and may deliver out of order, so a redelivery is answered from this row and
+// never applied twice. The payload itself is never applied — the handler
+// re-reads the card from the api — so only what was done about it is kept.
+model CitizenPayEvent {
+  id     String @id @default(cuid())
+  fundId String
+  fund   Fund   @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  eventId    String
+  type       String // "card.blocked", "card.unblocked", …
+  serial     String?
+  occurredAt DateTime? // the payload's `at`
+  receivedAt DateTime  @default(now())
+
+  outcome CitizenPayEventOutcome @default(RECEIVED)
+  detail  String? // what was applied, or why not / the error
+
+  @@unique([fundId, eventId])
+  @@index([fundId, receivedAt])
+}
+
+enum CitizenPayEventOutcome {
+  RECEIVED // stored, not processed yet
+  APPLIED // the card's local row changed
+  IGNORED // nothing to change: unknown card, unhandled type, state already right
+  FAILED // the re-read or the write failed; the api retries the delivery
+}
+
+// Audit trail of a card's PIN block: the api's block imported here (webhook or
+// sync) and the fund's explicit unblock, with the acting admin. The api keeps
+// its own `card_pin_events`; this is the local record of what La Caisse did
+// and who did it.
+model CardEvent {
+  id     String @id @default(cuid())
+  fundId String
+  fund   Fund   @relation(fields: [fundId], references: [id], onDelete: Cascade)
+  cardId String
+  card   Card   @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  kind   CardEventKind
+  source CardEventSource
+
+  // The acting admin on ADMIN events; null for the webhook and the sync.
+  actorUserId String? @db.Uuid
+  actor       User?   @relation("CardEventActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  // Where the block happened, from the api's event (a place is a merchant
+  // location); the name is resolved from the fund's merchants at write time.
+  placeId           String?
+  placeName         String?
+  terminalId        String?
+  // The api event this came from (CitizenPayEvent.eventId), when any.
+  citizenPayEventId String?
+
+  at        DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@index([cardId, at])
+  @@index([fundId, at])
+  @@index([actorUserId])
+}
+
+enum CardEventKind {
+  PIN_BLOCKED
+  PIN_UNBLOCKED
+}
+
+enum CardEventSource {
+  WEBHOOK // Citizen Pay's events webhook
+  SYNC // the /cards sync, or a status push the api refused
+  ADMIN // a fund admin, from the card page
+}
+
 enum CardStatus {
   ACTIVE // in use; a card flips here automatically on its first charge
   INACTIVE // factory default — not charged yet; does NOT block the card
   BLOCKED // terminal will refuse
+}
+
+// Why a card is BLOCKED. PIN: Citizen Pay blocked it after three wrong PIN
+// entries (`pin_blocked_at` on the api). That block belongs to the api: La
+// Caisse imports it (events webhook, card sync) and never pushes ACTIVE over
+// it; only the explicit unblock on the card page (ADMIN + step-up, `PATCH
+// {status:"active", unblock:true}`) or the holder setting a new PIN in the
+// card wallet lifts it. FUND: the fund blocked the card itself (lost card…)
+// — local-authoritative, pushed to the api like any status. Null on an
+// ACTIVE / INACTIVE card, and on rows blocked before the column existed
+// (read as FUND). See services/card/pin-block.ts.
+enum CardBlockedReason {
+  PIN
+  FUND
 }
 
 // =============================================================================
@@ -2393,6 +2503,12 @@ enum EmailType {
   // Sent by hand from the member detail page when a member asks for their
   // payment link / account page again (issue #45). No automatic trigger.
   MEMBER_PAYMENT_LINK
+
+  // Citizen Pay blocked the card after three wrong PIN entries (events
+  // webhook): to the fund's OWNER/ADMIN staff, and to the bound member when
+  // they have an email. Both are linked to the card (Card.emails).
+  CARD_PIN_BLOCKED
+  CARD_PIN_BLOCKED_HOLDER
 }
 
 enum EmailStatus {

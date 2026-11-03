@@ -13,6 +13,7 @@ import type {
   BankTransactionsPage,
   CardChargeCardInput,
   CardChargeOnPlaceInput,
+  CardChargeRefusal,
   CardChargeResult,
   CardOperationInput,
   CardOperationResult,
@@ -232,12 +233,35 @@ export interface CitizenPayClient {
 
   /**
    * Update a card's status on CitizenPay. Used by the sync page to push
-   * the locally-authoritative status to CP when the two diverged.
+   * the locally-authoritative status to CP when the two diverged. Throws
+   * `CitizenPayApiError` with status 409 when the api refuses the change —
+   * a plain ACTIVE on a card the api PIN-blocked after three wrong PIN
+   * entries: that block is the api's and is imported, never overwritten
+   * (services/card/pin-block.ts; `unblockCardPin` is the explicit lift).
    */
   setCardStatus(
     serialNumber: string,
     status: "ACTIVE" | "INACTIVE" | "BLOCKED",
   ): Promise<void>;
+
+  /**
+   * Lift a PIN block (`pin_blocked_at` on the api): `PATCH {status:"active",
+   * unblock:true}`, the explicit unblock the api demands, which also resets
+   * the wrong-entry counter and writes the api's `unblocked` event. Throws
+   * `CitizenPayApiError` 409 when this treasury is not the card's issuer
+   * (an enrolled fund cannot lift the issuer's block).
+   */
+  unblockCardPin(serialNumber: string): Promise<void>;
+
+  /**
+   * The card's refused terminal taps in this treasury's view, newest first
+   * (`GET /v2/treasury/cards/{serial}/refusals`), at most `limit` (default
+   * 20). Empty when the api does not know the card.
+   */
+  listCardRefusals(
+    serialNumber: string,
+    limit?: number,
+  ): Promise<CardChargeRefusal[]>;
 
   /**
    * Set (or clear, with null) the card another card pulls from when its own
@@ -300,6 +324,17 @@ export interface CitizenPayClient {
    * Returns null when the treasury has no slug.
    */
   getTreasurySlug(): Promise<string | null>;
+
+  /**
+   * Register (or rotate) the treasury events webhook with the api: the url
+   * it posts `card.blocked` / `card.unblocked` to and the HMAC secret it
+   * signs them with (`PATCH /v2/treasury { eventsWebhookUrl,
+   * eventsWebhookSecret }`). See services/citizenpay/events-webhook.ts.
+   */
+  setTreasuryEventsWebhook(webhook: {
+    url: string;
+    secret: string;
+  }): Promise<void>;
 
   /**
    * Draft payouts: paid/refunded orders not yet attached to a payout,
