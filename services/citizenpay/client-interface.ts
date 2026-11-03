@@ -310,6 +310,14 @@ export interface CitizenPayClient {
   confirmCardHolder(serialNumber: string, holderRef: string): Promise<void>;
 
   /**
+   * Refuse ONE login's pending claim and keep the card's holder (`POST
+   * /v2/treasury/cards/{serial}/holder/refuse {holder_ref}`). Throws
+   * `CitizenPayApiError` on a non-2xx — 404 `no pending claim` when that
+   * login has none (the caller reads it as already gone).
+   */
+  refuseCardHolder(serialNumber: string, holderRef: string): Promise<void>;
+
+  /**
    * Declare a wallet login as a member of this fund, with the serials of the
    * fund's own cards bound to them (`PUT /v2/treasury/members/{holder_ref}
    * {cards}`): a claim from that login needs no proof for those cards.

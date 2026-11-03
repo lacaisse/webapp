@@ -30,7 +30,7 @@ import { HolderClaimActions } from "./holder-claim-actions";
 // nothing when empty, which is the common case. A claim by a login that is
 // not a member here is shown but never confirmable.
 
-const PROOFS = new Set(["app", "bound", "payment", "fund", "pending"]);
+const PROOFS = new Set(["treasury", "fund", "payment", "confirmed", "pending"]);
 
 export async function HolderClaimsPanel({ fundId }: { fundId: string }) {
   const claims = await listCardHolderClaims(fundId);
@@ -43,7 +43,7 @@ export async function HolderClaimsPanel({ fundId }: { fundId: string }) {
 
   const proofLabel = (proof: string | null) =>
     proof && PROOFS.has(proof)
-      ? tProof(proof as "app" | "bound" | "payment" | "fund" | "pending")
+      ? tProof(proof as "treasury" | "fund" | "payment" | "confirmed" | "pending")
       : tProof("unknown");
   const nameOf = (c: CardHolderClaimListItem) =>
     c.member ? `${c.member.firstName} ${c.member.lastName}`.trim() : "";

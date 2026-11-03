@@ -3703,19 +3703,19 @@
             "textBody": "Hallo,\n\n{holder} heeft kaart {serial} op {date} opgeëist vanuit de kaartwallet, met zijn of haar {fundName}-login. Bewijs van bezit: {proof}.\n\nDe kaart is nu aan die login gekoppeld: ze is privé in de wallet en kan stemmen. Klopt dit niet, dan kan een beheerder van {fundName} ze loskoppelen op de kaartpagina:\n\n{cardUrl}\n\nHet {fundName}-team",
             "ctaLabel": "Open de kaart",
             "proof": {
-              "app": "al gekoppeld aan de telefoon in de app",
-              "bound": "de kaart was hier aan hen toegewezen",
+              "treasury": "gekoppeld door de kas",
+              "fund": "de kaart was hier aan hen toegewezen, geen bewijs nodig",
               "payment": "een recente betaling met de kaart",
-              "fund": "bevestigd door de kas",
+              "confirmed": "bevestigd door de kas",
               "unknown": "niet vermeld"
             }
           }
         },
         "proof": {
-          "app": "Gekoppeld in de app",
-          "bound": "Hier toegewezen",
+          "treasury": "Gekoppeld door de kas",
+          "fund": "Hier toegewezen, geen bewijs nodig",
           "payment": "Recente betaling",
-          "fund": "Bevestigd door de kas",
+          "confirmed": "Bevestigd door de kas",
           "pending": "In afwachting",
           "unknown": "Niet vermeld"
         },
@@ -3726,8 +3726,10 @@
           "loginRemoved": "Dat lid heeft geen geverifieerde login meer.",
           "notAttached": "Deze kaart is aan geen login gekoppeld.",
           "apiNotDeployed": "Citizen Pay biedt dit nog niet aan. Probeer het opnieuw na de volgende api-release.",
-          "apiRefused": "Citizen Pay weigerde: er is geen openstaande claim meer voor die login.",
-          "failed": "Er ging iets mis. Probeer het opnieuw."
+          "apiRefused": "Citizen Pay weigerde: de kaart werd intussen aan een andere login gekoppeld.",
+          "failed": "Er ging iets mis. Probeer het opnieuw.",
+          "loginDisabled": "Ledenlogin staat uit voor deze kas: zet het aan onder Instellingen → Onboarding voor u een claim bevestigt.",
+          "legacyOwner": "Citizen Pay weigerde: een telefoonaccount houdt deze kaart nog. Koppel die eerst los en bevestig dan."
         },
         "card": {
           "title": "Login van de houder",

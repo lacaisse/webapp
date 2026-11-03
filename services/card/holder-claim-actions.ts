@@ -45,10 +45,19 @@ type ErrorCode =
   | "notPending"
   | "notMember"
   | "loginRemoved"
+  | "loginDisabled"
   | "notAttached"
   | "apiNotDeployed"
   | "apiRefused"
+  | "legacyOwner"
   | "failed";
+
+// The api's error word, for the 404 / 409 answers that mean different things
+// (`{"error": "no pending claim"}`, `"legacy_owner"`, docs/card-claim.md).
+function apiErrorWord(e: CitizenPayApiError): string {
+  const body = e.body as { error?: unknown } | null;
+  return typeof body?.error === "string" ? body.error : "";
+}
 
 async function errorResult(code: ErrorCode): Promise<{ error: string }> {
   const t = await getTranslations();
@@ -93,6 +102,8 @@ export async function confirmCardHolderClaimAction(input: {
   if (claim.member.userId !== claim.holderRef || !claim.member.emailVerifiedAt) {
     return errorResult("loginRemoved");
   }
+  // With member login off the holder sync would undo the attachment at once.
+  if (!fund.memberLoginEnabled) return errorResult("loginDisabled");
   const memberId = claim.member.id;
 
   // The api first: it holds the claim, and its answer is what makes the
@@ -102,12 +113,24 @@ export async function confirmCardHolderClaimAction(input: {
   try {
     await getCitizenPayClient(fund).confirmCardHolder(claim.serial, claim.holderRef);
   } catch (e) {
-    if (e instanceof CitizenPayApiError && e.status === 404) {
-      console.warn("[card.holder-claims] confirm: route or card not found", claim.serial);
-      return errorResult("apiNotDeployed");
-    }
-    if (e instanceof CitizenPayApiError && e.status === 409) {
-      return errorResult("apiRefused");
+    if (e instanceof CitizenPayApiError) {
+      const word = apiErrorWord(e);
+      if (e.status === 404 && word === "no pending claim") {
+        // The claim is gone at the api (refused, re-claimed, detached): the
+        // local row is stale, not pending.
+        await prisma.cardHolderClaim.updateMany({
+          where: { id: claim.id, status: "PENDING" },
+          data: { status: "SUPERSEDED", decidedAt: new Date() },
+        });
+        revalidateCard(claim.cardId);
+        return errorResult("notPending");
+      }
+      if (e.status === 404) {
+        console.warn("[card.holder-claims] confirm: route or card not found", claim.serial);
+        return errorResult("apiNotDeployed");
+      }
+      if (e.status === 409 && word === "legacy_owner") return errorResult("legacyOwner");
+      if (e.status === 409) return errorResult("apiRefused");
     }
     console.error("[card.holder-claims] confirm failed", claim.serial, e);
     return errorResult("failed");
@@ -121,7 +144,7 @@ export async function confirmCardHolderClaimAction(input: {
       kind: "CLAIM_CONFIRMED" as const,
       source: "ADMIN" as const,
       actorUserId: user.id,
-      detail: "fund",
+      detail: "confirmed",
     };
     let previousMemberId: string | null = null;
     if (card.memberId === memberId) {
@@ -144,6 +167,7 @@ export async function confirmCardHolderClaimAction(input: {
         cardId: card.id,
       },
     });
+    scheduleCardHolderNamePublish(fund, card.id);
     scheduleMemberApiSync(previousMemberId ? [memberId, previousMemberId] : memberId);
   } catch (e) {
     // The api attached the card; its webhook binds it here if this did not.
@@ -164,10 +188,13 @@ export async function refuseCardHolderClaimAction(input: {
   if (!claim) return errorResult("notFound");
   if (claim.status !== "PENDING") return errorResult("notPending");
 
-  // DELETE …/holder drops the claim at the api. A 404 = nothing there (or
-  // the route is missing): the claim is refused here all the same.
+  // `POST …/holder/refuse` ends this login's claim only — the card's
+  // holder, a legacy phone owner and any other claimant are untouched
+  // (DELETE …/holder would drop them all). A 404 `no pending claim` = already
+  // gone at the api; a bare 404 = route not deployed yet: refused here all
+  // the same, the api has nothing to keep.
   try {
-    await getCitizenPayClient(fund).setCardHolder(claim.serial, null);
+    await getCitizenPayClient(fund).refuseCardHolder(claim.serial, claim.holderRef);
   } catch (e) {
     if (e instanceof CitizenPayApiError && e.status === 404) {
       console.warn("[card.holder-claims] refuse: nothing at the api", claim.serial);

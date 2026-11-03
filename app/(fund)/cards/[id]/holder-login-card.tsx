@@ -40,7 +40,10 @@ type HolderMember = {
   emailVerifiedAt: Date | null;
 };
 
-const PROOFS = ["app", "bound", "payment", "fund"] as const;
+// The api's proof words (docs/card-claim.md): treasury = the fund's own PUT,
+// fund = the fund had bound the serial (no proof needed), payment = one
+// recent card payment, confirmed = the fund confirmed a pending claim.
+const PROOFS = ["treasury", "fund", "payment", "confirmed"] as const;
 type Proof = (typeof PROOFS)[number];
 const isProof = (v: string | null): v is Proof =>
   v !== null && (PROOFS as readonly string[]).includes(v);
@@ -100,7 +103,7 @@ export async function HolderLoginCard({
     // carries no word.
     const word =
       lastHolderEvent.detail ??
-      (lastHolderEvent.kind === "CLAIM_CONFIRMED" ? "fund" : null);
+      (lastHolderEvent.kind === "CLAIM_CONFIRMED" ? "confirmed" : null);
     const label = isProof(word) ? tProof(word) : tProof("unknown");
     proof = `${label} · ${when(lastHolderEvent.at)}`;
   } else if (hasVerifiedLogin) {
@@ -209,6 +212,16 @@ async function AttachedRow({
     iso
       ? format.dateTime(new Date(iso), { dateStyle: "medium", timeStyle: "short" })
       : "—";
+
+  // A fund without a Citizen Pay key has nothing to read (the live client
+  // factory would throw on every view).
+  if (!fund.citizenPayApiKeyId || !fund.citizenPayApiKeyEnc) {
+    return (
+      <DtDd label={t("attached")}>
+        <span className="text-muted-foreground">{t("notAvailable")}</span>
+      </DtDd>
+    );
+  }
 
   let info: CardHolderInfo;
   try {

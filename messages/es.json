@@ -3694,19 +3694,19 @@
             "textBody": "Hola,\n\n{holder} reclamó la tarjeta {serial} desde el monedero de tarjetas el {date}, con su acceso de {fundName}. Prueba de posesión: {proof}.\n\nLa tarjeta queda vinculada a ese acceso: es privada en el monedero y puede votar. Si no es correcto, un administrador de {fundName} puede desvincularla desde la página de la tarjeta:\n\n{cardUrl}\n\nEl equipo de {fundName}",
             "ctaLabel": "Abrir la tarjeta",
             "proof": {
-              "app": "ya vinculada a su teléfono en la app",
-              "bound": "la tarjeta se le había asignado aquí",
+              "treasury": "vinculada por la caja",
+              "fund": "la tarjeta se le había asignado aquí, sin prueba necesaria",
               "payment": "un pago reciente hecho con la tarjeta",
-              "fund": "confirmada por la caja",
+              "confirmed": "confirmada por la caja",
               "unknown": "no indicada"
             }
           }
         },
         "proof": {
-          "app": "Vinculada en la app",
-          "bound": "Asignada aquí",
+          "treasury": "Vinculada por la caja",
+          "fund": "Asignada aquí, sin prueba",
           "payment": "Pago reciente",
-          "fund": "Confirmada por la caja",
+          "confirmed": "Confirmada por la caja",
           "pending": "Pendiente",
           "unknown": "No indicada"
         },
@@ -3717,8 +3717,10 @@
           "loginRemoved": "Ese miembro ya no tiene un acceso verificado.",
           "notAttached": "Esta tarjeta no está vinculada a ningún acceso.",
           "apiNotDeployed": "Citizen Pay aún no ofrece esto. Inténtelo de nuevo tras la próxima versión de la api.",
-          "apiRefused": "Citizen Pay lo rechazó: ya no hay ninguna solicitud pendiente para ese acceso.",
-          "failed": "Algo salió mal. Inténtelo de nuevo."
+          "apiRefused": "Citizen Pay lo rechazó: la tarjeta se vinculó a otro acceso mientras tanto.",
+          "failed": "Algo salió mal. Inténtelo de nuevo.",
+          "loginDisabled": "El acceso de miembros está desactivado para esta caja: actívelo en Ajustes → Alta antes de confirmar una reclamación.",
+          "legacyOwner": "Citizen Pay lo rechazó: una cuenta de teléfono aún tiene esta tarjeta. Desvincúlela primero y luego confirme."
         },
         "card": {
           "title": "Acceso del titular",

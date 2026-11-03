@@ -3779,19 +3779,19 @@
             "textBody": "Hello,\n\n{holder} claimed card {serial} from the card wallet on {date}, with their {fundName} login. Proof of possession: {proof}.\n\nThe card is now attached to that login: it is private on the wallet and can vote. If that is not right, an admin of {fundName} can detach it from the card page:\n\n{cardUrl}\n\nThe {fundName} team",
             "ctaLabel": "Open the card",
             "proof": {
-              "app": "already linked to their phone in the app",
-              "bound": "the card was assigned to them here",
+              "treasury": "attached by the fund",
+              "fund": "the card was assigned to them here, no proof needed",
               "payment": "a recent payment made with the card",
-              "fund": "confirmed by the fund",
+              "confirmed": "confirmed by the fund",
               "unknown": "not stated"
             }
           }
         },
         "proof": {
-          "app": "Linked in the app",
-          "bound": "Assigned here",
+          "treasury": "Attached by the fund",
+          "fund": "Assigned here, no proof needed",
           "payment": "Recent payment",
-          "fund": "Confirmed by the fund",
+          "confirmed": "Confirmed by the fund",
           "pending": "Pending",
           "unknown": "Not stated"
         },
@@ -3802,8 +3802,10 @@
           "loginRemoved": "That member no longer has a verified login.",
           "notAttached": "This card is not attached to a login.",
           "apiNotDeployed": "Citizen Pay does not offer this yet. Try again after the next api release.",
-          "apiRefused": "Citizen Pay refused it: there is no pending claim for that login any more.",
-          "failed": "Something went wrong. Try again."
+          "apiRefused": "Citizen Pay refused it: the card was attached to another login meanwhile.",
+          "failed": "Something went wrong. Try again.",
+          "loginDisabled": "Member login is off for this fund: turn it on in Settings → Onboarding before confirming a claim.",
+          "legacyOwner": "Citizen Pay refused it: a phone account still holds this card. Detach it first, then confirm."
         },
         "card": {
           "title": "Holder login",

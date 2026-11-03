@@ -21,6 +21,7 @@ vi.mock("@/services/auth/step-up", () => ({ hasRecentAuth: auth.hasRecentAuth })
 
 const cp = vi.hoisted(() => ({
   confirmCardHolder: vi.fn(),
+  refuseCardHolder: vi.fn(),
   setCardHolder: vi.fn(),
   getCitizenPayCard: vi.fn(),
 }));
@@ -57,7 +58,12 @@ import {
 } from "./holder-claim-actions";
 
 const LOGIN = "11111111-2222-3333-4444-555555555555";
-const fund = { id: "fund-1", citizenPayApiKeyId: "0xkey", citizenPayApiKeyEnc: "v1:enc" };
+const fund = {
+  id: "fund-1",
+  memberLoginEnabled: true,
+  citizenPayApiKeyId: "0xkey",
+  citizenPayApiKeyEnc: "v1:enc",
+};
 const user = { id: "aaaaaaaa-1111-1111-1111-111111111111" };
 const claim = {
   id: "claim-1",
@@ -98,6 +104,7 @@ beforeEach(() => {
   prisma.cardEvent.create.mockResolvedValue({ id: "ev-1" });
   prisma.cardEvent.delete.mockResolvedValue({});
   cp.confirmCardHolder.mockResolvedValue(undefined);
+  cp.refuseCardHolder.mockResolvedValue(undefined);
   cp.setCardHolder.mockResolvedValue(undefined);
 });
 
@@ -144,13 +151,40 @@ describe("confirmCardHolderClaimAction", () => {
     expect(cp.confirmCardHolder).not.toHaveBeenCalled();
   });
 
-  it("maps the api's 404 and 409 and writes nothing", async () => {
+  it("refuses while member login is off at the fund", async () => {
+    auth.requireFundRole.mockResolvedValue({ fund: { ...fund, memberLoginEnabled: false }, user });
+    expect(await confirmCardHolderClaimAction({ claimId: "claim-1" })).toEqual({
+      error: "cards.admin.holderClaims.errors.loginDisabled",
+    });
+    expect(cp.confirmCardHolder).not.toHaveBeenCalled();
+  });
+
+  it("maps the api's 404 and 409 answers and writes nothing", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     cp.confirmCardHolder.mockRejectedValueOnce(new CitizenPayApiError("x", 404, null));
     expect(await confirmCardHolderClaimAction({ claimId: "claim-1" })).toEqual({
       error: "cards.admin.holderClaims.errors.apiNotDeployed",
     });
-    cp.confirmCardHolder.mockRejectedValueOnce(new CitizenPayApiError("x", 409, null));
+    // 404 `no pending claim`: the claim is gone at the api, the row is stale.
+    cp.confirmCardHolder.mockRejectedValueOnce(
+      new CitizenPayApiError("x", 404, { error: "no pending claim" }),
+    );
+    expect(await confirmCardHolderClaimAction({ claimId: "claim-1" })).toEqual({
+      error: "cards.admin.holderClaims.errors.notPending",
+    });
+    expect(prisma.cardHolderClaim.updateMany).toHaveBeenCalledWith({
+      where: { id: "claim-1", status: "PENDING" },
+      data: { status: "SUPERSEDED", decidedAt: expect.any(Date) },
+    });
+    cp.confirmCardHolder.mockRejectedValueOnce(
+      new CitizenPayApiError("x", 409, { error: "legacy_owner" }),
+    );
+    expect(await confirmCardHolderClaimAction({ claimId: "claim-1" })).toEqual({
+      error: "cards.admin.holderClaims.errors.legacyOwner",
+    });
+    cp.confirmCardHolder.mockRejectedValueOnce(
+      new CitizenPayApiError("x", 409, { error: "card is attached to another member" }),
+    );
     expect(await confirmCardHolderClaimAction({ claimId: "claim-1" })).toEqual({
       error: "cards.admin.holderClaims.errors.apiRefused",
     });
@@ -181,7 +215,7 @@ describe("confirmCardHolderClaimAction", () => {
         kind: "CLAIM_CONFIRMED",
         source: "ADMIN",
         actorUserId: user.id,
-        detail: "fund",
+        detail: "confirmed",
       }),
       select: { id: true },
     });
@@ -195,6 +229,7 @@ describe("confirmCardHolderClaimAction", () => {
       },
     });
     expect(apiSync.scheduleMemberApiSync).toHaveBeenCalledWith("m1");
+    expect(publish.scheduleCardHolderNamePublish).toHaveBeenCalledWith(fund, "card-1");
   });
 
   it("creates the card row when the fund has none", async () => {
@@ -226,11 +261,12 @@ describe("confirmCardHolderClaimAction", () => {
 });
 
 describe("refuseCardHolderClaimAction", () => {
-  it("drops the claim at the api, then marks it REFUSED with the decider and the audit line", async () => {
+  it("refuses this login's claim at the api (never DELETE …/holder), then marks it REFUSED with the decider and the audit line", async () => {
     const res = await refuseCardHolderClaimAction({ claimId: "claim-1" });
     expect(res).toEqual({ ok: true });
     expect(auth.requireFundRole).toHaveBeenCalledWith("OPERATOR");
-    expect(cp.setCardHolder).toHaveBeenCalledWith("SER1", null);
+    expect(cp.refuseCardHolder).toHaveBeenCalledWith("SER1", LOGIN);
+    expect(cp.setCardHolder).not.toHaveBeenCalled();
     expect(prisma.cardHolderClaim.updateMany).toHaveBeenCalledWith({
       where: { id: "claim-1", status: { in: ["PENDING", "SUPERSEDED"] } },
       data: { status: "REFUSED", decidedAt: expect.any(Date), decidedById: user.id },
@@ -249,9 +285,11 @@ describe("refuseCardHolderClaimAction", () => {
   it("tolerates a 404, fails on anything else", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
-    cp.setCardHolder.mockRejectedValueOnce(new CitizenPayApiError("x", 404, null));
+    cp.refuseCardHolder.mockRejectedValueOnce(
+      new CitizenPayApiError("x", 404, { error: "no pending claim" }),
+    );
     expect(await refuseCardHolderClaimAction({ claimId: "claim-1" })).toEqual({ ok: true });
-    cp.setCardHolder.mockRejectedValueOnce(new CitizenPayApiError("x", 500, null));
+    cp.refuseCardHolder.mockRejectedValueOnce(new CitizenPayApiError("x", 500, null));
     prisma.cardHolderClaim.updateMany.mockClear();
     expect(await refuseCardHolderClaimAction({ claimId: "claim-1" })).toEqual({
       error: "cards.admin.holderClaims.errors.failed",
@@ -266,7 +304,7 @@ describe("refuseCardHolderClaimAction", () => {
     expect(await refuseCardHolderClaimAction({ claimId: "claim-1" })).toEqual({
       error: "cards.admin.holderClaims.errors.notPending",
     });
-    expect(cp.setCardHolder).not.toHaveBeenCalled();
+    expect(cp.refuseCardHolder).not.toHaveBeenCalled();
   });
 });
 

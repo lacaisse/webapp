@@ -1505,7 +1505,10 @@ model CitizenPayEvent {
   outcome CitizenPayEventOutcome @default(RECEIVED)
   detail  String? // what was applied, or why not / the error
 
-  @@unique([fundId, eventId])
+  // The api draws ids from several sequences (PIN events, holder events,
+  // claims) and namespaces them as strings; the key carries the type too so
+  // the receiver never depends on the sender's namespacing.
+  @@unique([fundId, type, eventId])
   @@index([fundId, receivedAt])
 }
 
@@ -1589,6 +1592,8 @@ model CardHolderClaim {
   decidedById String?   @db.Uuid
   decidedBy   User?     @relation("CardHolderClaimDecider", fields: [decidedById], references: [id], onDelete: SetNull)
 
+  // Plus a partial unique index (fundId, serial) WHERE status = 'PENDING' in
+  // the migration — one open claim per card — which Prisma cannot express.
   @@index([fundId, status, requestedAt])
   @@index([cardId])
   @@index([memberId])

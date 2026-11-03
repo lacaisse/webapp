@@ -486,7 +486,7 @@ class MockCitizenPayClient implements CitizenPayClient {
       mockCardHolderMeta.delete(key);
     } else {
       mockCardHolders.set(key, holderRef);
-      mockCardHolderMeta.set(key, { attachedAt: new Date().toISOString(), proof: "fund" });
+      mockCardHolderMeta.set(key, { attachedAt: new Date().toISOString(), proof: "treasury" });
     }
   }
 
@@ -519,10 +519,11 @@ class MockCitizenPayClient implements CitizenPayClient {
     return {
       holderRef,
       attachedAt: holderRef ? (meta?.attachedAt ?? MOCK_CLAIM_AT) : null,
-      proof: holderRef ? (meta?.proof ?? "fund") : null,
+      proof: holderRef ? (meta?.proof ?? "treasury") : null,
       pendingHolderRef: pending?.holderRef ?? null,
       pendingProof: pending ? "pending" : null,
       pendingSince: pending?.requestedAt ?? null,
+      pendingKnown: true,
       appOwnerLinked: false,
     };
   }
@@ -530,14 +531,31 @@ class MockCitizenPayClient implements CitizenPayClient {
   async confirmCardHolder(serialNumber: string, holderRef: string): Promise<void> {
     this.log("confirmCardHolder", { serialNumber, holderRef });
     const key = serialNumber.toUpperCase();
+    const current = mockCardHolders.get(key);
+    if (current === holderRef) return; // already this login's: 200
+    if (current) {
+      throw new CitizenPayApiError("card is attached to another member", 409, {
+        error: "card is attached to another member",
+      });
+    }
     const pending = mockPendingClaims.get(key);
     if (!pending || pending.holderRef !== holderRef) {
-      // The api's 409: nothing pending for that login.
-      throw new CitizenPayApiError("no pending claim for this holder", 409, null);
+      // The api's 404 when that login has no pending claim.
+      throw new CitizenPayApiError("no pending claim", 404, { error: "no pending claim" });
     }
     mockPendingClaims.delete(key);
     mockCardHolders.set(key, holderRef);
-    mockCardHolderMeta.set(key, { attachedAt: new Date().toISOString(), proof: "fund" });
+    mockCardHolderMeta.set(key, { attachedAt: new Date().toISOString(), proof: "confirmed" });
+  }
+
+  async refuseCardHolder(serialNumber: string, holderRef: string): Promise<void> {
+    this.log("refuseCardHolder", { serialNumber, holderRef });
+    const key = serialNumber.toUpperCase();
+    const pending = mockPendingClaims.get(key);
+    if (!pending || pending.holderRef !== holderRef) {
+      throw new CitizenPayApiError("no pending claim", 404, { error: "no pending claim" });
+    }
+    mockPendingClaims.delete(key);
   }
 
   async setTreasuryMember(holderRef: string, cards: string[]): Promise<void> {

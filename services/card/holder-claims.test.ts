@@ -13,10 +13,12 @@ const prisma = vi.hoisted(() => ({
   member: { findFirst: vi.fn(), updateMany: vi.fn() },
   cardEvent: { create: vi.fn() },
   cardHolderClaim: {
+    findFirst: vi.fn(),
     findMany: vi.fn(),
     updateMany: vi.fn(),
     update: vi.fn(),
     create: vi.fn(),
+    count: vi.fn(),
   },
   $transaction: vi.fn(),
 }));
@@ -33,6 +35,9 @@ vi.mock("@/services/member/api-sync", () => apiSync);
 
 const numbering = vi.hoisted(() => ({ nextCardNumber: vi.fn() }));
 vi.mock("./numbering", () => numbering);
+
+const publish = vi.hoisted(() => ({ scheduleCardHolderNamePublish: vi.fn() }));
+vi.mock("./publish-holder-name", () => publish);
 
 import { CitizenPayApiError } from "@/services/citizenpay/api";
 
@@ -83,6 +88,7 @@ const noHolder = {
   pendingHolderRef: null,
   pendingProof: null,
   pendingSince: null,
+  pendingKnown: true,
   appOwnerLinked: false,
 };
 
@@ -112,6 +118,8 @@ beforeEach(() => {
   prisma.cardHolderClaim.updateMany.mockResolvedValue({ count: 0 });
   prisma.cardHolderClaim.update.mockResolvedValue({});
   prisma.cardHolderClaim.create.mockResolvedValue({ id: "claim-new" });
+  prisma.cardHolderClaim.count.mockResolvedValue(0);
+  prisma.cardHolderClaim.findFirst.mockResolvedValue(null);
   cp.getCardHolder.mockResolvedValue({
     ...noHolder,
     holderRef: LOGIN,
@@ -476,5 +484,80 @@ describe("listCardHolderClaims", () => {
     const items = await listCardHolderClaims("fund-1");
     expect(items.map((i) => i.id)).toEqual(["p1", "p2", "new-decided", "old-decided"]);
     expect(items[0]).toMatchObject({ cardNumber: null, member: null });
+  });
+});
+
+describe("handleCardHolderEvent — review round 1", () => {
+  it("sends no staff email for the fund's own confirmation, nor for a claim it already holds", async () => {
+    cp.getCardHolder.mockResolvedValue({
+      ...noHolder,
+      holderRef: LOGIN,
+      attachedAt: ATTACHED_AT,
+      proof: "confirmed",
+    });
+    let res = await handleCardHolderEvent(fund, event({ proof: "confirmed" }));
+    expect(res.outcome).toBe("APPLIED");
+    expect(emails.sendCardClaimedFromWalletEmails).not.toHaveBeenCalled();
+
+    cp.getCardHolder.mockResolvedValue({
+      ...noHolder,
+      holderRef: LOGIN,
+      attachedAt: ATTACHED_AT,
+      proof: "payment",
+    });
+    prisma.cardHolderClaim.count.mockResolvedValue(1);
+    res = await handleCardHolderEvent(fund, event());
+    expect(res.outcome).toBe("APPLIED");
+    expect(prisma.cardHolderClaim.count).toHaveBeenCalledWith({
+      where: { fundId: "fund-1", serial: "SER1", holderRef: LOGIN, status: { in: ["PENDING", "CONFIRMED"] } },
+    });
+    expect(emails.sendCardClaimedFromWalletEmails).not.toHaveBeenCalled();
+    expect(publish.scheduleCardHolderNamePublish).toHaveBeenCalledWith(fund, "card-1");
+  });
+
+  it("binds nothing while member login is off at the fund", async () => {
+    const res = await handleCardHolderEvent({ ...fund, memberLoginEnabled: false }, event());
+    expect(res).toEqual({ outcome: "IGNORED", detail: "member login is off at this fund" });
+    expect(prisma.card.update).not.toHaveBeenCalled();
+  });
+
+  it("gives a member without a primary card this one", async () => {
+    await handleCardHolderEvent(fund, event());
+    expect(prisma.member.updateMany).toHaveBeenCalledWith({
+      where: { id: "m1", primaryCardId: null },
+      data: { primaryCardId: "card-1" },
+    });
+  });
+
+  it("reads a P2002 on the pending claim as a concurrent delivery and refreshes that row", async () => {
+    cp.getCardHolder.mockResolvedValue({
+      ...noHolder,
+      pendingHolderRef: LOGIN,
+      pendingProof: "pending",
+      pendingSince: ATTACHED_AT,
+    });
+    prisma.cardHolderClaim.create.mockRejectedValueOnce(
+      Object.assign(new Error("unique"), { code: "P2002" }),
+    );
+    prisma.cardHolderClaim.findFirst.mockResolvedValueOnce({ id: "claim-raced" });
+    const res = await handleCardHolderEvent(fund, event({ type: "card.claim_pending", proof: "pending" }));
+    expect(res).toEqual({
+      outcome: "APPLIED",
+      detail: "claim pending (fund to confirm); already on file, refreshed",
+    });
+    expect(prisma.cardHolderClaim.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "claim-raced" } }),
+    );
+  });
+
+  it("leaves open claims alone when the holder read does not expose the pending field", async () => {
+    prisma.card.findFirst.mockResolvedValue(unboundCard);
+    cp.getCardHolder.mockResolvedValue({ ...noHolder, pendingKnown: false });
+    await handleCardHolderEvent(fund, event({ type: "card.attached" }));
+    expect(prisma.cardHolderClaim.updateMany).not.toHaveBeenCalled();
+    await handleCardHolderEvent(fund, event({ type: "card.detached" }));
+    expect(prisma.cardHolderClaim.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: "SUPERSEDED" }) }),
+    );
   });
 });

@@ -88,7 +88,9 @@ export async function POST(request: NextRequest) {
   } catch (e) {
     if ((e as { code?: string }).code !== "P2002") throw e;
     const seen = await prisma.citizenPayEvent.findUnique({
-      where: { fundId_eventId: { fundId: fund.id, eventId: payload.id } },
+      where: {
+        fundId_type_eventId: { fundId: fund.id, type: payload.type, eventId: payload.id },
+      },
       select: { id: true, outcome: true },
     });
     if (!seen) throw e;

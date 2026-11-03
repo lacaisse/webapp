@@ -199,15 +199,18 @@ export type CardPinEvent = {
 
 // The holder state of one card at Citizen Pay (`GET
 // /v2/treasury/cards/{serial}/holder`, plan "Bread card-holder voting", api
-// PR A). `holderRef` is the La Caisse User id the card is attached to (the
-// wallet JWT's `sub`) — null = public. `proof` says how the attachment was
-// proven: `app` (already linked in the app), `bound` (the fund had assigned
-// the card to that member), `payment` (one recent card payment), `fund` (the
-// fund confirmed or attached it itself). `pendingHolderRef` names a claim the
-// api left for the fund to confirm (D13 `needs_proof`); null when none.
+// PR A, docs/card-claim.md). `holderRef` is the La Caisse User id the card
+// is attached to (the wallet JWT's `sub`) — null = public. `proof` is the
+// api's word for how the attachment came about: `treasury` (the fund's own
+// PUT), `fund` (the fund had bound the serial to that member, so the wallet
+// claim needed no proof), `payment` (one recent card payment), `confirmed`
+// (the fund confirmed a pending claim). `pendingHolderRef` names the newest
+// claim the api left for the fund to confirm (`pending`, proof `pending`);
+// `pendingKnown` says whether the read exposed that field at all (an api
+// that predates it leaves it out, and absence must not read as "none").
 // `appOwnerLinked` is the legacy phone claim (`cards.owner`). Fields the api
 // does not send are null / false.
-export type CardClaimProof = "app" | "bound" | "payment" | "fund" | "pending";
+export type CardClaimProof = "treasury" | "fund" | "payment" | "confirmed" | "pending";
 
 export type CardHolderInfo = {
   holderRef: string | null;
@@ -216,6 +219,7 @@ export type CardHolderInfo = {
   pendingHolderRef: string | null;
   pendingProof: string | null;
   pendingSince: string | null; // ISO 8601
+  pendingKnown: boolean;
   appOwnerLinked: boolean;
 };
 

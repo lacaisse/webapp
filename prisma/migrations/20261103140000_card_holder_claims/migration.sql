@@ -72,3 +72,13 @@ ALTER TABLE "CardHolderClaim" ADD CONSTRAINT "CardHolderClaim_memberId_fkey" FOR
 
 -- AddForeignKey
 ALTER TABLE "CardHolderClaim" ADD CONSTRAINT "CardHolderClaim_decidedById_fkey" FOREIGN KEY ("decidedById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- One open claim per card: the handler's find-then-create is not enough
+-- under two concurrent deliveries; a P2002 here is read as "refresh".
+CREATE UNIQUE INDEX "CardHolderClaim_fundId_serial_pending_key" ON "CardHolderClaim"("fundId", "serial") WHERE "status" = 'PENDING';
+
+-- The api namespaces its event ids per kind ("pin:12", "holder:12",
+-- "claim:12"); the receiver's idempotency key carries the type as well so it
+-- never depends on that namespacing.
+DROP INDEX "CitizenPayEvent_fundId_eventId_key";
+CREATE UNIQUE INDEX "CitizenPayEvent_fundId_type_eventId_key" ON "CitizenPayEvent"("fundId", "type", "eventId");

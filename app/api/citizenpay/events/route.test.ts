@@ -20,7 +20,14 @@ const prisma = vi.hoisted(() => ({
   merchant: { findFirst: vi.fn() },
   // The holder events (services/card/holder-claims.ts).
   member: { findFirst: vi.fn(), updateMany: vi.fn() },
-  cardHolderClaim: { findMany: vi.fn(), updateMany: vi.fn(), update: vi.fn(), create: vi.fn() },
+  cardHolderClaim: {
+    findFirst: vi.fn(),
+    findMany: vi.fn(),
+    updateMany: vi.fn(),
+    update: vi.fn(),
+    create: vi.fn(),
+    count: vi.fn(),
+  },
   $transaction: vi.fn(),
 }));
 vi.mock("@/services/db/prisma", () => ({ prisma }));
@@ -33,6 +40,7 @@ vi.mock("@/services/card/pin-block-emails", () => emails);
 
 const claimEmails = vi.hoisted(() => ({ sendCardClaimedFromWalletEmails: vi.fn() }));
 vi.mock("@/services/card/holder-claim-emails", () => claimEmails);
+vi.mock("@/services/card/publish-holder-name", () => ({ scheduleCardHolderNamePublish: vi.fn() }));
 const apiSync = vi.hoisted(() => ({ scheduleMemberApiSync: vi.fn() }));
 vi.mock("@/services/member/api-sync", () => apiSync);
 
@@ -51,6 +59,7 @@ const fund = {
   citizenPayApiKeyEnc: "enc:apikey",
   citizenPayEventsSecretEnc: `enc:${SECRET}`,
   citizenPayTreasurySlug: "acme",
+  memberLoginEnabled: true,
 };
 const localCard = {
   id: "card-1",
@@ -146,6 +155,7 @@ beforeEach(() => {
   prisma.cardHolderClaim.updateMany.mockResolvedValue({ count: 0 });
   prisma.$transaction.mockImplementation(async (ops: Promise<unknown>[]) => Promise.all(ops));
   claimEmails.sendCardClaimedFromWalletEmails.mockResolvedValue(1);
+  prisma.cardHolderClaim.count.mockResolvedValue(0);
 });
 
 describe("POST /api/citizenpay/events — the door", () => {
@@ -386,10 +396,11 @@ describe("POST /api/citizenpay/events — holder events", () => {
     cp.getCardHolder.mockResolvedValue({
       holderRef: LOGIN,
       attachedAt: BLOCKED_AT,
-      proof: "bound",
+      proof: "fund",
       pendingHolderRef: null,
       pendingProof: null,
       pendingSince: null,
+      pendingKnown: true,
       appOwnerLinked: false,
     });
 
@@ -400,7 +411,7 @@ describe("POST /api/citizenpay/events — holder events", () => {
         project: "acme",
         serial: "SER1",
         holder_ref: LOGIN,
-        proof: "bound",
+        proof: "fund",
         at: BLOCKED_AT,
       }),
     );
@@ -420,7 +431,7 @@ describe("POST /api/citizenpay/events — holder events", () => {
         kind: "HOLDER_ATTACHED",
         source: "WEBHOOK",
         citizenPayEventId: "77",
-        detail: "bound",
+        detail: "fund",
       }),
       select: { id: true },
     });
@@ -428,7 +439,7 @@ describe("POST /api/citizenpay/events — holder events", () => {
     expect(emails.sendCardPinBlockedEmails).not.toHaveBeenCalled();
     expect(prisma.citizenPayEvent.update).toHaveBeenCalledWith({
       where: { id: "row-1" },
-      data: { outcome: "APPLIED", detail: "bound to member (proof: bound); 1 staff email(s)" },
+      data: { outcome: "APPLIED", detail: "bound to member (proof: fund); 1 staff email(s)" },
     });
   });
 

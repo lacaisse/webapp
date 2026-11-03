@@ -3779,19 +3779,19 @@
             "textBody": "Bonjour,\n\n{holder} a revendiqué la carte {serial} depuis le portefeuille de carte le {date}, avec son accès {fundName}. Preuve de possession : {proof}.\n\nLa carte est désormais rattachée à cet accès : elle est privée sur le portefeuille et peut voter. Si ce n'est pas correct, un admin de {fundName} peut la détacher depuis la page de la carte :\n\n{cardUrl}\n\nL'équipe {fundName}",
             "ctaLabel": "Ouvrir la carte",
             "proof": {
-              "app": "déjà liée à son téléphone dans l'app",
-              "bound": "la carte lui était attribuée ici",
+              "treasury": "rattachée par la caisse",
+              "fund": "la carte lui était attribuée ici, sans preuve nécessaire",
               "payment": "un paiement récent effectué avec la carte",
-              "fund": "confirmée par la caisse",
+              "confirmed": "confirmée par la caisse",
               "unknown": "non précisée"
             }
           }
         },
         "proof": {
-          "app": "Liée dans l'app",
-          "bound": "Attribuée ici",
+          "treasury": "Rattachée par la caisse",
+          "fund": "Attribuée ici, sans preuve",
           "payment": "Paiement récent",
-          "fund": "Confirmée par la caisse",
+          "confirmed": "Confirmée par la caisse",
           "pending": "En attente",
           "unknown": "Non précisée"
         },
@@ -3802,8 +3802,10 @@
           "loginRemoved": "Ce membre n'a plus d'accès vérifié.",
           "notAttached": "Cette carte n'est rattachée à aucun accès.",
           "apiNotDeployed": "Citizen Pay ne propose pas encore cette fonction. Réessayez après la prochaine mise à jour de l'api.",
-          "apiRefused": "Citizen Pay a refusé : il n'y a plus de revendication en attente pour cet accès.",
-          "failed": "Une erreur s'est produite. Réessayez."
+          "apiRefused": "Citizen Pay a refusé : la carte a été rattachée à un autre accès entre-temps.",
+          "failed": "Une erreur s'est produite. Réessayez.",
+          "loginDisabled": "L'accès des membres est désactivé pour cette caisse : activez-le dans Paramètres → Inscription avant de confirmer une demande.",
+          "legacyOwner": "Citizen Pay a refusé : un compte téléphone détient encore cette carte. Détachez-le d'abord, puis confirmez."
         },
         "card": {
           "title": "Accès du porteur",

@@ -373,10 +373,11 @@ export async function sendCardPinBlockedHolder(args: {
   });
 }
 
-// The proof words the api sends on a wallet claim (`card.attached`), each with
-// its own phrase in `cards.admin.holderClaims.email.staff.proof`; anything
-// else reads as "not stated".
-const WALLET_CLAIM_PROOFS = new Set(["app", "bound", "payment", "fund"]);
+// The proof words the api sends on a wallet claim (`card.attached`,
+// docs/card-claim.md), each with its own phrase in
+// `cards.admin.holderClaims.email.staff.proof`; anything else reads as
+// "not stated".
+const WALLET_CLAIM_PROOFS = new Set(["treasury", "fund", "payment", "confirmed"]);
 
 // A holder claimed one of the fund's cards from the card wallet and Citizen
 // Pay attached it to their login (plan "Bread card-holder voting", events

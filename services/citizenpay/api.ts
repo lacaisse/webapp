@@ -51,6 +51,7 @@ export type CardHolderWire = {
     proof?: string | null;
     requested_at?: string | null;
   } | null;
+  pending_claims?: unknown[] | null;
   pending_holder_ref?: string | null;
   pending_proof?: string | null;
   pending_since?: string | null;
@@ -955,7 +956,24 @@ export const cards = {
       { body: { holder_ref: holderRef }, timeoutMs: opts.timeoutMs ?? 5_000 },
     );
   },
-  // DELETE /cards/{serial}/holder — detach (the card is public again).
+  // POST /cards/{serial}/holder/refuse — the fund refuses ONE login's pending
+  // claim and touches no holder (DELETE …/holder would detach the holder and
+  // refuse every claim). 404 `no pending claim` when that login has none.
+  refuseHolder(
+    creds: CitizenPayApiCredentials,
+    serial: string,
+    holderRef: string,
+    opts: { timeoutMs?: number } = {},
+  ): Promise<unknown> {
+    return request(
+      creds,
+      "POST",
+      `/v2/treasury/cards/${encodeURIComponent(serial)}/holder/refuse`,
+      { body: { holder_ref: holderRef }, timeoutMs: opts.timeoutMs ?? 5_000 },
+    );
+  },
+  // DELETE /cards/{serial}/holder — detach the holder AND refuse every
+  // pending claim on the card (the card is public again).
   clearHolder(
     creds: CitizenPayApiCredentials,
     serial: string,

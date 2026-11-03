@@ -836,6 +836,10 @@ export class LiveCitizenPayClient implements CitizenPayClient {
     await apiCards.confirmHolder(this.creds, serialNumber, holderRef);
   }
 
+  async refuseCardHolder(serialNumber: string, holderRef: string): Promise<void> {
+    await apiCards.refuseHolder(this.creds, serialNumber, holderRef);
+  }
+
   async setTreasuryMember(holderRef: string, cards: string[]): Promise<void> {
     await apiMembers.put(this.creds, holderRef, cards);
   }
@@ -1483,6 +1487,13 @@ export function cardHolderFromWire(w: CardHolderWire): CardHolderInfo {
     pendingSince: pendingFromState
       ? str(w.attached_at)
       : (str(w.pending?.requested_at) ?? str(w.pending_since)),
+    // The api exposes `pending` as an object or null (plus `pending_claims`);
+    // a read without either comes from an api that predates pending claims.
+    pendingKnown:
+      w.pending !== undefined ||
+      w.pending_claims !== undefined ||
+      w.pending_holder_ref !== undefined ||
+      Boolean(pendingFromState),
     appOwnerLinked: w.app_owner_linked === true,
   };
 }

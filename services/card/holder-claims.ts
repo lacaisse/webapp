@@ -23,6 +23,7 @@ import { scheduleMemberApiSync } from "@/services/member/api-sync";
 import { sendCardClaimedFromWalletEmails } from "./holder-claim-emails";
 import { desiredHolderState } from "./holder-sync";
 import { nextCardNumber } from "./numbering";
+import { scheduleCardHolderNamePublish } from "./publish-holder-name";
 import { normalizeSerial } from "./serial";
 
 // Wallet claims of the fund's cards (plan "Bread card-holder voting", PR
@@ -289,6 +290,11 @@ export async function bindCardToHolder(args: {
       where: { id: args.card.id },
       data: { memberId: args.memberId, formerMemberId: null },
     }),
+    // A member without a primary card gets this one, as activation does.
+    prisma.member.updateMany({
+      where: { id: args.memberId, primaryCardId: null },
+      data: { primaryCardId: args.card.id },
+    }),
     ...(previous
       ? [
           prisma.member.updateMany({
@@ -404,21 +410,44 @@ export async function openPendingClaim(args: {
     });
     return { claimId: same.id, refreshed: true };
   }
-  const row = await prisma.cardHolderClaim.create({
-    data: {
-      fundId: args.fundId,
-      serial,
-      cardId: args.cardId,
-      holderRef: args.holderRef,
-      memberId: args.memberId,
-      proof: "pending",
-      status: "PENDING",
-      citizenPayEventId: args.citizenPayEventId,
-      requestedAt: args.requestedAt,
-    },
-    select: { id: true },
-  });
-  return { claimId: row.id, refreshed: false };
+  try {
+    const row = await prisma.cardHolderClaim.create({
+      data: {
+        fundId: args.fundId,
+        serial,
+        cardId: args.cardId,
+        holderRef: args.holderRef,
+        memberId: args.memberId,
+        proof: "pending",
+        status: "PENDING",
+        citizenPayEventId: args.citizenPayEventId,
+        requestedAt: args.requestedAt,
+      },
+      select: { id: true },
+    });
+    return { claimId: row.id, refreshed: false };
+  } catch (e) {
+    // The partial unique index (one PENDING per fund + serial) caught a
+    // concurrent delivery: that row is the claim, refreshed like a redelivery.
+    if ((e as { code?: string }).code !== "P2002") throw e;
+    const raced = await prisma.cardHolderClaim.findFirst({
+      where: { fundId: args.fundId, serial, status: "PENDING" },
+      select: { id: true },
+    });
+    if (!raced) throw e;
+    await prisma.cardHolderClaim.update({
+      where: { id: raced.id },
+      data: {
+        holderRef: args.holderRef,
+        citizenPayEventId: args.citizenPayEventId,
+        requestedAt: args.requestedAt,
+        memberId: args.memberId,
+        cardId: args.cardId,
+        proof: "pending",
+      },
+    });
+    return { claimId: raced.id, refreshed: true };
+  }
 }
 
 // =============================================================================
@@ -480,7 +509,7 @@ export async function handleCardHolderEvent(
   if (pendingPayload && payload.holder_ref) {
     return applyPendingClaim(fund, payload, serial, payload.holder_ref, payload.at ?? null);
   }
-  return applyDetachment(fund, payload, serial);
+  return applyDetachment(fund, payload, serial, holder);
 }
 
 async function applyAttachment(
@@ -501,7 +530,27 @@ async function applyAttachment(
     return ignored("holder is not a member of this fund");
   }
 
+  // With member login off the holder sync would detach it again at once:
+  // the fund turned the feature off, so nothing is bound here.
+  if (!fund.memberLoginEnabled) {
+    return ignored("member login is off at this fund");
+  }
+
   const { card } = await ensureFundCard(fund, serial);
+  // The fund's own doing — its confirmation of a pending claim (proof
+  // `confirmed`), or a claim by this login it already holds as PENDING or
+  // CONFIRMED — is no news to its staff: no email for those. Read before
+  // the claims are settled below.
+  const ownConfirmation =
+    holder.proof === "confirmed" ||
+    (await prisma.cardHolderClaim.count({
+      where: {
+        fundId: fund.id,
+        serial: normalizeSerial(serial),
+        holderRef,
+        status: { in: ["PENDING", "CONFIRMED"] },
+      },
+    })) > 0;
   // The claimant's open claims are settled by this attachment; another
   // claimant's are stale unless the api still shows theirs as pending.
   const settle = async () => {
@@ -536,16 +585,22 @@ async function applyAttachment(
   });
   await settle();
 
-  const staff = await sendCardClaimedFromWalletEmails({
-    fund,
-    card,
-    member,
-    eventId: payload.id,
-    proof,
-    claimedAt: at,
-  });
+  const staff = ownConfirmation
+    ? 0
+    : await sendCardClaimedFromWalletEmails({
+        fund,
+        card,
+        member,
+        eventId: payload.id,
+        proof,
+        claimedAt: at,
+      });
+  // The holder's name on the wallet, as activation and addCard do.
+  scheduleCardHolderNamePublish(fund, card.id);
   scheduleMemberApiSync(previousMemberId ? [member.id, previousMemberId] : member.id);
-  return applied(`bound to member (proof: ${proof ?? "unknown"}); ${staff} staff email(s)`);
+  return applied(
+    `bound to member (proof: ${proof ?? "unknown"}); ${ownConfirmation ? "fund's own confirmation, no email" : `${staff} staff email(s)`}`,
+  );
 }
 
 async function applyPendingClaim(
@@ -591,6 +646,7 @@ async function applyDetachment(
   fund: EventFund,
   payload: CitizenPayEventPayload,
   serial: string,
+  holder: CardHolderInfo,
 ): Promise<Outcome> {
   // An event that announced an attachment or a claim the read does not show
   // says so: the api's state moved on (an out-of-order delivery).
@@ -601,8 +657,13 @@ async function applyDetachment(
         ? `api shows no pending claim (${detail})`
         : detail;
 
-  // Nothing is pending at the api: any open claim here is stale.
-  await closePendingClaims({ fundId: fund.id, serial, status: "SUPERSEDED" });
+  // Nothing is pending at the api: any open claim here is stale. Only when
+  // the read actually exposed its `pending` field (as null) or the event is
+  // the detachment itself, which refuses every claim — an api read that
+  // predates pending claims says nothing about them.
+  if (holder.pendingKnown || payload.type === "card.detached") {
+    await closePendingClaims({ fundId: fund.id, serial, status: "SUPERSEDED" });
+  }
 
   const card = await findFundCard(fund.id, serial);
   if (!card?.memberId || !card.member) return ignored(say("already detached"));
@@ -625,6 +686,8 @@ async function applyDetachment(
       citizenPayEventId: payload.id,
     },
   });
+  // Back to CP's default wallet name, as the fund's own Detach does.
+  scheduleCardHolderNamePublish(fund, card.id);
   scheduleMemberApiSync(memberId);
   return applied(say("holder detached; card unbound from its member"));
 }
