@@ -212,7 +212,7 @@ async function withdraw(page) {
   const button = page.getByRole("button", { name: /^withdraw$/i }).first();
   await button.waitFor({ timeout: 30_000 });
   await button.click();
-  await page.getByRole("button", { name: /^withdraw$/i }).last().click();
+  await page.getByRole("button", { name: /^withdraw proposal$/i }).click();
   await settle(page);
   log("withdrawn");
 }
