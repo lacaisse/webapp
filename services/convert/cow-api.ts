@@ -29,10 +29,16 @@ import { ConvertError, type Address, type Hex } from "./types";
 // hosted orderbook for the chain. 10 s timeout per request.
 
 const TIMEOUT_MS = 10_000;
-// The hosted orderbook throttles order creation (HTTP 429, keyed on more than
-// the IP — seen on Gnosis after a burst of quotes and one order). One short
-// retry covers a transient bucket; a second 429 is reported as rate_limited.
-const RETRY_429_AFTER_MS = 2_000;
+// The hosted orderbook rate-limits per IP (quotes 10/s, orders 5/s, reads
+// 100/min, and a WAF that is stricter still on /quote), and separately
+// throttles order creation per owner. This app runs on shared cloud egress
+// (Vercel), so a single quote can meet a 429 that other tenants' traffic
+// earned: the orderbook answers with its x402 pay-per-quote pitch. CoW's own
+// guidance is to honour Retry-After and retry a few times; after that the
+// caller hears `rate_limited` — a quota, not an outage.
+const RETRY_429_ATTEMPTS = 3; // requests in all, the first included
+const RETRY_429_BACKOFF_MS = [2_000, 4_000]; // when no Retry-After is sent
+const RETRY_AFTER_MAX_MS = 10_000; // a longer Retry-After is not worth the wait
 
 const COW_API_BY_CHAIN: Record<number, string> = {
   100: "https://api.cow.fi/xdai",
@@ -48,9 +54,9 @@ export function cowApiBaseUrl(chainId: number): string | null {
 // HTTP
 // ---------------------------------------------------------------------------
 
-type HttpResult = { status: number; text: string };
+type HttpResult = { status: number; text: string; retryAfterMs: number | null };
 
-async function send(
+async function sendOnce(
   chainId: number,
   method: "GET" | "POST",
   path: string,
@@ -73,7 +79,48 @@ async function send(
     const reason = e instanceof Error ? e.message : String(e);
     throw new ConvertError("cow_api", `${method} ${path} failed: ${reason}`, { cause: e });
   }
-  return { status: res.status, text: await res.text().catch(() => "") };
+  return {
+    status: res.status,
+    text: await res.text().catch(() => ""),
+    retryAfterMs: retryAfterMs(res.headers.get("retry-after")),
+  };
+}
+
+// Retry-After is seconds or an HTTP date; anything unreadable, negative or
+// longer than we care to wait counts as not sent.
+export function retryAfterMs(header: string | null, now = Date.now()): number | null {
+  if (!header) return null;
+  const h = header.trim();
+  let ms: number;
+  if (/^\d+$/.test(h)) ms = Number(h) * 1000;
+  else {
+    const at = Date.parse(h);
+    if (Number.isNaN(at)) return null;
+    ms = at - now;
+  }
+  if (ms < 0 || ms > RETRY_AFTER_MAX_MS) return null;
+  return ms;
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** `sendOnce`, retried through 429s; still 429 after the last attempt → rate_limited. */
+async function send(
+  chainId: number,
+  method: "GET" | "POST",
+  path: string,
+  body?: unknown,
+): Promise<HttpResult> {
+  let r = await sendOnce(chainId, method, path, body);
+  for (let attempt = 1; r.status === 429 && attempt < RETRY_429_ATTEMPTS; attempt++) {
+    const backoff = RETRY_429_BACKOFF_MS[Math.min(attempt, RETRY_429_BACKOFF_MS.length) - 1];
+    await sleep(r.retryAfterMs ?? backoff);
+    r = await sendOnce(chainId, method, path, body);
+  }
+  if (r.status === 429) {
+    throw new ConvertError("rate_limited", `${method} ${path} HTTP 429: ${r.text.slice(0, 300)}`);
+  }
+  return r;
 }
 
 function httpError(method: string, path: string, r: HttpResult): ConvertError {
@@ -187,14 +234,7 @@ export async function postPreSignOrder(a: {
     signingScheme: "presign",
     signature: a.owner,
   };
-  let r = await send(a.chainId, "POST", path, body);
-  if (r.status === 429) {
-    await new Promise((resolve) => setTimeout(resolve, RETRY_429_AFTER_MS));
-    r = await send(a.chainId, "POST", path, body);
-    if (r.status === 429) {
-      throw new ConvertError("rate_limited", `POST ${path} HTTP 429: ${r.text.slice(0, 200)}`);
-    }
-  }
+  const r = await send(a.chainId, "POST", path, body);
   if (r.status >= 200 && r.status < 300) {
     const json = parseJson("POST", path, r);
     const answered = shaped("order uid", () => hex(json, "uid"));

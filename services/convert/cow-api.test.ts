@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 import { COW_CONTRACTS_BY_CHAIN } from "./assets";
-import { cowApiBaseUrl, getOrder, getTrades, postPreSignOrder, requestQuote } from "./cow-api";
+import { cowApiBaseUrl, getOrder, getTrades, postPreSignOrder, requestQuote, retryAfterMs } from "./cow-api";
 import { APP_DATA_DOC, APP_DATA_HASH, orderUid, type CowOrder } from "./cow-order";
 
 // The orderbook client against a stubbed fetch: request shapes, the answers
@@ -43,8 +43,14 @@ function stubFetch(responder: (url: string, init?: RequestInit, n?: number) => R
     }),
   );
 }
-const json = (status: number, body: unknown) =>
-  new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+const json = (status: number, body: unknown, headers: Record<string, string> = {}) =>
+  new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", ...headers } });
+// The hosted orderbook's 429 for a quote from a shared cloud IP (seen from
+// Vercel on 2026-11-04): the pitch for its paid quote service.
+const THROTTLED = {
+  error:
+    "You can use x402.api.cow.fi for pay-as-you-go requests. Docs: https://x402.cow.fi/docs. If you route more than $1M in monthly trading volume, reach out to @MooKeeper on the CoW Protocol Discord server to discuss a partner integration.",
+};
 const bodyOf = (c: Call) => JSON.parse(String(c.init?.body)) as Record<string, unknown>;
 
 beforeEach(() => {
@@ -122,6 +128,78 @@ describe("requestQuote", () => {
     await expect(requestQuote(100, req)).rejects.toMatchObject({ code: "cow_api" });
     await expect(requestQuote(1, req)).rejects.toMatchObject({ code: "config" });
   });
+
+  const req = {
+    sellToken: EURE,
+    buyToken: WXDAI,
+    owner: SAFE,
+    sellAmountBeforeFee: BigInt("500000000000000000"),
+    appDataDoc: APP_DATA_DOC,
+    appDataHash: APP_DATA_HASH,
+    validFor: 600,
+  };
+  const QUOTE = {
+    quote: { sellAmount: "499999994414625623", feeAmount: "5585374377", buyAmount: "560166047667388179", validTo: 1794295416 },
+    expiration: "2026-11-03T08:00:00Z",
+    id: 7,
+  };
+
+  it("a 429 is retried: 2 s, then 4 s, before the quota is reported as rate_limited", async () => {
+    vi.useFakeTimers();
+    try {
+      stubFetch((_url, _init, n) => (n === 3 ? json(200, QUOTE) : json(429, THROTTLED)));
+      const p = requestQuote(100, req);
+      await vi.advanceTimersByTimeAsync(2_000);
+      expect(calls).toHaveLength(2);
+      await vi.advanceTimersByTimeAsync(3_999);
+      expect(calls).toHaveLength(2);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(calls).toHaveLength(3);
+      await expect(p).resolves.toMatchObject({ buyAmount: BigInt("560166047667388179"), id: 7 });
+
+      stubFetch(() => json(429, THROTTLED));
+      const q = requestQuote(100, req);
+      const expectation = expect(q).rejects.toMatchObject({
+        code: "rate_limited",
+        message: expect.stringContaining("x402.api.cow.fi"),
+      });
+      await vi.advanceTimersByTimeAsync(6_000);
+      await expectation;
+      expect(calls).toHaveLength(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("honours Retry-After when the orderbook sends one", async () => {
+    vi.useFakeTimers();
+    try {
+      stubFetch((_url, _init, n) => (n === 1 ? json(429, THROTTLED, { "retry-after": "1" }) : json(200, QUOTE)));
+      const p = requestQuote(100, req);
+      await vi.advanceTimersByTimeAsync(999);
+      expect(calls).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(calls).toHaveLength(2);
+      await expect(p).resolves.toMatchObject({ id: 7 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("retryAfterMs", () => {
+  it("seconds, an HTTP date, nothing readable, and nothing worth waiting for", () => {
+    const now = Date.parse("2026-11-04T17:00:00Z");
+    expect(retryAfterMs("2", now)).toBe(2_000);
+    expect(retryAfterMs(" 0 ", now)).toBe(0);
+    expect(retryAfterMs("Wed, 04 Nov 2026 17:00:05 GMT", now)).toBe(5_000);
+    expect(retryAfterMs("Wed, 04 Nov 2026 16:59:00 GMT", now)).toBeNull();
+    expect(retryAfterMs("soon", now)).toBeNull();
+    expect(retryAfterMs("", now)).toBeNull();
+    expect(retryAfterMs(null, now)).toBeNull();
+    expect(retryAfterMs("11", now)).toBeNull();
+    expect(retryAfterMs("10", now)).toBe(10_000);
+  });
 });
 
 describe("postPreSignOrder", () => {
@@ -158,7 +236,7 @@ describe("postPreSignOrder", () => {
     await expect(postPreSignOrder(args)).resolves.toBeUndefined();
   });
 
-  it("retries one 429 after a pause; a second 429 is rate_limited", async () => {
+  it("retries a 429 twice with backoff; a third 429 is rate_limited", async () => {
     vi.useFakeTimers();
     try {
       stubFetch((_url, _init, n) => (n === 1 ? json(429, { error: "rate limit" }) : json(201, UID)));
@@ -170,9 +248,9 @@ describe("postPreSignOrder", () => {
       stubFetch(() => json(429, { error: "rate limit" }));
       const q = postPreSignOrder(args);
       const expectation = expect(q).rejects.toMatchObject({ code: "rate_limited" });
-      await vi.advanceTimersByTimeAsync(2_000);
+      await vi.advanceTimersByTimeAsync(6_000);
       await expectation;
-      expect(calls).toHaveLength(2);
+      expect(calls).toHaveLength(3);
     } finally {
       vi.useRealTimers();
     }

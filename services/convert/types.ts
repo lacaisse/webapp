@@ -146,7 +146,7 @@ export function legQuoteFromJson(j: JsonLegQuote): LegQuote {
 export type ConvertErrorCode =
   | "config" // env / contracts missing for the chain
   | "cow_api" // CoW orderbook HTTP / shape error
-  | "rate_limited" // the orderbook throttled order creation (429 twice)
+  | "rate_limited" // the orderbook answered 429 through the retries (per-IP quota or per-owner order throttle)
   | "no_pair" // no converter for (from, to), or the fund does not show both
   | "quote_failed" // the outside service gave no usable quote
   | "quote_moved" // fresh minimum below what the user accepted
