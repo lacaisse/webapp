@@ -53,6 +53,7 @@ vi.mock("@/services/transaction-annotation/annotate", () => annotate);
 const cowApi = vi.hoisted(() => ({
   requestQuote: vi.fn(),
   preparedQuoteRequest: vi.fn(),
+  preparedOrderRequest: vi.fn(() => ({ method: "POST", url: "https://cow.test/api/v1/orders", headers: {}, body: "{}" })),
   postPreSignOrder: vi.fn(),
   getOrder: vi.fn(),
   getTrades: vi.fn(),
@@ -78,6 +79,7 @@ import {
   ORDER_VALID_FOR_S,
   cancelConversion,
   checkCalls,
+  completeStart,
   continueConversion,
   prepareQuote,
   quoteConversion,
@@ -175,9 +177,18 @@ function summaryOf(i: number) {
   return db.fundSafeTransaction[i].summary as Extract<SafeTxSummary, { kind: "CONVERSION" }>;
 }
 
+// A start in both halves: the browser's order post is answered 201 with the
+// uid the leg computed (postPreSignOrder is mocked, so any uid does).
+const ANSWERED = { status: 201, text: JSON.stringify(`0x${"ab".repeat(56)}`) };
+async function startFully(a: Parameters<typeof startConversion>[0]) {
+  const out = await startConversion(a);
+  if (out.kind === "started") return out.started;
+  return completeStart({ fund: a.fund, safeId: a.safeId, userId: a.userId, ticket: out.ticket, relayed: ANSWERED, now: a.now });
+}
+
 async function quoteAndStart(converterId: string, amount = "50") {
   const quote = await quoteConversion({ fund: FUND, safeId, converterId, amount, slippageBps: 50, now: NOW });
-  const started = await startConversion({
+  const started = await startFully({
     fund: FUND,
     safeId,
     userId: "u-a",
@@ -189,6 +200,7 @@ async function quoteAndStart(converterId: string, amount = "50") {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubEnv("APP_CRED_KEY", "11".repeat(32)); // seals the start ticket
   resetFake();
   relayer.isRelayerConfigured.mockReturnValue(true);
   relayer.execSafeTransaction.mockResolvedValue({ txHash: EXEC_HASH });
@@ -235,6 +247,65 @@ describe("a quote the admin's browser fetches", () => {
     // Without one, the leg calls out itself.
     await quoteConversion({ fund: FUND, safeId, converterId: "eure-bread", amount: "50", slippageBps: 50, now: NOW });
     expect(cowApi.requestQuote).toHaveBeenLastCalledWith(100, expect.anything(), { relayed: undefined, now: NOW });
+  });
+});
+
+describe("the order post the admin's browser carries (start → relay → completeStart)", () => {
+  const ORDER_REQ = { method: "POST" as const, url: "https://cow.test/api/v1/orders", headers: {}, body: '{"kind":"sell"}' };
+  const input = (minOut: string) => ({ converterId: "eure-bread", amount: "50", minOut, slippageBps: 50 });
+
+  it("stops after the quote with the post to make and a sealed ticket; nothing posted, nothing written", async () => {
+    seed(ONE_OF_ONE);
+    cowApi.preparedOrderRequest.mockReturnValue(ORDER_REQ);
+    const quote = await quoteConversion({ fund: FUND, safeId, converterId: "eure-bread", amount: "50", slippageBps: 50, now: NOW });
+    const out = await startConversion({ fund: FUND, safeId, userId: "u-a", input: input(quote.minOut), now: NOW });
+    expect(out.kind).toBe("relay");
+    if (out.kind !== "relay") throw new Error("unreachable");
+    expect(out.request).toEqual(ORDER_REQ);
+    expect(cowApi.preparedOrderRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ chainId: 100, owner: getAddress(String(db.fundSafe[0].address)), order: expect.objectContaining({ sellAmount: IN, buyAmount: MIN }) }),
+    );
+    expect(out.ticket).toMatch(/^v2:/); // sealed, bound to fund + Safe + admin
+    expect(cowApi.postPreSignOrder).not.toHaveBeenCalled();
+    expect(db.fundConversion).toHaveLength(0);
+    expect(db.fundSafeTransaction).toHaveLength(0);
+
+    // The answer comes back: the leg reads it (no call of its own), the row
+    // and the proposal follow as a one-shot start would have made them.
+    const started = await completeStart({ fund: FUND, safeId, userId: "u-a", ticket: out.ticket, relayed: ANSWERED, now: NOW });
+    expect(cowApi.postPreSignOrder).toHaveBeenCalledTimes(1);
+    expect(cowApi.postPreSignOrder.mock.calls[0][1]).toEqual(ANSWERED);
+    expect(cowApi.postPreSignOrder.mock.calls[0][0]).toMatchObject({ chainId: 100, order: expect.objectContaining({ sellAmount: IN, buyAmount: MIN }) });
+    expect(db.fundConversion).toHaveLength(1);
+    expect(db.fundConversion[0]).toMatchObject({ id: started.conversionId, status: "FILLING", minOut: MIN.toString(), expectedOut: QUOTED.toString() }); // 1-of-1: the proposal ran at once
+    expect(summaryOf(0)).toMatchObject({ kind: "CONVERSION", step: 1, label: "swap" });
+    expect(cowApi.requestQuote).toHaveBeenCalledTimes(2); // the quote, the start; none on completion
+  });
+
+  it("with no answer (the browser could not post) the server posts itself", async () => {
+    seed(ONE_OF_ONE);
+    const quote = await quoteConversion({ fund: FUND, safeId, converterId: "eure-bread", amount: "50", slippageBps: 50, now: NOW });
+    const out = await startConversion({ fund: FUND, safeId, userId: "u-a", input: input(quote.minOut), now: NOW });
+    if (out.kind !== "relay") throw new Error("expected a relay");
+    await completeStart({ fund: FUND, safeId, userId: "u-a", ticket: out.ticket, relayed: null, now: NOW });
+    expect(cowApi.postPreSignOrder.mock.calls[0][1]).toBeNull();
+    expect(db.fundConversion).toHaveLength(1);
+  });
+
+  it("refuses a ticket from another admin, an altered one, and one past its five minutes", async () => {
+    seed({ threshold: 1, owners: [{ userId: "u-a", address: "0x00000000000000000000000000000000000000Aa", byte: "aa" }] });
+    db.fundMember.push({ fundId: FUND.id, userId: "u-b", role: "ADMIN" });
+    const quote = await quoteConversion({ fund: FUND, safeId, converterId: "eure-bread", amount: "50", slippageBps: 50, now: NOW });
+    const out = await startConversion({ fund: FUND, safeId, userId: "u-a", input: input(quote.minOut), now: NOW });
+    if (out.kind !== "relay") throw new Error("expected a relay");
+    await expect(completeStart({ fund: FUND, safeId, userId: "u-b", ticket: out.ticket, relayed: ANSWERED, now: NOW })).rejects.toMatchObject({ code: "invalid_state" });
+    const altered = out.ticket.slice(0, -4) + (out.ticket.endsWith("AAAA") ? "BBBB" : "AAAA");
+    await expect(completeStart({ fund: FUND, safeId, userId: "u-a", ticket: altered, relayed: ANSWERED, now: NOW })).rejects.toMatchObject({ code: "invalid_state" });
+    await expect(
+      completeStart({ fund: FUND, safeId, userId: "u-a", ticket: out.ticket, relayed: ANSWERED, now: new Date(NOW.getTime() + 5 * 60_000 + 1) }),
+    ).rejects.toMatchObject({ code: "quote_moved" });
+    expect(cowApi.postPreSignOrder).not.toHaveBeenCalled();
+    expect(db.fundConversion).toHaveLength(0);
   });
 });
 
@@ -351,18 +422,27 @@ describe("EURe → BREAD on a 1-of-1 Safe", () => {
     const quote = await quoteConversion({ fund: FUND, safeId, converterId: "eure-bread", amount: "50", slippageBps: 50, now: NOW });
     cowApi.requestQuote.mockResolvedValue(cowQuote(E("55"))); // the market moved
     await expect(
-      startConversion({ fund: FUND, safeId, userId: "u-a", input: { converterId: "eure-bread", amount: "50", minOut: quote.minOut, slippageBps: 50 }, now: NOW }),
+      startFully({ fund: FUND, safeId, userId: "u-a", input: { converterId: "eure-bread", amount: "50", minOut: quote.minOut, slippageBps: 50 }, now: NOW }),
     ).rejects.toMatchObject({ code: "quote_moved" });
     expect(cowApi.postPreSignOrder).not.toHaveBeenCalled();
     expect(db.fundConversion).toHaveLength(0);
     expect(db.fundSafeTransaction).toHaveLength(0);
   });
 
+  it("a slight downtick within the accepted minimum still starts, at that minimum", async () => {
+    seed(ONE_OF_ONE);
+    const quote = await quoteConversion({ fund: FUND, safeId, converterId: "eure-bread", amount: "50", slippageBps: 50, now: NOW });
+    cowApi.requestQuote.mockResolvedValue(cowQuote(E("55") + BigInt("900000000000000000"))); // 55.9 expected, above the 55.72 accepted
+    await startFully({ fund: FUND, safeId, userId: "u-a", input: { converterId: "eure-bread", amount: "50", minOut: quote.minOut, slippageBps: 50 }, now: NOW });
+    expect(cowApi.postPreSignOrder.mock.calls[0][0].order.buyAmount).toBe(MIN);
+    expect(db.fundConversion[0].minOut).toBe(MIN.toString());
+  });
+
   it("posts no less than the accepted minimum when the fresh quote is better", async () => {
     seed(ONE_OF_ONE);
     const quote = await quoteConversion({ fund: FUND, safeId, converterId: "eure-bread", amount: "50", slippageBps: 50, now: NOW });
     cowApi.requestQuote.mockResolvedValue(cowQuote(E("57")));
-    await startConversion({ fund: FUND, safeId, userId: "u-a", input: { converterId: "eure-bread", amount: "50", minOut: quote.minOut, slippageBps: 50 }, now: NOW });
+    await startFully({ fund: FUND, safeId, userId: "u-a", input: { converterId: "eure-bread", amount: "50", minOut: quote.minOut, slippageBps: 50 }, now: NOW });
     const freshMin = (E("57") * BigInt(9_950)) / BigInt(10_000);
     expect(cowApi.postPreSignOrder.mock.calls[0][0].order.buyAmount).toBe(freshMin);
     expect(db.fundConversion[0].minOut).toBe(freshMin.toString());

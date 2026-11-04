@@ -3,6 +3,7 @@ import "server-only";
 
 import { decodeFunctionData, getAddress, parseUnits } from "viem";
 
+import { decryptSecret, encryptSecret } from "@/services/crypto/secret";
 import { prisma } from "@/services/db/prisma";
 import {
   loadActiveSafe as loadSafeWithOwners,
@@ -32,7 +33,7 @@ import {
   type QuoteRequest,
   type RelayedHttp,
 } from "./types";
-import { converterContracts, prepareChainQuote, quoteChain, type Position } from "./walk";
+import { converterContracts, legContext, prepareChainQuote, quoteChain, walk, type Position, type Walk } from "./walk";
 
 // Quote / start / continue / cancel — the parts of a conversion that create
 // Safe proposals (through proposals.ts proposeConversionStep). What happens
@@ -268,13 +269,90 @@ export type StartConversionInput = {
   relayed?: RelayedHttp; // the fresh quote, as the browser fetched it (prepareQuote)
 };
 
+export type Started = { conversionId: string; proposal: ProposeResult };
+
+// Starting a conversion stops half-way when its first api step (the CoW
+// order post) is one the holder's browser should make (browser-relay.ts):
+// the browser gets the exact request and a sealed ticket, and brings both
+// the answer and the ticket back to completeStart.
+export type StartOutcome =
+  | { kind: "started"; started: Started }
+  | { kind: "relay"; request: PreparedHttp; ticket: string };
+
+// What completeStart needs to carry on from: the quote the start was
+// checked against (as the leg state), the api step waiting on its answer,
+// and the row's figures. Sealed (AES-GCM, services/crypto/secret.ts) and
+// bound to the fund, Safe and admin, so it is opaque to the browser that
+// carries it, cannot be altered, and cannot be presented elsewhere.
+type StartTicket = {
+  v: 1;
+  fundId: string;
+  safeId: string;
+  userId: string;
+  converterId: string;
+  amountIn: string;
+  expectedOut: string;
+  minOut: string;
+  slippageBps: number;
+  validUntil: string; // ISO
+  state: ConversionState; // leg quotes, no results yet
+  pending: { legIndex: number; data: unknown }; // Leg.apiRequest's pending
+  exp: number; // unix ms
+};
+// A posted order waits a week for its pre-signature; the browser's trip to
+// the orderbook takes seconds. Long enough for a slow network, short enough
+// that a forgotten tab does not start on last week's quote.
+const START_TICKET_TTL_MS = 5 * 60 * 1000;
+
+const ticketAad = (fundId: string, safeId: string, userId: string) => `convert-start:${fundId}:${safeId}:${userId}`;
+
+function sealTicket(t: StartTicket): string {
+  return encryptSecret(JSON.stringify(t), ticketAad(t.fundId, t.safeId, t.userId));
+}
+
+function openTicket(sealed: string, fundId: string, safeId: string, userId: string, now: Date): StartTicket {
+  let json: string;
+  try {
+    json = decryptSecret(sealed, ticketAad(fundId, safeId, userId));
+  } catch (e) {
+    throw new ConvertError("invalid_state", "Start ticket is not for this Safe", { cause: e });
+  }
+  const t = JSON.parse(json) as Partial<StartTicket>;
+  if (
+    t.v !== 1 ||
+    t.fundId !== fundId ||
+    t.safeId !== safeId ||
+    t.userId !== userId ||
+    typeof t.converterId !== "string" ||
+    typeof t.amountIn !== "string" ||
+    !/^\d+$/.test(t.amountIn) ||
+    typeof t.expectedOut !== "string" ||
+    !/^\d+$/.test(t.expectedOut) ||
+    typeof t.minOut !== "string" ||
+    !/^\d+$/.test(t.minOut) ||
+    typeof t.slippageBps !== "number" ||
+    typeof t.validUntil !== "string" ||
+    !t.state ||
+    !Array.isArray(t.state.legs) ||
+    !t.pending ||
+    typeof t.pending.legIndex !== "number" ||
+    typeof t.exp !== "number"
+  ) {
+    throw new ConvertError("invalid_state", "Start ticket is malformed");
+  }
+  if (t.exp <= now.getTime()) throw new ConvertError("quote_moved", "Start ticket expired; quote again");
+  return t as StartTicket;
+}
+
 /**
  * Start a conversion: re-quote, refuse if the market moved below what the
- * user accepted or the Safe does not hold the input, run the api steps (post
- * the CoW order), then create the row and its first Safe proposal. Nothing
- * is written if the order cannot be posted; the row is removed if the
- * proposal cannot be made (the posted order is never pre-signed, so it can
- * never fill).
+ * user accepted or the Safe does not hold the input, then post the CoW
+ * order and make the first Safe proposal (proposeFirstStep). When the swap
+ * leg can hand the order post to the holder's browser, the start stops
+ * there with a `relay` outcome and completeStart finishes it. Nothing is
+ * written before the order is posted; the row is removed if the proposal
+ * cannot be made (the posted order is never pre-signed, so it can never
+ * fill).
  */
 export async function startConversion(a: {
   fund: ConvertFund;
@@ -282,7 +360,7 @@ export async function startConversion(a: {
   userId: string;
   input: StartConversionInput;
   now?: Date;
-}): Promise<{ conversionId: string; proposal: ProposeResult }> {
+}): Promise<StartOutcome> {
   const now = a.now ?? new Date();
   const pair = await pairFor(a.fund, a.input.converterId);
   const { converter } = pair;
@@ -300,8 +378,12 @@ export async function startConversion(a: {
     now,
     relayed: a.input.relayed,
   });
-  if (fresh.minOut < userMin) {
-    throw new ConvertError("quote_moved", `Fresh minimum ${fresh.minOut} is below the accepted ${userMin}`);
+  // The admin accepted a minimum; the order is posted at that minimum as
+  // long as the market is still at or above it. Quotes jitter by hundredths
+  // of a percent between the quote and the click, so comparing the two
+  // minimums instead would refuse every slight downtick.
+  if (fresh.expectedOut < userMin) {
+    throw new ConvertError("quote_moved", `Fresh expected ${fresh.expectedOut} is below the accepted minimum ${userMin}`);
   }
   // The minimum the user accepted is the minimum posted: the registry
   // guarantees one swap leg, so the overall minimum IS that leg's minimum.
@@ -315,14 +397,121 @@ export async function startConversion(a: {
   await requireHolderBalance({ chainId, holder: address, asset: converter.legs[0].from, amountIn });
 
   const state: ConversionState = { legs: legs.map((q) => ({ quote: legQuoteToJson(q), results: [] })) };
-  const w = await runApiSteps({
-    converterId: converter.id,
-    chainId,
-    holder: address,
+  const figures = {
     amountIn,
+    expectedOut: fresh.expectedOut,
+    minOut,
+    slippageBps: a.input.slippageBps,
+    validUntil: fresh.validUntil,
+  };
+
+  // An api step the browser can make: hand it over, with everything needed
+  // to carry on sealed into a ticket.
+  const first = walk({ converter, chainId, holder: address, amountIn, state, now });
+  if (!first.done && first.position.step.kind === "api") {
+    const leg = converter.legs[first.position.legIndex];
+    if (leg.apiRequest) {
+      const { request, pending } = leg.apiRequest(
+        legContext({ chainId, holder: address, amountIn: first.position.amountIn, state, legIndex: first.position.legIndex, now }),
+      );
+      const ticket: StartTicket = {
+        v: 1,
+        fundId: a.fund.id,
+        safeId: a.safeId,
+        userId: a.userId,
+        converterId: converter.id,
+        amountIn: amountIn.toString(),
+        expectedOut: figures.expectedOut.toString(),
+        minOut: minOut.toString(),
+        slippageBps: figures.slippageBps,
+        validUntil: figures.validUntil.toISOString(),
+        state,
+        pending: { legIndex: first.position.legIndex, data: pending },
+        exp: now.getTime() + START_TICKET_TTL_MS,
+      };
+      return { kind: "relay", request, ticket: sealTicket(ticket) };
+    }
+  }
+
+  const w = await runApiSteps({ converterId: converter.id, chainId, holder: address, amountIn, state, now });
+  const started = await proposeFirstStep({ fund: a.fund, userId: a.userId, pair, safe, chainId, address, state, w, ...figures });
+  return { kind: "started", started };
+}
+
+/**
+ * Finish a start the browser carried the order post for: read the answer
+ * into the api step (or post from the server when the browser could not),
+ * then make the first Safe proposal as startConversion would have.
+ */
+export async function completeStart(a: {
+  fund: ConvertFund;
+  safeId: string;
+  userId: string;
+  ticket: string;
+  relayed: RelayedHttp | null;
+  now?: Date;
+}): Promise<Started> {
+  const now = a.now ?? new Date();
+  const t = openTicket(a.ticket, a.fund.id, a.safeId, a.userId, now);
+  const pair = await pairFor(a.fund, t.converterId);
+  const { converter } = pair;
+  const { safe, chainId, address } = await loadActiveSafe(a.fund, a.safeId);
+  const amountIn = BigInt(t.amountIn);
+  const state = t.state;
+
+  const first = walk({ converter, chainId, holder: address, amountIn, state, now });
+  if (first.done || first.position.step.kind !== "api" || first.position.legIndex !== t.pending.legIndex) {
+    throw new ConvertError("invalid_state", "Start ticket is not at its api step");
+  }
+  const leg = converter.legs[first.position.legIndex];
+  if (!leg.apiResult) throw new ConvertError("invalid_state", `Leg ${leg.id} cannot take a relayed answer`);
+  const result = await leg.apiResult(
+    legContext({ chainId, holder: address, amountIn: first.position.amountIn, state, legIndex: first.position.legIndex, now }),
+    t.pending.data,
+    a.relayed,
+  );
+  for (const i of first.position.appliesTo) state.legs[i].results.push(result);
+  const w = await runApiSteps({ converterId: converter.id, chainId, holder: address, amountIn, state, now });
+
+  // Checked at the start too; the Safe must still hold the input now that a
+  // proposal is about to ask for it.
+  await requireHolderBalance({ chainId, holder: address, asset: converter.legs[0].from, amountIn });
+  return proposeFirstStep({
+    fund: a.fund,
+    userId: a.userId,
+    pair,
+    safe,
+    chainId,
+    address,
     state,
-    now,
+    w,
+    amountIn,
+    expectedOut: BigInt(t.expectedOut),
+    minOut: BigInt(t.minOut),
+    slippageBps: t.slippageBps,
+    validUntil: new Date(t.validUntil),
   });
+}
+
+// The order is on the orderbook: create the row and its first Safe
+// proposal. The row is removed if the proposal cannot be made.
+async function proposeFirstStep(a: {
+  fund: ConvertFund;
+  userId: string;
+  pair: OfferedPair;
+  safe: Awaited<ReturnType<typeof loadActiveSafe>>["safe"];
+  chainId: number;
+  address: Address;
+  state: ConversionState;
+  w: Walk;
+  amountIn: bigint;
+  expectedOut: bigint;
+  minOut: bigint;
+  slippageBps: number;
+  validUntil: Date;
+}): Promise<Started> {
+  const { converter } = a.pair;
+  const { w, chainId } = a;
   if (w.done || w.position.step.kind !== "calls") {
     throw new ConvertError("invalid_state", "Conversion does not start with an on-chain step");
   }
@@ -332,19 +521,19 @@ export async function startConversion(a: {
     data: {
       fundId: a.fund.id,
       holderKind: "SAFE",
-      safeId: safe.id,
-      holderAddress: address,
+      safeId: a.safe.id,
+      holderAddress: a.address,
       converterId: converter.id,
       fromAsset: converter.legs[0].from,
       toAsset: converter.legs[converter.legs.length - 1].to,
-      amountIn: amountIn.toString(),
-      expectedOut: fresh.expectedOut.toString(),
-      minOut: minOut.toString(),
-      slippageBps: a.input.slippageBps,
+      amountIn: a.amountIn.toString(),
+      expectedOut: a.expectedOut.toString(),
+      minOut: a.minOut.toString(),
+      slippageBps: a.slippageBps,
       status: "PROPOSED",
       round: 1,
-      state: state as never,
-      validUntil: fresh.validUntil,
+      state: a.state as never,
+      validUntil: a.validUntil,
       createdById: a.userId,
     },
     select: { id: true },
@@ -352,7 +541,7 @@ export async function startConversion(a: {
   try {
     const proposal = await proposeConversionStep({
       fund: { id: a.fund.id, tokenChainId: a.fund.tokenChainId },
-      safe,
+      safe: a.safe,
       userId: a.userId,
       conversionId: row.id,
       calls: w.position.step.calls,
@@ -361,9 +550,9 @@ export async function startConversion(a: {
         converter,
         step: 1,
         position: w.position,
-        from: { symbol: pair.from.symbol, decimals: pair.from.decimals, amountIn },
-        to: { symbol: pair.to.symbol, decimals: pair.to.decimals, minOut },
-        validUntil: fresh.validUntil,
+        from: { symbol: a.pair.from.symbol, decimals: a.pair.from.decimals, amountIn: a.amountIn },
+        to: { symbol: a.pair.to.symbol, decimals: a.pair.to.decimals, minOut: a.minOut },
+        validUntil: a.validUntil,
       }),
     });
     return { conversionId: row.id, proposal };

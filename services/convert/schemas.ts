@@ -49,6 +49,15 @@ export const StartConversionSchema = QuoteConversionSchema.extend({
 });
 export type StartConversionInput = z.input<typeof StartConversionSchema>;
 
+// Finishing a start the browser carried the order post for: the sealed
+// ticket the start action handed out, and the orderbook's answer.
+export const CompleteStartSchema = z.object({
+  safeId: z.string().min(1),
+  ticket: z.string(UNKNOWN).min(1, UNKNOWN).max(65_536, UNKNOWN),
+  relayed: RelayedHttpSchema.optional(),
+});
+export type CompleteStartInput = z.input<typeof CompleteStartSchema>;
+
 export const ConversionIdSchema = z.object({
   safeId: z.string().min(1),
   conversionId: z.string().min(1),

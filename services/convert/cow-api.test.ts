@@ -5,7 +5,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 import { COW_CONTRACTS_BY_CHAIN } from "./assets";
-import { cowApiBaseUrl, getOrder, getTrades, postPreSignOrder, preparedQuoteRequest, requestQuote, retryAfterMs } from "./cow-api";
+import {
+  cowApiBaseUrl,
+  getOrder,
+  getTrades,
+  postPreSignOrder,
+  preparedOrderRequest,
+  preparedQuoteRequest,
+  requestQuote,
+  retryAfterMs,
+} from "./cow-api";
 import { APP_DATA_DOC, APP_DATA_HASH, orderUid, type CowOrder } from "./cow-order";
 
 // The orderbook client against a stubbed fetch: request shapes, the answers
@@ -412,6 +421,46 @@ describe("postPreSignOrder", () => {
     await expect(postPreSignOrder(args)).rejects.toMatchObject({
       code: "cow_api",
       message: expect.stringContaining("InsufficientBalance"),
+    });
+  });
+
+  describe("posted by the browser (preparedOrderRequest → answer)", () => {
+    const answered = (body: unknown, status = 201) => ({ status, text: JSON.stringify(body) });
+    const noFetch = () => stubFetch(() => Promise.reject(new Error("the server must not call out")));
+
+    it("the prepared post is the post the server would make, byte for byte", async () => {
+      stubFetch(() => json(201, UID));
+      await postPreSignOrder(args);
+      expect(preparedOrderRequest(args)).toEqual({
+        method: "POST",
+        url: "https://api.cow.fi/xdai/api/v1/orders",
+        headers: { "content-type": "application/json" },
+        body: String(calls[0].init?.body),
+      });
+    });
+
+    it("reads the uid answered without a call; a wrong uid, or DuplicatedOrder, as from the server", async () => {
+      noFetch();
+      await expect(postPreSignOrder(args, answered(UID))).resolves.toBeUndefined();
+      await expect(postPreSignOrder(args, answered(`0x${"ab".repeat(56)}`))).rejects.toMatchObject({ code: "cow_api" });
+      await expect(postPreSignOrder(args, answered({ errorType: "DuplicatedOrder" }, 400))).resolves.toBeUndefined();
+      await expect(postPreSignOrder(args, answered({ errorType: "InsufficientBalance" }, 400))).rejects.toMatchObject({ code: "cow_api" });
+      expect(calls).toHaveLength(0);
+    });
+
+    it("an answer that is not the orderbook's (the browser's 429, a WAF page) → the server posts", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        for (const bad of [answered(THROTTLED, 429), { status: 403, text: "<html>Attention Required!" }]) {
+          stubFetch(() => json(201, UID));
+          await expect(postPreSignOrder(args, bad)).resolves.toBeUndefined();
+          expect(calls).toHaveLength(1);
+          expect(calls[0].url).toBe("https://api.cow.fi/xdai/api/v1/orders");
+        }
+        expect(warn).toHaveBeenCalledTimes(2);
+      } finally {
+        warn.mockRestore();
+      }
     });
   });
 });

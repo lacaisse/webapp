@@ -13,13 +13,22 @@ import {
 } from "@/services/safe/action-helpers";
 import type { ProposeActionResult } from "@/services/safe/action-types";
 
-import type { CancelConversionResult, PrepareQuoteResult, QuoteActionResult } from "./action-types";
-import { cancelConversion, continueConversion, prepareQuote, quoteConversion, startConversion } from "./engine";
+import type { CancelConversionResult, PrepareQuoteResult, QuoteActionResult, StartActionResult } from "./action-types";
 import {
+  cancelConversion,
+  completeStart,
+  continueConversion,
+  prepareQuote,
+  quoteConversion,
+  startConversion,
+} from "./engine";
+import {
+  CompleteStartSchema,
   ConversionIdSchema,
   QuoteConversionSchema,
   StartConversionSchema,
   type ConversionIdInput,
+  type CompleteStartInput,
   type QuoteConversionInput,
   type StartConversionInput,
 } from "./schemas";
@@ -74,7 +83,10 @@ export async function quoteConversionAction(input: QuoteConversionInput): Promis
   }
 }
 
-export async function startConversionAction(input: StartConversionInput): Promise<ProposeActionResult> {
+// Starting is gated like a proposal from its first half: the order goes out
+// under the fund's name, and the proposal follows seconds later on the same
+// step-up proof.
+export async function startConversionAction(input: StartConversionInput): Promise<StartActionResult> {
   const t = await getTranslations();
   const { fund, user } = await requireFundRole("ADMIN");
   const parsed = StartConversionSchema.safeParse(input);
@@ -86,11 +98,32 @@ export async function startConversionAction(input: StartConversionInput): Promis
 
   try {
     const res = await startConversion({ fund, safeId, userId: user.id, input: rest });
+    if (res.kind === "relay") return { ok: true, relay: { ticket: res.ticket, request: res.request } };
+    revalidateSafe(safeId);
+    return proposed(res.started.proposal);
+  } catch (e) {
+    revalidateSafe(safeId);
+    return { error: convertErrorFor(t, e, "start") };
+  }
+}
+
+export async function completeConversionStartAction(input: CompleteStartInput): Promise<ProposeActionResult> {
+  const t = await getTranslations();
+  const { fund, user } = await requireFundRole("ADMIN");
+  const parsed = CompleteStartSchema.safeParse(input);
+  if (!parsed.success) return { error: t(parsed.error.issues[0].message as never) };
+  const { safeId, ticket, relayed } = parsed.data;
+
+  const stepUp = await requireProposerStepUp(t, { fundId: fund.id, safeId, userId: user.id });
+  if (stepUp) return stepUp;
+
+  try {
+    const res = await completeStart({ fund, safeId, userId: user.id, ticket, relayed: relayed ?? null });
     revalidateSafe(safeId);
     return proposed(res.proposal);
   } catch (e) {
     revalidateSafe(safeId);
-    return { error: convertErrorFor(t, e, "start") };
+    return { error: convertErrorFor(t, e, "complete-start") };
   }
 }
 

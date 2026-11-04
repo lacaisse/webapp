@@ -61,7 +61,7 @@ export type PollResult =
 // An HTTP request the server prepared for the holder's browser to make on
 // its behalf, and the answer the browser brings back. Pure data: the body is
 // the exact bytes to send, the answer the exact bytes received. The browser
-// carries them and decides nothing (services/convert/browser-quote.ts).
+// carries them and decides nothing (services/convert/browser-relay.ts).
 export type PreparedHttp = { method: "POST"; url: string; headers: Record<string, string>; body: string };
 export type RelayedHttp = { status: number; text: string };
 
@@ -114,7 +114,13 @@ export type Leg = {
   next(c: LegContext): Step | null;
   // The leg's actual output once known (exact legs: the input), else null.
   output(c: LegContext): bigint | null;
-  run?(c: LegContext): Promise<StepResult>; // an `api` step
+  run?(c: LegContext): Promise<StepResult>; // an `api` step, made by the server
+  // The same `api` step in two halves, so the holder's browser can make the
+  // call (browser-relay.ts): the request it would make and what the leg
+  // keeps to read the answer, then the result from that answer — or, with
+  // a null answer, from a call the leg makes itself.
+  apiRequest?(c: LegContext): { request: PreparedHttp; pending: unknown };
+  apiResult?(c: LegContext, pending: unknown, answer: RelayedHttp | null): Promise<StepResult>;
   poll?(c: LegContext): Promise<PollResult>; // a `wait` step
 };
 
