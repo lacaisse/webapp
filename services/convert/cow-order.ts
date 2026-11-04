@@ -204,6 +204,13 @@ export function orderFromJson(j: JsonCowOrder): CowOrder {
 export const GPV2_SETTLEMENT_ABI = [
   {
     type: "function",
+    name: "filledAmount",
+    stateMutability: "view",
+    inputs: [{ name: "orderUid", type: "bytes" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
     name: "setPreSignature",
     stateMutability: "nonpayable",
     inputs: [

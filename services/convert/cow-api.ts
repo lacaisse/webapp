@@ -3,7 +3,6 @@ import "server-only";
 
 import {
   ShapeError,
-  addr,
   hex,
   int,
   obj,
@@ -22,8 +21,7 @@ import { ConvertError, type Address, type Hex, type PreparedHttp, type RelayedHt
 //   POST /api/v1/quote           → price for selling an exact amount
 //   POST /api/v1/orders          → post a pre-sign order (body = the order
 //                                  + owner; answers the uid)
-//   GET  /api/v1/orders/{uid}    → status, executed amounts
-//   GET  /api/v1/trades?orderUid → the fills (one for a fill-or-kill order)
+// Fills are read from the chain, not the orderbook (chain.ts).
 //
 // `COW_API_URL` overrides the base (a mock in dev / tests); otherwise the
 // hosted orderbook for the chain. 10 s timeout per request.
@@ -45,9 +43,7 @@ const TIMEOUT_MS = 10_000;
 // How many requests each call may make in all. A quote (the user is
 // waiting, the per-IP bucket refills within seconds) retries twice; an order
 // post once — its throttle is per owner and lasts minutes, a second wait
-// never helps; the status reads not at all: they run inside the Safe page's
-// render and the cron, where a sleep stalls everything behind them, and the
-// next poll comes by itself.
+// never helps.
 const QUOTE_ATTEMPTS = 3;
 const ORDER_ATTEMPTS = 2;
 const RETRY_429_BACKOFF_MS = [2_000, 4_000]; // when no Retry-After is sent
@@ -71,22 +67,15 @@ export function cowApiBaseUrl(chainId: number): string | null {
 
 type HttpResult = { status: number; text: string; retryAfterMs: number | null };
 
-async function sendOnce(
-  chainId: number,
-  method: "GET" | "POST",
-  path: string,
-  body?: unknown,
-): Promise<HttpResult> {
+async function sendOnce(chainId: number, method: "POST", path: string, body: unknown): Promise<HttpResult> {
   const base = cowApiBaseUrl(chainId);
   if (!base) throw new ConvertError("config", `No CoW orderbook for chain ${chainId}`);
-  const headers: Record<string, string> = { accept: "application/json" };
-  if (body !== undefined) headers["content-type"] = "application/json";
   let res: Response;
   try {
     res = await fetch(`${base}${path}`, {
       method,
-      headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      headers: { accept: "application/json", "content-type": "application/json" },
+      body: JSON.stringify(body),
       cache: "no-store",
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
@@ -120,16 +109,16 @@ export function retryAfterMs(header: string | null, now = Date.now()): number | 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * `sendOnce`, retried through 429s up to `attempts` requests in all (default
- * one: no retry); still 429 afterwards, or asked to wait longer than
- * RETRY_AFTER_MAX_MS, → rate_limited.
+ * `sendOnce`, retried through 429s up to `attempts` requests in all; still
+ * 429 afterwards, or asked to wait longer than RETRY_AFTER_MAX_MS, →
+ * rate_limited.
  */
 async function send(
   chainId: number,
-  method: "GET" | "POST",
+  method: "POST",
   path: string,
-  body?: unknown,
-  attempts = 1,
+  body: unknown,
+  attempts: number,
 ): Promise<HttpResult> {
   let r = await sendOnce(chainId, method, path, body);
   for (let attempt = 1; r.status === 429 && attempt < attempts; attempt++) {
@@ -378,76 +367,4 @@ export async function postPreSignOrder(a: OrderPost & { uid: Hex }, answer: Rela
   }
   if (r.status === 400 && /DuplicatedOrder/.test(r.text)) return;
   throw httpError("POST", path, r);
-}
-
-export type CowOrderStatus = "presignaturePending" | "open" | "fulfilled" | "cancelled" | "expired";
-
-export type CowOrderView = {
-  uid: Hex;
-  status: CowOrderStatus;
-  executedSellAmount: bigint;
-  executedBuyAmount: bigint;
-  invalidated: boolean;
-  validTo: number;
-};
-
-const ORDER_STATUSES = new Set<string>([
-  "presignaturePending",
-  "open",
-  "fulfilled",
-  "cancelled",
-  "expired",
-]);
-
-export async function getOrder(chainId: number, uid: Hex): Promise<CowOrderView | null> {
-  const path = `/api/v1/orders/${uid}`;
-  const r = await send(chainId, "GET", path);
-  if (r.status === 404) return null;
-  if (r.status < 200 || r.status >= 300) throw httpError("GET", path, r);
-  const json = parseJson("GET", path, r);
-  return shaped("order", () => {
-    const o = obj(json, "order");
-    const status = str(o.status, "status");
-    if (!ORDER_STATUSES.has(status)) throw new ShapeError(`unknown status ${status}`);
-    return {
-      uid: hex(o.uid, "uid"),
-      status: status as CowOrderStatus,
-      executedSellAmount: uint(o.executedSellAmount, "executedSellAmount"),
-      executedBuyAmount: uint(o.executedBuyAmount, "executedBuyAmount"),
-      invalidated: o.invalidated === true,
-      validTo: int(o.validTo, "validTo"),
-    };
-  });
-}
-
-export type CowTrade = {
-  orderUid: Hex;
-  owner: Address;
-  sellAmount: bigint;
-  buyAmount: bigint;
-  txHash: Hex;
-  blockNumber: number;
-  logIndex: number;
-};
-
-export async function getTrades(chainId: number, uid: Hex): Promise<CowTrade[]> {
-  const path = `/api/v1/trades?orderUid=${uid}`;
-  const r = await send(chainId, "GET", path);
-  if (r.status < 200 || r.status >= 300) throw httpError("GET", path, r);
-  const json = parseJson("GET", path, r);
-  return shaped("trades", () => {
-    if (!Array.isArray(json)) throw new ShapeError("trades is not an array");
-    return json.map((t, i) => {
-      const o = obj(t, `trade ${i}`);
-      return {
-        orderUid: hex(o.orderUid, "orderUid"),
-        owner: addr(o.owner, "owner"),
-        sellAmount: uint(o.sellAmount, "sellAmount"),
-        buyAmount: uint(o.buyAmount, "buyAmount"),
-        txHash: hex(o.txHash, "txHash"),
-        blockNumber: int(o.blockNumber, "blockNumber"),
-        logIndex: int(o.logIndex, "logIndex"),
-      };
-    });
-  });
 }

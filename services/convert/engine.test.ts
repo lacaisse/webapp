@@ -55,13 +55,17 @@ const cowApi = vi.hoisted(() => ({
   preparedQuoteRequest: vi.fn(),
   preparedOrderRequest: vi.fn(() => ({ method: "POST", url: "https://cow.test/api/v1/orders", headers: {}, body: "{}" })),
   postPreSignOrder: vi.fn(),
-  getOrder: vi.fn(),
-  getTrades: vi.fn(),
   cowApiBaseUrl: vi.fn(() => "https://cow.test"),
 }));
 vi.mock("@/services/convert/cow-api", () => cowApi);
 
-const chain = vi.hoisted(() => ({ holderBalance: vi.fn(), readSettledTrade: vi.fn() }));
+const chain = vi.hoisted(() => ({
+  holderBalance: vi.fn(),
+  orderFilledAmount: vi.fn(),
+  blockOfTransaction: vi.fn(),
+  findSettledTrade: vi.fn(),
+  ORDER_INVALIDATED: BigInt(2) ** BigInt(256) - BigInt(1),
+}));
 vi.mock("@/services/convert/chain", () => chain);
 
 const displayTokens = vi.hoisted(() => ({ getDisplayTokens: vi.fn() }));
@@ -214,7 +218,18 @@ beforeEach(() => {
   cowApi.requestQuote.mockResolvedValue(cowQuote(QUOTED));
   cowApi.postPreSignOrder.mockResolvedValue(undefined);
   chain.holderBalance.mockResolvedValue(E("1000"));
+  // The chain: nothing filled until a test says so.
+  chain.orderFilledAmount.mockResolvedValue(BigInt(0));
+  chain.blockOfTransaction.mockResolvedValue(BigInt(1));
+  chain.findSettledTrade.mockResolvedValue(null);
 });
+
+// The order filled on chain: the settlement contract took the whole sell
+// amount, and its Trade event says what arrived.
+function filledOnChain(buyAmount: bigint) {
+  chain.orderFilledAmount.mockResolvedValue(IN);
+  chain.findSettledTrade.mockResolvedValue({ sellAmount: IN, buyAmount, feeAmount: BigInt(0), txHash: SETTLE_HASH, blockNumber: BigInt(2) });
+}
 
 describe("a quote the admin's browser fetches", () => {
   const PREPARED = { method: "POST" as const, url: "https://cow.test/api/v1/quote", headers: {}, body: "{}" };
@@ -378,12 +393,12 @@ describe("EURe → BREAD on a 1-of-1 Safe", () => {
     expect(row()).toMatchObject({ status: "FILLING", round: 1, amountOut: null, minOut: MIN.toString() });
 
     // The cron: the order filled; the chain confirms the Trade.
-    cowApi.getOrder.mockResolvedValue({ uid: posted.uid, status: "fulfilled", executedSellAmount: IN, executedBuyAmount: FILLED, invalidated: false, validTo: posted.order.validTo });
-    cowApi.getTrades.mockResolvedValue([{ orderUid: posted.uid, owner: SAFE, sellAmount: IN, buyAmount: FILLED, txHash: SETTLE_HASH, blockNumber: 1, logIndex: 0 }]);
-    chain.readSettledTrade.mockResolvedValue({ sellAmount: IN, buyAmount: FILLED, feeAmount: BigInt(0) });
+    filledOnChain(FILLED);
     const tick = await advanceConversions(new Date(NOW.getTime() + 60_000));
     expect(tick).toMatchObject({ polled: 1, filled: 1, errors: [] });
-    expect(chain.readSettledTrade).toHaveBeenCalledWith({ chainId: 100, txHash: SETTLE_HASH, orderUid: posted.uid });
+    expect(chain.orderFilledAmount).toHaveBeenCalledWith({ chainId: 100, orderUid: posted.uid });
+    expect(chain.blockOfTransaction).toHaveBeenCalledWith({ chainId: 100, txHash: EXEC_HASH });
+    expect(chain.findSettledTrade).toHaveBeenCalledWith({ chainId: 100, owner: SAFE, orderUid: posted.uid, fromBlock: BigInt(1) });
     expect(row().status).toBe("READY");
 
     // An owner continues: the mint, sized to the fill, as proposal 2.
@@ -465,35 +480,39 @@ describe("EURe → BREAD on a 1-of-1 Safe", () => {
     await expect(quoteConversion({ fund: FUND, safeId, converterId: "eure-bread", amount: "1.0000000000000000001", slippageBps: 50, now: NOW })).rejects.toMatchObject({ code: "amount" });
   });
 
-  it("an expired order ends the conversion EXPIRED; a fill below the minimum ends it FAILED", async () => {
+  it("an order unfilled past its validity ends the conversion EXPIRED; one invalidated on chain, or filled below the minimum, ends it FAILED", async () => {
     seed(ONE_OF_ONE);
     const { started } = await quoteAndStart("eure-bread");
-    const uid = cowApi.postPreSignOrder.mock.calls[0][0].uid;
-    cowApi.getOrder.mockResolvedValue({ uid, status: "expired", executedSellAmount: BigInt(0), executedBuyAmount: BigInt(0), invalidated: false, validTo: 1 });
-    await advanceConversions(NOW);
+    // Nothing filled, a week and the grace gone by: the contract will not settle it any more.
+    const pastValidity = new Date(NOW.getTime() + ORDER_VALID_FOR_S * 1000 + 11 * 60_000);
+    await advanceConversions(pastValidity);
     expect(db.fundConversion.find((c) => c.id === started.conversionId)).toMatchObject({ status: "EXPIRED" });
 
     resetFake();
     seed(ONE_OF_ONE);
+    const invalidated = await quoteAndStart("eure-bread");
+    chain.orderFilledAmount.mockResolvedValue(chain.ORDER_INVALIDATED);
+    expect((await advanceConversions(NOW)).failed).toBe(1);
+    expect(db.fundConversion.find((c) => c.id === invalidated.started.conversionId)).toMatchObject({ status: "FAILED" });
+    expect(db.fundConversion[0].errorMessage).toMatch(/invalidated/);
+
+    resetFake();
+    seed(ONE_OF_ONE);
     const again = await quoteAndStart("eure-bread");
-    const uid2 = cowApi.postPreSignOrder.mock.calls[1][0].uid;
-    cowApi.getOrder.mockResolvedValue({ uid: uid2, status: "fulfilled", executedSellAmount: IN, executedBuyAmount: E("50"), invalidated: false, validTo: 1 });
-    cowApi.getTrades.mockResolvedValue([{ orderUid: uid2, owner: SAFE, sellAmount: IN, buyAmount: E("50"), txHash: SETTLE_HASH, blockNumber: 1, logIndex: 0 }]);
-    chain.readSettledTrade.mockResolvedValue({ sellAmount: IN, buyAmount: E("50"), feeAmount: BigInt(0) });
+    filledOnChain(E("50"));
     const tick = await advanceConversions(NOW);
     expect(tick.failed).toBe(1);
     expect(db.fundConversion.find((c) => c.id === again.started.conversionId)).toMatchObject({ status: "FAILED" });
     expect(db.fundConversion[0].errorMessage).toMatch(/below the order minimum/);
   });
 
-  it("a pending order is left alone; indexer lag (fulfilled, no trade yet) too", async () => {
+  it("a pending order is left alone; a fill whose Trade log the RPC has not served yet too", async () => {
     seed(ONE_OF_ONE);
     const { started } = await quoteAndStart("eure-bread");
-    const uid = cowApi.postPreSignOrder.mock.calls[0][0].uid;
-    cowApi.getOrder.mockResolvedValue({ uid, status: "open", executedSellAmount: BigInt(0), executedBuyAmount: BigInt(0), invalidated: false, validTo: Math.floor(NOW.getTime() / 1000) + 600 });
     expect(await advanceConversions(NOW)).toMatchObject({ polled: 1, filled: 0 });
-    cowApi.getOrder.mockResolvedValue({ uid, status: "fulfilled", executedSellAmount: IN, executedBuyAmount: FILLED, invalidated: false, validTo: 1 });
-    cowApi.getTrades.mockResolvedValue([]);
+    expect(chain.findSettledTrade).not.toHaveBeenCalled();
+    chain.orderFilledAmount.mockResolvedValue(IN);
+    chain.findSettledTrade.mockResolvedValue(null);
     expect(await advanceConversions(NOW)).toMatchObject({ polled: 1, filled: 0 });
     expect(db.fundConversion.find((c) => c.id === started.conversionId)).toMatchObject({ status: "FILLING" });
   });
@@ -524,9 +543,7 @@ describe("BREAD → EURe on a 1-of-1 Safe", () => {
     const state = row().state as { legs: { results: { kind: string }[] }[] };
     expect(state.legs.map((l) => l.results.map((r) => r.kind))).toEqual([["calls"], ["api", "calls"]]);
 
-    cowApi.getOrder.mockResolvedValue({ uid: posted.uid, status: "fulfilled", executedSellAmount: IN, executedBuyAmount: FILLED, invalidated: false, validTo: 1 });
-    cowApi.getTrades.mockResolvedValue([{ orderUid: posted.uid, owner: SAFE, sellAmount: IN, buyAmount: FILLED, txHash: SETTLE_HASH, blockNumber: 1, logIndex: 0 }]);
-    chain.readSettledTrade.mockResolvedValue({ sellAmount: IN, buyAmount: FILLED, feeAmount: BigInt(0) });
+    filledOnChain(FILLED);
     await advanceConversions(NOW);
     expect(row()).toMatchObject({ status: "DONE", amountOut: FILLED.toString() });
   });
@@ -580,10 +597,7 @@ describe("multisig: a proposal that waits, is withdrawn, or whose hook was misse
   it("a mint step proposed after the fill depends on no order: it goes ahead however late, with no validity on its card", async () => {
     seed(ONE_OF_ONE);
     const { started } = await quoteAndStart("eure-bread");
-    const posted = cowApi.postPreSignOrder.mock.calls[0][0];
-    cowApi.getOrder.mockResolvedValue({ uid: posted.uid, status: "fulfilled", executedSellAmount: IN, executedBuyAmount: FILLED, invalidated: false, validTo: posted.order.validTo });
-    cowApi.getTrades.mockResolvedValue([{ orderUid: posted.uid, owner: SAFE, sellAmount: IN, buyAmount: FILLED, txHash: SETTLE_HASH, blockNumber: 1, logIndex: 0 }]);
-    chain.readSettledTrade.mockResolvedValue({ sellAmount: IN, buyAmount: FILLED, feeAmount: BigInt(0) });
+    filledOnChain(FILLED);
     await advanceConversions(new Date(NOW.getTime() + 60_000));
     expect(db.fundConversion[0].status).toBe("READY");
 
