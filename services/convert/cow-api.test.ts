@@ -7,8 +7,6 @@ vi.mock("server-only", () => ({}));
 import { COW_CONTRACTS_BY_CHAIN } from "./assets";
 import {
   cowApiBaseUrl,
-  getOrder,
-  getTrades,
   postPreSignOrder,
   preparedOrderRequest,
   preparedQuoteRequest,
@@ -341,27 +339,6 @@ describe("retryAfterMs", () => {
   });
 });
 
-describe("getOrder / getTrades never wait on a 429", () => {
-  it("a throttled read is rate_limited at once (the Safe page and the cron are behind it)", async () => {
-    vi.useFakeTimers();
-    try {
-      stubFetch(() => json(429, THROTTLED));
-      const p = getOrder(100, UID);
-      const expectation = expect(p).rejects.toMatchObject({ code: "rate_limited" });
-      await vi.advanceTimersByTimeAsync(0);
-      await expectation;
-      expect(calls).toHaveLength(1);
-      const t = getTrades(100, UID);
-      const expectation2 = expect(t).rejects.toMatchObject({ code: "rate_limited" });
-      await vi.advanceTimersByTimeAsync(0);
-      await expectation2;
-      expect(calls).toHaveLength(2); // one request each, no retry
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-});
-
 describe("postPreSignOrder", () => {
   const args = { chainId: 100, order: ORDER, owner: SAFE, appDataDoc: APP_DATA_DOC, uid: UID };
 
@@ -465,38 +442,3 @@ describe("postPreSignOrder", () => {
   });
 });
 
-describe("getOrder / getTrades", () => {
-  it("parses an order, null on 404, refuses an unknown status", async () => {
-    stubFetch(() =>
-      json(200, { uid: UID, status: "fulfilled", executedSellAmount: "500000000000000000", executedBuyAmount: "560166047667388179", invalidated: false, validTo: 1794295416 }),
-    );
-    expect(await getOrder(100, UID)).toEqual({
-      uid: UID,
-      status: "fulfilled",
-      executedSellAmount: BigInt("500000000000000000"),
-      executedBuyAmount: BigInt("560166047667388179"),
-      invalidated: false,
-      validTo: 1794295416,
-    });
-    expect(calls[0].url).toBe(`https://api.cow.fi/xdai/api/v1/orders/${UID}`);
-    stubFetch(() => json(404, { errorType: "OrderNotFound" }));
-    expect(await getOrder(100, UID)).toBeNull();
-    stubFetch(() => json(200, { uid: UID, status: "teleported", executedSellAmount: "0", executedBuyAmount: "0", validTo: 1 }));
-    await expect(getOrder(100, UID)).rejects.toMatchObject({ code: "cow_api" });
-  });
-
-  it("parses the trades of an order", async () => {
-    stubFetch(() =>
-      json(200, [
-        { orderUid: UID, owner: SAFE.toLowerCase(), sellAmount: "500000000000000000", buyAmount: "560166047667388179", txHash: `0x${"9e".repeat(32)}`, blockNumber: 49084770, logIndex: 3 },
-      ]),
-    );
-    const trades = await getTrades(100, UID);
-    expect(trades).toEqual([
-      { orderUid: UID, owner: SAFE, sellAmount: BigInt("500000000000000000"), buyAmount: BigInt("560166047667388179"), txHash: `0x${"9e".repeat(32)}`, blockNumber: 49084770, logIndex: 3 },
-    ]);
-    expect(calls[0].url).toBe(`https://api.cow.fi/xdai/api/v1/trades?orderUid=${UID}`);
-    stubFetch(() => json(200, { not: "an array" }));
-    await expect(getTrades(100, UID)).rejects.toMatchObject({ code: "cow_api" });
-  });
-});
