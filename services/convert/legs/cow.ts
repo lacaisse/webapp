@@ -2,15 +2,8 @@
 import "server-only";
 
 import { COW_CONTRACTS_BY_CHAIN, assetAddress, assetChainId } from "../assets";
-import { readSettledTrade } from "../chain";
-import {
-  getOrder,
-  getTrades,
-  postPreSignOrder,
-  preparedOrderRequest,
-  preparedQuoteRequest,
-  requestQuote,
-} from "../cow-api";
+import { ORDER_INVALIDATED, blockOfTransaction, findSettledTrade, orderFilledAmount } from "../chain";
+import { postPreSignOrder, preparedOrderRequest, preparedQuoteRequest, requestQuote } from "../cow-api";
 import {
   APP_DATA_DOC,
   APP_DATA_HASH,
@@ -42,10 +35,14 @@ import {
 //   api   — post the order (uid computed locally; a duplicate is ours)
 //   calls — approve the exact sell amount to the vault relayer, then
 //           setPreSignature(uid, true) on the settlement contract
-//   wait  — the orderbook reports the fill; the amount is then read from the
-//           settlement transaction's Trade event, never from the API alone.
+//   wait  — the chain reports the fill: the settlement contract's
+//           filledAmount, then its Trade event for the amount that arrived.
+//           The orderbook is not asked (chain.ts says why).
 // Server-only: quote / run / poll call the orderbook and the chain. Module
 // map: services/convert/assets.ts.
+
+// Seconds past an order's validTo before an unfilled order is given up on.
+const EXPIRY_GRACE_S = 10 * 60;
 
 type QuoteData = { sellAmount: string; feeAmount: string; buyAmount: string; quoteId: number | null };
 type ApiData = { order: JsonCowOrder };
@@ -208,39 +205,32 @@ export function cowLeg(from: Erc20AssetId, to: Erc20AssetId): Leg {
 
     poll: async (c): Promise<PollResult> => {
       const { uid, order } = postedOrder(c);
-      const view = await getOrder(c.chainId, uid);
-      if (!view) return { status: "failed", reason: "order unknown to the orderbook" };
-      if (view.status === "expired" || view.status === "cancelled") return { status: "expired" };
-      if (view.invalidated) return { status: "failed", reason: "order invalidated" };
-      if (view.status !== "fulfilled") {
-        // The orderbook marks expiry itself; past validTo with a long grace,
-        // treat a still-open order as expired so the row does not poll forever.
-        if (c.now.getTime() / 1000 > view.validTo + 6 * 3600) return { status: "expired" };
+      const o = orderFromJson(order);
+      const filled = await orderFilledAmount({ chainId: c.chainId, orderUid: uid });
+      if (filled === ORDER_INVALIDATED) return { status: "failed", reason: "order invalidated on chain" };
+      if (filled === BigInt(0)) {
+        // Nothing yet. The contract refuses to settle past validTo; a short
+        // grace covers a settlement mined right at it.
+        if (c.now.getTime() / 1000 > o.validTo + EXPIRY_GRACE_S) return { status: "expired" };
         return { status: "pending" };
       }
-      const trades = (await getTrades(c.chainId, uid)).filter(
-        (t) => t.orderUid.toLowerCase() === uid.toLowerCase(),
-      );
-      if (trades.length === 0) return { status: "pending" }; // indexer lag
-      // Fill-or-kill: one trade. Read what the chain says it received.
-      const trade = trades[trades.length - 1];
-      const settled = await readSettledTrade({ chainId: c.chainId, txHash: trade.txHash, orderUid: uid });
-      if (!settled) {
-        return { status: "failed", reason: `no Trade event for the order in ${trade.txHash}` };
-      }
-      const min = orderFromJson(order).buyAmount;
-      if (settled.buyAmount < min) {
+      // Filled (fill-or-kill: in one go). Its Trade event sits at or after
+      // the block the pre-signature landed in.
+      const presign = c.results.find((r) => r.kind === "calls");
+      const fromBlock = presign?.txHash
+        ? await blockOfTransaction({ chainId: c.chainId, txHash: presign.txHash as Hex })
+        : null;
+      const trade = await findSettledTrade({ chainId: c.chainId, owner: c.holder, orderUid: uid, fromBlock });
+      if (!trade) return { status: "pending" }; // the RPC's logs trail its state: next poll
+      if (trade.buyAmount < o.buyAmount) {
         return {
           status: "failed",
-          reason: `settled ${settled.buyAmount} is below the order minimum ${min}`,
+          reason: `settled ${trade.buyAmount} is below the order minimum ${o.buyAmount}`,
         };
-      }
-      if (settled.buyAmount !== trade.buyAmount) {
-        console.warn("[convert] orderbook / chain fill differ", uid, trade.buyAmount, settled.buyAmount);
       }
       return {
         status: "filled",
-        result: { kind: "wait", amountOut: settled.buyAmount.toString(), txHash: trade.txHash },
+        result: { kind: "wait", amountOut: trade.buyAmount.toString(), txHash: trade.txHash },
       };
     },
   };
