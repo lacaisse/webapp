@@ -52,6 +52,7 @@ vi.mock("@/services/transaction-annotation/annotate", () => annotate);
 
 const cowApi = vi.hoisted(() => ({
   requestQuote: vi.fn(),
+  preparedQuoteRequest: vi.fn(),
   postPreSignOrder: vi.fn(),
   getOrder: vi.fn(),
   getTrades: vi.fn(),
@@ -78,6 +79,7 @@ import {
   cancelConversion,
   checkCalls,
   continueConversion,
+  prepareQuote,
   quoteConversion,
   signingRounds,
   startConversion,
@@ -200,6 +202,40 @@ beforeEach(() => {
   cowApi.requestQuote.mockResolvedValue(cowQuote(QUOTED));
   cowApi.postPreSignOrder.mockResolvedValue(undefined);
   chain.holderBalance.mockResolvedValue(E("1000"));
+});
+
+describe("a quote the admin's browser fetches", () => {
+  const PREPARED = { method: "POST" as const, url: "https://cow.test/api/v1/quote", headers: {}, body: "{}" };
+  const RELAYED = { status: 200, text: '{"quote":{}}' };
+
+  it("prepareQuote is the swap leg's request on the Safe's address and the exact legs' pass-through", async () => {
+    seed({ threshold: 1, owners: [{ userId: "u-a", address: "0x00000000000000000000000000000000000000Aa", byte: "aa" }] });
+    cowApi.preparedQuoteRequest.mockReturnValue(PREPARED);
+    expect(await prepareQuote({ fund: FUND, safeId, converterId: "bread-eure", amount: "50", slippageBps: 50, now: NOW })).toEqual(PREPARED);
+    expect(cowApi.preparedQuoteRequest).toHaveBeenCalledWith(
+      100,
+      expect.objectContaining({ sellToken: WXDAI, buyToken: EURE, owner: getAddress(db.fundSafe[0].address), sellAmountBeforeFee: IN }),
+    );
+    await expect(prepareQuote({ fund: FUND, safeId, converterId: "eure-bread", amount: "0", slippageBps: 50, now: NOW })).rejects.toMatchObject({ code: "amount" });
+  });
+
+  it("the relayed answer reaches the swap leg's quote, on the quote and again on start", async () => {
+    seed({ threshold: 1, owners: [{ userId: "u-a", address: "0x00000000000000000000000000000000000000Aa", byte: "aa" }] });
+    const quote = await quoteConversion({ fund: FUND, safeId, converterId: "eure-bread", amount: "50", slippageBps: 50, now: NOW, relayed: RELAYED });
+    expect(cowApi.requestQuote).toHaveBeenLastCalledWith(100, expect.objectContaining({ sellAmountBeforeFee: IN }), { relayed: RELAYED, now: NOW });
+    await startConversion({
+      fund: FUND,
+      safeId,
+      userId: "u-a",
+      input: { converterId: "eure-bread", amount: "50", minOut: quote.minOut, slippageBps: 50, relayed: RELAYED },
+      now: NOW,
+    });
+    expect(cowApi.requestQuote).toHaveBeenCalledTimes(2);
+    expect(cowApi.requestQuote).toHaveBeenLastCalledWith(100, expect.anything(), { relayed: RELAYED, now: NOW });
+    // Without one, the leg calls out itself.
+    await quoteConversion({ fund: FUND, safeId, converterId: "eure-bread", amount: "50", slippageBps: 50, now: NOW });
+    expect(cowApi.requestQuote).toHaveBeenLastCalledWith(100, expect.anything(), { relayed: undefined, now: NOW });
+  });
 });
 
 describe("registry", () => {

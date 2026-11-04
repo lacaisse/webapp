@@ -13,7 +13,7 @@ import {
 } from "@/services/http/shape";
 
 import { orderToJson, type CowOrder } from "./cow-order";
-import { ConvertError, type Address, type Hex } from "./types";
+import { ConvertError, type Address, type Hex, type PreparedHttp, type RelayedHttp } from "./types";
 
 // CoW Protocol orderbook — the few calls the swap leg needs, plain fetch, no
 // SDK (built like services/safe/tx-service.ts). Module map:
@@ -27,6 +27,10 @@ import { ConvertError, type Address, type Hex } from "./types";
 //
 // `COW_API_URL` overrides the base (a mock in dev / tests); otherwise the
 // hosted orderbook for the chain. 10 s timeout per request.
+//
+// A quote may also be fetched by the holder's browser: preparedQuoteRequest
+// gives the exact request, requestQuote `relayed` parses the exact answer
+// and checks it against the request (see browser-quote.ts for why).
 
 const TIMEOUT_MS = 10_000;
 // The hosted orderbook rate-limits per IP (quotes 10/s, orders 5/s, reads
@@ -169,9 +173,10 @@ export type CowQuote = {
   id: number | null;
 };
 
-export async function requestQuote(chainId: number, q: CowQuoteRequest): Promise<CowQuote> {
-  const path = "/api/v1/quote";
-  const r = await send(chainId, "POST", path, {
+const QUOTE_PATH = "/api/v1/quote";
+
+function quoteRequestBody(q: CowQuoteRequest) {
+  return {
     sellToken: q.sellToken,
     buyToken: q.buyToken,
     receiver: q.owner,
@@ -184,7 +189,44 @@ export async function requestQuote(chainId: number, q: CowQuoteRequest): Promise
     validFor: q.validFor,
     appData: q.appDataDoc,
     appDataHash: q.appDataHash,
-  });
+  };
+}
+
+/** The quote request, byte for byte, for the holder's browser to make. */
+export function preparedQuoteRequest(chainId: number, q: CowQuoteRequest): PreparedHttp {
+  const base = cowApiBaseUrl(chainId);
+  if (!base) throw new ConvertError("config", `No CoW orderbook for chain ${chainId}`);
+  return {
+    method: "POST",
+    url: `${base}${QUOTE_PATH}`,
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(quoteRequestBody(q)),
+  };
+}
+
+export type RequestQuoteOptions = {
+  // The answer the browser brought back for preparedQuoteRequest(q): parsed
+  // in place of a call, and checked against q — the orderbook echoes the
+  // request, so an answer to anything else, or a stale one, is refused.
+  relayed?: RelayedHttp;
+  now?: Date; // what "stale" is measured against (relayed only)
+};
+
+export async function requestQuote(
+  chainId: number,
+  q: CowQuoteRequest,
+  opts: RequestQuoteOptions = {},
+): Promise<CowQuote> {
+  const path = QUOTE_PATH;
+  let r: HttpResult;
+  if (opts.relayed) {
+    r = { status: opts.relayed.status, text: opts.relayed.text, retryAfterMs: null };
+    if (r.status === 429) {
+      throw new ConvertError("rate_limited", `POST ${path} (browser) HTTP 429: ${r.text.slice(0, 300)}`);
+    }
+  } else {
+    r = await send(chainId, "POST", path, quoteRequestBody(q));
+  }
   if (r.status < 200 || r.status >= 300) {
     // No route / too small / unsupported token: a quote problem, not an outage.
     if (r.status === 400 || r.status === 404) {
@@ -193,12 +235,12 @@ export async function requestQuote(chainId: number, q: CowQuoteRequest): Promise
     throw httpError("POST", path, r);
   }
   const json = parseJson("POST", path, r);
-  return shaped("quote", () => {
+  const parsed = shaped("quote", () => {
     const o = obj(json, "quote response");
     const quote = obj(o.quote, "quote");
     const expiration = new Date(str(o.expiration, "expiration"));
     if (Number.isNaN(expiration.getTime())) throw new ShapeError("expiration is not a date");
-    return {
+    const result: CowQuote = {
       sellAmount: uint(quote.sellAmount, "sellAmount"),
       feeAmount: uint(quote.feeAmount, "feeAmount"),
       buyAmount: uint(quote.buyAmount, "buyAmount"),
@@ -206,7 +248,45 @@ export async function requestQuote(chainId: number, q: CowQuoteRequest): Promise
       expiration,
       id: typeof o.id === "number" ? o.id : null,
     };
+    if (!opts.relayed) return { result, echo: null };
+    return {
+      result,
+      echo: {
+        sellToken: str(quote.sellToken, "sellToken"),
+        buyToken: str(quote.buyToken, "buyToken"),
+        receiver: str(quote.receiver, "receiver"),
+        from: str(o.from, "from"),
+        kind: str(quote.kind, "kind"),
+        appDataHash: str(quote.appDataHash, "appDataHash"),
+      },
+    };
   });
+  if (parsed.echo) checkRelayedQuote(q, parsed.result, parsed.echo, opts.now ?? new Date());
+  return parsed.result;
+}
+
+type QuoteEcho = { sellToken: string; buyToken: string; receiver: string; from: string; kind: string; appDataHash: string };
+
+// A relayed answer must be the orderbook's answer to exactly this request:
+// same tokens, same holder, same appData, amounts that add up to what was
+// asked, and not past the orderbook's own expiry (a browser could replay).
+// What it cannot check is the price — the holder's admin, who is trusted to
+// propose transfers, could feed a worse one; the owners see the minimum.
+function checkRelayedQuote(q: CowQuoteRequest, quote: CowQuote, echo: QuoteEcho, now: Date): void {
+  const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+  const refuse = (what: string) => {
+    throw new ConvertError("cow_api", `Relayed quote is not the answer to this request: ${what}`);
+  };
+  if (!same(echo.sellToken, q.sellToken)) refuse(`sellToken ${echo.sellToken}`);
+  if (!same(echo.buyToken, q.buyToken)) refuse(`buyToken ${echo.buyToken}`);
+  if (!same(echo.receiver, q.owner)) refuse(`receiver ${echo.receiver}`);
+  if (!same(echo.from, q.owner)) refuse(`from ${echo.from}`);
+  if (echo.kind !== "sell") refuse(`kind ${echo.kind}`);
+  if (!same(echo.appDataHash, q.appDataHash)) refuse(`appDataHash ${echo.appDataHash}`);
+  if (quote.sellAmount + quote.feeAmount !== q.sellAmountBeforeFee) {
+    refuse(`sellAmount ${quote.sellAmount} + fee ${quote.feeAmount} ≠ ${q.sellAmountBeforeFee}`);
+  }
+  if (quote.expiration.getTime() <= now.getTime()) refuse(`expired ${quote.expiration.toISOString()}`);
 }
 
 // ---------------------------------------------------------------------------

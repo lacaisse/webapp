@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 import { COW_CONTRACTS_BY_CHAIN } from "./assets";
-import { cowApiBaseUrl, getOrder, getTrades, postPreSignOrder, requestQuote, retryAfterMs } from "./cow-api";
+import { cowApiBaseUrl, getOrder, getTrades, postPreSignOrder, preparedQuoteRequest, requestQuote, retryAfterMs } from "./cow-api";
 import { APP_DATA_DOC, APP_DATA_HASH, orderUid, type CowOrder } from "./cow-order";
 
 // The orderbook client against a stubbed fetch: request shapes, the answers
@@ -184,6 +184,111 @@ describe("requestQuote", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("a quote the browser fetched (preparedQuoteRequest → requestQuote relayed)", () => {
+  const NOW = new Date("2026-11-04T17:22:11Z");
+  const req = {
+    sellToken: EURE,
+    buyToken: WXDAI,
+    owner: SAFE,
+    sellAmountBeforeFee: BigInt("10000000000000000000"),
+    appDataDoc: APP_DATA_DOC,
+    appDataHash: APP_DATA_HASH,
+    validFor: 604_800,
+  };
+  // The orderbook's answer to exactly that request (Gnosis, 2026-11-04),
+  // echo fields included.
+  const ANSWER = {
+    quote: {
+      sellToken: EURE.toLowerCase(),
+      buyToken: WXDAI.toLowerCase(),
+      receiver: SAFE.toLowerCase(),
+      sellAmount: "9999999955492985179",
+      buyAmount: "11227511339554350270",
+      validTo: 1794417731,
+      appData: APP_DATA_DOC,
+      appDataHash: APP_DATA_HASH,
+      feeAmount: "44507014821",
+      kind: "sell",
+      partiallyFillable: false,
+      sellTokenBalance: "erc20",
+      buyTokenBalance: "erc20",
+      signingScheme: "presign",
+    },
+    from: SAFE.toLowerCase(),
+    expiration: "2026-11-04T17:24:11.948896861Z",
+    id: 255834133,
+    verified: false,
+  };
+  const relayed = (body: unknown, status = 200) => ({ status, text: JSON.stringify(body) });
+  const noFetch = () => stubFetch(() => Promise.reject(new Error("the server must not call out")));
+
+  it("the prepared request is the request the server would send, byte for byte", async () => {
+    stubFetch(() => json(200, ANSWER));
+    await requestQuote(100, req);
+    const prepared = preparedQuoteRequest(100, req);
+    expect(prepared).toEqual({
+      method: "POST",
+      url: "https://api.cow.fi/xdai/api/v1/quote",
+      headers: { "content-type": "application/json" },
+      body: String(calls[0].init?.body),
+    });
+    expect(() => preparedQuoteRequest(1, req)).toThrow(expect.objectContaining({ code: "config" }));
+  });
+
+  it("the relayed answer is parsed without a call, once checked against the request", async () => {
+    noFetch();
+    const q = await requestQuote(100, req, { relayed: relayed(ANSWER), now: NOW });
+    expect(q).toEqual({
+      sellAmount: BigInt("9999999955492985179"),
+      feeAmount: BigInt("44507014821"),
+      buyAmount: BigInt("11227511339554350270"),
+      validTo: 1794417731,
+      expiration: new Date("2026-11-04T17:24:11.948Z"),
+      id: 255834133,
+    });
+    expect(calls).toHaveLength(0);
+  });
+
+  it("an answer to another request, or a stale one, is refused", async () => {
+    noFetch();
+    const refused = async (patch: Record<string, unknown>, topLevel = false, at = NOW) => {
+      const body = topLevel ? { ...ANSWER, ...patch } : { ...ANSWER, quote: { ...ANSWER.quote, ...patch } };
+      await expect(requestQuote(100, req, { relayed: relayed(body), now: at })).rejects.toMatchObject({
+        code: "cow_api",
+        message: expect.stringContaining("not the answer to this request"),
+      });
+    };
+    await refused({ sellToken: WXDAI });
+    await refused({ buyToken: EURE });
+    await refused({ receiver: getAddress("0x0000000000000000000000000000000000000001") });
+    await refused({ from: getAddress("0x0000000000000000000000000000000000000001") }, true);
+    await refused({ kind: "buy" });
+    await refused({ appDataHash: `0x${"00".repeat(32)}` });
+    await refused({ sellAmount: "9999999955492985178" }); // + fee ≠ what was asked
+    await refused({ feeAmount: "0" });
+    await refused({}, false, new Date("2026-11-04T17:24:12Z")); // past the orderbook's expiry
+    // Missing echo fields are a shape error, not a pass.
+    const { from: _from, ...noFrom } = ANSWER;
+    void _from;
+    await expect(requestQuote(100, req, { relayed: relayed(noFrom), now: NOW })).rejects.toMatchObject({ code: "cow_api" });
+  });
+
+  it("the browser's own refusals read like the server's: 429 rate_limited, 400 quote_failed, 5xx cow_api", async () => {
+    noFetch();
+    await expect(requestQuote(100, req, { relayed: relayed(THROTTLED, 429), now: NOW })).rejects.toMatchObject({
+      code: "rate_limited",
+      message: expect.stringContaining("(browser)"),
+    });
+    await expect(
+      requestQuote(100, req, { relayed: relayed({ errorType: "NoLiquidity" }, 400), now: NOW }),
+    ).rejects.toMatchObject({ code: "quote_failed" });
+    await expect(requestQuote(100, req, { relayed: { status: 502, text: "<html>bad gateway" }, now: NOW })).rejects.toMatchObject({
+      code: "cow_api",
+    });
+    expect(calls).toHaveLength(0);
   });
 });
 

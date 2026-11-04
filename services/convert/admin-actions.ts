@@ -13,8 +13,8 @@ import {
 } from "@/services/safe/action-helpers";
 import type { ProposeActionResult } from "@/services/safe/action-types";
 
-import type { CancelConversionResult, QuoteActionResult } from "./action-types";
-import { cancelConversion, continueConversion, quoteConversion, startConversion } from "./engine";
+import type { CancelConversionResult, PrepareQuoteResult, QuoteActionResult } from "./action-types";
+import { cancelConversion, continueConversion, prepareQuote, quoteConversion, startConversion } from "./engine";
 import {
   ConversionIdSchema,
   QuoteConversionSchema,
@@ -43,6 +43,22 @@ function convertErrorFor(t: T, e: unknown, context: string): string {
     return t(`fund.safes.conversion.errors.${e.code}` as never);
   }
   return errorFor(t, e, context);
+}
+
+// The quote in two halves so the admin's browser can make the outside call
+// (browser-quote.ts): prepare gives the request, quote takes the answer. A
+// quote without `relayed` is the server calling out itself.
+export async function prepareQuoteAction(input: QuoteConversionInput): Promise<PrepareQuoteResult> {
+  const t = await getTranslations();
+  const { fund } = await requireFundRole("ADMIN");
+  const parsed = QuoteConversionSchema.safeParse(input);
+  if (!parsed.success) return { error: t(parsed.error.issues[0].message as never) };
+  try {
+    const request = await prepareQuote({ fund, ...parsed.data });
+    return { ok: true, request };
+  } catch (e) {
+    return { error: convertErrorFor(t, e, "prepare-quote") };
+  }
 }
 
 export async function quoteConversionAction(input: QuoteConversionInput): Promise<QuoteActionResult> {

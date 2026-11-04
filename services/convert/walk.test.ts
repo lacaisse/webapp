@@ -12,7 +12,7 @@ import {
   type Leg,
   type StepResult,
 } from "./types";
-import { assertConverter, converterContracts, quoteChain, walk } from "./walk";
+import { assertConverter, converterContracts, prepareChainQuote, quoteChain, walk } from "./walk";
 
 // The walk is exercised with the real BREAD legs and a stand-in swap leg
 // that behaves like the CoW one (api → calls → wait) without the orderbook.
@@ -37,6 +37,12 @@ function swapLeg(from: Erc20AssetId, to: Erc20AssetId): Leg {
       { address: SELL, selectors: [APPROVE] },
       { address: SETTLE, selectors: [PRESIGN] },
     ],
+    quoteRequest: (r) => ({
+      method: "POST",
+      url: "https://swap.test/quote",
+      headers: {},
+      body: JSON.stringify({ amountIn: r.amountIn.toString(), relayed: r.relayed ?? null }),
+    }),
     quote: async (r) => ({
       amountIn: r.amountIn,
       amountOut: QUOTED,
@@ -95,6 +101,24 @@ describe("quoteChain", () => {
     const r = await quoteChain(BREAD_EURE, { chainId: 100, holder: SAFE, amountIn: IN, slippageBps: 100, validFor: 600, now: NOW });
     expect(r.legs[1].amountIn).toBe(IN); // burn is exact: the swap sells the full input
     expect(r.minOut).toBe((QUOTED * BigInt(9_900)) / BigInt(10_000));
+  });
+});
+
+describe("prepareChainQuote", () => {
+  const req = { chainId: 100, holder: SAFE, amountIn: IN, slippageBps: 50, validFor: 600, now: NOW };
+
+  it("is the swap leg's request on the input the exact legs before it pass through", async () => {
+    const direct = await prepareChainQuote(EURE_BREAD, req);
+    expect(direct?.url).toBe("https://swap.test/quote");
+    expect(JSON.parse(direct!.body)).toEqual({ amountIn: IN.toString(), relayed: null });
+    // burn + wrap are 1:1: the swap sells what was put in, and a relayed
+    // answer on the request does not leak into the request prepared.
+    const afterBurn = await prepareChainQuote(BREAD_EURE, { ...req, relayed: { status: 200, text: "{}" } });
+    expect(JSON.parse(afterBurn!.body)).toEqual({ amountIn: IN.toString(), relayed: null });
+  });
+
+  it("is null for a chain that quotes nothing outside", async () => {
+    expect(await prepareChainQuote({ id: "exact-only", legs: [breadBurn] }, req)).toBeNull();
   });
 });
 

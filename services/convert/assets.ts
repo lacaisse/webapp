@@ -18,6 +18,9 @@
 //   registry.ts     — server: the converters, pair lookup, what a fund
 //                     is offered.
 //   cow-api.ts      — server: CoW orderbook HTTP client (no SDK).
+//   browser-quote.ts — client: the quote request the server prepared, made
+//                     from the holder's browser (its own IP, not the
+//                     server's shared one).
 //   engine.ts       — server: quote / start / continue / cancel — the parts
 //                     that create Safe proposals.
 //   progress.ts     — server: what happens when a proposal executes or
