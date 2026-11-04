@@ -23,7 +23,7 @@ import { prepareQuoteAction, quoteConversionAction, startConversionAction } from
 import { relayQuote } from "@/services/convert/browser-quote";
 import type { ConversionQuote } from "@/services/convert/engine";
 import { DEFAULT_SLIPPAGE_BPS, QuoteConversionSchema } from "@/services/convert/schemas";
-import type { PreparedHttp } from "@/services/convert/types";
+import type { PreparedHttp, RelayedHttp } from "@/services/convert/types";
 import type { SigningPasskeyHandle } from "@/services/safe/action-types";
 
 import { useStepUp } from "@/components/reauth-dialog";
@@ -37,6 +37,11 @@ export type ConvertPairOption = {
   from: { symbol: string; balance: string | null }; // balance: human amount on the Safe
   to: { symbol: string };
 };
+
+// A quote the browser fetched is reused on the step-up retry while this
+// young: the orderbook honours it for two minutes, and the admin should not
+// pay a second quote for confirming who they are.
+const RELAY_REUSE_MS = 60_000;
 
 const SELECT_CLASS =
   "h-8 w-full rounded-md bg-background px-2 text-sm ring-1 ring-foreground/15 outline-none focus-visible:ring-2 focus-visible:ring-ring";
@@ -148,21 +153,27 @@ export function ConvertDialog({
     });
   };
 
-  const onSubmit = () => {
+  type Fetched = { relayed: RelayedHttp; at: number };
+  const onSubmit = (reuse: Fetched | null = null) => {
     if (!quote) return;
     setError(null);
     startTransition(async () => {
-      const relayed = prepared ? await relayQuote(prepared) : null;
+      let fetched: Fetched | null = reuse && Date.now() - reuse.at < RELAY_REUSE_MS ? reuse : null;
+      if (!fetched && prepared) {
+        const relayed = await relayQuote(prepared);
+        if (relayed) fetched = { relayed, at: Date.now() };
+      }
       const res = await startConversionAction({
         safeId,
         converterId: quote.converterId,
         amount,
         minOut: quote.minOut,
         slippageBps: quote.slippageBps,
-        ...(relayed ? { relayed } : {}),
+        ...(fetched ? { relayed: fetched.relayed } : {}),
       });
-      // Not fresh enough: confirm identity, then the same submit again.
-      if (stepUp.check(res, onSubmit)) return;
+      // Not fresh enough: confirm identity, then the same submit again, on
+      // the same quote.
+      if (stepUp.check(res, () => onSubmit(fetched))) return;
       router.refresh();
       if ("error" in res) {
         setError(res.error);
@@ -315,7 +326,7 @@ export function ConvertDialog({
                   {t("requote")}
                 </Button>
               )}
-              <Button type="button" onClick={onSubmit} disabled={pending || quoting || !quote}>
+              <Button type="button" onClick={() => onSubmit()} disabled={pending || quoting || !quote}>
                 {pending ? <Loader2 className="size-4 animate-spin" /> : <Repeat className="size-4" />}
                 {t("confirm")}
               </Button>

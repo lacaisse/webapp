@@ -163,7 +163,8 @@ export type ConvertErrorCode =
   | "rate_limited" // the orderbook answered 429 through the retries (per-IP quota or per-owner order throttle)
   | "no_pair" // no converter for (from, to), or the fund does not show both
   | "quote_failed" // the outside service gave no usable quote
-  | "quote_moved" // fresh minimum below what the user accepted
+  | "quote_moved" // fresh minimum below what the user accepted, or the relayed quote expired: quote again
+  | "relay_mismatch" // the quote the browser brought back answers another request
   | "amount" // zero / malformed / too precise
   | "expired" // the order or quote ran out
   | "fill_mismatch" // the fill reported does not match the chain

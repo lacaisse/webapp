@@ -40,9 +40,19 @@ const TIMEOUT_MS = 10_000;
 // earned: the orderbook answers with its x402 pay-per-quote pitch. CoW's own
 // guidance is to honour Retry-After and retry a few times; after that the
 // caller hears `rate_limited` — a quota, not an outage.
-const RETRY_429_ATTEMPTS = 3; // requests in all, the first included
+//
+// How many requests each call may make in all. A quote (the user is
+// waiting, the per-IP bucket refills within seconds) retries twice; an order
+// post once — its throttle is per owner and lasts minutes, a second wait
+// never helps; the status reads not at all: they run inside the Safe page's
+// render and the cron, where a sleep stalls everything behind them, and the
+// next poll comes by itself.
+const QUOTE_ATTEMPTS = 3;
+const ORDER_ATTEMPTS = 2;
 const RETRY_429_BACKOFF_MS = [2_000, 4_000]; // when no Retry-After is sent
-const RETRY_AFTER_MAX_MS = 10_000; // a longer Retry-After is not worth the wait
+// A Retry-After longer than this is not waited for: the call gives up at
+// once rather than retrying early against the orderbook's word.
+const RETRY_AFTER_MAX_MS = 10_000;
 
 const COW_API_BY_CHAIN: Record<number, string> = {
   100: "https://api.cow.fi/xdai",
@@ -90,8 +100,9 @@ async function sendOnce(
   };
 }
 
-// Retry-After is seconds or an HTTP date; anything unreadable, negative or
-// longer than we care to wait counts as not sent.
+// Retry-After is seconds or an HTTP date; anything unreadable or in the
+// past counts as not sent. Not capped here: `send` decides what to do with
+// a long one.
 export function retryAfterMs(header: string | null, now = Date.now()): number | null {
   if (!header) return null;
   const h = header.trim();
@@ -102,23 +113,28 @@ export function retryAfterMs(header: string | null, now = Date.now()): number | 
     if (Number.isNaN(at)) return null;
     ms = at - now;
   }
-  if (ms < 0 || ms > RETRY_AFTER_MAX_MS) return null;
-  return ms;
+  return ms < 0 ? null : ms;
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** `sendOnce`, retried through 429s; still 429 after the last attempt → rate_limited. */
+/**
+ * `sendOnce`, retried through 429s up to `attempts` requests in all (default
+ * one: no retry); still 429 afterwards, or asked to wait longer than
+ * RETRY_AFTER_MAX_MS, → rate_limited.
+ */
 async function send(
   chainId: number,
   method: "GET" | "POST",
   path: string,
   body?: unknown,
+  attempts = 1,
 ): Promise<HttpResult> {
   let r = await sendOnce(chainId, method, path, body);
-  for (let attempt = 1; r.status === 429 && attempt < RETRY_429_ATTEMPTS; attempt++) {
-    const backoff = RETRY_429_BACKOFF_MS[Math.min(attempt, RETRY_429_BACKOFF_MS.length) - 1];
-    await sleep(r.retryAfterMs ?? backoff);
+  for (let attempt = 1; r.status === 429 && attempt < attempts; attempt++) {
+    const wait = r.retryAfterMs ?? RETRY_429_BACKOFF_MS[Math.min(attempt, RETRY_429_BACKOFF_MS.length) - 1];
+    if (wait > RETRY_AFTER_MAX_MS) break;
+    await sleep(wait);
     r = await sendOnce(chainId, method, path, body);
   }
   if (r.status === 429) {
@@ -212,6 +228,12 @@ export type RequestQuoteOptions = {
   now?: Date; // what "stale" is measured against (relayed only)
 };
 
+// What the orderbook says about THIS request: a quote, or its refusal of the
+// amount / pair. Anything else a browser brings back (429 on its own IP, a
+// WAF 403 page, a 5xx, a captive portal) is the browser's network trouble,
+// and the server asks for itself.
+const isOrderbookAnswer = (status: number) => (status >= 200 && status < 300) || status === 400 || status === 404;
+
 export async function requestQuote(
   chainId: number,
   q: CowQuoteRequest,
@@ -219,13 +241,14 @@ export async function requestQuote(
 ): Promise<CowQuote> {
   const path = QUOTE_PATH;
   let r: HttpResult;
-  if (opts.relayed) {
-    r = { status: opts.relayed.status, text: opts.relayed.text, retryAfterMs: null };
-    if (r.status === 429) {
-      throw new ConvertError("rate_limited", `POST ${path} (browser) HTTP 429: ${r.text.slice(0, 300)}`);
-    }
+  const relayed = opts.relayed && isOrderbookAnswer(opts.relayed.status) ? opts.relayed : null;
+  if (relayed) {
+    r = { status: relayed.status, text: relayed.text, retryAfterMs: null };
   } else {
-    r = await send(chainId, "POST", path, quoteRequestBody(q));
+    if (opts.relayed) {
+      console.warn(`[convert] browser quote answered HTTP ${opts.relayed.status}; quoting from the server`);
+    }
+    r = await send(chainId, "POST", path, quoteRequestBody(q), QUOTE_ATTEMPTS);
   }
   if (r.status < 200 || r.status >= 300) {
     // No route / too small / unsupported token: a quote problem, not an outage.
@@ -248,7 +271,7 @@ export async function requestQuote(
       expiration,
       id: typeof o.id === "number" ? o.id : null,
     };
-    if (!opts.relayed) return { result, echo: null };
+    if (!relayed) return { result, echo: null };
     return {
       result,
       echo: {
@@ -269,13 +292,15 @@ type QuoteEcho = { sellToken: string; buyToken: string; receiver: string; from: 
 
 // A relayed answer must be the orderbook's answer to exactly this request:
 // same tokens, same holder, same appData, amounts that add up to what was
-// asked, and not past the orderbook's own expiry (a browser could replay).
-// What it cannot check is the price — the holder's admin, who is trusted to
-// propose transfers, could feed a worse one; the owners see the minimum.
+// asked (relay_mismatch: quote again), and not past the orderbook's own
+// expiry — a browser could replay, a laptop could have slept (quote_moved:
+// the dialog asks for a new quote). What it cannot check is the price — the
+// holder's admin, who is trusted to propose transfers, could feed a worse
+// one; the owners see the minimum.
 function checkRelayedQuote(q: CowQuoteRequest, quote: CowQuote, echo: QuoteEcho, now: Date): void {
   const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
   const refuse = (what: string) => {
-    throw new ConvertError("cow_api", `Relayed quote is not the answer to this request: ${what}`);
+    throw new ConvertError("relay_mismatch", `Relayed quote is not the answer to this request: ${what}`);
   };
   if (!same(echo.sellToken, q.sellToken)) refuse(`sellToken ${echo.sellToken}`);
   if (!same(echo.buyToken, q.buyToken)) refuse(`buyToken ${echo.buyToken}`);
@@ -286,7 +311,9 @@ function checkRelayedQuote(q: CowQuoteRequest, quote: CowQuote, echo: QuoteEcho,
   if (quote.sellAmount + quote.feeAmount !== q.sellAmountBeforeFee) {
     refuse(`sellAmount ${quote.sellAmount} + fee ${quote.feeAmount} ≠ ${q.sellAmountBeforeFee}`);
   }
-  if (quote.expiration.getTime() <= now.getTime()) refuse(`expired ${quote.expiration.toISOString()}`);
+  if (quote.expiration.getTime() <= now.getTime()) {
+    throw new ConvertError("quote_moved", `Relayed quote expired ${quote.expiration.toISOString()}; quote again`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -314,7 +341,7 @@ export async function postPreSignOrder(a: {
     signingScheme: "presign",
     signature: a.owner,
   };
-  const r = await send(a.chainId, "POST", path, body);
+  const r = await send(a.chainId, "POST", path, body, ORDER_ATTEMPTS);
   if (r.status >= 200 && r.status < 300) {
     const json = parseJson("POST", path, r);
     const answered = shaped("order uid", () => hex(json, "uid"));

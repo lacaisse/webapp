@@ -185,6 +185,20 @@ describe("requestQuote", () => {
       vi.useRealTimers();
     }
   });
+
+  it("gives up at once on a Retry-After longer than it would wait, instead of retrying early", async () => {
+    vi.useFakeTimers();
+    try {
+      stubFetch(() => json(429, THROTTLED, { "retry-after": "30" }));
+      const p = requestQuote(100, req);
+      const expectation = expect(p).rejects.toMatchObject({ code: "rate_limited" });
+      await vi.advanceTimersByTimeAsync(0);
+      await expectation;
+      expect(calls).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("a quote the browser fetched (preparedQuoteRequest → requestQuote relayed)", () => {
@@ -252,12 +266,12 @@ describe("a quote the browser fetched (preparedQuoteRequest → requestQuote rel
     expect(calls).toHaveLength(0);
   });
 
-  it("an answer to another request, or a stale one, is refused", async () => {
+  it("an answer to another request is relay_mismatch; a stale one is quote_moved (quote again)", async () => {
     noFetch();
-    const refused = async (patch: Record<string, unknown>, topLevel = false, at = NOW) => {
+    const refused = async (patch: Record<string, unknown>, topLevel = false) => {
       const body = topLevel ? { ...ANSWER, ...patch } : { ...ANSWER, quote: { ...ANSWER.quote, ...patch } };
-      await expect(requestQuote(100, req, { relayed: relayed(body), now: at })).rejects.toMatchObject({
-        code: "cow_api",
+      await expect(requestQuote(100, req, { relayed: relayed(body), now: NOW })).rejects.toMatchObject({
+        code: "relay_mismatch",
         message: expect.stringContaining("not the answer to this request"),
       });
     };
@@ -269,26 +283,38 @@ describe("a quote the browser fetched (preparedQuoteRequest → requestQuote rel
     await refused({ appDataHash: `0x${"00".repeat(32)}` });
     await refused({ sellAmount: "9999999955492985178" }); // + fee ≠ what was asked
     await refused({ feeAmount: "0" });
-    await refused({}, false, new Date("2026-11-04T17:24:12Z")); // past the orderbook's expiry
+    await expect(
+      requestQuote(100, req, { relayed: relayed(ANSWER), now: new Date("2026-11-04T17:24:12Z") }), // past the orderbook's expiry
+    ).rejects.toMatchObject({ code: "quote_moved" });
     // Missing echo fields are a shape error, not a pass.
     const { from: _from, ...noFrom } = ANSWER;
     void _from;
     await expect(requestQuote(100, req, { relayed: relayed(noFrom), now: NOW })).rejects.toMatchObject({ code: "cow_api" });
+    expect(calls).toHaveLength(0);
   });
 
-  it("the browser's own refusals read like the server's: 429 rate_limited, 400 quote_failed, 5xx cow_api", async () => {
+  it("the orderbook's refusal of the amount is taken from the browser: 400 → quote_failed, no call", async () => {
     noFetch();
-    await expect(requestQuote(100, req, { relayed: relayed(THROTTLED, 429), now: NOW })).rejects.toMatchObject({
-      code: "rate_limited",
-      message: expect.stringContaining("(browser)"),
-    });
     await expect(
       requestQuote(100, req, { relayed: relayed({ errorType: "NoLiquidity" }, 400), now: NOW }),
     ).rejects.toMatchObject({ code: "quote_failed" });
-    await expect(requestQuote(100, req, { relayed: { status: 502, text: "<html>bad gateway" }, now: NOW })).rejects.toMatchObject({
-      code: "cow_api",
-    });
     expect(calls).toHaveLength(0);
+  });
+
+  it("anything else the browser brings back (its own 429, a WAF page, a 5xx) is the browser's trouble: the server asks itself", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      for (const bad of [relayed(THROTTLED, 429), { status: 403, text: "<html>Attention Required! | Cloudflare" }, { status: 502, text: "<html>bad gateway" }]) {
+        stubFetch(() => json(200, ANSWER));
+        await expect(requestQuote(100, req, { relayed: bad, now: NOW })).resolves.toMatchObject({ id: 255834133 });
+        expect(calls).toHaveLength(1);
+        expect(calls[0].url).toBe("https://api.cow.fi/xdai/api/v1/quote");
+      }
+      expect(warn).toHaveBeenCalledTimes(3);
+      expect(String(warn.mock.calls[0][0])).toContain("HTTP 429");
+    } finally {
+      warn.mockRestore();
+    }
   });
 });
 
@@ -302,8 +328,28 @@ describe("retryAfterMs", () => {
     expect(retryAfterMs("soon", now)).toBeNull();
     expect(retryAfterMs("", now)).toBeNull();
     expect(retryAfterMs(null, now)).toBeNull();
-    expect(retryAfterMs("11", now)).toBeNull();
-    expect(retryAfterMs("10", now)).toBe(10_000);
+    expect(retryAfterMs("30", now)).toBe(30_000); // the cap is send()'s decision, not the parser's
+  });
+});
+
+describe("getOrder / getTrades never wait on a 429", () => {
+  it("a throttled read is rate_limited at once (the Safe page and the cron are behind it)", async () => {
+    vi.useFakeTimers();
+    try {
+      stubFetch(() => json(429, THROTTLED));
+      const p = getOrder(100, UID);
+      const expectation = expect(p).rejects.toMatchObject({ code: "rate_limited" });
+      await vi.advanceTimersByTimeAsync(0);
+      await expectation;
+      expect(calls).toHaveLength(1);
+      const t = getTrades(100, UID);
+      const expectation2 = expect(t).rejects.toMatchObject({ code: "rate_limited" });
+      await vi.advanceTimersByTimeAsync(0);
+      await expectation2;
+      expect(calls).toHaveLength(2); // one request each, no retry
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -341,7 +387,7 @@ describe("postPreSignOrder", () => {
     await expect(postPreSignOrder(args)).resolves.toBeUndefined();
   });
 
-  it("retries a 429 twice with backoff; a third 429 is rate_limited", async () => {
+  it("retries one 429 after a pause (the throttle is per owner, a longer wait never helps); a second is rate_limited", async () => {
     vi.useFakeTimers();
     try {
       stubFetch((_url, _init, n) => (n === 1 ? json(429, { error: "rate limit" }) : json(201, UID)));
@@ -355,7 +401,7 @@ describe("postPreSignOrder", () => {
       const expectation = expect(q).rejects.toMatchObject({ code: "rate_limited" });
       await vi.advanceTimersByTimeAsync(6_000);
       await expectation;
-      expect(calls).toHaveLength(3);
+      expect(calls).toHaveLength(2);
     } finally {
       vi.useRealTimers();
     }

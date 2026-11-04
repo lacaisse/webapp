@@ -605,6 +605,7 @@
           "no_pair": "Deze conversie is niet beschikbaar voor dit fonds. Schakel beide tokens in onder Instellingen → Token.",
           "quote_failed": "Dit bedrag kon niet geprijsd worden.",
           "quote_moved": "De prijs is veranderd. Bekijk de nieuwe prijsopgave.",
+          "relay_mismatch": "De prijsopgave die je browser ophaalde hoort niet bij deze omzetting. Vraag opnieuw op.",
           "amount": "Voer een positief bedrag in met hoogstens de decimalen van het token.",
           "expired": "De order is verlopen voordat hij werd uitgevoerd.",
           "fill_mismatch": "De uitvoering komt niet overeen met wat de keten toont.",

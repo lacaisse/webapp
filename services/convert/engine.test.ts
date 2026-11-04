@@ -214,7 +214,7 @@ describe("a quote the admin's browser fetches", () => {
     expect(await prepareQuote({ fund: FUND, safeId, converterId: "bread-eure", amount: "50", slippageBps: 50, now: NOW })).toEqual(PREPARED);
     expect(cowApi.preparedQuoteRequest).toHaveBeenCalledWith(
       100,
-      expect.objectContaining({ sellToken: WXDAI, buyToken: EURE, owner: getAddress(db.fundSafe[0].address), sellAmountBeforeFee: IN }),
+      expect.objectContaining({ sellToken: WXDAI, buyToken: EURE, owner: getAddress(String(db.fundSafe[0].address)), sellAmountBeforeFee: IN }),
     );
     await expect(prepareQuote({ fund: FUND, safeId, converterId: "eure-bread", amount: "0", slippageBps: 50, now: NOW })).rejects.toMatchObject({ code: "amount" });
   });

@@ -29,6 +29,7 @@ import {
   type Converter,
   type LegQuote,
   type PreparedHttp,
+  type QuoteRequest,
   type RelayedHttp,
 } from "./types";
 import { converterContracts, prepareChainQuote, quoteChain, type Position } from "./walk";
@@ -128,40 +129,37 @@ type QuoteArgs = {
   now?: Date;
 };
 
+// What a quote is about, resolved once for prepareQuote and quoteConversion
+// alike: the pair the fund is offered, the Safe as holder, the amount in
+// raw units, and the request the legs are asked with.
+async function quoteContext(a: QuoteArgs) {
+  const pair = await pairFor(a.fund, a.converterId);
+  const { chainId, address } = await quoteHolder(a.fund, a.safeId);
+  const units = parseAmount(a.amount, pair.from);
+  const request: QuoteRequest = {
+    chainId,
+    holder: address,
+    amountIn: units,
+    slippageBps: a.slippageBps,
+    validFor: ORDER_VALID_FOR_S,
+    now: a.now ?? new Date(),
+  };
+  return { pair, units, request };
+}
+
 /**
  * The outside request a quote makes, for the admin's browser to make it
  * (browser-quote.ts): the orderbook rate-limits per IP, and the browser's
  * address is not the server's shared one. Null: the quote calls nothing out.
  */
 export async function prepareQuote(a: QuoteArgs): Promise<PreparedHttp | null> {
-  const now = a.now ?? new Date();
-  const pair = await pairFor(a.fund, a.converterId);
-  const { chainId, address } = await quoteHolder(a.fund, a.safeId);
-  const units = parseAmount(a.amount, pair.from);
-  return prepareChainQuote(pair.converter, {
-    chainId,
-    holder: address,
-    amountIn: units,
-    slippageBps: a.slippageBps,
-    validFor: ORDER_VALID_FOR_S,
-    now,
-  });
+  const { pair, request } = await quoteContext(a);
+  return prepareChainQuote(pair.converter, request);
 }
 
 export async function quoteConversion(a: QuoteArgs & { relayed?: RelayedHttp }): Promise<ConversionQuote> {
-  const now = a.now ?? new Date();
-  const pair = await pairFor(a.fund, a.converterId);
-  const { chainId, address } = await quoteHolder(a.fund, a.safeId);
-  const units = parseAmount(a.amount, pair.from);
-  const q = await quoteChain(pair.converter, {
-    chainId,
-    holder: address,
-    amountIn: units,
-    slippageBps: a.slippageBps,
-    validFor: ORDER_VALID_FOR_S,
-    now,
-    relayed: a.relayed,
-  });
+  const { pair, units, request } = await quoteContext(a);
+  const q = await quoteChain(pair.converter, { ...request, relayed: a.relayed });
   return {
     converterId: pair.converter.id,
     from: { symbol: pair.from.symbol, decimals: pair.from.decimals, amount: formatAmount(units, pair.from.decimals) },

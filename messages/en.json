@@ -622,6 +622,7 @@
           "no_pair": "This conversion is not available for this fund. Enable both tokens under Settings → Token.",
           "quote_failed": "This amount could not be quoted.",
           "quote_moved": "The price moved. Review the new quote.",
+          "relay_mismatch": "The quote your browser fetched is not for this conversion. Quote again.",
           "amount": "Enter a positive amount with at most the token's decimals.",
           "expired": "The order expired before it filled.",
           "fill_mismatch": "The fill does not match what the chain shows.",

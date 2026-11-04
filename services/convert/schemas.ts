@@ -25,10 +25,12 @@ const SLIPPAGE_BPS = z.number(UNKNOWN).int(UNKNOWN).min(1, UNKNOWN).max(MAX_SLIP
 // What the browser brings back from the quote request the server prepared
 // (prepareQuoteAction → services/convert/browser-quote.ts): an HTTP status
 // and the body, which the server parses and checks itself. Size-capped: a
-// quote is under a kilobyte.
+// quote is under a kilobyte, and the browser cuts anything longer (an error
+// page) to the cap before sending.
+export const RELAYED_TEXT_MAX = 16_384;
 export const RelayedHttpSchema = z.object({
   status: z.number(UNKNOWN).int(UNKNOWN).min(100, UNKNOWN).max(599, UNKNOWN),
-  text: z.string(UNKNOWN).max(16_384, UNKNOWN),
+  text: z.string(UNKNOWN).max(RELAYED_TEXT_MAX, UNKNOWN),
 });
 
 export const QuoteConversionSchema = z.object({

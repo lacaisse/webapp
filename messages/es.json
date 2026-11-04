@@ -600,6 +600,7 @@
           "no_pair": "Esta conversión no está disponible para este fondo. Activa ambos tokens en Ajustes → Token.",
           "quote_failed": "No se pudo cotizar este importe.",
           "quote_moved": "El precio cambió. Revisa la nueva cotización.",
+          "relay_mismatch": "La cotización obtenida por tu navegador no corresponde a esta conversión. Vuelve a cotizar.",
           "amount": "Introduce un importe positivo con como máximo los decimales del token.",
           "expired": "La orden expiró antes de ejecutarse.",
           "fill_mismatch": "La ejecución no coincide con lo que muestra la cadena.",
