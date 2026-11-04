@@ -28,9 +28,10 @@ import { ConvertError, type Address, type Hex, type PreparedHttp, type RelayedHt
 // `COW_API_URL` overrides the base (a mock in dev / tests); otherwise the
 // hosted orderbook for the chain. 10 s timeout per request.
 //
-// A quote may also be fetched by the holder's browser: preparedQuoteRequest
-// gives the exact request, requestQuote `relayed` parses the exact answer
-// and checks it against the request (see browser-quote.ts for why).
+// A quote, and the order post, may also be made by the holder's browser:
+// preparedQuoteRequest / preparedOrderRequest give the exact request,
+// requestQuote `relayed` / postPreSignOrder `answer` read the exact answer
+// and check it against the request (see browser-relay.ts for why).
 
 const TIMEOUT_MS = 10_000;
 // The hosted orderbook rate-limits per IP (quotes 10/s, orders 5/s, reads
@@ -320,20 +321,12 @@ function checkRelayedQuote(q: CowQuoteRequest, quote: CowQuote, echo: QuoteEcho,
 // Orders
 // ---------------------------------------------------------------------------
 
-/**
- * Post a pre-sign order. `uid` is the locally computed uid (cow-order.ts):
- * the orderbook must answer the same one, and an order it already has
- * (DuplicatedOrder) is fine — it is ours.
- */
-export async function postPreSignOrder(a: {
-  chainId: number;
-  order: CowOrder;
-  owner: Address;
-  appDataDoc: string;
-  uid: Hex;
-}): Promise<void> {
-  const path = "/api/v1/orders";
-  const body = {
+const ORDERS_PATH = "/api/v1/orders";
+
+type OrderPost = { chainId: number; order: CowOrder; owner: Address; appDataDoc: string };
+
+function orderBody(a: OrderPost) {
+  return {
     ...orderToJson(a.order),
     appData: a.appDataDoc,
     appDataHash: a.order.appData,
@@ -341,7 +334,37 @@ export async function postPreSignOrder(a: {
     signingScheme: "presign",
     signature: a.owner,
   };
-  const r = await send(a.chainId, "POST", path, body, ORDER_ATTEMPTS);
+}
+
+/** The order post, byte for byte, for the holder's browser to make. */
+export function preparedOrderRequest(a: OrderPost): PreparedHttp {
+  const base = cowApiBaseUrl(a.chainId);
+  if (!base) throw new ConvertError("config", `No CoW orderbook for chain ${a.chainId}`);
+  return {
+    method: "POST",
+    url: `${base}${ORDERS_PATH}`,
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(orderBody(a)),
+  };
+}
+
+/**
+ * Post a pre-sign order. `uid` is the locally computed uid (cow-order.ts):
+ * the orderbook must answer the same one, and an order it already has
+ * (DuplicatedOrder) is fine — it is ours. With `answer`, the browser made
+ * the post (preparedOrderRequest) and this reads its answer instead — when
+ * it is the orderbook's; anything else (the browser's own 429, a WAF page)
+ * and the server posts itself.
+ */
+export async function postPreSignOrder(a: OrderPost & { uid: Hex }, answer: RelayedHttp | null = null): Promise<void> {
+  const path = ORDERS_PATH;
+  let r: HttpResult;
+  if (answer && isOrderbookAnswer(answer.status)) {
+    r = { status: answer.status, text: answer.text, retryAfterMs: null };
+  } else {
+    if (answer) console.warn(`[convert] browser order post answered HTTP ${answer.status}; posting from the server`);
+    r = await send(a.chainId, "POST", path, orderBody(a), ORDER_ATTEMPTS);
+  }
   if (r.status >= 200 && r.status < 300) {
     const json = parseJson("POST", path, r);
     const answered = shaped("order uid", () => hex(json, "uid"));

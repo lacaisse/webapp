@@ -3,7 +3,14 @@ import "server-only";
 
 import { COW_CONTRACTS_BY_CHAIN, assetAddress, assetChainId } from "../assets";
 import { readSettledTrade } from "../chain";
-import { getOrder, getTrades, postPreSignOrder, preparedQuoteRequest, requestQuote } from "../cow-api";
+import {
+  getOrder,
+  getTrades,
+  postPreSignOrder,
+  preparedOrderRequest,
+  preparedQuoteRequest,
+  requestQuote,
+} from "../cow-api";
 import {
   APP_DATA_DOC,
   APP_DATA_HASH,
@@ -26,6 +33,7 @@ import {
   type LegContext,
   type PollResult,
   type QuoteRequest,
+  type RelayedHttp,
   type StepResult,
 } from "../types";
 
@@ -41,6 +49,9 @@ import {
 
 type QuoteData = { sellAmount: string; feeAmount: string; buyAmount: string; quoteId: number | null };
 type ApiData = { order: JsonCowOrder };
+// What the api step keeps between its request and its answer (sealed into
+// the start ticket when the browser makes the post, engine.ts).
+type ApiPending = { uid: Hex; order: JsonCowOrder };
 
 function cowFor(chainId: number) {
   const c = COW_CONTRACTS_BY_CHAIN[chainId];
@@ -83,6 +94,45 @@ export function cowLeg(from: Erc20AssetId, to: Erc20AssetId): Leg {
       appDataHash: APP_DATA_HASH,
       validFor: r.validFor,
     };
+  };
+
+  // The order the api step posts: the quote's amounts, the minimum the
+  // conversion accepted, the quote's validity.
+  const orderFor = (c: LegContext) => {
+    const q = quoteData(c);
+    // The quote was taken for exactly this input; a different actual input
+    // (an upstream leg that is not exact) needs a fresh quote first.
+    if (BigInt(q.sellAmount) + BigInt(q.feeAmount) !== c.amountIn) {
+      throw new ConvertError("quote_moved", "CoW leg input differs from its quote; re-quote");
+    }
+    const order = orderFromQuote({
+      sellToken,
+      buyToken,
+      receiver: c.holder,
+      quote: { sellAmount: BigInt(q.sellAmount), feeAmount: BigInt(q.feeAmount), buyAmount: BigInt(q.buyAmount) },
+      buyAmount: c.quote.minAmountOut,
+      validTo: Math.floor(c.quote.validUntil.getTime() / 1000),
+    });
+    const uid = orderUid(c.chainId, cowFor(c.chainId).settlement, order, c.holder);
+    return { order, uid };
+  };
+
+  // The api step's result: the order is on the orderbook — posted by the
+  // browser (`answer`) or by the server (null). The pending order is hashed
+  // again rather than trusted: its uid is what the Safe will pre-sign.
+  const postOrder = async (c: LegContext, pending: unknown, answer: RelayedHttp | null): Promise<StepResult> => {
+    const p = pending as Partial<ApiPending> | undefined;
+    if (!p || typeof p.uid !== "string" || !p.order) {
+      throw new ConvertError("invalid_state", "CoW api step has no pending order");
+    }
+    const order = orderFromJson(p.order);
+    const uid = orderUid(c.chainId, cowFor(c.chainId).settlement, order, c.holder);
+    if (uid.toLowerCase() !== p.uid.toLowerCase()) {
+      throw new ConvertError("invalid_state", "CoW pending order does not hash to its uid");
+    }
+    await postPreSignOrder({ chainId: c.chainId, order, owner: c.holder, appDataDoc: APP_DATA_DOC, uid }, answer);
+    const data: ApiData = { order: p.order };
+    return { kind: "api", ref: uid, data };
   };
 
   return {
@@ -140,25 +190,20 @@ export function cowLeg(from: Erc20AssetId, to: Erc20AssetId): Leg {
       return w ? BigInt(w.amountOut) : null;
     },
 
-    run: async (c): Promise<StepResult> => {
-      const q = quoteData(c);
-      // The quote was taken for exactly this input; a different actual input
-      // (an upstream leg that is not exact) needs a fresh quote first.
-      if (BigInt(q.sellAmount) + BigInt(q.feeAmount) !== c.amountIn) {
-        throw new ConvertError("quote_moved", "CoW leg input differs from its quote; re-quote");
-      }
-      const order = orderFromQuote({
-        sellToken,
-        buyToken,
-        receiver: c.holder,
-        quote: { sellAmount: BigInt(q.sellAmount), feeAmount: BigInt(q.feeAmount), buyAmount: BigInt(q.buyAmount) },
-        buyAmount: c.quote.minAmountOut,
-        validTo: Math.floor(c.quote.validUntil.getTime() / 1000),
-      });
-      const uid = orderUid(c.chainId, cowFor(c.chainId).settlement, order, c.holder);
-      await postPreSignOrder({ chainId: c.chainId, order, owner: c.holder, appDataDoc: APP_DATA_DOC, uid });
-      const data: ApiData = { order: orderToJson(order) };
-      return { kind: "api", ref: uid, data };
+    apiRequest: (c) => {
+      const { order, uid } = orderFor(c);
+      const pending: ApiPending = { uid, order: orderToJson(order) };
+      return {
+        request: preparedOrderRequest({ chainId: c.chainId, order, owner: c.holder, appDataDoc: APP_DATA_DOC }),
+        pending,
+      };
+    },
+
+    apiResult: (c, pending, answer) => postOrder(c, pending, answer),
+
+    run: (c): Promise<StepResult> => {
+      const { order, uid } = orderFor(c);
+      return postOrder(c, { uid, order: orderToJson(order) } satisfies ApiPending, null);
     },
 
     poll: async (c): Promise<PollResult> => {

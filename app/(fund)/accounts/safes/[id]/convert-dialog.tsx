@@ -19,12 +19,17 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { prepareQuoteAction, quoteConversionAction, startConversionAction } from "@/services/convert/admin-actions";
-import { relayQuote } from "@/services/convert/browser-quote";
+import {
+  completeConversionStartAction,
+  prepareQuoteAction,
+  quoteConversionAction,
+  startConversionAction,
+} from "@/services/convert/admin-actions";
+import { relayRequest } from "@/services/convert/browser-relay";
 import type { ConversionQuote } from "@/services/convert/engine";
 import { DEFAULT_SLIPPAGE_BPS, QuoteConversionSchema } from "@/services/convert/schemas";
 import type { PreparedHttp, RelayedHttp } from "@/services/convert/types";
-import type { SigningPasskeyHandle } from "@/services/safe/action-types";
+import type { ProposeActionResult, SigningPasskeyHandle } from "@/services/safe/action-types";
 
 import { useStepUp } from "@/components/reauth-dialog";
 import { useProposeAndSign, type ProposalOutcome } from "../passkey-hooks";
@@ -51,10 +56,12 @@ const SELECT_CLASS =
 // transactions — then propose: the first transaction collects signatures
 // like a transfer; the engine takes it from there (services/convert).
 //
-// The quote's outside call is made from THIS browser: the server prepares
-// the request, the browser fetches it, the server parses the answer
-// (services/convert/browser-quote.ts says why). Propose fetches a fresh one
-// the same way, so the order is posted on a price seconds old.
+// The orderbook calls are made from THIS browser: the server prepares the
+// request, the browser fetches it, the server parses the answer
+// (services/convert/browser-relay.ts says why). Propose fetches a fresh
+// quote the same way, then carries the order post too: the start action
+// hands back the post and a sealed ticket, the browser posts, and the
+// complete action makes the proposal from the ticket and the answer.
 export function ConvertDialog({
   safeId,
   chainId,
@@ -142,7 +149,7 @@ export function ConvertDialog({
       }
       // A browser that cannot reach the orderbook sends no answer: the
       // server then calls out itself.
-      const relayed = prep.request ? await relayQuote(prep.request) : null;
+      const relayed = prep.request ? await relayRequest(prep.request) : null;
       const res = await quoteConversionAction({ ...parsed.data, ...(relayed ? { relayed } : {}) });
       if ("error" in res) {
         setError(res.error);
@@ -160,7 +167,7 @@ export function ConvertDialog({
     startTransition(async () => {
       let fetched: Fetched | null = reuse && Date.now() - reuse.at < RELAY_REUSE_MS ? reuse : null;
       if (!fetched && prepared) {
-        const relayed = await relayQuote(prepared);
+        const relayed = await relayRequest(prepared);
         if (relayed) fetched = { relayed, at: Date.now() };
       }
       const res = await startConversionAction({
@@ -174,14 +181,34 @@ export function ConvertDialog({
       // Not fresh enough: confirm identity, then the same submit again, on
       // the same quote.
       if (stepUp.check(res, () => onSubmit(fetched))) return;
-      router.refresh();
       if ("error" in res) {
+        router.refresh();
         setError(res.error);
         setQuote(null); // the market may have moved: quote again
         return;
       }
+      let done: ProposeActionResult;
+      if ("relay" in res) {
+        // The order post, from this browser; the server reads the answer
+        // and makes the proposal (or posts itself when the browser could not).
+        const answer = await relayRequest(res.relay.request);
+        done = await completeConversionStartAction({
+          safeId,
+          ticket: res.relay.ticket,
+          ...(answer ? { relayed: answer } : {}),
+        });
+        if (stepUp.check(done, () => onSubmit(fetched))) return;
+      } else {
+        done = res;
+      }
+      router.refresh();
+      if ("error" in done) {
+        setError(done.error);
+        setQuote(null); // the market may have moved: quote again
+        return;
+      }
       // A passkey owner signs their own proposal right away (one more tap).
-      const outcome = await finish(res);
+      const outcome = await finish(done);
       router.refresh();
       setResult(outcome);
     });

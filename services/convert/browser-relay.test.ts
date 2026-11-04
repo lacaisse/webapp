@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { relayQuote } from "./browser-quote";
+import { relayRequest } from "./browser-relay";
 import { RELAYED_TEXT_MAX } from "./schemas";
 
-// The client half of the browser quote: the exact request goes out, the
+// The client half of the browser relay (quote and order post): the exact request goes out, the
 // status and body come back unchanged (cut to what the server reads), and
 // anything that keeps the browser from an answer is null — the server then
 // asks for itself.
@@ -21,11 +21,11 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("relayQuote", () => {
+describe("relayRequest", () => {
   it("sends the prepared request as is and brings back the status and body", async () => {
     const fetch = vi.fn(async () => new Response('{"quote":{}}', { status: 200 }));
     vi.stubGlobal("fetch", fetch);
-    expect(await relayQuote(REQ)).toEqual({ status: 200, text: '{"quote":{}}' });
+    expect(await relayRequest(REQ)).toEqual({ status: 200, text: '{"quote":{}}' });
     const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe(REQ.url);
     expect(init).toMatchObject({ method: "POST", headers: REQ.headers, body: REQ.body, mode: "cors", credentials: "omit" });
@@ -34,19 +34,19 @@ describe("relayQuote", () => {
 
   it("brings back a refusal too, cut to what the server will read", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("x".repeat(RELAYED_TEXT_MAX + 5_000), { status: 403 })));
-    const r = await relayQuote(REQ);
+    const r = await relayRequest(REQ);
     expect(r?.status).toBe(403);
     expect(r?.text).toHaveLength(RELAYED_TEXT_MAX);
   });
 
   it("is null when the browser cannot fetch, or the body cannot be read", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(new TypeError("Failed to fetch"))));
-    expect(await relayQuote(REQ)).toBeNull();
+    expect(await relayRequest(REQ)).toBeNull();
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => ({ status: 200, text: () => Promise.reject(new Error("body stream broke")) })),
     );
-    expect(await relayQuote(REQ)).toBeNull();
+    expect(await relayRequest(REQ)).toBeNull();
   });
 
   it("is null once the timeout aborts the request", async () => {
@@ -60,7 +60,7 @@ describe("relayQuote", () => {
           }),
       ),
     );
-    const p = relayQuote(REQ, 1_000);
+    const p = relayRequest(REQ, 1_000);
     await vi.advanceTimersByTimeAsync(999);
     await vi.advanceTimersByTimeAsync(1);
     expect(await p).toBeNull();
