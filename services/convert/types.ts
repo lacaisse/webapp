@@ -58,6 +58,13 @@ export type PollResult =
   | { status: "expired" }
   | { status: "failed"; reason: string };
 
+// An HTTP request the server prepared for the holder's browser to make on
+// its behalf, and the answer the browser brings back. Pure data: the body is
+// the exact bytes to send, the answer the exact bytes received. The browser
+// carries them and decides nothing (services/convert/browser-quote.ts).
+export type PreparedHttp = { method: "POST"; url: string; headers: Record<string, string>; body: string };
+export type RelayedHttp = { status: number; text: string };
+
 export type QuoteRequest = {
   chainId: number;
   holder: Address;
@@ -65,6 +72,10 @@ export type QuoteRequest = {
   slippageBps: number;
   validFor: number; // seconds the quote / order should stay valid
   now: Date;
+  // The swap leg's quote as the browser fetched it from the request the leg
+  // prepared (Leg.quoteRequest): the leg parses and checks it instead of
+  // calling out itself. Absent: the leg calls out.
+  relayed?: RelayedHttp;
 };
 
 // What a leg sees of its own conversion: its actual input (the previous
@@ -96,6 +107,9 @@ export type Leg = {
   // on it: the engine refuses anything else before it reaches a Safe.
   contracts(chainId: number): AllowedContract[];
   quote(r: QuoteRequest): Promise<LegQuote>;
+  // For a leg whose quote calls an outside service: the request it would
+  // make, so the holder's browser can make it and hand back `r.relayed`.
+  quoteRequest?(r: QuoteRequest): PreparedHttp;
   // Pure: the next step given the results so far, null once the leg is done.
   next(c: LegContext): Step | null;
   // The leg's actual output once known (exact legs: the input), else null.
@@ -146,10 +160,11 @@ export function legQuoteFromJson(j: JsonLegQuote): LegQuote {
 export type ConvertErrorCode =
   | "config" // env / contracts missing for the chain
   | "cow_api" // CoW orderbook HTTP / shape error
-  | "rate_limited" // the orderbook throttled order creation (429 twice)
+  | "rate_limited" // the orderbook answered 429 through the retries (per-IP quota or per-owner order throttle)
   | "no_pair" // no converter for (from, to), or the fund does not show both
   | "quote_failed" // the outside service gave no usable quote
-  | "quote_moved" // fresh minimum below what the user accepted
+  | "quote_moved" // fresh minimum below what the user accepted, or the relayed quote expired: quote again
+  | "relay_mismatch" // the quote the browser brought back answers another request
   | "amount" // zero / malformed / too precise
   | "expired" // the order or quote ran out
   | "fill_mismatch" // the fill reported does not match the chain

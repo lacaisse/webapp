@@ -22,11 +22,23 @@ export const MAX_SLIPPAGE_BPS = 300;
 const UNKNOWN = "fund.safes.errors.unknown";
 const SLIPPAGE_BPS = z.number(UNKNOWN).int(UNKNOWN).min(1, UNKNOWN).max(MAX_SLIPPAGE_BPS, UNKNOWN);
 
+// What the browser brings back from the quote request the server prepared
+// (prepareQuoteAction → services/convert/browser-quote.ts): an HTTP status
+// and the body, which the server parses and checks itself. Size-capped: a
+// quote is under a kilobyte, and the browser cuts anything longer (an error
+// page) to the cap before sending.
+export const RELAYED_TEXT_MAX = 16_384;
+export const RelayedHttpSchema = z.object({
+  status: z.number(UNKNOWN).int(UNKNOWN).min(100, UNKNOWN).max(599, UNKNOWN),
+  text: z.string(UNKNOWN).max(RELAYED_TEXT_MAX, UNKNOWN),
+});
+
 export const QuoteConversionSchema = z.object({
   safeId: z.string().min(1),
   converterId: z.string().min(1),
   amount: DECIMAL_AMOUNT,
   slippageBps: SLIPPAGE_BPS.default(DEFAULT_SLIPPAGE_BPS),
+  relayed: RelayedHttpSchema.optional(),
 });
 export type QuoteConversionInput = z.input<typeof QuoteConversionSchema>;
 

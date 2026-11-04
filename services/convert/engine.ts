@@ -28,8 +28,11 @@ import {
   type ConversionState,
   type Converter,
   type LegQuote,
+  type PreparedHttp,
+  type QuoteRequest,
+  type RelayedHttp,
 } from "./types";
-import { converterContracts, quoteChain, type Position } from "./walk";
+import { converterContracts, prepareChainQuote, quoteChain, type Position } from "./walk";
 
 // Quote / start / continue / cancel — the parts of a conversion that create
 // Safe proposals (through proposals.ts proposeConversionStep). What happens
@@ -117,26 +120,46 @@ export type ConversionQuote = {
   validUntil: string; // ISO: the order's validTo
 };
 
-export async function quoteConversion(a: {
+type QuoteArgs = {
   fund: ConvertFund;
   safeId: string;
   converterId: string;
   amount: string;
   slippageBps: number;
   now?: Date;
-}): Promise<ConversionQuote> {
-  const now = a.now ?? new Date();
+};
+
+// What a quote is about, resolved once for prepareQuote and quoteConversion
+// alike: the pair the fund is offered, the Safe as holder, the amount in
+// raw units, and the request the legs are asked with.
+async function quoteContext(a: QuoteArgs) {
   const pair = await pairFor(a.fund, a.converterId);
   const { chainId, address } = await quoteHolder(a.fund, a.safeId);
   const units = parseAmount(a.amount, pair.from);
-  const q = await quoteChain(pair.converter, {
+  const request: QuoteRequest = {
     chainId,
     holder: address,
     amountIn: units,
     slippageBps: a.slippageBps,
     validFor: ORDER_VALID_FOR_S,
-    now,
-  });
+    now: a.now ?? new Date(),
+  };
+  return { pair, units, request };
+}
+
+/**
+ * The outside request a quote makes, for the admin's browser to make it
+ * (browser-quote.ts): the orderbook rate-limits per IP, and the browser's
+ * address is not the server's shared one. Null: the quote calls nothing out.
+ */
+export async function prepareQuote(a: QuoteArgs): Promise<PreparedHttp | null> {
+  const { pair, request } = await quoteContext(a);
+  return prepareChainQuote(pair.converter, request);
+}
+
+export async function quoteConversion(a: QuoteArgs & { relayed?: RelayedHttp }): Promise<ConversionQuote> {
+  const { pair, units, request } = await quoteContext(a);
+  const q = await quoteChain(pair.converter, { ...request, relayed: a.relayed });
   return {
     converterId: pair.converter.id,
     from: { symbol: pair.from.symbol, decimals: pair.from.decimals, amount: formatAmount(units, pair.from.decimals) },
@@ -242,6 +265,7 @@ export type StartConversionInput = {
   amount: string; // human decimal
   minOut: string; // raw units the user accepted (from the quote they saw)
   slippageBps: number;
+  relayed?: RelayedHttp; // the fresh quote, as the browser fetched it (prepareQuote)
 };
 
 /**
@@ -274,6 +298,7 @@ export async function startConversion(a: {
     slippageBps: a.input.slippageBps,
     validFor: ORDER_VALID_FOR_S,
     now,
+    relayed: a.input.relayed,
   });
   if (fresh.minOut < userMin) {
     throw new ConvertError("quote_moved", `Fresh minimum ${fresh.minOut} is below the accepted ${userMin}`);

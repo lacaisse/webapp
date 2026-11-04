@@ -13,8 +13,8 @@ import {
 } from "@/services/safe/action-helpers";
 import type { ProposeActionResult } from "@/services/safe/action-types";
 
-import type { CancelConversionResult, QuoteActionResult } from "./action-types";
-import { cancelConversion, continueConversion, quoteConversion, startConversion } from "./engine";
+import type { CancelConversionResult, PrepareQuoteResult, QuoteActionResult } from "./action-types";
+import { cancelConversion, continueConversion, prepareQuote, quoteConversion, startConversion } from "./engine";
 import {
   ConversionIdSchema,
   QuoteConversionSchema,
@@ -35,12 +35,30 @@ import { isConvertError } from "./types";
 // proposal itself → the Safe strings.
 function convertErrorFor(t: T, e: unknown, context: string): string {
   if (isConvertError(e)) {
-    if (e.code !== "quote_moved" && e.code !== "no_pair" && e.code !== "amount" && e.code !== "rate_limited") {
+    // User-side refusals are expected and not logged; a throttle is logged
+    // with the orderbook's words (they name the quota that was hit).
+    if (e.code !== "quote_moved" && e.code !== "no_pair" && e.code !== "amount") {
       console.warn(`[convert] ${context}:`, e.code, e.message);
     }
     return t(`fund.safes.conversion.errors.${e.code}` as never);
   }
   return errorFor(t, e, context);
+}
+
+// The quote in two halves so the admin's browser can make the outside call
+// (browser-quote.ts): prepare gives the request, quote takes the answer. A
+// quote without `relayed` is the server calling out itself.
+export async function prepareQuoteAction(input: QuoteConversionInput): Promise<PrepareQuoteResult> {
+  const t = await getTranslations();
+  const { fund } = await requireFundRole("ADMIN");
+  const parsed = QuoteConversionSchema.safeParse(input);
+  if (!parsed.success) return { error: t(parsed.error.issues[0].message as never) };
+  try {
+    const request = await prepareQuote({ fund, ...parsed.data });
+    return { ok: true, request };
+  } catch (e) {
+    return { error: convertErrorFor(t, e, "prepare-quote") };
+  }
 }
 
 export async function quoteConversionAction(input: QuoteConversionInput): Promise<QuoteActionResult> {

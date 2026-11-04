@@ -3,7 +3,7 @@ import "server-only";
 
 import { COW_CONTRACTS_BY_CHAIN, assetAddress, assetChainId } from "../assets";
 import { readSettledTrade } from "../chain";
-import { getOrder, getTrades, postPreSignOrder, requestQuote } from "../cow-api";
+import { getOrder, getTrades, postPreSignOrder, preparedQuoteRequest, requestQuote } from "../cow-api";
 import {
   APP_DATA_DOC,
   APP_DATA_HASH,
@@ -25,6 +25,7 @@ import {
   type Leg,
   type LegContext,
   type PollResult,
+  type QuoteRequest,
   type StepResult,
 } from "../types";
 
@@ -69,6 +70,21 @@ export function cowLeg(from: Erc20AssetId, to: Erc20AssetId): Leg {
   const sellToken = assetAddress(from)!;
   const buyToken = assetAddress(to)!;
 
+  // The one quote request, whether the server or the holder's browser makes it.
+  const cowQuoteRequest = (r: QuoteRequest) => {
+    if (r.chainId !== chainId) throw new ConvertError("config", "CoW leg: wrong chain");
+    if (r.amountIn <= BigInt(0)) throw new ConvertError("amount", "Amount must be positive");
+    return {
+      sellToken,
+      buyToken,
+      owner: r.holder,
+      sellAmountBeforeFee: r.amountIn,
+      appDataDoc: APP_DATA_DOC,
+      appDataHash: APP_DATA_HASH,
+      validFor: r.validFor,
+    };
+  };
+
   return {
     id: "cow-swap",
     from,
@@ -80,18 +96,10 @@ export function cowLeg(from: Erc20AssetId, to: Erc20AssetId): Leg {
       { address: cowFor(c).settlement, selectors: [SET_PRE_SIGNATURE_SELECTOR] },
     ],
 
+    quoteRequest: (r) => preparedQuoteRequest(r.chainId, cowQuoteRequest(r)),
+
     quote: async (r) => {
-      if (r.chainId !== chainId) throw new ConvertError("config", "CoW leg: wrong chain");
-      if (r.amountIn <= BigInt(0)) throw new ConvertError("amount", "Amount must be positive");
-      const q = await requestQuote(r.chainId, {
-        sellToken,
-        buyToken,
-        owner: r.holder,
-        sellAmountBeforeFee: r.amountIn,
-        appDataDoc: APP_DATA_DOC,
-        appDataHash: APP_DATA_HASH,
-        validFor: r.validFor,
-      });
+      const q = await requestQuote(r.chainId, cowQuoteRequest(r), { relayed: r.relayed, now: r.now });
       if (q.buyAmount <= BigInt(0)) throw new ConvertError("quote_failed", "CoW quoted nothing");
       const data: QuoteData = {
         sellAmount: q.sellAmount.toString(),

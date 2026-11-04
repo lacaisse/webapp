@@ -24,4 +24,14 @@ describe("conversion schemas", () => {
     }
     expect(firstMessage(QuoteConversionSchema.safeParse({ ...VALID, amount: "x" }))).toBe("fund.safes.errors.amountInvalid");
   });
+
+  it("take the quote the browser fetched as a status and a capped body, or nothing", () => {
+    const relayed = { status: 200, text: '{"quote":{}}' };
+    expect(QuoteConversionSchema.parse({ ...VALID, relayed }).relayed).toEqual(relayed);
+    expect(StartConversionSchema.parse({ ...VALID, relayed }).relayed).toEqual(relayed);
+    expect(QuoteConversionSchema.parse(VALID).relayed).toBeUndefined();
+    for (const bad of [{ status: 200 }, { status: "200", text: "" }, { status: 99, text: "" }, { status: 200, text: "x".repeat(16_385) }]) {
+      expect(firstMessage(QuoteConversionSchema.safeParse({ ...VALID, relayed: bad }))).toBe("fund.safes.errors.unknown");
+    }
+  });
 });

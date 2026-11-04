@@ -19,9 +19,11 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { quoteConversionAction, startConversionAction } from "@/services/convert/admin-actions";
+import { prepareQuoteAction, quoteConversionAction, startConversionAction } from "@/services/convert/admin-actions";
+import { relayQuote } from "@/services/convert/browser-quote";
 import type { ConversionQuote } from "@/services/convert/engine";
 import { DEFAULT_SLIPPAGE_BPS, QuoteConversionSchema } from "@/services/convert/schemas";
+import type { PreparedHttp, RelayedHttp } from "@/services/convert/types";
 import type { SigningPasskeyHandle } from "@/services/safe/action-types";
 
 import { useStepUp } from "@/components/reauth-dialog";
@@ -36,6 +38,11 @@ export type ConvertPairOption = {
   to: { symbol: string };
 };
 
+// A quote the browser fetched is reused on the step-up retry while this
+// young: the orderbook honours it for two minutes, and the admin should not
+// pay a second quote for confirming who they are.
+const RELAY_REUSE_MS = 60_000;
+
 const SELECT_CLASS =
   "h-8 w-full rounded-md bg-background px-2 text-sm ring-1 ring-foreground/15 outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
@@ -43,6 +50,11 @@ const SELECT_CLASS =
 // order the Safe pre-signs. Quote first — expected, minimum, how many Safe
 // transactions — then propose: the first transaction collects signatures
 // like a transfer; the engine takes it from there (services/convert).
+//
+// The quote's outside call is made from THIS browser: the server prepares
+// the request, the browser fetches it, the server parses the answer
+// (services/convert/browser-quote.ts says why). Propose fetches a fresh one
+// the same way, so the order is posted on a price seconds old.
 export function ConvertDialog({
   safeId,
   chainId,
@@ -65,6 +77,9 @@ export function ConvertDialog({
   const [converterId, setConverterId] = useState(pairs[0]?.converterId ?? "");
   const [amount, setAmount] = useState("");
   const [quote, setQuote] = useState<ConversionQuote | null>(null);
+  // The quote request as the server prepared it, kept for the fresh quote at
+  // propose time; null when the quote calls nothing outside.
+  const [prepared, setPrepared] = useState<PreparedHttp | null>(null);
   const [quoting, startQuoting] = useTransition();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -78,6 +93,7 @@ export function ConvertDialog({
     setConverterId(pairs[0]?.converterId ?? "");
     setAmount("");
     setQuote(null);
+    setPrepared(null);
     setError(null);
   }
 
@@ -91,14 +107,16 @@ export function ConvertDialog({
     }
   }
 
-  // Any change to what is converted invalidates the quote.
+  // Any change to what is converted invalidates the quote and its request.
   const onAmount = (v: string) => {
     setAmount(v);
     setQuote(null);
+    setPrepared(null);
   };
   const onPair = (v: string) => {
     setConverterId(v);
     setQuote(null);
+    setPrepared(null);
   };
 
   const parsedInput = () =>
@@ -117,28 +135,45 @@ export function ConvertDialog({
       return;
     }
     startQuoting(async () => {
-      const res = await quoteConversionAction(parsed.data);
+      const prep = await prepareQuoteAction(parsed.data);
+      if ("error" in prep) {
+        setError(prep.error);
+        return;
+      }
+      // A browser that cannot reach the orderbook sends no answer: the
+      // server then calls out itself.
+      const relayed = prep.request ? await relayQuote(prep.request) : null;
+      const res = await quoteConversionAction({ ...parsed.data, ...(relayed ? { relayed } : {}) });
       if ("error" in res) {
         setError(res.error);
         return;
       }
+      setPrepared(prep.request);
       setQuote(res.quote);
     });
   };
 
-  const onSubmit = () => {
+  type Fetched = { relayed: RelayedHttp; at: number };
+  const onSubmit = (reuse: Fetched | null = null) => {
     if (!quote) return;
     setError(null);
     startTransition(async () => {
+      let fetched: Fetched | null = reuse && Date.now() - reuse.at < RELAY_REUSE_MS ? reuse : null;
+      if (!fetched && prepared) {
+        const relayed = await relayQuote(prepared);
+        if (relayed) fetched = { relayed, at: Date.now() };
+      }
       const res = await startConversionAction({
         safeId,
         converterId: quote.converterId,
         amount,
         minOut: quote.minOut,
         slippageBps: quote.slippageBps,
+        ...(fetched ? { relayed: fetched.relayed } : {}),
       });
-      // Not fresh enough: confirm identity, then the same submit again.
-      if (stepUp.check(res, onSubmit)) return;
+      // Not fresh enough: confirm identity, then the same submit again, on
+      // the same quote.
+      if (stepUp.check(res, () => onSubmit(fetched))) return;
       router.refresh();
       if ("error" in res) {
         setError(res.error);
@@ -291,7 +326,7 @@ export function ConvertDialog({
                   {t("requote")}
                 </Button>
               )}
-              <Button type="button" onClick={onSubmit} disabled={pending || quoting || !quote}>
+              <Button type="button" onClick={() => onSubmit()} disabled={pending || quoting || !quote}>
                 {pending ? <Loader2 className="size-4 animate-spin" /> : <Repeat className="size-4" />}
                 {t("confirm")}
               </Button>

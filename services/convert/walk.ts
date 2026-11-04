@@ -21,6 +21,7 @@ import {
   type Converter,
   type LegContext,
   type LegQuote,
+  type PreparedHttp,
   type QuoteRequest,
   type Step,
 } from "./types";
@@ -192,4 +193,20 @@ export async function quoteChain(converter: Converter, req: QuoteRequest): Promi
   }
   if (!validUntil) throw new ConvertError("invalid_state", "Converter has no legs");
   return { legs, expectedOut: amountIn, minOut, fee, validUntil };
+}
+
+/**
+ * The request the chain's swap leg would make for its quote, on the input
+ * the exact legs before it pass through — for the holder's browser to make
+ * it (browser-quote.ts) and hand the answer back as QuoteRequest.relayed.
+ * Null when no leg quotes an outside service.
+ */
+export async function prepareChainQuote(converter: Converter, req: QuoteRequest): Promise<PreparedHttp | null> {
+  let amountIn = req.amountIn;
+  for (const leg of converter.legs) {
+    if (leg.quoteRequest) return leg.quoteRequest({ ...req, amountIn, relayed: undefined });
+    const q = await leg.quote({ ...req, amountIn, relayed: undefined });
+    amountIn = q.amountOut;
+  }
+  return null;
 }

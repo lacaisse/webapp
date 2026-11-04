@@ -622,6 +622,7 @@
           "no_pair": "Cette conversion n'est pas disponible pour cette caisse. Activez les deux jetons dans Paramètres → Jeton.",
           "quote_failed": "Ce montant n'a pas pu être coté.",
           "quote_moved": "Le prix a bougé. Vérifiez la nouvelle cotation.",
+          "relay_mismatch": "La cotation récupérée par votre navigateur ne correspond pas à cette conversion. Recotez.",
           "amount": "Entrez un montant positif avec au plus les décimales du jeton.",
           "expired": "L'ordre a expiré avant d'être exécuté.",
           "fill_mismatch": "L'exécution ne correspond pas à ce que montre la chaîne.",
