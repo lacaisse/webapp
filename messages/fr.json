@@ -4722,7 +4722,7 @@
   },
   "terms": {
     "title": "Conditions d’utilisation",
-    "lastUpdated": "Dernière mise à jour : 12 mai 2026",
+    "lastUpdated": "Dernière mise à jour : 5 novembre 2026",
     "intro": "Ces conditions régissent votre utilisation de La caisse, la plateforme exploitée par Citizen Pay BV. En créant un compte ou en utilisant le service, vous les acceptez.",
     "about": {
       "heading": "1. À propos de ces conditions",
@@ -4749,8 +4749,8 @@
     "billing": {
       "heading": "5. Abonnement et facturation",
       "items": [
-        "Plan hébergé : 20 €/mois par caisse, facturé mensuellement. TVA appliquée le cas échéant.",
-        "Gratuit pour les associations et écoles : les associations enregistrées, ASBL et établissements scolaires utilisent La caisse gratuitement. Fournissez un justificatif à l’inscription ou dans les paramètres de votre compte.",
+        "Plan hébergé : {price} par mois et par caisse, hors TVA, facturé mensuellement par Citizen Pay BV. La TVA est ajoutée le cas échéant.",
+        "Exonération : Citizen Pay BV peut dispenser une caisse des frais d’hébergement au moyen d’un code d’invitation.",
         "Auto-hébergement : La caisse est sous licence AGPL-3.0 — l’auto-hébergement est gratuit, et ces conditions ne couvrent que le service hébergé proposé par Citizen Pay BV.",
         "Remboursements : les frais mensuels ne sont pas remboursables, mais vous pouvez résilier à tout moment ; la résiliation prend effet à la fin de la période de facturation en cours."
       ]
@@ -4765,7 +4765,7 @@
     },
     "availability": {
       "heading": "8. Disponibilité du service",
-      "body": "Nous faisons des efforts raisonnables pour maintenir La caisse disponible mais n’offrons aucune garantie de disponibilité pour les plans gratuit ou standard. Nous pouvons effectuer des opérations de maintenance, avec préavis lorsque possible."
+      "body": "Nous faisons des efforts raisonnables pour maintenir La caisse disponible mais n’offrons aucune garantie de disponibilité pour le service hébergé. Nous pouvons effectuer des opérations de maintenance, avec préavis lorsque possible."
     },
     "disclaimers": {
       "heading": "9. Exclusions de garantie",

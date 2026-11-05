@@ -4722,7 +4722,7 @@
   },
   "terms": {
     "title": "Terms of service",
-    "lastUpdated": "Last updated: 12 May 2026",
+    "lastUpdated": "Last updated: 5 November 2026",
     "intro": "These terms govern your use of La caisse, the platform operated by Citizen Pay BV. By creating an account or using the service, you agree to them.",
     "about": {
       "heading": "1. About these terms",
@@ -4749,8 +4749,8 @@
     "billing": {
       "heading": "5. Subscription and billing",
       "items": [
-        "Hosted plan: €20/month per fund, billed monthly. VAT applied where required.",
-        "Free for non-profits and schools: registered non-profits, charities, and educational institutions use La caisse free of charge. Provide registration evidence on signup or in account settings.",
+        "Hosted plan: {price} per month per fund, excl. VAT, invoiced monthly by Citizen Pay BV. VAT is added where required.",
+        "Waiver: Citizen Pay BV may waive the hosting fee for a fund by invite code.",
         "Self-hosted: La caisse is licensed under AGPL-3.0 — self-hosting is free, and these terms cover only the hosted service offered by Citizen Pay BV.",
         "Refunds: monthly fees are non-refundable, but you may cancel at any time; cancellation takes effect at the end of the current billing period."
       ]
@@ -4765,7 +4765,7 @@
     },
     "availability": {
       "heading": "8. Service availability",
-      "body": "We make reasonable efforts to keep La caisse available but offer no uptime guarantee for the free or standard plans. We may perform maintenance, with notice where feasible."
+      "body": "We make reasonable efforts to keep La caisse available but offer no uptime guarantee for the hosted service. We may perform maintenance, with notice where feasible."
     },
     "disclaimers": {
       "heading": "9. Disclaimers",
