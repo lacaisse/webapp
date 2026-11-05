@@ -43,7 +43,8 @@
       "passkeyWaiting": "Esperando la clave de acceso…",
       "passkeyEmailRequired": "Introduzca su correo electrónico para iniciar sesión con una clave de acceso.",
       "waitlistPrompt": "¿Aún no tiene una cuenta?",
-      "joinWaitlist": "Unirse a la lista de espera"
+      "joinWaitlist": "Unirse a la lista de espera",
+      "startWithCode": "Crear una caja con un código de invitación"
     },
     "forgotPassword": {
       "title": "Restablecer su contraseña",
@@ -80,7 +81,7 @@
       "passwordsDontMatch": "Las contraseñas no coinciden.",
       "invalidCredentials": "Credenciales no válidas.",
       "invalidInput": "Entrada no válida.",
-      "signupsClosed": "Por el momento, el registro es solo con invitación. Únase a la lista de espera para solicitar acceso.",
+      "signupsClosed": "Por ahora el registro es solo por invitación. Use su código de invitación para crear una caja o únase a la lista de espera para solicitar uno.",
       "passkeyStartFailed": "No se pudo iniciar el acceso con clave de acceso.",
       "passkeyVerifyFailed": "No se pudo verificar la respuesta de la clave de acceso.",
       "signInFailed": "Error al iniciar sesión.",
@@ -3100,7 +3101,9 @@
       "codeRequired": "Introduzca su código de invitación.",
       "codeInvalid": "Este código no es válido, o ya no lo es. Compruébelo, o pida uno nuevo a quien se lo dio.",
       "tooMany": "Demasiados intentos. Espere un poco antes de volver a intentarlo."
-    }
+    },
+    "noCode": "¿Aún sin código de invitación?",
+    "joinWaitlist": "Unirse a la lista de espera"
   },
   "members": {
     "email": {
@@ -4228,7 +4231,9 @@
           "tokenEmpty": "Dale un nombre a tu token. «Solidario», «crédito», «ticket»: tú decides.",
           "tokenTooLong": "Que sea corto: esta palabra aparece en cada saldo y transacción.",
           "tokenMultiWord": "Las palabras sueltas funcionan mejor: «solidarios» se lee mejor en un saldo que «créditos de alimentación»."
-        }
+        },
+        "startFund": "Crear una caja",
+        "noCodeWaitlist": "¿Aún sin código de invitación? Únase a la lista de espera"
       },
       "swatches": {
         "terracotta": "Terracota",
@@ -4499,8 +4504,10 @@
       "left": {
         "eyebrow": "Listos cuando tú lo estés",
         "title": "Crea un fondo en una tarde.",
-        "body": "Configura tu subdominio, invita a tus primeros miembros, da de alta a tus primeros comercios y proveedores. Lenguaje claro, valores predeterminados sensatos. 20 €/mes, gratis para entidades sin ánimo de lucro y centros educativos registrados.",
-        "ctaPrimary": "Crear un fondo"
+        "body": "Configura tu subdominio, invita a tus primeros miembros, da de alta a tus primeros comercios y proveedores. Lenguaje claro, valores predeterminados sensatos. 40 €/mes, gratis para entidades sin ánimo de lucro y centros educativos registrados.",
+        "ctaPrimary": "Crear un fondo",
+        "haveCode": "¿Ya tiene un código de invitación de Citizen Pay?",
+        "haveCodeCta": "Cree su caja ahora →"
       },
       "right": {
         "eyebrow": "Para desarrolladores",

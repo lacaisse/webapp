@@ -40,7 +40,17 @@ export async function LandingGetStarted() {
                 {t("left.body")}
               </p>
             </div>
-            <WaitlistForm />
+            <div className="space-y-4">
+              <WaitlistForm />
+              {/* Already holding an invite code from Citizen Pay? Skip the
+                  list: the /join door creates the account and the fund. */}
+              <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+                {t("left.haveCode")}{" "}
+                <a href="/join" className="text-foreground underline">
+                  {t("left.haveCodeCta")}
+                </a>
+              </p>
+            </div>
           </div>
 
           <div

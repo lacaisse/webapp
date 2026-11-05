@@ -273,7 +273,7 @@ function Configurator({
 
         <div className="mt-1 flex flex-col gap-2.5 pt-2">
           <a
-            href="#get-started"
+            href="/join"
             className="inline-flex h-11 w-full items-center justify-between rounded-lg px-[18px] text-[15px] font-medium text-primary-foreground no-underline transition-opacity hover:opacity-90"
             style={{
               background: color.oklch,
@@ -282,8 +282,15 @@ function Configurator({
                 "background 280ms var(--ease-out), opacity 120ms var(--ease-out)",
             }}
           >
-            <span>{t("joinWaitlist")}</span>
+            <span>{t("startFund")}</span>
             <span>→</span>
+          </a>
+          <a
+            href="#get-started"
+            className="text-center text-sm underline"
+            style={{ color: "var(--muted-foreground)" }}
+          >
+            {t("noCodeWaitlist")}
           </a>
         </div>
       </div>
