@@ -149,11 +149,12 @@ export async function signupAction(
 ): Promise<ActionResult> {
   const t = await getTranslations("auth");
 
-  // Self-serve signups are closed (waitlist-only). An account is created
-  // only for the address of a live staff invite whose token the visitor
-  // holds: the invite accept URL rides in as `returnTo` (the public signup
-  // route renders the form only with one). Better Auth's own sign-up
-  // endpoint is disabled, so this action is the single door.
+  // There is no self-serve sign-up here (a stranger starts a fund at the
+  // apex /join door instead). This action creates an account only for the
+  // address of a live staff invite whose token the visitor holds: the invite
+  // accept URL rides in as `returnTo` (the public signup route renders the
+  // form only with one). Better Auth's own sign-up endpoint is disabled, so
+  // this action is the invite's single door.
   const parsed = SignupSchema.safeParse(input);
   if (!parsed.success) {
     return { error: t("errors.invalidInput") };

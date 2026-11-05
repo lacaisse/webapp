@@ -10,11 +10,11 @@ import { auth } from "./better-auth";
 // invite whose token the visitor holds (it reached them by email), for
 // exactly the invited address. Holding the token proves control of the
 // inbox, so the account starts email-verified. The two other doors — the
-// member login (services/member/auth.ts) and the apex /join for a holder of
-// a subscription waiver code (services/fund-setup/join-actions.ts) — write
-// the same two rows through Prisma inside their own transaction, unverified;
-// the /join door then sends Better Auth's verification email. The waitlist
-// only records interest.
+// member login (services/member/auth.ts) and the apex /join, where anyone
+// starts a fund (services/fund-setup/join-actions.ts) — write the same two
+// rows through Prisma inside their own transaction, unverified; the /join
+// door then sends Better Auth's verification email. The waitlist
+// (services/waitlist) only records interest and is no longer offered.
 
 export type CreateInvitedAccountResult =
   | { ok: true; user: { id: string; email: string } }

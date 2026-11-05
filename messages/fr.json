@@ -42,8 +42,7 @@
       "passkeyButton": "Se connecter avec une passkey",
       "passkeyWaiting": "En attente de la passkey…",
       "passkeyEmailRequired": "Saisissez votre email pour vous connecter avec une passkey.",
-      "waitlistPrompt": "Vous n'avez pas encore de compte ?",
-      "joinWaitlist": "Rejoindre la liste d'attente",
+      "startFundPrompt": "Vous n'avez pas encore de compte ?",
       "memberHint": {
         "title": "Membre de {fundName} ?",
         "description": "Connectez-vous avec votre identifiant de membre pour ouvrir vos cartes dans le portefeuille Citizen Pay.",
@@ -4279,8 +4278,7 @@
       "features": "Fonctionnalités",
       "getStarted": "Commencer",
       "signIn": "Se connecter",
-      "startFund": "Créer une caisse",
-      "joinWaitlist": "Rejoindre la liste d'attente"
+      "startFund": "Créer une caisse"
     },
     "hero": {
       "badge": "Open source · Multi-caisses · Hébergé ou auto-hébergé",
@@ -4306,7 +4304,6 @@
         "primaryColor": "Couleur principale",
         "tokenName": "Nom du jeton",
         "tokenNameHelper": "Comment s'appelle la monnaie de votre caisse. Au singulier — on gère le pluriel.",
-        "joinWaitlist": "Rejoindre la liste d'attente",
         "swatchHelperDefault": "la couleur par défaut de la caisse.",
         "swatchHelperOther": "utilisée pour les boutons, accents et mises en avant.",
         "errors": {
@@ -4318,7 +4315,7 @@
           "tokenMultiWord": "Un seul mot fonctionne mieux — « solidaires » sonne mieux dans un solde que « crédits alimentaires »."
         },
         "startFund": "Créer une caisse",
-        "notReadyWaitlist": "Pas encore prêt ? Rejoignez la liste d'attente"
+        "notReadyHowItWorks": "Pas encore prêt ? Voyez comment ça marche"
       },
       "swatches": {
         "terracotta": "Terracotta",
@@ -4481,7 +4478,7 @@
           "step": "PARCOURS 01",
           "label": "INSTANCE OFFICIELLE",
           "title": "Hébergée par Citizen Pay.",
-          "body": "Nous provisionnons votre caisse, gérons l'hébergement et les mises à jour, et exploitons l'infrastructure. Vous vous concentrez sur vos membres. 20 €/mois forfait — gratuit pour les associations enregistrées et les écoles."
+          "body": "Nous provisionnons votre caisse, gérons l'hébergement et les mises à jour, et exploitons l'infrastructure. Vous vous concentrez sur vos membres. {price}/mois par caisse, hors TVA."
         },
         "path2": {
           "step": "PARCOURS 02",
@@ -4587,12 +4584,10 @@
     },
     "getStarted": {
       "left": {
-        "eyebrow": "Liste d'attente",
-        "title": "Soyez les premiers à lancer votre caisse.",
-        "body": "Nous intégrons les nouvelles caisses par petits groupes. Laissez-nous votre email et nous vous enverrons une invitation pour configurer la vôtre — sous-domaine, membres, commerçants, tout y est. 40 €/mois, gratuit pour les associations enregistrées et les écoles.",
-        "ctaPrimary": "Créer une caisse",
-        "readyNow": "Prêt à vous lancer ?",
-        "readyNowCta": "Créez votre caisse maintenant →"
+        "eyebrow": "Prêt quand vous l'êtes",
+        "title": "Lancez votre caisse en un après-midi.",
+        "body": "Créez votre compte et votre caisse en une seule fois — sous-domaine, membres, commerçants, tout y est. Votre tableau de bord vous guide ensuite pas à pas : inscription chez Citizen Pay, open banking et hébergement à {price}/mois.",
+        "cta": "Créer une caisse"
       },
       "right": {
         "eyebrow": "Pour les développeurs",
@@ -4601,13 +4596,6 @@
       }
     },
     "waitlist": {
-      "emailLabel": "Email",
-      "emailPlaceholder": "vous@exemple.com",
-      "fundNameLabel": "Comment appelleriez-vous votre caisse ? (facultatif)",
-      "fundNamePlaceholder": "Caisse de Saint-Gilles",
-      "submit": "Demander une invitation",
-      "submitting": "Inscription…",
-      "successTitle": "Vous êtes sur la liste.",
       "successBody": "Merci — nous vous écrirons dès que votre invitation sera prête.",
       "errors": {
         "fundNameMax": "Limitez-vous à {max} caractères."

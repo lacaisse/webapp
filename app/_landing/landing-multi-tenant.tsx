@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { getTranslations } from "next-intl/server";
+import { getFormatter, getTranslations } from "next-intl/server";
+import { SUBSCRIPTION_MONTHLY_EUR } from "@/services/fund-setup/config";
 
 const YOURS_KEYS = [
   "customDomain",
@@ -194,7 +195,17 @@ function Column({
 }
 
 async function HostedFooter() {
-  const t = await getTranslations("landing.multiTenant.hosting");
+  const [t, format] = await Promise.all([
+    getTranslations("landing.multiTenant.hosting"),
+    getFormatter(),
+  ]);
+  // The hosting subscription the dashboard checklist asks a new fund for —
+  // the figure /join and the get-started section quote.
+  const price = format.number(SUBSCRIPTION_MONTHLY_EUR, {
+    style: "currency",
+    currency: "EUR",
+    maximumFractionDigits: 0,
+  });
 
   return (
     <div
@@ -243,7 +254,7 @@ async function HostedFooter() {
           step={t("path1.step")}
           label={t("path1.label")}
           title={t("path1.title")}
-          body={t("path1.body")}
+          body={t("path1.body", { price })}
           background="var(--card)"
         />
         <HostedCard

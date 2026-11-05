@@ -42,8 +42,7 @@
       "passkeyButton": "Inloggen met passkey",
       "passkeyWaiting": "Wachten op passkey…",
       "passkeyEmailRequired": "Voer uw e-mail in om met een passkey in te loggen.",
-      "waitlistPrompt": "Heeft u nog geen account?",
-      "joinWaitlist": "Aanmelden voor de wachtlijst",
+      "startFundPrompt": "Heeft u nog geen account?",
       "memberHint": {
         "title": "Lid van {fundName}?",
         "description": "Log in met uw ledenlogin om uw kaarten in de Citizen Pay-wallet te openen.",
@@ -4203,8 +4202,7 @@
       "features": "Functies",
       "getStarted": "Aan de slag",
       "signIn": "Inloggen",
-      "startFund": "Fonds starten",
-      "joinWaitlist": "Aanmelden voor de wachtlijst"
+      "startFund": "Fonds starten"
     },
     "hero": {
       "badge": "Open source · Multi-fonds · Gehost of zelf-gehost",
@@ -4230,7 +4228,6 @@
         "primaryColor": "Hoofdkleur",
         "tokenName": "Naam van het tegoed",
         "tokenNameHelper": "Hoe de munteenheid van uw fonds heet. Enkelvoud — wij regelen het meervoud.",
-        "joinWaitlist": "Aanmelden voor de wachtlijst",
         "swatchHelperDefault": "de standaardkleur van la caisse.",
         "swatchHelperOther": "gebruikt voor knoppen, accenten en uitlichtingen.",
         "errors": {
@@ -4242,7 +4239,7 @@
           "tokenMultiWord": "Eén woord werkt het beste — \"solidaires\" leest beter in een saldo dan \"voedselcredits\"."
         },
         "startFund": "Start een kas",
-        "notReadyWaitlist": "Nog niet klaar? Zet u op de wachtlijst"
+        "notReadyHowItWorks": "Nog niet klaar? Bekijk hoe het werkt"
       },
       "swatches": {
         "terracotta": "Terracotta",
@@ -4405,7 +4402,7 @@
           "step": "PAD 01",
           "label": "OFFICIËLE INSTANTIE",
           "title": "Gehost door Citizen Pay.",
-          "body": "Wij voorzien uw fonds, regelen hosting en updates, en runnen de infrastructuur. U focust op uw leden. €20/maand vast — gratis voor geregistreerde non-profits en scholen."
+          "body": "Wij voorzien uw fonds, regelen hosting en updates, en runnen de infrastructuur. U focust op uw leden. {price}/maand per fonds, excl. btw."
         },
         "path2": {
           "step": "PAD 02",
@@ -4513,10 +4510,8 @@
       "left": {
         "eyebrow": "Klaar wanneer u dat bent",
         "title": "Start een fonds in één namiddag.",
-        "body": "Zet uw subdomein op, nodig uw eerste leden uit, onboard uw eerste handelaars en leveranciers. Helder Nederlands, zinvolle standaardwaarden. €40/maand — gratis voor geregistreerde non-profits en scholen.",
-        "ctaPrimary": "Start een fonds",
-        "readyNow": "Klaar om te starten?",
-        "readyNowCta": "Start uw kas nu →"
+        "body": "Maak uw account en uw fonds in één keer aan — subdomein, leden, handelaars en al de rest. Uw dashboard leidt u daarna stap voor stap: registratie bij Citizen Pay, open banking en hosting aan {price}/maand.",
+        "cta": "Start een fonds"
       },
       "right": {
         "eyebrow": "Voor ontwikkelaars",
@@ -4525,13 +4520,6 @@
       }
     },
     "waitlist": {
-      "emailLabel": "E-mail",
-      "emailPlaceholder": "naam@voorbeeld.com",
-      "fundNameLabel": "Hoe zou u uw fonds noemen? (optioneel)",
-      "fundNamePlaceholder": "Caisse de Saint-Gilles",
-      "submit": "Uitnodiging aanvragen",
-      "submitting": "Aanmelden…",
-      "successTitle": "U staat op de lijst.",
       "successBody": "Bedankt — we mailen u zodra uw uitnodiging klaar is.",
       "errors": {
         "fundNameMax": "Houd het onder {max} tekens."

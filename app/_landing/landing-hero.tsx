@@ -286,11 +286,11 @@ function Configurator({
             <span>→</span>
           </a>
           <a
-            href="#get-started"
+            href="#how-it-works"
             className="text-center text-sm underline"
             style={{ color: "var(--muted-foreground)" }}
           >
-            {t("notReadyWaitlist")}
+            {t("notReadyHowItWorks")}
           </a>
         </div>
       </div>

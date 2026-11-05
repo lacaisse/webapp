@@ -42,8 +42,7 @@
       "passkeyButton": "Sign in with a passkey",
       "passkeyWaiting": "Waiting for passkey…",
       "passkeyEmailRequired": "Enter your email to sign in with a passkey.",
-      "waitlistPrompt": "Don't have an account yet?",
-      "joinWaitlist": "Join the waitlist",
+      "startFundPrompt": "Don't have an account yet?",
       "memberHint": {
         "title": "Member of {fundName}?",
         "description": "Sign in with your member login to open your cards in the Citizen Pay wallet.",
@@ -4279,8 +4278,7 @@
       "features": "Features",
       "getStarted": "Get started",
       "signIn": "Sign in",
-      "startFund": "Start a fund",
-      "joinWaitlist": "Join the waitlist"
+      "startFund": "Start a fund"
     },
     "hero": {
       "badge": "Open source · Multi-tenant · Hosted or self-hosted",
@@ -4306,7 +4304,6 @@
         "primaryColor": "Primary color",
         "tokenName": "Token name",
         "tokenNameHelper": "What your fund's currency is called. Singular form — we'll handle the plural.",
-        "joinWaitlist": "Join the waitlist",
         "swatchHelperDefault": "the la caisse default.",
         "swatchHelperOther": "used for buttons, highlights, and accents.",
         "errors": {
@@ -4318,7 +4315,7 @@
           "tokenMultiWord": "Single words work best — \"solidaires\" reads better in a balance than \"food credits\"."
         },
         "startFund": "Start a fund",
-        "notReadyWaitlist": "Not ready yet? Join the waitlist"
+        "notReadyHowItWorks": "Not ready yet? See how it works"
       },
       "swatches": {
         "terracotta": "Terracotta",
@@ -4481,7 +4478,7 @@
           "step": "PATH 01",
           "label": "OFFICIAL INSTANCE",
           "title": "Hosted by Citizen Pay.",
-          "body": "We provision your fund, handle hosting and updates, and run the infrastructure. You focus on your members. €20/month flat — free for registered non-profits and schools."
+          "body": "We provision your fund, handle hosting and updates, and run the infrastructure. You focus on your members. {price}/month per fund, excl. VAT."
         },
         "path2": {
           "step": "PATH 02",
@@ -4587,12 +4584,10 @@
     },
     "getStarted": {
       "left": {
-        "eyebrow": "Join the waitlist",
-        "title": "Be first to start your fund.",
-        "body": "We're onboarding new funds in small batches. Leave your email and we'll send you an invite to set yours up — subdomain, members, merchants and all. €40/month, free for registered non-profits and schools.",
-        "ctaPrimary": "Start a fund",
-        "readyNow": "Ready to go?",
-        "readyNowCta": "Start your fund now →"
+        "eyebrow": "Ready when you are",
+        "title": "Start your fund in an afternoon.",
+        "body": "Create your account and your fund in one go — subdomain, members, merchants and all. Your dashboard then walks you through the setup: Citizen Pay registration, open banking and hosting at {price}/month.",
+        "cta": "Start a fund"
       },
       "right": {
         "eyebrow": "For developers",
@@ -4601,13 +4596,6 @@
       }
     },
     "waitlist": {
-      "emailLabel": "Email",
-      "emailPlaceholder": "you@example.com",
-      "fundNameLabel": "What would you call your fund? (optional)",
-      "fundNamePlaceholder": "Caisse de Saint-Gilles",
-      "submit": "Request an invite",
-      "submitting": "Adding you…",
-      "successTitle": "You're on the list.",
       "successBody": "Thanks — we'll email you as soon as your invite is ready.",
       "errors": {
         "fundNameMax": "Keep it under {max} characters."

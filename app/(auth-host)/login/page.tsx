@@ -120,16 +120,9 @@ export default async function LoginPage({
           // There is no sign-up of its own: an account is made by starting a
           // fund at the apex /join door (or by accepting an invite, above).
           <span>
-            {t("waitlistPrompt")}&nbsp;
+            {t("startFundPrompt")}&nbsp;
             <Link href={getApexUrl("/join")} className="text-foreground underline">
               {t("startFund")}
-            </Link>
-            &nbsp;·&nbsp;
-            <Link
-              href={getApexUrl("/#get-started")}
-              className="text-foreground underline"
-            >
-              {t("joinWaitlist")}
             </Link>
           </span>
         )}
