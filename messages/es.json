@@ -44,7 +44,7 @@
       "passkeyEmailRequired": "Introduzca su correo electrónico para iniciar sesión con una clave de acceso.",
       "waitlistPrompt": "¿Aún no tiene una cuenta?",
       "joinWaitlist": "Unirse a la lista de espera",
-      "startWithCode": "Crear una caja con un código de invitación"
+      "startFund": "Crear una caja"
     },
     "forgotPassword": {
       "title": "Restablecer su contraseña",
@@ -81,7 +81,7 @@
       "passwordsDontMatch": "Las contraseñas no coinciden.",
       "invalidCredentials": "Credenciales no válidas.",
       "invalidInput": "Entrada no válida.",
-      "signupsClosed": "Por ahora el registro es solo por invitación. Use su código de invitación para crear una caja o únase a la lista de espera para solicitar uno.",
+      "signupsClosed": "Aquí no hay registro libre. Cree una caja desde la página de inicio o use la invitación que recibió.",
       "passkeyStartFailed": "No se pudo iniciar el acceso con clave de acceso.",
       "passkeyVerifyFailed": "No se pudo verificar la respuesta de la clave de acceso.",
       "signInFailed": "Error al iniciar sesión.",
@@ -114,8 +114,8 @@
         "text": "Hola:\n\nConfirme que {email} es suya abriendo el enlace siguiente:\n\n{url}\n\nEl enlace es válido durante 24 horas. Si no ha creado una cuenta en La Caisse, ignore este mensaje.\n\nEl equipo de La Caisse"
       },
       "joinExistingAccount": {
-        "subject": "Su cuenta de La Caisse y un código de invitación",
-        "text": "Hola:\n\nAlguien — probablemente usted — ha usado un código de invitación en La Caisse con esta dirección, que ya tiene una cuenta. Para crear su caja con ese código, inicie sesión aquí:\n\n{url}\n\nSi no fue usted, ignore este mensaje: no se ha creado ni cambiado nada.\n\nEl equipo de La Caisse"
+        "subject": "Crear una caja con su cuenta de La Caisse",
+        "text": "Hola:\n\nAlguien — probablemente usted — ha empezado a crear una caja en La Caisse con esta dirección, que ya tiene una cuenta. Para crear su caja en esa cuenta, inicie sesión aquí:\n\n{url}\n\nSi no fue usted, ignore este mensaje: no se ha creado ni cambiado nada.\n\nEl equipo de La Caisse"
       }
     }
   },
@@ -3080,11 +3080,7 @@
   },
   "join": {
     "title": "Cree su caja",
-    "description": "Un código de invitación de Citizen Pay abre una caja alojada gratuitamente. Introdúzcalo para crear su cuenta y su caja de una vez.",
-    "code": "Código de invitación",
-    "continue": "Continuar",
-    "codeAccepted": "Código aceptado: alojamiento gratuito para «{label}».",
-    "changeCode": "Usar otro código",
+    "description": "Cree su cuenta y su caja de una vez. El alojamiento cuesta {price} al mes, sin IVA; su panel le guía en la configuración.",
     "account": "Su cuenta",
     "email": "Correo electrónico",
     "password": "Contraseña",
@@ -3092,18 +3088,20 @@
     "fund": "Su caja",
     "name": "Nombre de la caja",
     "subdomain": "Subdominio",
+    "haveCode": "Tengo un código de invitación",
+    "code": "Código de invitación",
+    "codeHint": "Un código de Citizen Pay exime a esta caja del coste de alojamiento.",
+    "codeChecking": "Comprobando…",
+    "codeAccepted": "Código aceptado: alojamiento gratuito para «{label}».",
     "submit": "Crear mi cuenta y mi caja",
     "submitting": "Creando…",
     "checkInbox": "Hemos enviado un correo a {email}. Ábralo para continuar.",
     "haveAccount": "¿Ya tiene una cuenta?",
     "signIn": "Iniciar sesión",
     "errors": {
-      "codeRequired": "Introduzca su código de invitación.",
       "codeInvalid": "Este código no es válido, o ya no lo es. Compruébelo, o pida uno nuevo a quien se lo dio.",
       "tooMany": "Demasiados intentos. Espere un poco antes de volver a intentarlo."
-    },
-    "noCode": "¿Aún sin código de invitación?",
-    "joinWaitlist": "Unirse a la lista de espera"
+    }
   },
   "members": {
     "email": {
@@ -4233,7 +4231,7 @@
           "tokenMultiWord": "Las palabras sueltas funcionan mejor: «solidarios» se lee mejor en un saldo que «créditos de alimentación»."
         },
         "startFund": "Crear una caja",
-        "noCodeWaitlist": "¿Aún sin código de invitación? Únase a la lista de espera"
+        "notReadyWaitlist": "¿Aún no? Únase a la lista de espera"
       },
       "swatches": {
         "terracotta": "Terracota",
@@ -4506,8 +4504,8 @@
         "title": "Crea un fondo en una tarde.",
         "body": "Configura tu subdominio, invita a tus primeros miembros, da de alta a tus primeros comercios y proveedores. Lenguaje claro, valores predeterminados sensatos. 40 €/mes, gratis para entidades sin ánimo de lucro y centros educativos registrados.",
         "ctaPrimary": "Crear un fondo",
-        "haveCode": "¿Ya tiene un código de invitación de Citizen Pay?",
-        "haveCodeCta": "Cree su caja ahora →"
+        "readyNow": "¿Listo para empezar?",
+        "readyNowCta": "Cree su caja ahora →"
       },
       "right": {
         "eyebrow": "Para desarrolladores",

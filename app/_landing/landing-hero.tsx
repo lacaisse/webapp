@@ -290,7 +290,7 @@ function Configurator({
             className="text-center text-sm underline"
             style={{ color: "var(--muted-foreground)" }}
           >
-            {t("noCodeWaitlist")}
+            {t("notReadyWaitlist")}
           </a>
         </div>
       </div>

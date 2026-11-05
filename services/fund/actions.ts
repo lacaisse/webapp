@@ -3,8 +3,7 @@
 
 import { getLocale, getTranslations } from "next-intl/server";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
-import { fundCreatorAccess } from "@/services/auth/dal";
+import { requireUser } from "@/services/auth/dal";
 import { prisma } from "@/services/db/prisma";
 import { isUniqueViolationOn } from "@/services/db/unique-violation";
 import { claimWaiverCodeUse, findUsableWaiverCode } from "@/services/fund-setup/waiver-claim";
@@ -43,18 +42,13 @@ export async function createFundAction(
     };
   }
 
-  // The gate accepts a holder of a usable waiver code besides admins and
-  // staff; a code that came along is used either way (an admin's fund with a
-  // code is waived too). It was checked when /new opened and is read again
-  // here — it may have been used up, revoked or expired since — and claimed
-  // inside the transaction below. Nothing tells those apart from a wrong
-  // code (services/fund-setup/join.ts); a newcomer whose only key was that
-  // code gets those words, not /unauthorized.
-  const { user, access } = await fundCreatorAccess(parsed.data.code);
-  if (!access) {
-    if (parsed.data.code) return { error: t("join.errors.codeInvalid") };
-    redirect("/unauthorized");
-  }
+  // Any signed-in account may open a fund (app/(apex)/new/page.tsx says
+  // why). A code that came along is used whoever brought it (an admin's fund
+  // with a code is waived too): checked when /new opened, read again here —
+  // it may have been used up, revoked or expired since — and claimed inside
+  // the transaction below. Nothing tells those apart from a wrong code
+  // (services/fund-setup/join.ts).
+  const user = await requireUser();
   const waiverCode = parsed.data.code ? await findUsableWaiverCode(parsed.data.code) : null;
   if (parsed.data.code && !waiverCode) return { error: t("join.errors.codeInvalid") };
 

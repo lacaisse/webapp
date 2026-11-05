@@ -49,7 +49,7 @@
         "description": "Log in met uw ledenlogin om uw kaarten in de Citizen Pay-wallet te openen.",
         "createLogin": "Maak uw {fundName}-login aan"
       },
-      "startWithCode": "Start een kas met een uitnodigingscode"
+      "startFund": "Een kas starten"
     },
     "forgotPassword": {
       "title": "Wachtwoord opnieuw instellen",
@@ -86,7 +86,7 @@
       "passwordsDontMatch": "Wachtwoorden komen niet overeen.",
       "invalidCredentials": "Ongeldige inloggegevens.",
       "invalidInput": "Ongeldige invoer.",
-      "signupsClosed": "Inschrijven kan voorlopig alleen op uitnodiging. Gebruik uw uitnodigingscode om een kas te starten, of zet u op de wachtlijst om er een aan te vragen.",
+      "signupsClosed": "Hier is geen vrije inschrijving. Start een kas vanaf de startpagina, of gebruik de uitnodiging die u ontving.",
       "passkeyStartFailed": "Kan passkey-inloggen niet starten.",
       "passkeyVerifyFailed": "Kan de passkey-respons niet verifiëren.",
       "signInFailed": "Inloggen mislukt.",
@@ -119,8 +119,8 @@
         "text": "Hallo,\n\nBevestig dat {email} van u is door de onderstaande link te openen:\n\n{url}\n\nDe link is 24 uur geldig. Als u geen La Caisse-account hebt aangemaakt, negeer dan dit bericht.\n\nHet La Caisse-team"
       },
       "joinExistingAccount": {
-        "subject": "Uw La Caisse-account en een uitnodigingscode",
-        "text": "Hallo,\n\nIemand — waarschijnlijk u — heeft op La Caisse een uitnodigingscode gebruikt met dit adres, dat al een account heeft. Om met die code uw kas aan te maken, logt u hier in:\n\n{url}\n\nWas u dit niet, negeer dan dit bericht: er is niets aangemaakt of gewijzigd.\n\nHet La Caisse-team"
+        "subject": "Een kas starten met uw La Caisse-account",
+        "text": "Hallo,\n\nIemand — waarschijnlijk u — is op La Caisse een kas beginnen aanmaken met dit adres, dat al een account heeft. Om uw kas op dat account aan te maken, logt u hier in:\n\n{url}\n\nWas u dit niet, negeer dan dit bericht: er is niets aangemaakt of gewijzigd.\n\nHet La Caisse-team"
       }
     }
   },
@@ -3089,11 +3089,7 @@
   },
   "join": {
     "title": "Uw kas starten",
-    "description": "Een uitnodigingscode van Citizen Pay opent een kas die gratis gehost wordt. Voer hem in om uw account en uw kas in één keer aan te maken.",
-    "code": "Uitnodigingscode",
-    "continue": "Doorgaan",
-    "codeAccepted": "Code aanvaard — gratis hosting voor “{label}”.",
-    "changeCode": "Een andere code gebruiken",
+    "description": "Maak uw account en uw kas in één keer aan. Hosting kost {price} per maand, excl. btw — uw dashboard leidt u door de rest van de instelling.",
     "account": "Uw account",
     "email": "E-mail",
     "password": "Wachtwoord",
@@ -3101,18 +3097,20 @@
     "fund": "Uw kas",
     "name": "Naam van de kas",
     "subdomain": "Subdomein",
+    "haveCode": "Ik heb een uitnodigingscode",
+    "code": "Uitnodigingscode",
+    "codeHint": "Een code van Citizen Pay stelt deze kas vrij van de hostingkosten.",
+    "codeChecking": "Controleren…",
+    "codeAccepted": "Code aanvaard — gratis hosting voor “{label}”.",
     "submit": "Mijn account en kas aanmaken",
     "submitting": "Aanmaken…",
     "checkInbox": "We hebben een e-mail gestuurd naar {email}. Open hem om verder te gaan.",
     "haveAccount": "Heeft u al een account?",
     "signIn": "Inloggen",
     "errors": {
-      "codeRequired": "Voer uw uitnodigingscode in.",
       "codeInvalid": "Deze code is niet geldig, of niet meer. Controleer hem, of vraag een nieuwe aan wie hem u gaf.",
       "tooMany": "Te veel pogingen. Wacht even voordat u het opnieuw probeert."
-    },
-    "noCode": "Nog geen uitnodigingscode?",
-    "joinWaitlist": "Op de wachtlijst"
+    }
   },
   "members": {
     "email": {
@@ -4244,7 +4242,7 @@
           "tokenMultiWord": "Eén woord werkt het beste — \"solidaires\" leest beter in een saldo dan \"voedselcredits\"."
         },
         "startFund": "Start een kas",
-        "noCodeWaitlist": "Nog geen uitnodigingscode? Zet u op de wachtlijst"
+        "notReadyWaitlist": "Nog niet klaar? Zet u op de wachtlijst"
       },
       "swatches": {
         "terracotta": "Terracotta",
@@ -4517,8 +4515,8 @@
         "title": "Start een fonds in één namiddag.",
         "body": "Zet uw subdomein op, nodig uw eerste leden uit, onboard uw eerste handelaars en leveranciers. Helder Nederlands, zinvolle standaardwaarden. €40/maand — gratis voor geregistreerde non-profits en scholen.",
         "ctaPrimary": "Start een fonds",
-        "haveCode": "Hebt u al een uitnodigingscode van Citizen Pay?",
-        "haveCodeCta": "Start uw kas nu →"
+        "readyNow": "Klaar om te starten?",
+        "readyNowCta": "Start uw kas nu →"
       },
       "right": {
         "eyebrow": "Voor ontwikkelaars",

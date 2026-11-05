@@ -49,7 +49,7 @@
         "description": "Sign in with your member login to open your cards in the Citizen Pay wallet.",
         "createLogin": "Create your {fundName} login"
       },
-      "startWithCode": "Start a fund with an invite code"
+      "startFund": "Start a fund"
     },
     "consent": {
       "title": "Authorize access",
@@ -102,7 +102,7 @@
       "passwordsDontMatch": "Passwords don't match.",
       "invalidCredentials": "Invalid credentials.",
       "invalidInput": "Invalid input.",
-      "signupsClosed": "Sign-ups are invite-only right now. Use your invite code to start a fund, or join the waitlist to request one.",
+      "signupsClosed": "There is no open sign-up here. Start a fund from the home page, or use the invitation you received.",
       "passkeyStartFailed": "Could not start passkey sign-in.",
       "passkeyVerifyFailed": "Could not verify the passkey response.",
       "signInFailed": "Sign-in failed.",
@@ -135,8 +135,8 @@
         "text": "Hi,\n\nConfirm that {email} is yours by opening the link below:\n\n{url}\n\nThe link is valid for 24 hours. If you didn't create a La Caisse account, ignore this message.\n\nThe La Caisse team"
       },
       "joinExistingAccount": {
-        "subject": "Your La Caisse account and an invite code",
-        "text": "Hi,\n\nSomeone — probably you — used an invite code on La Caisse with this address, which already has an account. To create your fund with that code, sign in here:\n\n{url}\n\nIf this wasn't you, ignore this message: nothing was created or changed.\n\nThe La Caisse team"
+        "subject": "Starting a fund with your La Caisse account",
+        "text": "Hi,\n\nSomeone — probably you — started creating a fund on La Caisse with this address, which already has an account. To create your fund on that account, sign in here:\n\n{url}\n\nIf this wasn't you, ignore this message: nothing was created or changed.\n\nThe La Caisse team"
       }
     }
   },
@@ -3147,11 +3147,7 @@
   },
   "join": {
     "title": "Start your fund",
-    "description": "An invite code from Citizen Pay opens a fund that hosts for free. Enter it to create your account and your fund in one go.",
-    "code": "Invite code",
-    "continue": "Continue",
-    "codeAccepted": "Code accepted — free hosting for “{label}”.",
-    "changeCode": "Use another code",
+    "description": "Create your account and your fund in one go. Hosting costs {price} per month, excl. VAT — your dashboard walks you through the setup.",
     "account": "Your account",
     "email": "Email",
     "password": "Password",
@@ -3159,18 +3155,20 @@
     "fund": "Your fund",
     "name": "Fund name",
     "subdomain": "Subdomain",
+    "haveCode": "I have an invite code",
+    "code": "Invite code",
+    "codeHint": "A code from Citizen Pay waives this fund's hosting fee.",
+    "codeChecking": "Checking…",
+    "codeAccepted": "Code accepted — free hosting for “{label}”.",
     "submit": "Create my account and fund",
     "submitting": "Creating…",
     "checkInbox": "We've sent an email to {email}. Open it to continue.",
     "haveAccount": "Already have an account?",
     "signIn": "Sign in",
     "errors": {
-      "codeRequired": "Enter your invite code.",
       "codeInvalid": "This code is not valid, or no longer is. Check it, or ask the person who gave it to you for a new one.",
       "tooMany": "Too many attempts. Wait a little before trying again."
-    },
-    "noCode": "No invite code yet?",
-    "joinWaitlist": "Join the waitlist"
+    }
   },
   "members": {
     "email": {
@@ -4320,7 +4318,7 @@
           "tokenMultiWord": "Single words work best — \"solidaires\" reads better in a balance than \"food credits\"."
         },
         "startFund": "Start a fund",
-        "noCodeWaitlist": "No invite code yet? Join the waitlist"
+        "notReadyWaitlist": "Not ready yet? Join the waitlist"
       },
       "swatches": {
         "terracotta": "Terracotta",
@@ -4593,8 +4591,8 @@
         "title": "Be first to start your fund.",
         "body": "We're onboarding new funds in small batches. Leave your email and we'll send you an invite to set yours up — subdomain, members, merchants and all. €40/month, free for registered non-profits and schools.",
         "ctaPrimary": "Start a fund",
-        "haveCode": "Already have an invite code from Citizen Pay?",
-        "haveCodeCta": "Start your fund now →"
+        "readyNow": "Ready to go?",
+        "readyNowCta": "Start your fund now →"
       },
       "right": {
         "eyebrow": "For developers",

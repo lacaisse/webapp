@@ -83,12 +83,27 @@ export const RedeemWaiverCodeSchema = z.object({
 });
 export type RedeemWaiverCodeInput = z.input<typeof RedeemWaiverCodeSchema>;
 
-// The apex /join door (join-actions.ts): a waiver code, an account and a fund
-// in one submit. The code field is the redeem field with the public page's
-// messages; the account fields are the auth host's sign-up rules (email
-// stored lowercase, like every account); the fund fields are /new's.
-export const JoinWithCodeSchema = CreateFundSchema.extend({
-  code: waiverCodeField("join.errors.codeRequired", "join.errors.codeInvalid"),
+// An optional waiver code — the apex /join door's "I have an invite code"
+// field. Empty (nothing typed, or only separators) means no code; anything
+// else must have a code's shape once normalised. Whether it exists is the
+// action's business.
+function optionalWaiverCodeField(invalidKey: string) {
+  return z
+    .string()
+    .optional()
+    .transform((raw) => {
+      const code = normaliseWaiverCode(raw ?? "");
+      return code === "" ? undefined : code;
+    })
+    .refine((code) => code === undefined || isWellFormedWaiverCode(code), { error: invalidKey });
+}
+
+// The apex /join door (join-actions.ts): an account and a fund in one submit,
+// with or without a waiver code. The account fields are the auth host's
+// sign-up rules (email stored lowercase, like every account); the fund fields
+// are /new's; the code is optional and uses the public page's words.
+export const JoinSchema = CreateFundSchema.extend({
+  code: optionalWaiverCodeField("join.errors.codeInvalid"),
   email: z
     .string()
     .trim()
@@ -96,8 +111,8 @@ export const JoinWithCodeSchema = CreateFundSchema.extend({
     .pipe(z.email({ error: "auth.errors.emailInvalid" })),
   password: z.string().min(PASSWORD_MIN_LENGTH, { error: "auth.errors.passwordMin" }),
 });
-export type JoinWithCodeInput = z.input<typeof JoinWithCodeSchema>;
-export type JoinWithCodeValues = z.output<typeof JoinWithCodeSchema>;
+export type JoinInput = z.input<typeof JoinSchema>;
+export type JoinValues = z.output<typeof JoinSchema>;
 
 // Apex /admin/waivers: a platform admin mints a code. The label is who or why
 // ("contributor: Alice", "école communale de X") and becomes the fund's

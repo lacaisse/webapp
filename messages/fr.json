@@ -49,7 +49,7 @@
         "description": "Connectez-vous avec votre identifiant de membre pour ouvrir vos cartes dans le portefeuille Citizen Pay.",
         "createLogin": "Créer votre identifiant {fundName}"
       },
-      "startWithCode": "Créer une caisse avec un code d'invitation"
+      "startFund": "Créer une caisse"
     },
     "consent": {
       "title": "Autoriser l'accès",
@@ -102,7 +102,7 @@
       "passwordsDontMatch": "Les mots de passe ne correspondent pas.",
       "invalidCredentials": "Identifiants invalides.",
       "invalidInput": "Saisie invalide.",
-      "signupsClosed": "Les inscriptions se font sur invitation pour l'instant. Utilisez votre code d'invitation pour créer une caisse, ou rejoignez la liste d'attente pour en demander un.",
+      "signupsClosed": "Il n'y a pas d'inscription libre ici. Créez une caisse depuis la page d'accueil, ou utilisez l'invitation que vous avez reçue.",
       "passkeyStartFailed": "Impossible de démarrer la connexion par passkey.",
       "passkeyVerifyFailed": "Impossible de vérifier la réponse de la passkey.",
       "signInFailed": "Échec de la connexion.",
@@ -135,8 +135,8 @@
         "text": "Bonjour,\n\nConfirmez que {email} est bien à vous en ouvrant le lien ci-dessous :\n\n{url}\n\nLe lien est valable 24 heures. Si vous n'avez pas créé de compte La Caisse, ignorez ce message.\n\nL'équipe La Caisse"
       },
       "joinExistingAccount": {
-        "subject": "Votre compte La Caisse et un code d'invitation",
-        "text": "Bonjour,\n\nQuelqu'un — probablement vous — a utilisé un code d'invitation sur La Caisse avec cette adresse, qui a déjà un compte. Pour créer votre caisse avec ce code, connectez-vous ici :\n\n{url}\n\nSi ce n'était pas vous, ignorez ce message : rien n'a été créé ni modifié.\n\nL'équipe La Caisse"
+        "subject": "Créer une caisse avec votre compte La Caisse",
+        "text": "Bonjour,\n\nQuelqu'un — probablement vous — a commencé à créer une caisse sur La Caisse avec cette adresse, qui a déjà un compte. Pour créer votre caisse sur ce compte, connectez-vous ici :\n\n{url}\n\nSi ce n'était pas vous, ignorez ce message : rien n'a été créé ni modifié.\n\nL'équipe La Caisse"
       }
     }
   },
@@ -3147,11 +3147,7 @@
   },
   "join": {
     "title": "Créer votre caisse",
-    "description": "Un code d'invitation de Citizen Pay ouvre une caisse hébergée gratuitement. Saisissez-le pour créer votre compte et votre caisse en une fois.",
-    "code": "Code d'invitation",
-    "continue": "Continuer",
-    "codeAccepted": "Code accepté — hébergement gratuit pour « {label} ».",
-    "changeCode": "Utiliser un autre code",
+    "description": "Créez votre compte et votre caisse en une fois. L'hébergement coûte {price} par mois, hors TVA — votre tableau de bord vous guide pour la suite.",
     "account": "Votre compte",
     "email": "Email",
     "password": "Mot de passe",
@@ -3159,18 +3155,20 @@
     "fund": "Votre caisse",
     "name": "Nom de la caisse",
     "subdomain": "Sous-domaine",
+    "haveCode": "J'ai un code d'invitation",
+    "code": "Code d'invitation",
+    "codeHint": "Un code de Citizen Pay dispense cette caisse des frais d'hébergement.",
+    "codeChecking": "Vérification…",
+    "codeAccepted": "Code accepté — hébergement gratuit pour « {label} ».",
     "submit": "Créer mon compte et ma caisse",
     "submitting": "Création…",
     "checkInbox": "Nous avons envoyé un email à {email}. Ouvrez-le pour continuer.",
     "haveAccount": "Vous avez déjà un compte ?",
     "signIn": "Se connecter",
     "errors": {
-      "codeRequired": "Saisissez votre code d'invitation.",
       "codeInvalid": "Ce code n'est pas valide, ou ne l'est plus. Vérifiez-le, ou demandez-en un nouveau à la personne qui vous l'a remis.",
       "tooMany": "Trop de tentatives. Patientez un peu avant de réessayer."
-    },
-    "noCode": "Pas encore de code d'invitation ?",
-    "joinWaitlist": "Rejoindre la liste d'attente"
+    }
   },
   "members": {
     "email": {
@@ -4320,7 +4318,7 @@
           "tokenMultiWord": "Un seul mot fonctionne mieux — « solidaires » sonne mieux dans un solde que « crédits alimentaires »."
         },
         "startFund": "Créer une caisse",
-        "noCodeWaitlist": "Pas encore de code d'invitation ? Rejoignez la liste d'attente"
+        "notReadyWaitlist": "Pas encore prêt ? Rejoignez la liste d'attente"
       },
       "swatches": {
         "terracotta": "Terracotta",
@@ -4593,8 +4591,8 @@
         "title": "Soyez les premiers à lancer votre caisse.",
         "body": "Nous intégrons les nouvelles caisses par petits groupes. Laissez-nous votre email et nous vous enverrons une invitation pour configurer la vôtre — sous-domaine, membres, commerçants, tout y est. 40 €/mois, gratuit pour les associations enregistrées et les écoles.",
         "ctaPrimary": "Créer une caisse",
-        "haveCode": "Vous avez déjà un code d'invitation de Citizen Pay ?",
-        "haveCodeCta": "Créez votre caisse maintenant →"
+        "readyNow": "Prêt à vous lancer ?",
+        "readyNowCta": "Créez votre caisse maintenant →"
       },
       "right": {
         "eyebrow": "Pour les développeurs",

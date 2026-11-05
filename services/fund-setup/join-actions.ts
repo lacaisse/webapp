@@ -21,26 +21,34 @@ import { getAuthUrl } from "@/services/host/server";
 import { isSupportedLocale } from "@/services/i18n/config";
 import { registerFundMcpResource } from "@/services/mcp/auth";
 
-import { allowExistingAccountEmail, allowJoinSubmit, countJoinSubmit } from "./join";
+import {
+  allowExistingAccountEmail,
+  allowJoinSubmit,
+  countJoinSubmit,
+  lookupJoinCode,
+  type JoinCodeLookup,
+} from "./join";
 import { sendJoinExistingAccountEmail } from "./join-emails";
-import { JoinWithCodeSchema, PASSWORD_MIN_LENGTH, type JoinWithCodeInput } from "./schema";
+import { JoinSchema, PASSWORD_MIN_LENGTH, type JoinInput } from "./schema";
 import { claimWaiverCodeUse, findUsableWaiverCode } from "./waiver-claim";
 import { formatWaiverCode } from "./waiver-codes";
 
 // The apex /join submit (see ./join.ts for the door and its posture): one
-// transaction claims a use of the code, creates the account (User + its
-// credential Account, the two rows Better Auth's sign-up would write — its
-// own sign-up stays disabled, review S5, like the member path in
-// services/member/auth.ts) and creates the fund with that account as OWNER,
-// waived from the start. Any failure after the claim rolls the use back.
+// transaction creates the account (User + its credential Account, the two
+// rows Better Auth's sign-up would write — its own sign-up stays disabled,
+// review S5, like the member path in services/member/auth.ts) and creates
+// the fund with that account as OWNER. With an invite code the same
+// transaction first claims a use of it and the fund starts waived; any
+// failure after the claim rolls the use back.
 
 export type JoinField = "code" | "email" | "password" | "name" | "subdomain";
 
-export type JoinWithCodeResult =
+export type JoinResult =
   | { ok: true; redirectTo: string }
   // The address already has an account: the answer went to that inbox (the
-  // sign-in link coming back to /new?code=), the screen only says an email
-  // went out — never which of the two happened to which address.
+  // sign-in link coming back to /new, with the code when there was one), the
+  // screen only says an email went out — never which of the two happened to
+  // which address.
   | { ok: true; sentTo: string }
   | { error: string; field?: JoinField };
 
@@ -56,10 +64,19 @@ const FIELD_PARAMS: Record<JoinField, Record<string, number>> = {
   subdomain: { min: SUBDOMAIN_MIN_LENGTH, max: SUBDOMAIN_MAX_LENGTH },
 };
 
-export async function joinWithCodeAction(input: JoinWithCodeInput): Promise<JoinWithCodeResult> {
+/**
+ * The form's check of a code typed into "I have an invite code" — the same
+ * never-consuming lookup the page runs on ?code=, so the holder sees the
+ * verdict (and the code's label) before creating anything.
+ */
+export async function checkJoinCodeAction(raw: string): Promise<JoinCodeLookup> {
+  return lookupJoinCode(typeof raw === "string" ? raw : "");
+}
+
+export async function joinAction(input: JoinInput): Promise<JoinResult> {
   const t = await getTranslations();
 
-  const parsed = JoinWithCodeSchema.safeParse(input);
+  const parsed = JoinSchema.safeParse(input);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
     const field = issue.path[0] as JoinField | undefined;
@@ -70,10 +87,12 @@ export async function joinWithCodeAction(input: JoinWithCodeInput): Promise<Join
   }
   const { code: normalisedCode, email, password, name, subdomain } = parsed.data;
 
-  if (!(await allowJoinSubmit(normalisedCode))) return { error: t("join.errors.tooMany") };
+  if (!(await allowJoinSubmit(normalisedCode ?? null))) return { error: t("join.errors.tooMany") };
 
-  const code = await findUsableWaiverCode(normalisedCode);
-  if (!code) {
+  // A code that came along is read before anything is written; nothing
+  // tells an unknown one from a dead one (join.ts). None is no gate.
+  const code = normalisedCode ? await findUsableWaiverCode(normalisedCode) : null;
+  if (normalisedCode && !code) {
     await countJoinSubmit();
     return { error: t("join.errors.codeInvalid"), field: "code" };
   }
@@ -91,7 +110,7 @@ export async function joinWithCodeAction(input: JoinWithCodeInput): Promise<Join
   let created: { userId: string; fund: { id: string; name: string; domain: string } };
   try {
     created = await prisma.$transaction(async (tx) => {
-      if (!(await claimWaiverCodeUse(tx, code, now))) throw new WaiverCodeUnusable();
+      if (code && !(await claimWaiverCodeUse(tx, code, now))) throw new WaiverCodeUnusable();
       // Nothing proved this inbox (the staff invite's token did), so the
       // account starts unverified; the verification email below, or a
       // password reset (services/auth/better-auth.ts::onPasswordReset),
@@ -114,16 +133,17 @@ export async function joinWithCodeAction(input: JoinWithCodeInput): Promise<Join
         defaultLocale,
         ownerUserId: user.id,
         now,
-        waiver: { codeId: code.id, label: code.label },
+        waiver: code ? { codeId: code.id, label: code.label } : undefined,
       });
       return { userId: user.id, fund: { id: fund.id, name: fund.name, domain: fund.domain } };
     });
   } catch (e) {
     // Each race has its own answer. The code's last use went to someone else:
     // same words as a wrong code. The address has an account: an email to
-    // that inbox with the sign-in link that comes back to /new?code= (one per
-    // address per while), and a screen that says only that. The subdomain got
-    // taken: say so — that submit spends nothing of the IP's budget.
+    // that inbox with the sign-in link that comes back to /new (the code
+    // along, if any; one per address per while), and a screen that says
+    // only that. The subdomain got taken: say so — that submit spends
+    // nothing of the IP's budget.
     if (e instanceof WaiverCodeUnusable) {
       await countJoinSubmit();
       return { error: t("join.errors.codeInvalid"), field: "code" };
@@ -131,10 +151,11 @@ export async function joinWithCodeAction(input: JoinWithCodeInput): Promise<Join
     if (isUniqueViolationOn(e, "email")) {
       await countJoinSubmit();
       if (allowExistingAccountEmail(email)) {
+        const newFundPath = code
+          ? `/new?code=${encodeURIComponent(formatWaiverCode(code.code))}`
+          : "/new";
         const signInUrl = getAuthUrl(
-          `/login?return_to=${encodeURIComponent(
-            getApexUrl(`/new?code=${encodeURIComponent(formatWaiverCode(code.code))}`),
-          )}`,
+          `/login?return_to=${encodeURIComponent(getApexUrl(newFundPath))}`,
         );
         try {
           await sendJoinExistingAccountEmail({ email, signInUrl });
@@ -181,7 +202,7 @@ export async function joinWithCodeAction(input: JoinWithCodeInput): Promise<Join
     console.error("[join] sign-in after account creation failed:", e.body);
   }
 
-  revalidatePath("/admin/waivers");
+  if (code) revalidatePath("/admin/waivers");
   // Cross-host handoff (services/auth/redirects.ts): a single-use code bound
   // to the fund's host, consumed by its /auth/exchange, which writes that
   // host's session cookie and lands them on the dashboard.

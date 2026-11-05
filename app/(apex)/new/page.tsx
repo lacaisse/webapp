@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
-import { redirect } from "next/navigation";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Card,
@@ -10,7 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { fundCreatorAccess } from "@/services/auth/dal";
+import { requireUser } from "@/services/auth/dal";
 import { findUsableWaiverCode } from "@/services/fund-setup/waiver-claim";
 import { formatWaiverCode } from "@/services/fund-setup/waiver-codes";
 import { CreateFundForm } from "./create-fund-form";
@@ -24,21 +23,21 @@ export default async function NewFundPage({
   searchParams: Promise<{ code?: string | string[] }>;
 }) {
   // (apex) layout already bounced any non-apex host here, so there's no fund
-  // context to worry about — getCurrentFund would always be null. Only
-  // existing staff, a platform admin, or the holder of a usable subscription
-  // waiver code (?code=, the apex /join door for someone who already has an
-  // account) may open a fund: a member login is a User too and must not
-  // become a fund OWNER without one of those. A newcomer whose code stopped
-  // being usable between /join and here goes back to /join, which says so —
-  // /unauthorized would be a dead end for them.
+  // context to worry about — getCurrentFund would always be null. Any
+  // signed-in account may open a fund: the door is as open as the apex
+  // /join's, where a stranger creates account and fund together, and the
+  // fund costs its subscription before it runs (the dashboard's setup
+  // checklist). A card holder's member login (services/member/auth.ts) may
+  // too — it becomes OWNER of the new fund only, never staff of the fund it
+  // holds a card at.
+  await requireUser();
   const params = await searchParams;
   const rawCode = typeof params.code === "string" ? params.code.trim() : "";
-  const { access } = await fundCreatorAccess(rawCode || undefined);
-  if (!access) redirect(rawCode ? `/join?code=${encodeURIComponent(rawCode)}` : "/unauthorized");
 
-  // A code that came along is used whoever brought it: the fund starts
-  // waived (createFundAction claims the use in the same transaction). Staff
-  // with a code that no longer checks out still get the plain form.
+  // A code that came along (?code=, from /join) is used whoever brought it:
+  // the fund starts waived (createFundAction claims the use in the same
+  // transaction). One that no longer checks out — used up, revoked or
+  // expired since the link was shared — is said so, over the plain form.
   const waiver = rawCode ? await findUsableWaiverCode(rawCode) : null;
 
   const [t, tRoot] = await Promise.all([getTranslations("funds.create"), getTranslations()]);
