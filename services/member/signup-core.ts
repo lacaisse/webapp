@@ -228,12 +228,7 @@ function normalizeExtra(value: ExtraValue): ExtraValue {
   return value;
 }
 
-/** Prisma P2002 on a unique that includes `field` (e.g. paymentReference, email). */
-export function isUniqueViolationOn(e: unknown, field: string): boolean {
-  if (!(e instanceof Error) || !("code" in e)) return false;
-  if ((e as { code?: string }).code !== "P2002") return false;
-  const meta = (e as { meta?: { target?: unknown } }).meta;
-  if (!meta?.target) return false;
-  const target = Array.isArray(meta.target) ? meta.target : [meta.target];
-  return target.some((t) => typeof t === "string" && t.includes(field));
-}
+// The P2002 helper lives in services/db/unique-violation.ts (it must read the
+// driver adapter's error shape, see there); re-exported so existing imports
+// keep working.
+export { isUniqueViolationOn } from "@/services/db/unique-violation";
