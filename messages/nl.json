@@ -48,7 +48,8 @@
         "title": "Lid van {fundName}?",
         "description": "Log in met uw ledenlogin om uw kaarten in de Citizen Pay-wallet te openen.",
         "createLogin": "Maak uw {fundName}-login aan"
-      }
+      },
+      "startWithCode": "Start een kas met een uitnodigingscode"
     },
     "forgotPassword": {
       "title": "Wachtwoord opnieuw instellen",
@@ -85,7 +86,7 @@
       "passwordsDontMatch": "Wachtwoorden komen niet overeen.",
       "invalidCredentials": "Ongeldige inloggegevens.",
       "invalidInput": "Ongeldige invoer.",
-      "signupsClosed": "Registreren kan momenteel alleen op uitnodiging. Meld u aan voor de wachtlijst om toegang aan te vragen.",
+      "signupsClosed": "Inschrijven kan voorlopig alleen op uitnodiging. Gebruik uw uitnodigingscode om een kas te starten, of zet u op de wachtlijst om er een aan te vragen.",
       "passkeyStartFailed": "Kan passkey-inloggen niet starten.",
       "passkeyVerifyFailed": "Kan de passkey-respons niet verifiëren.",
       "signInFailed": "Inloggen mislukt.",
@@ -3109,7 +3110,9 @@
       "codeRequired": "Voer uw uitnodigingscode in.",
       "codeInvalid": "Deze code is niet geldig, of niet meer. Controleer hem, of vraag een nieuwe aan wie hem u gaf.",
       "tooMany": "Te veel pogingen. Wacht even voordat u het opnieuw probeert."
-    }
+    },
+    "noCode": "Nog geen uitnodigingscode?",
+    "joinWaitlist": "Op de wachtlijst"
   },
   "members": {
     "email": {
@@ -4239,7 +4242,9 @@
           "tokenEmpty": "Geef uw tegoed een naam. \"Solidair\", \"credit\", \"ticket\" — aan u.",
           "tokenTooLong": "Houd het kort — dit woord verschijnt in elk saldo en elke transactie.",
           "tokenMultiWord": "Eén woord werkt het beste — \"solidaires\" leest beter in een saldo dan \"voedselcredits\"."
-        }
+        },
+        "startFund": "Start een kas",
+        "noCodeWaitlist": "Nog geen uitnodigingscode? Zet u op de wachtlijst"
       },
       "swatches": {
         "terracotta": "Terracotta",
@@ -4510,8 +4515,10 @@
       "left": {
         "eyebrow": "Klaar wanneer u dat bent",
         "title": "Start een fonds in één namiddag.",
-        "body": "Zet uw subdomein op, nodig uw eerste leden uit, onboard uw eerste handelaars en leveranciers. Helder Nederlands, zinvolle standaardwaarden. €20/maand — gratis voor geregistreerde non-profits en scholen.",
-        "ctaPrimary": "Start een fonds"
+        "body": "Zet uw subdomein op, nodig uw eerste leden uit, onboard uw eerste handelaars en leveranciers. Helder Nederlands, zinvolle standaardwaarden. €40/maand — gratis voor geregistreerde non-profits en scholen.",
+        "ctaPrimary": "Start een fonds",
+        "haveCode": "Hebt u al een uitnodigingscode van Citizen Pay?",
+        "haveCodeCta": "Start uw kas nu →"
       },
       "right": {
         "eyebrow": "Voor ontwikkelaars",

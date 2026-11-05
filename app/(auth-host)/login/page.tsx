@@ -117,16 +117,21 @@ export default async function LoginPage({
             </Link>
           </>
         ) : (
-          // Public self-serve signup is closed — point newcomers at the waitlist.
-          <>
+          // Public self-serve signup is closed: an invite code opens a fund at
+          // the apex /join door; everyone else joins the waitlist.
+          <span>
             {t("waitlistPrompt")}&nbsp;
+            <Link href={getApexUrl("/join")} className="text-foreground underline">
+              {t("startWithCode")}
+            </Link>
+            &nbsp;·&nbsp;
             <Link
               href={getApexUrl("/#get-started")}
               className="text-foreground underline"
             >
               {t("joinWaitlist")}
             </Link>
-          </>
+          </span>
         )}
       </CardFooter>
     </Card>

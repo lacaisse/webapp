@@ -48,7 +48,8 @@
         "title": "Membre de {fundName} ?",
         "description": "Connectez-vous avec votre identifiant de membre pour ouvrir vos cartes dans le portefeuille Citizen Pay.",
         "createLogin": "Créer votre identifiant {fundName}"
-      }
+      },
+      "startWithCode": "Créer une caisse avec un code d'invitation"
     },
     "consent": {
       "title": "Autoriser l'accès",
@@ -101,7 +102,7 @@
       "passwordsDontMatch": "Les mots de passe ne correspondent pas.",
       "invalidCredentials": "Identifiants invalides.",
       "invalidInput": "Saisie invalide.",
-      "signupsClosed": "Les inscriptions sont sur invitation pour le moment. Rejoignez la liste d'attente pour demander un accès.",
+      "signupsClosed": "Les inscriptions se font sur invitation pour l'instant. Utilisez votre code d'invitation pour créer une caisse, ou rejoignez la liste d'attente pour en demander un.",
       "passkeyStartFailed": "Impossible de démarrer la connexion par passkey.",
       "passkeyVerifyFailed": "Impossible de vérifier la réponse de la passkey.",
       "signInFailed": "Échec de la connexion.",
@@ -3167,7 +3168,9 @@
       "codeRequired": "Saisissez votre code d'invitation.",
       "codeInvalid": "Ce code n'est pas valide, ou ne l'est plus. Vérifiez-le, ou demandez-en un nouveau à la personne qui vous l'a remis.",
       "tooMany": "Trop de tentatives. Patientez un peu avant de réessayer."
-    }
+    },
+    "noCode": "Pas encore de code d'invitation ?",
+    "joinWaitlist": "Rejoindre la liste d'attente"
   },
   "members": {
     "email": {
@@ -4315,7 +4318,9 @@
           "tokenEmpty": "Donnez un nom à votre jeton. « solidaire », « crédit », « ticket » — à vous de voir.",
           "tokenTooLong": "Restez court — ce mot apparaît dans chaque solde et transaction.",
           "tokenMultiWord": "Un seul mot fonctionne mieux — « solidaires » sonne mieux dans un solde que « crédits alimentaires »."
-        }
+        },
+        "startFund": "Créer une caisse",
+        "noCodeWaitlist": "Pas encore de code d'invitation ? Rejoignez la liste d'attente"
       },
       "swatches": {
         "terracotta": "Terracotta",
@@ -4586,8 +4591,10 @@
       "left": {
         "eyebrow": "Liste d'attente",
         "title": "Soyez les premiers à lancer votre caisse.",
-        "body": "Nous intégrons les nouvelles caisses par petits groupes. Laissez-nous votre email et nous vous enverrons une invitation pour configurer la vôtre — sous-domaine, membres, commerçants, tout y est. 20 €/mois, gratuit pour les associations enregistrées et les écoles.",
-        "ctaPrimary": "Créer une caisse"
+        "body": "Nous intégrons les nouvelles caisses par petits groupes. Laissez-nous votre email et nous vous enverrons une invitation pour configurer la vôtre — sous-domaine, membres, commerçants, tout y est. 40 €/mois, gratuit pour les associations enregistrées et les écoles.",
+        "ctaPrimary": "Créer une caisse",
+        "haveCode": "Vous avez déjà un code d'invitation de Citizen Pay ?",
+        "haveCodeCta": "Créez votre caisse maintenant →"
       },
       "right": {
         "eyebrow": "Pour les développeurs",

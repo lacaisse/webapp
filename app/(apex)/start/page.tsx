@@ -110,11 +110,19 @@ export default async function JoinPage({
             <CardDescription>{t("description")}</CardDescription>
           </CardHeader>
           <CardContent>{body}</CardContent>
-          <CardFooter className="text-sm text-muted-foreground">
-            {t("haveAccount")}&nbsp;
-            <a href={loginHref} className="text-foreground underline">
-              {t("signIn")}
-            </a>
+          <CardFooter className="flex-col items-start gap-1.5 text-sm text-muted-foreground">
+            <span>
+              {t("haveAccount")}&nbsp;
+              <a href={loginHref} className="text-foreground underline">
+                {t("signIn")}
+              </a>
+            </span>
+            <span>
+              {t("noCode")}&nbsp;
+              <a href={getApexUrl("/#get-started")} className="text-foreground underline">
+                {t("joinWaitlist")}
+              </a>
+            </span>
           </CardFooter>
         </Card>
       </div>

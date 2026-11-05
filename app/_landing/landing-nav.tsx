@@ -56,12 +56,15 @@ export async function LandingNav() {
           >
             {t("signIn")}
           </a>
+          {/* The invite-code door (app/(apex)/start, served at /join): a code
+              from Citizen Pay opens a fund on the spot. The waitlist stays
+              one scroll down, in the get-started section, for everyone else. */}
           <a
-            href="#get-started"
+            href="/join"
             className="inline-flex h-9 items-center rounded-lg px-3.5 text-sm font-medium text-primary-foreground no-underline transition-colors hover:opacity-90"
             style={{ background: "var(--primary)" }}
           >
-            {t("joinWaitlist")}
+            {t("startFund")}
           </a>
         </div>
       </div>
