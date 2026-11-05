@@ -1,7 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { describe, expect, it } from "vitest";
 
-import { AcceptSubscriptionSchema, normaliseVatNumber, type AcceptSubscriptionInput } from "./schema";
+import {
+  AcceptSubscriptionSchema,
+  CreateWaiverCodeSchema,
+  RedeemWaiverCodeSchema,
+  WAIVER_EXPIRES_DAYS_MAX,
+  WAIVER_LABEL_MAX,
+  WAIVER_MAX_USES_MAX,
+  normaliseVatNumber,
+  type AcceptSubscriptionInput,
+} from "./schema";
 
 const VALID: AcceptSubscriptionInput = {
   legalName: "La Caisse de Saint-Gilles ASBL",
@@ -66,5 +75,71 @@ describe("AcceptSubscriptionSchema", () => {
     expect(errorsOf({ address: "x".repeat(501) })).toEqual([
       "fund.settings.subscription.errors.addressMax",
     ]);
+  });
+});
+
+describe("RedeemWaiverCodeSchema", () => {
+  it("normalises what a person typed and keeps a well-formed code", () => {
+    const parsed = RedeemWaiverCodeSchema.safeParse({ code: " 7k3p-m2qx 9rtd " });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.code).toBe("7K3PM2QX9RTD");
+  });
+
+  it("maps the look-alike letters the alphabet left out", () => {
+    const parsed = RedeemWaiverCodeSchema.safeParse({ code: "OIL1-2345-6789" });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.code).toBe("011123456789");
+  });
+
+  it("refuses an empty code with its own message", () => {
+    const parsed = RedeemWaiverCodeSchema.safeParse({ code: " -- " });
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) {
+      expect(parsed.error.issues[0].message).toBe("fund.settings.subscription.errors.codeRequired");
+    }
+  });
+
+  it("refuses the wrong length or a letter outside the alphabet", () => {
+    for (const code of ["7K3P-M2QX", "7K3P-M2QX-9RTD-AAAA", "7K3P-M2QX-9RTU"]) {
+      const parsed = RedeemWaiverCodeSchema.safeParse({ code });
+      expect(parsed.success).toBe(false);
+      if (!parsed.success) {
+        expect(parsed.error.issues[0].message).toBe("fund.settings.subscription.errors.codeInvalid");
+      }
+    }
+  });
+});
+
+describe("CreateWaiverCodeSchema", () => {
+  const valid = { label: "  Contributor: Alice ", maxUses: 1, expiresInDays: null };
+
+  it("trims the label and accepts a code without expiry", () => {
+    const parsed = CreateWaiverCodeSchema.safeParse(valid);
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.label).toBe("Contributor: Alice");
+      expect(parsed.data.expiresInDays).toBeNull();
+    }
+  });
+
+  it("bounds the label length", () => {
+    expect(CreateWaiverCodeSchema.safeParse({ ...valid, label: "A" }).success).toBe(false);
+    expect(
+      CreateWaiverCodeSchema.safeParse({ ...valid, label: "A".repeat(WAIVER_LABEL_MAX + 1) }).success,
+    ).toBe(false);
+  });
+
+  it("wants whole numbers inside the ranges", () => {
+    for (const maxUses of [0, 1.5, Number.NaN, WAIVER_MAX_USES_MAX + 1]) {
+      const parsed = CreateWaiverCodeSchema.safeParse({ ...valid, maxUses });
+      expect(parsed.success).toBe(false);
+      if (!parsed.success) expect(parsed.error.issues[0].message).toBe("admin.waivers.errors.maxUsesRange");
+    }
+    for (const expiresInDays of [0, 2.5, WAIVER_EXPIRES_DAYS_MAX + 1]) {
+      const parsed = CreateWaiverCodeSchema.safeParse({ ...valid, expiresInDays });
+      expect(parsed.success).toBe(false);
+      if (!parsed.success) expect(parsed.error.issues[0].message).toBe("admin.waivers.errors.expiresRange");
+    }
+    expect(CreateWaiverCodeSchema.safeParse({ ...valid, maxUses: 25, expiresInDays: 30 }).success).toBe(true);
   });
 });

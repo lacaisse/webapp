@@ -20,8 +20,10 @@ import type { BankingStatus } from "@/services/citizenpay/types";
 //                    initiation never requested)            → todo
 //                An unread status (`not_read`) only happens before citizenpay
 //                is done; should it reach here, it reads as todo.
-//   subscription done once an OWNER accepted the hosting plan, else todo.
-//                Never blocked — a fund may accept before connecting.
+//   subscription done once an OWNER accepted the hosting plan OR the fund's
+//                hosting was waived (a redeemed waiver code, or a platform
+//                admin's script), else todo. Never blocked — a fund may
+//                accept before connecting.
 
 export const SETUP_STEP_KEYS = ["citizenpay", "banking", "subscription"] as const;
 export type SetupStepKey = (typeof SETUP_STEP_KEYS)[number];
@@ -47,6 +49,7 @@ export type SetupInput = {
   citizenPayApiKeyId: string | null;
   banking: BankingRead;
   subscriptionAcceptedAt: Date | null;
+  subscriptionWaivedAt: Date | null;
 };
 
 function present(value: string | null): boolean {
@@ -76,13 +79,20 @@ function bankingStatus(input: SetupInput, citizenPayDone: boolean): SetupStepSta
   return "todo";
 }
 
+// The hosting question is closed: accepted (paying) or waived (free).
+export function isSubscriptionSettled(
+  input: Pick<SetupInput, "subscriptionAcceptedAt" | "subscriptionWaivedAt">,
+): boolean {
+  return input.subscriptionAcceptedAt != null || input.subscriptionWaivedAt != null;
+}
+
 // Always the three keys, in SETUP_STEP_KEYS order.
 export function deriveSetupSteps(input: SetupInput): SetupStep[] {
   const citizenPayDone = isCitizenPayConnected(input);
   const statuses: Record<SetupStepKey, SetupStepStatus> = {
     citizenpay: citizenPayDone ? "done" : "todo",
     banking: bankingStatus(input, citizenPayDone),
-    subscription: input.subscriptionAcceptedAt ? "done" : "todo",
+    subscription: isSubscriptionSettled(input) ? "done" : "todo",
   };
   return SETUP_STEP_KEYS.map((key) => ({ key, status: statuses[key] }));
 }

@@ -72,7 +72,7 @@ describe("acceptSubscriptionAction", () => {
 
     expect(fundUpdateMany).toHaveBeenCalledOnce();
     const [args] = fundUpdateMany.mock.calls[0];
-    expect(args.where).toEqual({ id: "fund-1", subscriptionAcceptedAt: null });
+    expect(args.where).toEqual({ id: "fund-1", subscriptionAcceptedAt: null, subscriptionWaivedAt: null });
     expect(args.data).toEqual({
       subscriptionAcceptedAt: expect.any(Date),
       subscriptionAcceptedByUserId: "user-1",

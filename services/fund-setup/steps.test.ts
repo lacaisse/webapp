@@ -8,6 +8,7 @@ import {
   deriveSetupSteps,
   isCitizenPayConnected,
   isSetupComplete,
+  isSubscriptionSettled,
   type BankingRead,
   type SetupInput,
   type SetupStepKey,
@@ -48,6 +49,7 @@ function input(overrides: Partial<SetupInput> = {}): SetupInput {
     citizenPayApiKeyId: null,
     banking: { kind: "not_read" },
     subscriptionAcceptedAt: null,
+    subscriptionWaivedAt: null,
     ...overrides,
   };
 }
@@ -194,5 +196,28 @@ describe("isSetupComplete", () => {
         ),
       ),
     ).toBe(false);
+  });
+});
+
+describe("subscription step: waiver", () => {
+  it("is done when hosting was waived, with no acceptance", () => {
+    expect(statusOf(input({ subscriptionWaivedAt: new Date() }), "subscription")).toBe("done");
+  });
+
+  it("is todo while neither accepted nor waived", () => {
+    expect(statusOf(input(), "subscription")).toBe("todo");
+  });
+
+  it("completes the checklist together with the other steps", () => {
+    const steps = deriveSetupSteps(
+      input({ ...CONNECTED, banking: banking({ ready: true }), subscriptionWaivedAt: new Date() }),
+    );
+    expect(isSetupComplete(steps)).toBe(true);
+  });
+
+  it("isSubscriptionSettled: accepted or waived", () => {
+    expect(isSubscriptionSettled({ subscriptionAcceptedAt: null, subscriptionWaivedAt: null })).toBe(false);
+    expect(isSubscriptionSettled({ subscriptionAcceptedAt: new Date(), subscriptionWaivedAt: null })).toBe(true);
+    expect(isSubscriptionSettled({ subscriptionAcceptedAt: null, subscriptionWaivedAt: new Date() })).toBe(true);
   });
 });

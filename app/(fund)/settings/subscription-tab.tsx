@@ -15,12 +15,14 @@ import { requireFundRole } from "@/services/auth/dal";
 import { resolveCitizenPayBusinessId } from "@/services/citizenpay/business-id";
 import { SUBSCRIPTION_MONTHLY_EUR } from "@/services/fund-setup/config";
 import { getCitizenPayDashboardUrls } from "@/services/fund-setup/server";
+import { RedeemWaiverForm } from "./redeem-waiver-form";
 import { SubscriptionForm } from "./subscription-form";
 
-// Settings → Subscription: the La Caisse hosting plan, and either the
-// acceptance form (OWNER only), an owner-only note (other admins), or the
-// recorded acceptance with a link to the invoices on the Citizen Pay
-// dashboard. Accepting is final in the app — there is no cancel here.
+// Settings → Subscription: the La Caisse hosting plan, and one of: the
+// acceptance form plus "Have an invite code?" (OWNER only), an owner-only
+// note (other admins), the recorded acceptance with a link to the invoices on
+// the Citizen Pay dashboard, or — for a fund whose hosting was waived — the
+// waiver and its reason. Accepting is final in the app; so is a waiver.
 export async function SubscriptionTab({
   fund,
 }: {
@@ -33,6 +35,8 @@ export async function SubscriptionTab({
     citizenPayApiKeyEnc: string | null;
     citizenPayBusinessId: string | null;
     subscriptionAcceptedAt: Date | null;
+    subscriptionWaivedAt: Date | null;
+    subscriptionWaiverReason: string | null;
     billingLegalName: string | null;
     billingEmail: string | null;
     billingAddress: string | null;
@@ -58,39 +62,91 @@ export async function SubscriptionTab({
           <CardDescription>{t("description")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 pb-4">
-          <p className="font-heading text-3xl font-medium">{t("plan.price", { price })}</p>
+          <p className="font-heading text-3xl font-medium">
+            {fund.subscriptionWaivedAt ? t("plan.free") : t("plan.price", { price })}
+          </p>
           <ul className="list-disc space-y-1 pl-5 text-sm">
             <li>{t("plan.line1")}</li>
             <li>{t("plan.line2")}</li>
             <li>{t("plan.line3")}</li>
           </ul>
-          <p className="text-sm text-muted-foreground">{t("plan.billing")}</p>
+          {!fund.subscriptionWaivedAt && (
+            <p className="text-sm text-muted-foreground">{t("plan.billing")}</p>
+          )}
         </CardContent>
       </Card>
 
-      {fund.subscriptionAcceptedAt ? (
+      {fund.subscriptionWaivedAt ? (
+        <WaivedCard waivedAt={fund.subscriptionWaivedAt} reason={fund.subscriptionWaiverReason} />
+      ) : fund.subscriptionAcceptedAt ? (
         <AcceptedCard fund={fund} acceptedAt={fund.subscriptionAcceptedAt} price={price} />
       ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("title")}</CardTitle>
-          </CardHeader>
-          <CardContent className="pb-4">
-            {isOwner ? (
-              <SubscriptionForm
-                fundName={fund.name}
-                defaults={{ legalName: fund.fullName ?? fund.name, email: user.email }}
-                price={price}
-              />
-            ) : (
-              <Alert>
-                <AlertDescription>{t("ownerOnly")}</AlertDescription>
-              </Alert>
-            )}
-          </CardContent>
-        </Card>
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("title")}</CardTitle>
+            </CardHeader>
+            <CardContent className="pb-4">
+              {isOwner ? (
+                <SubscriptionForm
+                  fundName={fund.name}
+                  defaults={{ legalName: fund.fullName ?? fund.name, email: user.email }}
+                  price={price}
+                />
+              ) : (
+                <Alert>
+                  <AlertDescription>{t("ownerOnly")}</AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+          {/* A waiver code (minted by a platform admin) replaces the
+              subscription. Same gate as accepting: it settles the fund's
+              hosting question, so OWNER only. */}
+          {isOwner && (
+            <Card>
+              <CardHeader>
+                <CardTitle>{t("redeem.title")}</CardTitle>
+                <CardDescription>{t("redeem.description")}</CardDescription>
+              </CardHeader>
+              <CardContent className="pb-4">
+                <RedeemWaiverForm />
+              </CardContent>
+            </Card>
+          )}
+        </>
       )}
     </div>
+  );
+}
+
+async function WaivedCard({ waivedAt, reason }: { waivedAt: Date; reason: string | null }) {
+  const t = await getTranslations("fund.settings.subscription");
+  const format = await getFormatter();
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <CheckCircle2 className="size-4 text-success" />
+          {t("waived.title")}
+        </CardTitle>
+        <CardDescription>
+          {t("waived.since", { date: format.dateTime(waivedAt, { dateStyle: "long" }) })}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4 pb-4">
+        <p className="text-sm">{t("waived.description")}</p>
+        {reason && (
+          <dl className="rounded-lg border bg-muted/30 p-4 text-sm">
+            <div className="flex gap-2">
+              <dt className="min-w-32 text-muted-foreground">{t("waived.reason")}</dt>
+              <dd>{reason}</dd>
+            </div>
+          </dl>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

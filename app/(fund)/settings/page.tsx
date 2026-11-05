@@ -382,6 +382,8 @@ async function SettingsContent({
               citizenPayApiKeyEnc: fund.citizenPayApiKeyEnc,
               citizenPayBusinessId: fund.citizenPayBusinessId,
               subscriptionAcceptedAt: fund.subscriptionAcceptedAt,
+              subscriptionWaivedAt: fund.subscriptionWaivedAt,
+              subscriptionWaiverReason: fund.subscriptionWaiverReason,
               billingLegalName: fund.billingLegalName,
               billingEmail: fund.billingEmail,
               billingAddress: fund.billingAddress,

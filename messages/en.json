@@ -138,7 +138,8 @@
       "emptyTitle": "No funds yet",
       "emptyDescription": "Create your first fund to get started.",
       "create": "Create a fund",
-      "createAnother": "Create another fund"
+      "createAnother": "Create another fund",
+      "adminLink": "Platform admin"
     },
     "create": {
       "title": "Create a fund",
@@ -897,7 +898,8 @@
         "subscription": {
           "title": "Start your subscription",
           "description": "Hosting on La Caisse costs {price} per month, invoiced by Citizen Pay. A fund owner accepts it in Settings.",
-          "cta": "Review and accept"
+          "cta": "Review and accept",
+          "descriptionWaived": "Hosting is free for this fund."
         }
       },
       "tokenFallback": "tokens",
@@ -2709,7 +2711,8 @@
           "line1": "Your fund's dashboard, member and merchant pages on La Caisse",
           "line2": "Token issuance, cards and merchant payouts through Citizen Pay",
           "line3": "Updates, backups and support",
-          "billing": "Invoiced monthly by Citizen Pay to the details below; the invoice can be paid by bank transfer or open banking. Cancel at any time through Citizen Pay — the current month remains due."
+          "billing": "Invoiced monthly by Citizen Pay to the details below; the invoice can be paid by bank transfer or open banking. Cancel at any time through Citizen Pay — the current month remains due.",
+          "free": "Free for this fund"
         },
         "form": {
           "legalName": "Legal name",
@@ -2731,6 +2734,19 @@
           "description": "Citizen Pay invoices {price} per month to {email}. To change the billing details, reply to your invoice email.",
           "invoices": "Invoices on Citizen Pay"
         },
+        "waived": {
+          "title": "Hosting is free for this fund",
+          "since": "Since {date}",
+          "description": "Your fund is hosted on La Caisse without a monthly subscription. Citizen Pay sends no invoices for it.",
+          "reason": "Reason"
+        },
+        "redeem": {
+          "title": "Have an invite code?",
+          "description": "Citizen Pay hands out codes to funds that host for free — contributors, non-profits, schools. A code replaces the subscription.",
+          "label": "Invite code",
+          "submit": "Redeem",
+          "submitting": "Redeeming…"
+        },
         "errors": {
           "legalNameMin": "The legal name must be at least {min} characters.",
           "legalNameMax": "The legal name must be at most {max} characters.",
@@ -2739,7 +2755,14 @@
           "addressMax": "The billing address is too long.",
           "vatInvalid": "Enter a valid VAT number (e.g. BE0123456789) or leave it empty.",
           "mustAccept": "You need to agree before starting the subscription.",
-          "alreadyAccepted": "This fund's subscription has already been accepted."
+          "alreadyAccepted": "This fund's subscription has already been accepted.",
+          "waived": "Hosting is free for this fund — there is no subscription to accept.",
+          "codeRequired": "Enter your invite code.",
+          "codeInvalid": "This code is not valid. Check it and try again.",
+          "codeExpired": "This code has expired. Ask Citizen Pay for a new one.",
+          "codeRevoked": "This code is no longer valid. Ask Citizen Pay for a new one.",
+          "codeExhausted": "This code has already been used.",
+          "alreadyWaived": "Hosting is already free for this fund."
         },
         "email": {
           "confirmation": {
@@ -4142,6 +4165,56 @@
         "notFound": "Passkey not found.",
         "notAllowed": "Not allowed.",
         "generic": "Something went wrong."
+      }
+    }
+  },
+  "admin": {
+    "title": "Platform admin",
+    "backToFunds": "Back to funds",
+    "waivers": {
+      "create": {
+        "title": "New invite code",
+        "description": "Mint a code for a fund that hosts for free. Its owner redeems it in Settings → Subscription; the subscription step is then done without a payment.",
+        "label": "Who or why",
+        "labelHint": "Shown to the fund as the reason, e.g. “Contributor: Alice” or “Registered non-profit”.",
+        "maxUses": "Uses",
+        "maxUsesHint": "How many funds may redeem it (1–{max}).",
+        "expiresInDays": "Valid for (days)",
+        "expiresInDaysHint": "Empty = never expires (max {max}).",
+        "submit": "Mint code",
+        "submitting": "Minting…",
+        "createdTitle": "Code minted for “{label}”",
+        "createdHint": "Send it to the fund's owner. It stays in the list below.",
+        "copy": "Copy",
+        "copied": "Copied"
+      },
+      "list": {
+        "title": "Invite codes",
+        "description": "Every code minted, newest first.",
+        "empty": "No codes yet.",
+        "code": "Code",
+        "label": "Who or why",
+        "uses": "Uses",
+        "expires": "Expires",
+        "never": "Never",
+        "status": "Status",
+        "redeemedBy": "Redeemed by"
+      },
+      "status": {
+        "active": "Active",
+        "expired": "Expired",
+        "revoked": "Revoked",
+        "exhausted": "Used up"
+      },
+      "revoke": "Revoke",
+      "revoking": "Revoking…",
+      "revokeConfirm": "Revoke this code? Funds that already redeemed it stay free.",
+      "errors": {
+        "labelMin": "The label must be at least {min} characters.",
+        "labelMax": "The label must be at most {max} characters.",
+        "maxUsesRange": "Uses must be a whole number between 1 and {maxUses}.",
+        "expiresRange": "Validity must be a whole number of days between 1 and {maxDays}.",
+        "notFound": "This code no longer exists."
       }
     }
   },

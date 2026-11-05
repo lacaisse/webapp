@@ -36,6 +36,9 @@ export function getCitizenPayDashboardUrls(
 export type FundSetup = {
   steps: SetupStep[];
   complete: boolean;
+  // Hosting is free for this fund (waiver code redeemed or set by a platform
+  // admin): the subscription step is done without an acceptance.
+  waived: boolean;
   // `not_read` when the fund isn't connected to Citizen Pay, `unavailable`
   // when Citizen Pay was asked and didn't answer.
   banking: BankingRead;
@@ -49,6 +52,7 @@ export type FundSetupInput = {
   citizenPayApiKeyEnc: string | null;
   citizenPayBusinessId: string | null;
   subscriptionAcceptedAt: Date | null;
+  subscriptionWaivedAt: Date | null;
 };
 
 async function readBanking(fund: FundSetupInput): Promise<BankingRead> {
@@ -75,10 +79,12 @@ async function loadFundSetup(fund: FundSetupInput): Promise<FundSetup> {
     citizenPayApiKeyId: fund.citizenPayApiKeyId,
     banking,
     subscriptionAcceptedAt: fund.subscriptionAcceptedAt,
+    subscriptionWaivedAt: fund.subscriptionWaivedAt,
   });
   return {
     steps,
     complete: isSetupComplete(steps),
+    waived: fund.subscriptionWaivedAt != null,
     banking,
     urls: getCitizenPayDashboardUrls(businessId),
   };

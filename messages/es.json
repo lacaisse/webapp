@@ -117,7 +117,8 @@
       "emptyTitle": "Aún no hay fondos",
       "emptyDescription": "Cree su primer fondo para empezar.",
       "create": "Crear un fondo",
-      "createAnother": "Crear otro fondo"
+      "createAnother": "Crear otro fondo",
+      "adminLink": "Administración"
     },
     "create": {
       "title": "Crear un fondo",
@@ -875,7 +876,8 @@
         "subscription": {
           "title": "Inicie su suscripción",
           "description": "El alojamiento en La Caisse cuesta {price} al mes, facturado por Citizen Pay. Un propietario del fondo lo acepta en Configuración.",
-          "cta": "Revisar y aceptar"
+          "cta": "Revisar y aceptar",
+          "descriptionWaived": "El alojamiento es gratuito para esta caja."
         }
       },
       "tokenFallback": "tokens",
@@ -2643,7 +2645,8 @@
           "line1": "El panel de su fondo y las páginas de miembros y comercios en La Caisse",
           "line2": "Emisión de tokens, tarjetas y pagos a comercios a través de Citizen Pay",
           "line3": "Actualizaciones, copias de seguridad y soporte",
-          "billing": "Facturado mensualmente por Citizen Pay con los datos de abajo; la factura puede pagarse por transferencia bancaria o mediante open banking. Puede cancelarse en cualquier momento a través de Citizen Pay; el mes en curso sigue siendo exigible."
+          "billing": "Facturado mensualmente por Citizen Pay con los datos de abajo; la factura puede pagarse por transferencia bancaria o mediante open banking. Puede cancelarse en cualquier momento a través de Citizen Pay; el mes en curso sigue siendo exigible.",
+          "free": "Gratis para esta caja"
         },
         "form": {
           "legalName": "Razón social",
@@ -2665,6 +2668,19 @@
           "description": "Citizen Pay factura {price} al mes a {email}. Para cambiar los datos de facturación, responda al correo de su factura.",
           "invoices": "Facturas en Citizen Pay"
         },
+        "waived": {
+          "title": "El alojamiento es gratuito para esta caja",
+          "since": "Desde el {date}",
+          "description": "Su caja está alojada en La Caisse sin suscripción mensual. Citizen Pay no envía facturas por ella.",
+          "reason": "Motivo"
+        },
+        "redeem": {
+          "title": "¿Tiene un código de invitación?",
+          "description": "Citizen Pay entrega códigos a las cajas alojadas gratuitamente: colaboradores, asociaciones sin ánimo de lucro, escuelas. Un código sustituye a la suscripción.",
+          "label": "Código de invitación",
+          "submit": "Usar el código",
+          "submitting": "Comprobando…"
+        },
         "errors": {
           "legalNameMin": "La razón social debe tener al menos {min} caracteres.",
           "legalNameMax": "La razón social debe tener como máximo {max} caracteres.",
@@ -2673,7 +2689,14 @@
           "addressMax": "La dirección de facturación es demasiado larga.",
           "vatInvalid": "Introduzca un número de IVA válido (p. ej. BE0123456789) o déjelo vacío.",
           "mustAccept": "Debe dar su conformidad antes de iniciar la suscripción.",
-          "alreadyAccepted": "La suscripción de este fondo ya ha sido aceptada."
+          "alreadyAccepted": "La suscripción de este fondo ya ha sido aceptada.",
+          "waived": "El alojamiento es gratuito para esta caja: no hay ninguna suscripción que aceptar.",
+          "codeRequired": "Introduzca su código de invitación.",
+          "codeInvalid": "Este código no es válido. Compruébelo e inténtelo de nuevo.",
+          "codeExpired": "Este código ha caducado. Pida uno nuevo a Citizen Pay.",
+          "codeRevoked": "Este código ya no es válido. Pida uno nuevo a Citizen Pay.",
+          "codeExhausted": "Este código ya se ha utilizado.",
+          "alreadyWaived": "El alojamiento ya es gratuito para esta caja."
         },
         "email": {
           "confirmation": {
@@ -4055,6 +4078,56 @@
         "notFound": "Clave de acceso no encontrada.",
         "notAllowed": "No permitido.",
         "generic": "Algo salió mal."
+      }
+    }
+  },
+  "admin": {
+    "title": "Administración de la plataforma",
+    "backToFunds": "Volver a las cajas",
+    "waivers": {
+      "create": {
+        "title": "Nuevo código de invitación",
+        "description": "Cree un código para una caja alojada gratuitamente. Su propietario lo usa en Ajustes → Suscripción; el paso de suscripción queda completado sin pago.",
+        "label": "Para quién o por qué",
+        "labelHint": "Se muestra a la caja como motivo, p. ej. «Colaborador: Alice» o «Asociación registrada».",
+        "maxUses": "Usos",
+        "maxUsesHint": "Cuántas cajas pueden usarlo (1–{max}).",
+        "expiresInDays": "Válido (días)",
+        "expiresInDaysHint": "Vacío = no caduca (máx. {max}).",
+        "submit": "Crear código",
+        "submitting": "Creando…",
+        "createdTitle": "Código creado para «{label}»",
+        "createdHint": "Envíelo al propietario de la caja. Queda en la lista de abajo.",
+        "copy": "Copiar",
+        "copied": "Copiado"
+      },
+      "list": {
+        "title": "Códigos de invitación",
+        "description": "Todos los códigos creados, del más reciente al más antiguo.",
+        "empty": "Todavía no hay códigos.",
+        "code": "Código",
+        "label": "Para quién o por qué",
+        "uses": "Usos",
+        "expires": "Caduca",
+        "never": "Nunca",
+        "status": "Estado",
+        "redeemedBy": "Usado por"
+      },
+      "status": {
+        "active": "Activo",
+        "expired": "Caducado",
+        "revoked": "Revocado",
+        "exhausted": "Agotado"
+      },
+      "revoke": "Revocar",
+      "revoking": "Revocando…",
+      "revokeConfirm": "¿Revocar este código? Las cajas que ya lo usaron siguen siendo gratuitas.",
+      "errors": {
+        "labelMin": "La etiqueta debe tener al menos {min} caracteres.",
+        "labelMax": "La etiqueta debe tener como máximo {max} caracteres.",
+        "maxUsesRange": "Los usos deben ser un número entero entre 1 y {maxUses}.",
+        "expiresRange": "La validez debe ser un número entero de días entre 1 y {maxDays}.",
+        "notFound": "Este código ya no existe."
       }
     }
   },

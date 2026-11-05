@@ -115,6 +115,15 @@ async function HomeContent({
             </div>
           </div>
           <div className="flex items-center gap-1">
+            {/* Platform admins only: waiver codes for funds that host for free. */}
+            {user?.globalRole === "ADMIN" && (
+              <Link
+                href="/admin/waivers"
+                className={buttonVariants({ variant: "ghost", size: "sm" })}
+              >
+                {t("adminLink")}
+              </Link>
+            )}
             <Link
               href="/account/security"
               className={buttonVariants({ variant: "ghost", size: "sm" })}

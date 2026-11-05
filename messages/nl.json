@@ -122,7 +122,8 @@
       "emptyTitle": "Nog geen fondsen",
       "emptyDescription": "Maak uw eerste fonds aan om te beginnen.",
       "create": "Fonds aanmaken",
-      "createAnother": "Nog een fonds aanmaken"
+      "createAnother": "Nog een fonds aanmaken",
+      "adminLink": "Platformbeheer"
     },
     "create": {
       "title": "Fonds aanmaken",
@@ -880,7 +881,8 @@
         "subscription": {
           "title": "Start je abonnement",
           "description": "Hosting op La Caisse kost {price} per maand, gefactureerd door Citizen Pay. Een eigenaar van het fonds aanvaardt het in Instellingen.",
-          "cta": "Bekijken en aanvaarden"
+          "cta": "Bekijken en aanvaarden",
+          "descriptionWaived": "Hosting is gratis voor deze kas."
         }
       },
       "tokenFallback": "tokens",
@@ -2652,7 +2654,8 @@
           "line1": "Het dashboard van je fonds en de pagina's voor leden en handelaars op La Caisse",
           "line2": "Uitgifte van tokens, kaarten en uitbetalingen aan handelaars via Citizen Pay",
           "line3": "Updates, back-ups en ondersteuning",
-          "billing": "Maandelijks gefactureerd door Citizen Pay op de onderstaande gegevens; de factuur kan per overschrijving of via open banking worden betaald. Op elk moment opzegbaar via Citizen Pay — de lopende maand blijft verschuldigd."
+          "billing": "Maandelijks gefactureerd door Citizen Pay op de onderstaande gegevens; de factuur kan per overschrijving of via open banking worden betaald. Op elk moment opzegbaar via Citizen Pay — de lopende maand blijft verschuldigd.",
+          "free": "Gratis voor deze kas"
         },
         "form": {
           "legalName": "Officiële naam",
@@ -2674,6 +2677,19 @@
           "description": "Citizen Pay factureert {price} per maand aan {email}. Wil je de factuurgegevens wijzigen, antwoord dan op de e-mail van je factuur.",
           "invoices": "Facturen op Citizen Pay"
         },
+        "waived": {
+          "title": "Hosting is gratis voor deze kas",
+          "since": "Sinds {date}",
+          "description": "Uw kas wordt op La Caisse gehost zonder maandelijks abonnement. Citizen Pay stuurt er geen facturen voor.",
+          "reason": "Reden"
+        },
+        "redeem": {
+          "title": "Hebt u een uitnodigingscode?",
+          "description": "Citizen Pay geeft codes aan kassen die gratis gehost worden — bijdragers, vzw's, scholen. Een code vervangt het abonnement.",
+          "label": "Uitnodigingscode",
+          "submit": "Code gebruiken",
+          "submitting": "Controleren…"
+        },
         "errors": {
           "legalNameMin": "De officiële naam moet minstens {min} tekens bevatten.",
           "legalNameMax": "De officiële naam mag hoogstens {max} tekens bevatten.",
@@ -2682,7 +2698,14 @@
           "addressMax": "Het factuuradres is te lang.",
           "vatInvalid": "Voer een geldig btw-nummer in (bv. BE0123456789) of laat het veld leeg.",
           "mustAccept": "Je moet akkoord gaan voordat je het abonnement start.",
-          "alreadyAccepted": "Het abonnement van dit fonds is al aanvaard."
+          "alreadyAccepted": "Het abonnement van dit fonds is al aanvaard.",
+          "waived": "Hosting is gratis voor deze kas — er is geen abonnement om te aanvaarden.",
+          "codeRequired": "Voer uw uitnodigingscode in.",
+          "codeInvalid": "Deze code is niet geldig. Controleer hem en probeer opnieuw.",
+          "codeExpired": "Deze code is verlopen. Vraag Citizen Pay om een nieuwe.",
+          "codeRevoked": "Deze code is niet meer geldig. Vraag Citizen Pay om een nieuwe.",
+          "codeExhausted": "Deze code is al gebruikt.",
+          "alreadyWaived": "Hosting is al gratis voor deze kas."
         },
         "email": {
           "confirmation": {
@@ -4066,6 +4089,56 @@
         "notFound": "Passkey niet gevonden.",
         "notAllowed": "Niet toegestaan.",
         "generic": "Er is iets misgegaan."
+      }
+    }
+  },
+  "admin": {
+    "title": "Platformbeheer",
+    "backToFunds": "Terug naar de kassen",
+    "waivers": {
+      "create": {
+        "title": "Nieuwe uitnodigingscode",
+        "description": "Maak een code voor een kas die gratis gehost wordt. De eigenaar gebruikt hem in Instellingen → Abonnement; de abonnementsstap is dan afgerond zonder betaling.",
+        "label": "Voor wie of waarom",
+        "labelHint": "Wordt aan de kas getoond als reden, bv. “Bijdrager: Alice” of “Geregistreerde vzw”.",
+        "maxUses": "Gebruik",
+        "maxUsesHint": "Hoeveel kassen hem mogen gebruiken (1–{max}).",
+        "expiresInDays": "Geldig (dagen)",
+        "expiresInDaysHint": "Leeg = verloopt nooit (max {max}).",
+        "submit": "Code aanmaken",
+        "submitting": "Aanmaken…",
+        "createdTitle": "Code aangemaakt voor “{label}”",
+        "createdHint": "Stuur hem naar de eigenaar van de kas. Hij blijft in de lijst hieronder staan.",
+        "copy": "Kopiëren",
+        "copied": "Gekopieerd"
+      },
+      "list": {
+        "title": "Uitnodigingscodes",
+        "description": "Alle aangemaakte codes, nieuwste eerst.",
+        "empty": "Nog geen codes.",
+        "code": "Code",
+        "label": "Voor wie of waarom",
+        "uses": "Gebruik",
+        "expires": "Verloopt",
+        "never": "Nooit",
+        "status": "Status",
+        "redeemedBy": "Gebruikt door"
+      },
+      "status": {
+        "active": "Actief",
+        "expired": "Verlopen",
+        "revoked": "Ingetrokken",
+        "exhausted": "Opgebruikt"
+      },
+      "revoke": "Intrekken",
+      "revoking": "Intrekken…",
+      "revokeConfirm": "Deze code intrekken? Kassen die hem al gebruikten blijven gratis.",
+      "errors": {
+        "labelMin": "Het label moet minstens {min} tekens lang zijn.",
+        "labelMax": "Het label mag hoogstens {max} tekens lang zijn.",
+        "maxUsesRange": "Gebruik moet een geheel getal tussen 1 en {maxUses} zijn.",
+        "expiresRange": "De geldigheid moet een geheel aantal dagen tussen 1 en {maxDays} zijn.",
+        "notFound": "Deze code bestaat niet meer."
       }
     }
   },

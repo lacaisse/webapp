@@ -69,6 +69,7 @@ export async function SetupChecklist() {
               price={price}
               urls={setup.urls}
               banking={setup.banking}
+              waived={setup.waived}
             />
           ))}
         </ol>
@@ -84,6 +85,7 @@ function StepRow({
   price,
   urls,
   banking,
+  waived,
 }: {
   step: SetupStep;
   index: number;
@@ -91,6 +93,7 @@ function StepRow({
   price: string;
   urls: CitizenPayDashboardUrls;
   banking: FundSetup["banking"];
+  waived: boolean;
 }) {
   const isDone = step.status === "done";
   const showCta = !isDone && step.status !== "blocked";
@@ -110,7 +113,7 @@ function StepRow({
         <div className={cn("min-w-0 space-y-0.5", isDone && "text-muted-foreground")}>
           <div className="font-medium">{stepTitle(step, t)}</div>
           <p className="text-sm text-muted-foreground">
-            {stepDescription(step, t, price, banking)}
+            {stepDescription(step, t, price, banking, waived)}
           </p>
         </div>
       </div>
@@ -140,6 +143,7 @@ function stepDescription(
   t: Translator,
   price: string,
   banking: FundSetup["banking"],
+  waived: boolean,
 ): string {
   switch (step.key) {
     case "citizenpay":
@@ -155,6 +159,9 @@ function stepDescription(
       }
       return t("banking.description");
     case "subscription":
+      // Done without an acceptance: a waiver code was redeemed, or a platform
+      // admin waived the fund. Don't quote a price it will never pay.
+      if (waived) return t("subscription.descriptionWaived");
       return t("subscription.description", { price });
   }
 }
