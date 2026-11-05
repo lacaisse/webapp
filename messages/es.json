@@ -42,8 +42,7 @@
       "passkeyButton": "Iniciar sesión con una clave de acceso",
       "passkeyWaiting": "Esperando la clave de acceso…",
       "passkeyEmailRequired": "Introduzca su correo electrónico para iniciar sesión con una clave de acceso.",
-      "waitlistPrompt": "¿Aún no tiene una cuenta?",
-      "joinWaitlist": "Unirse a la lista de espera",
+      "startFundPrompt": "¿Aún no tiene una cuenta?",
       "startFund": "Crear una caja"
     },
     "forgotPassword": {
@@ -4192,8 +4191,7 @@
       "features": "Funciones",
       "getStarted": "Empezar",
       "signIn": "Iniciar sesión",
-      "startFund": "Crear un fondo",
-      "joinWaitlist": "Unirse a la lista de espera"
+      "startFund": "Crear un fondo"
     },
     "hero": {
       "badge": "Código abierto · Multiinquilino · Alojado o autoalojado",
@@ -4219,7 +4217,6 @@
         "primaryColor": "Color principal",
         "tokenName": "Nombre del token",
         "tokenNameHelper": "Cómo se llama la moneda de tu fondo. En singular: del plural nos encargamos nosotros.",
-        "joinWaitlist": "Unirse a la lista de espera",
         "swatchHelperDefault": "el color predeterminado de la caisse.",
         "swatchHelperOther": "se usa en botones, resaltados y detalles.",
         "errors": {
@@ -4231,7 +4228,7 @@
           "tokenMultiWord": "Las palabras sueltas funcionan mejor: «solidarios» se lee mejor en un saldo que «créditos de alimentación»."
         },
         "startFund": "Crear una caja",
-        "notReadyWaitlist": "¿Aún no? Únase a la lista de espera"
+        "notReadyHowItWorks": "¿Aún no? Mira cómo funciona"
       },
       "swatches": {
         "terracotta": "Terracota",
@@ -4394,7 +4391,7 @@
           "step": "CAMINO 01",
           "label": "INSTANCIA OFICIAL",
           "title": "Alojado por Citizen Pay.",
-          "body": "Aprovisionamos tu fondo, nos ocupamos del alojamiento y las actualizaciones, y mantenemos la infraestructura. Tú te centras en tus miembros. 20 €/mes fijos, gratis para entidades sin ánimo de lucro y centros educativos registrados."
+          "body": "Aprovisionamos tu fondo, nos ocupamos del alojamiento y las actualizaciones, y mantenemos la infraestructura. Tú te centras en tus miembros. {price}/mes por fondo, sin IVA."
         },
         "path2": {
           "step": "CAMINO 02",
@@ -4502,10 +4499,8 @@
       "left": {
         "eyebrow": "Listos cuando tú lo estés",
         "title": "Crea un fondo en una tarde.",
-        "body": "Configura tu subdominio, invita a tus primeros miembros, da de alta a tus primeros comercios y proveedores. Lenguaje claro, valores predeterminados sensatos. 40 €/mes, gratis para entidades sin ánimo de lucro y centros educativos registrados.",
-        "ctaPrimary": "Crear un fondo",
-        "readyNow": "¿Listo para empezar?",
-        "readyNowCta": "Cree su caja ahora →"
+        "body": "Crea tu cuenta y tu fondo de una vez: subdominio, miembros, comercios y proveedores. Después, tu panel te guía paso a paso: registro en Citizen Pay, open banking y el alojamiento a {price}/mes.",
+        "cta": "Crear un fondo"
       },
       "right": {
         "eyebrow": "Para desarrolladores",
@@ -4514,13 +4509,6 @@
       }
     },
     "waitlist": {
-      "emailLabel": "Correo electrónico",
-      "emailPlaceholder": "tu@ejemplo.com",
-      "fundNameLabel": "¿Cómo llamarías a tu fondo? (opcional)",
-      "fundNamePlaceholder": "Caisse de Saint-Gilles",
-      "submit": "Solicitar una invitación",
-      "submitting": "Inscribiendo…",
-      "successTitle": "Estás en la lista.",
       "successBody": "Gracias. Te escribiremos en cuanto tu invitación esté lista.",
       "errors": {
         "fundNameMax": "No superes los {max} caracteres."

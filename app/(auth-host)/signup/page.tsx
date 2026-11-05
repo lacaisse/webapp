@@ -35,11 +35,11 @@ export default async function SignupPage({
     );
   }
 
-  // Self-serve account creation is closed — visitors join the waitlist instead.
-  // Invited users arrive with a `return_to` (e.g. a team-invite accept URL);
-  // only they get the create-account form.
+  // There is no sign-up of its own: an account is made by starting a fund at
+  // the apex /join door. Invited users arrive with a `return_to` (e.g. a
+  // team-invite accept URL); only they get the create-account form.
   if (!return_to) {
-    redirect(getApexUrl("/#get-started"));
+    redirect(getApexUrl("/join"));
   }
 
   const t = await getTranslations("auth.signup");
