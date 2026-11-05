@@ -2,12 +2,13 @@
 import { APIError } from "better-auth/api";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// Pins joinWithCodeAction (the apex /join door): shape errors before any read,
-// one vague answer for an unusable code, and the one transaction — claim a
-// use, User + credential Account, the fund waived and marked created-with —
-// with each race answered: the code's last use gone meanwhile, the email
-// taken meanwhile (answered by email, never on screen), the subdomain taken
-// meanwhile. The IP budget is spent only by submits that end.
+// Pins joinAction (the apex /join door): shape errors before any read, the
+// one transaction — User + credential Account, the fund — with or without a
+// code (with one: a use claimed first, the fund waived and marked
+// created-with; one vague answer for an unusable code), and each race
+// answered: the code's last use gone meanwhile, the email taken meanwhile
+// (answered by email, never on screen), the subdomain taken meanwhile. The
+// IP budget is spent only by submits that end.
 vi.mock("server-only", () => ({}));
 
 const {
@@ -17,6 +18,7 @@ const {
   allowJoinSubmit,
   countJoinSubmit,
   allowExistingAccountEmail,
+  lookupJoinCode,
   sendJoinExistingAccountEmail,
   signInEmail,
   sendVerificationEmail,
@@ -42,6 +44,7 @@ const {
     allowJoinSubmit: vi.fn(),
     countJoinSubmit: vi.fn(),
     allowExistingAccountEmail: vi.fn(),
+    lookupJoinCode: vi.fn(),
     sendJoinExistingAccountEmail: vi.fn(),
     signInEmail: vi.fn(),
     sendVerificationEmail: vi.fn(),
@@ -72,10 +75,15 @@ vi.mock("@/services/token/minter", () => ({
 vi.mock("@/services/host/server", () => ({
   getAuthUrl: (path: string) => `http://auth.localhost:3000${path}`,
 }));
-vi.mock("./join", () => ({ allowJoinSubmit, countJoinSubmit, allowExistingAccountEmail }));
+vi.mock("./join", () => ({
+  allowJoinSubmit,
+  countJoinSubmit,
+  allowExistingAccountEmail,
+  lookupJoinCode,
+}));
 vi.mock("./join-emails", () => ({ sendJoinExistingAccountEmail }));
 
-import { joinWithCodeAction } from "./join-actions";
+import { checkJoinCodeAction, joinAction } from "./join-actions";
 
 const activeCode = {
   id: "code-1",
@@ -87,18 +95,20 @@ const activeCode = {
   revokedAt: null,
 };
 
-const VALID = {
+const WITH_CODE = {
   code: "7k3p-m2qx-9rtd",
   email: " Alice@Example.org ",
   password: "correct horse",
   name: "La Class",
   subdomain: "laclass",
 };
+const NO_CODE = { ...WITH_CODE, code: "" };
 
 const DASHBOARD = "http://laclass.localhost:3000/dashboard";
-const SIGN_IN_URL =
-  "http://auth.localhost:3000/login?return_to=" +
-  encodeURIComponent("http://localhost:3000/new?code=" + encodeURIComponent("7K3P-M2QX-9RTD"));
+const signInUrlTo = (path: string) =>
+  "http://auth.localhost:3000/login?return_to=" + encodeURIComponent(`http://localhost:3000${path}`);
+const SIGN_IN_URL_WITH_CODE = signInUrlTo("/new?code=" + encodeURIComponent("7K3P-M2QX-9RTD"));
+const SIGN_IN_URL_NO_CODE = signInUrlTo("/new");
 
 function uniqueViolation(target: string[]) {
   return Object.assign(new Error("Unique constraint failed"), { code: "P2002", meta: { target } });
@@ -125,21 +135,40 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("joinWithCodeAction", () => {
+describe("checkJoinCodeAction", () => {
+  it("is the page's never-consuming lookup, for the form's field", async () => {
+    lookupJoinCode.mockResolvedValue({ kind: "ok", code: "7K3P-M2QX-9RTD", label: "Contributor: Alice" });
+    expect(await checkJoinCodeAction(" 7k3p m2qx 9rtd ")).toEqual({
+      kind: "ok",
+      code: "7K3P-M2QX-9RTD",
+      label: "Contributor: Alice",
+    });
+    expect(lookupJoinCode).toHaveBeenCalledWith(" 7k3p m2qx 9rtd ");
+    expect(tx.subscriptionWaiverCode.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("treats anything but a string as nothing typed", async () => {
+    lookupJoinCode.mockResolvedValue({ kind: "invalid" });
+    expect(await checkJoinCodeAction(42 as unknown as string)).toEqual({ kind: "invalid" });
+    expect(lookupJoinCode).toHaveBeenCalledWith("");
+  });
+});
+
+describe("joinAction", () => {
   it("refuses a malformed submit before counting or reading anything", async () => {
-    expect(await joinWithCodeAction({ ...VALID, code: "nope" })).toEqual({
+    expect(await joinAction({ ...WITH_CODE, code: "nope" })).toEqual({
       error: "join.errors.codeInvalid",
       field: "code",
     });
-    expect(await joinWithCodeAction({ ...VALID, email: "not-an-email" })).toEqual({
+    expect(await joinAction({ ...NO_CODE, email: "not-an-email" })).toEqual({
       error: "auth.errors.emailInvalid",
       field: "email",
     });
-    expect(await joinWithCodeAction({ ...VALID, password: "short" })).toEqual({
+    expect(await joinAction({ ...NO_CODE, password: "short" })).toEqual({
       error: "auth.errors.passwordMin",
       field: "password",
     });
-    expect(await joinWithCodeAction({ ...VALID, subdomain: "admin" })).toEqual({
+    expect(await joinAction({ ...NO_CODE, subdomain: "admin" })).toEqual({
       error: "funds.create.errors.subdomainReserved",
       field: "subdomain",
     });
@@ -150,10 +179,13 @@ describe("joinWithCodeAction", () => {
 
   it("refuses when the attempt limits say so, before any read and without counting", async () => {
     allowJoinSubmit.mockResolvedValue(false);
-    expect(await joinWithCodeAction(VALID)).toEqual({ error: "join.errors.tooMany" });
+    expect(await joinAction(WITH_CODE)).toEqual({ error: "join.errors.tooMany" });
     expect(allowJoinSubmit).toHaveBeenCalledWith("7K3PM2QX9RTD");
+    expect(await joinAction(NO_CODE)).toEqual({ error: "join.errors.tooMany" });
+    expect(allowJoinSubmit).toHaveBeenLastCalledWith(null);
     expect(countJoinSubmit).not.toHaveBeenCalled();
     expect(prisma.subscriptionWaiverCode.findUnique).not.toHaveBeenCalled();
+    expect(transaction).not.toHaveBeenCalled();
   });
 
   it("gives one answer for an unknown, revoked, expired or used-up code, and counts it", async () => {
@@ -164,7 +196,7 @@ describe("joinWithCodeAction", () => {
       { ...activeCode, usedCount: 1 },
     ]) {
       prisma.subscriptionWaiverCode.findUnique.mockResolvedValueOnce(row);
-      expect(await joinWithCodeAction(VALID)).toEqual({
+      expect(await joinAction(WITH_CODE)).toEqual({
         error: "join.errors.codeInvalid",
         field: "code",
       });
@@ -174,24 +206,18 @@ describe("joinWithCodeAction", () => {
   });
 
   it("never reads whether the address has an account before writing", async () => {
-    await joinWithCodeAction(VALID);
+    await joinAction(WITH_CODE);
+    await joinAction(NO_CODE);
     expect(prisma.user.findFirst).not.toHaveBeenCalled();
   });
 
-  it("claims a use, creates the account and the fund waived in one transaction, then verifies and hands over", async () => {
-    const result = await joinWithCodeAction(VALID);
+  it("without a code: creates the account and the fund, not waived, in one transaction, then verifies and hands over", async () => {
+    const result = await joinAction(NO_CODE);
 
     expect(result).toEqual({ ok: true, redirectTo: `EXCHANGE(${DASHBOARD})` });
+    expect(prisma.subscriptionWaiverCode.findUnique).not.toHaveBeenCalled();
     expect(transaction).toHaveBeenCalledTimes(1);
-    expect(tx.subscriptionWaiverCode.updateMany).toHaveBeenCalledWith({
-      where: {
-        id: "code-1",
-        revokedAt: null,
-        usedCount: { lt: 1 },
-        OR: [{ expiresAt: null }, { expiresAt: { gt: expect.any(Date) } }],
-      },
-      data: { usedCount: { increment: 1 } },
-    });
+    expect(tx.subscriptionWaiverCode.updateMany).not.toHaveBeenCalled();
     expect(tx.user.create).toHaveBeenCalledWith({
       data: { email: "alice@example.org", name: "alice", emailVerified: false },
       select: { id: true },
@@ -213,16 +239,11 @@ describe("joinWithCodeAction", () => {
       tokenMinterPrivateKeyEnc: "v2:enc",
       tokenMinterEoaAddress: "0xEOA",
       staff: { create: { userId: "user-1", role: "OWNER" } },
-      subscriptionWaivedAt: expect.any(Date),
-      subscriptionWaiverReason: "Contributor: Alice",
-      subscriptionWaiverCodeId: "code-1",
-      createdWithWaiverCodeId: "code-1",
     });
+    expect(data.subscriptionWaivedAt).toBeUndefined();
+    expect(data.subscriptionWaiverCodeId).toBeUndefined();
+    expect(data.createdWithWaiverCodeId).toBeUndefined();
     expect(data.tiers.create.name).toBe("Standard");
-
-    // The claim and the waiver share one clock.
-    const claimedAt = tx.subscriptionWaiverCode.updateMany.mock.calls[0][0].where.OR[1].expiresAt.gt;
-    expect(data.subscriptionWaivedAt).toEqual(claimedAt);
 
     expect(countJoinSubmit).toHaveBeenCalledTimes(1);
     expect(registerFundMcpResource).toHaveBeenCalledWith({
@@ -230,7 +251,6 @@ describe("joinWithCodeAction", () => {
       name: "La Class",
       domain: "laclass.lacaisse.eu",
     });
-    // The verification link comes back to the dashboard the exchange lands on.
     expect(sendVerificationEmail).toHaveBeenCalledWith({
       body: { email: "alice@example.org", callbackURL: DASHBOARD },
       headers: expect.any(Headers),
@@ -244,13 +264,60 @@ describe("joinWithCodeAction", () => {
       email: "alice@example.org",
       returnTo: DASHBOARD,
     });
+    // Nothing of the admin's code list changed.
+    expect(revalidatePath).not.toHaveBeenCalled();
+    expect(sendJoinExistingAccountEmail).not.toHaveBeenCalled();
+  });
+
+  it("with a code: claims a use, creates the account and the fund waived in one transaction, then verifies and hands over", async () => {
+    const result = await joinAction(WITH_CODE);
+
+    expect(result).toEqual({ ok: true, redirectTo: `EXCHANGE(${DASHBOARD})` });
+    expect(transaction).toHaveBeenCalledTimes(1);
+    expect(tx.subscriptionWaiverCode.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: "code-1",
+        revokedAt: null,
+        usedCount: { lt: 1 },
+        OR: [{ expiresAt: null }, { expiresAt: { gt: expect.any(Date) } }],
+      },
+      data: { usedCount: { increment: 1 } },
+    });
+    expect(tx.user.create).toHaveBeenCalledTimes(1);
+    expect(tx.account.create).toHaveBeenCalledTimes(1);
+    const data = tx.fund.create.mock.calls[0][0].data;
+    expect(data).toMatchObject({
+      name: "La Class",
+      domain: "laclass.lacaisse.eu",
+      staff: { create: { userId: "user-1", role: "OWNER" } },
+      subscriptionWaivedAt: expect.any(Date),
+      subscriptionWaiverReason: "Contributor: Alice",
+      subscriptionWaiverCodeId: "code-1",
+      createdWithWaiverCodeId: "code-1",
+    });
+
+    // The claim and the waiver share one clock.
+    const claimedAt = tx.subscriptionWaiverCode.updateMany.mock.calls[0][0].where.OR[1].expiresAt.gt;
+    expect(data.subscriptionWaivedAt).toEqual(claimedAt);
+
+    expect(countJoinSubmit).toHaveBeenCalledTimes(1);
+    // The verification link comes back to the dashboard the exchange lands on.
+    expect(sendVerificationEmail).toHaveBeenCalledWith({
+      body: { email: "alice@example.org", callbackURL: DASHBOARD },
+      headers: expect.any(Headers),
+    });
+    expect(buildPostAuthRedirect).toHaveBeenCalledWith({
+      userId: "user-1",
+      email: "alice@example.org",
+      returnTo: DASHBOARD,
+    });
     expect(revalidatePath).toHaveBeenCalledWith("/admin/waivers");
     expect(sendJoinExistingAccountEmail).not.toHaveBeenCalled();
   });
 
   it("answers like a wrong code when the code's last use went to someone else meanwhile, and counts it", async () => {
     tx.subscriptionWaiverCode.updateMany.mockResolvedValue({ count: 0 });
-    expect(await joinWithCodeAction(VALID)).toEqual({
+    expect(await joinAction(WITH_CODE)).toEqual({
       error: "join.errors.codeInvalid",
       field: "code",
     });
@@ -262,12 +329,12 @@ describe("joinWithCodeAction", () => {
 
   it("answers an address that has an account by email, with the same screen as any email (the claim rolls back)", async () => {
     tx.user.create.mockRejectedValue(uniqueViolation(["email"]));
-    expect(await joinWithCodeAction(VALID)).toEqual({ ok: true, sentTo: "alice@example.org" });
+    expect(await joinAction(WITH_CODE)).toEqual({ ok: true, sentTo: "alice@example.org" });
     // The real $transaction rolls the claimed use back with the throw; here
     // the mock surfaces it as the rejection the action catches.
     expect(sendJoinExistingAccountEmail).toHaveBeenCalledWith({
       email: "alice@example.org",
-      signInUrl: SIGN_IN_URL,
+      signInUrl: SIGN_IN_URL_WITH_CODE,
     });
     expect(countJoinSubmit).toHaveBeenCalledTimes(1);
     expect(tx.fund.create).not.toHaveBeenCalled();
@@ -275,10 +342,19 @@ describe("joinWithCodeAction", () => {
     expect(sendVerificationEmail).not.toHaveBeenCalled();
   });
 
+  it("sends that email's sign-in link back to a plain /new when no code was used", async () => {
+    tx.user.create.mockRejectedValue(uniqueViolation(["email"]));
+    expect(await joinAction(NO_CODE)).toEqual({ ok: true, sentTo: "alice@example.org" });
+    expect(sendJoinExistingAccountEmail).toHaveBeenCalledWith({
+      email: "alice@example.org",
+      signInUrl: SIGN_IN_URL_NO_CODE,
+    });
+  });
+
   it("says the same when that address was already emailed a moment ago, without a second email", async () => {
     tx.user.create.mockRejectedValue(uniqueViolation(["email"]));
     allowExistingAccountEmail.mockReturnValue(false);
-    expect(await joinWithCodeAction(VALID)).toEqual({ ok: true, sentTo: "alice@example.org" });
+    expect(await joinAction(WITH_CODE)).toEqual({ ok: true, sentTo: "alice@example.org" });
     expect(sendJoinExistingAccountEmail).not.toHaveBeenCalled();
   });
 
@@ -286,13 +362,13 @@ describe("joinWithCodeAction", () => {
     tx.user.create.mockRejectedValue(uniqueViolation(["email"]));
     sendJoinExistingAccountEmail.mockRejectedValue(new Error("resend down"));
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
-    expect(await joinWithCodeAction(VALID)).toEqual({ ok: true, sentTo: "alice@example.org" });
+    expect(await joinAction(NO_CODE)).toEqual({ ok: true, sentTo: "alice@example.org" });
     expect(error).toHaveBeenCalled();
   });
 
   it("names the subdomain when it got taken meanwhile, spending nothing of the IP budget", async () => {
     tx.fund.create.mockRejectedValue(uniqueViolation(["domain"]));
-    expect(await joinWithCodeAction(VALID)).toEqual({
+    expect(await joinAction(NO_CODE)).toEqual({
       error: "funds.create.errors.subdomainTaken",
       field: "subdomain",
     });
@@ -303,18 +379,18 @@ describe("joinWithCodeAction", () => {
 
   it("lets any other failure surface", async () => {
     tx.fund.create.mockRejectedValue(new Error("connection reset"));
-    await expect(joinWithCodeAction(VALID)).rejects.toThrow("connection reset");
+    await expect(joinAction(NO_CODE)).rejects.toThrow("connection reset");
   });
 
   it("still hands over when the verification email or the apex sign-in fails", async () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     sendVerificationEmail.mockRejectedValue(new APIError("BAD_REQUEST", { message: "no sender" }));
-    expect(await joinWithCodeAction(VALID)).toEqual({ ok: true, redirectTo: `EXCHANGE(${DASHBOARD})` });
+    expect(await joinAction(NO_CODE)).toEqual({ ok: true, redirectTo: `EXCHANGE(${DASHBOARD})` });
     sendVerificationEmail.mockRejectedValue(new Error("RESEND_API_KEY is not set"));
-    expect(await joinWithCodeAction(VALID)).toEqual({ ok: true, redirectTo: `EXCHANGE(${DASHBOARD})` });
+    expect(await joinAction(NO_CODE)).toEqual({ ok: true, redirectTo: `EXCHANGE(${DASHBOARD})` });
     sendVerificationEmail.mockResolvedValue({ status: true });
     signInEmail.mockRejectedValue(new APIError("UNAUTHORIZED", { message: "nope" }));
-    expect(await joinWithCodeAction(VALID)).toEqual({ ok: true, redirectTo: `EXCHANGE(${DASHBOARD})` });
+    expect(await joinAction(NO_CODE)).toEqual({ ok: true, redirectTo: `EXCHANGE(${DASHBOARD})` });
     expect(error).toHaveBeenCalledTimes(3);
   });
 });

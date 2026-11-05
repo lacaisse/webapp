@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// createFundAction with and without a waiver code (/new?code=): the gate's
-// decision is asked with the code, a usable one is claimed and the fund
-// created waived in one transaction, and the code's last use going elsewhere
-// meanwhile reads like a wrong code — a newcomer whose only key was the code
-// gets those words, not /unauthorized.
+// createFundAction with and without a waiver code (/new?code=): any signed-in
+// account may open a fund; a usable code is claimed and the fund created
+// waived in one transaction, and the code's last use going elsewhere
+// meanwhile reads like a wrong code.
 vi.mock("server-only", () => ({}));
 
-const { prisma, tx, transaction, fundCreatorAccess, redirect, revalidatePath, registerFundMcpResource } = vi.hoisted(() => {
+const { prisma, tx, transaction, requireUser, revalidatePath, registerFundMcpResource } = vi.hoisted(() => {
   const tx = { subscriptionWaiverCode: { updateMany: vi.fn() }, fund: { create: vi.fn() } };
   const transaction = vi.fn();
   return {
@@ -19,22 +18,18 @@ const { prisma, tx, transaction, fundCreatorAccess, redirect, revalidatePath, re
       subscriptionWaiverCode: { findUnique: vi.fn() },
       $transaction: transaction,
     },
-    fundCreatorAccess: vi.fn(),
-    redirect: vi.fn((url: string) => {
-      throw new Error(`REDIRECT:${url}`);
-    }),
+    requireUser: vi.fn(),
     revalidatePath: vi.fn(),
     registerFundMcpResource: vi.fn(),
   };
 });
 
 vi.mock("next/cache", () => ({ revalidatePath }));
-vi.mock("next/navigation", () => ({ redirect }));
 vi.mock("next-intl/server", () => ({
   getTranslations: async () => (key: string) => key,
   getLocale: async () => "en",
 }));
-vi.mock("@/services/auth/dal", () => ({ fundCreatorAccess }));
+vi.mock("@/services/auth/dal", () => ({ requireUser }));
 vi.mock("@/services/db/prisma", () => ({ prisma }));
 vi.mock("@/services/mcp/auth", () => ({ registerFundMcpResource }));
 vi.mock("@/services/token/minter", () => ({
@@ -57,7 +52,9 @@ const created = { id: "fund-1", name: "Acme", domain: "acme.lacaisse.eu" };
 
 beforeEach(() => {
   vi.clearAllMocks();
-  fundCreatorAccess.mockResolvedValue({ user: { id: "user-1", globalRole: "USER" }, access: "staff" });
+  // A plain account: no staff row anywhere, no platform role — a card
+  // holder's member login looks exactly like this.
+  requireUser.mockResolvedValue({ id: "user-1", globalRole: "USER" });
   prisma.fund.create.mockResolvedValue(created);
   prisma.subscriptionWaiverCode.findUnique.mockResolvedValue(activeCode);
   transaction.mockImplementation(async (fn: (client: typeof tx) => Promise<unknown>) => fn(tx));
@@ -66,10 +63,10 @@ beforeEach(() => {
 });
 
 describe("createFundAction", () => {
-  it("without a code: asks the gate with none and writes the fund outside a transaction, not waived", async () => {
+  it("without a code: any signed-in account writes the fund outside a transaction, not waived", async () => {
     const result = await createFundAction({ name: "Acme", subdomain: "acme" });
     expect(result).toEqual({ ok: true, redirectTo: "http://acme.lacaisse.eu" });
-    expect(fundCreatorAccess).toHaveBeenCalledWith(undefined);
+    expect(requireUser).toHaveBeenCalled();
     expect(transaction).not.toHaveBeenCalled();
     const data = prisma.fund.create.mock.calls[0][0].data;
     expect(data).toMatchObject({
@@ -81,12 +78,19 @@ describe("createFundAction", () => {
     expect(data.subscriptionWaivedAt).toBeUndefined();
     expect(data.createdWithWaiverCodeId).toBeUndefined();
     expect(registerFundMcpResource).toHaveBeenCalledWith(created);
+    expect(revalidatePath).not.toHaveBeenCalled();
   });
 
-  it("with a code: asks the gate with it, claims a use and creates the fund waived in one transaction", async () => {
+  it("is for signed-in accounts only: the gate's redirect to sign in surfaces before any read", async () => {
+    requireUser.mockRejectedValue(new Error("REDIRECT:/login"));
+    await expect(createFundAction({ name: "Acme", subdomain: "acme" })).rejects.toThrow("REDIRECT:/login");
+    expect(prisma.subscriptionWaiverCode.findUnique).not.toHaveBeenCalled();
+    expect(prisma.fund.create).not.toHaveBeenCalled();
+  });
+
+  it("with a code: claims a use and creates the fund waived in one transaction", async () => {
     const result = await createFundAction({ name: "Acme", subdomain: "acme", code: "7k3p-m2qx-9rtd" });
     expect(result).toEqual({ ok: true, redirectTo: "http://acme.lacaisse.eu" });
-    expect(fundCreatorAccess).toHaveBeenCalledWith("7k3p-m2qx-9rtd");
     expect(prisma.subscriptionWaiverCode.findUnique).toHaveBeenCalledWith({ where: { code: "7K3PM2QX9RTD" } });
     expect(transaction).toHaveBeenCalledTimes(1);
     expect(tx.subscriptionWaiverCode.updateMany).toHaveBeenCalledWith({
@@ -125,19 +129,6 @@ describe("createFundAction", () => {
     });
     expect(tx.fund.create).not.toHaveBeenCalled();
     expect(registerFundMcpResource).not.toHaveBeenCalled();
-  });
-
-  it("tells a newcomer whose code stopped being usable the wrong-code words, not /unauthorized", async () => {
-    fundCreatorAccess.mockResolvedValue({ user: { id: "user-9", globalRole: "USER" }, access: null });
-    expect(await createFundAction({ name: "Acme", subdomain: "acme", code: activeCode.code })).toEqual({
-      error: "join.errors.codeInvalid",
-    });
-    expect(redirect).not.toHaveBeenCalled();
-    expect(transaction).not.toHaveBeenCalled();
-    // Without any code, the gate's refusal is still /unauthorized.
-    await expect(createFundAction({ name: "Acme", subdomain: "acme" })).rejects.toThrow(
-      "REDIRECT:/unauthorized",
-    );
   });
 
   it("names the subdomain when it is taken, with or without a code", async () => {

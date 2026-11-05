@@ -46,9 +46,9 @@ const RESERVED_HOSTS = new Set(["www", "api", "admin", "app"]);
 const MEMBER_PAGE_SEGMENTS = new Set(["login", "signup", "forgot", "reset", "account"]);
 const MEMBER_PAGE_PREFIX = "/member";
 
-// The apex `/join` — the invite-code door (app/(apex)/start, services/fund-
-// setup/join.ts): a holder of a subscription waiver code creates their
-// account and their fund in one go. The path is the member sign-up's on fund
+// The apex `/join` — "Start your fund" (app/(apex)/start, services/fund-
+// setup/join.ts): anyone creates their account and their fund in one go, an
+// invite code optional. The path is the member sign-up's on fund
 // hosts (app/(fund-public)/join) and Next refuses two route groups resolving
 // to one URL, so the page lives at `/start` and the proxy rewrites `/join`
 // there on the apex only — the browser keeps the short URL, like the member

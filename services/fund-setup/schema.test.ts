@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   AcceptSubscriptionSchema,
   CreateWaiverCodeSchema,
-  JoinWithCodeSchema,
+  JoinSchema,
   PASSWORD_MIN_LENGTH,
   RedeemWaiverCodeSchema,
   WAIVER_EXPIRES_DAYS_MAX,
@@ -146,7 +146,7 @@ describe("CreateWaiverCodeSchema", () => {
   });
 });
 
-describe("JoinWithCodeSchema", () => {
+describe("JoinSchema", () => {
   const VALID = {
     code: "7k3p-m2qx-9rtd",
     email: " Alice@Example.org ",
@@ -155,19 +155,25 @@ describe("JoinWithCodeSchema", () => {
     subdomain: "laclass",
   };
   const firstError = (input: Partial<typeof VALID>) => {
-    const result = JoinWithCodeSchema.safeParse({ ...VALID, ...input });
+    const result = JoinSchema.safeParse({ ...VALID, ...input });
     return result.success ? null : result.error.issues[0];
   };
 
   it("normalises the code and stores the email lowercase and trimmed", () => {
-    const parsed = JoinWithCodeSchema.parse(VALID);
+    const parsed = JoinSchema.parse(VALID);
     expect(parsed.code).toBe("7K3PM2QX9RTD");
     expect(parsed.email).toBe("alice@example.org");
     expect(parsed).toMatchObject({ name: "La Class", subdomain: "laclass" });
   });
 
-  it("uses the public door's words for the code", () => {
-    expect(firstError({ code: "" })).toMatchObject({ path: ["code"], message: "join.errors.codeRequired" });
+  it("takes no code at all: absent, empty or only separators mean none", () => {
+    const { email, password, name, subdomain } = VALID;
+    expect(JoinSchema.parse({ email, password, name, subdomain }).code).toBeUndefined();
+    expect(JoinSchema.parse({ ...VALID, code: "" }).code).toBeUndefined();
+    expect(JoinSchema.parse({ ...VALID, code: " - " }).code).toBeUndefined();
+  });
+
+  it("uses the public door's words for a code that has no code's shape", () => {
     expect(firstError({ code: "7K3P-M2QX" })).toMatchObject({ path: ["code"], message: "join.errors.codeInvalid" });
   });
 

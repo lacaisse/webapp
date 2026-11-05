@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import type { Metadata } from "next";
-import { getTranslations } from "next-intl/server";
+import { getFormatter, getTranslations } from "next-intl/server";
 import { headers } from "next/headers";
 import Image from "next/image";
-import Link from "next/link";
 import { permanentRedirect, redirect } from "next/navigation";
 
 import { LocaleSwitcher } from "@/components/locale-switcher";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Card,
   CardContent,
@@ -18,23 +16,25 @@ import {
 } from "@/components/ui/card";
 import { getCurrentUser } from "@/services/auth/dal";
 import { getApexUrl } from "@/services/fund/server";
+import { SUBSCRIPTION_MONTHLY_EUR } from "@/services/fund-setup/config";
 import { lookupJoinCode } from "@/services/fund-setup/join";
 import { getAuthUrl } from "@/services/host/server";
 
-import { CodeForm } from "./code-form";
-import { JoinForm } from "./join-form";
+import { JoinForm, type JoinFormCode } from "./join-form";
 
 // Public, reached as /join on the apex (proxy.ts rewrites it here — see
 // APEX_JOIN_PATH there; the path itself is the member sign-up's on fund
-// hosts). A person who holds a subscription waiver code creates their account
-// and their fund in one go, waived from the start; the door's rules are in
+// hosts). "Start your fund": anyone creates their account and their fund in
+// one go; the dashboard's setup checklist then asks for the Citizen Pay
+// registration, open banking and the hosting subscription. An invite code is
+// the one extra — "I have an invite code" inside the form — and waives the
+// subscription from the start; the door's rules are in
 // services/fund-setup/join.ts.
 //
-// Three states, all from the URL so back/forward and a shared link work:
-// no code → the code field; a code that doesn't check out → the field with
-// the (deliberately vague) reason; a usable code → the account + fund form.
-// A signed-in visitor with a usable code is sent to /new?code=, where the
-// gate accepts the code and the fund is created on the account they have.
+// ?code= is a shared link (an admin hands the holder /join?code=…): the code
+// is checked here, never consumed, and the form opens with the verdict. A
+// signed-in visitor is sent to /new, where the fund goes on the account they
+// have (the code along, as typed; /new checks it again).
 //
 // ?code= carries the invite code, so no Referer leaves this page.
 export const metadata: Metadata = { referrer: "no-referrer" };
@@ -52,46 +52,36 @@ export default async function JoinPage({
 
   const params = await searchParams;
   const raw = typeof params.code === "string" ? params.code.trim() : "";
-  const t = await getTranslations("join");
 
-  let body: React.ReactNode;
-  // Where the footer's "Sign in" comes back to: /new with the code once it
-  // checked out (the gate there accepts it), the apex otherwise.
-  let returnTo = getApexUrl("/");
+  const user = await getCurrentUser();
+  if (user) redirect(raw ? `/new?code=${encodeURIComponent(raw)}` : "/new");
 
-  if (!raw) {
-    body = <CodeForm />;
-  } else {
+  const [t, format] = await Promise.all([getTranslations("join"), getFormatter()]);
+  const price = format.number(SUBSCRIPTION_MONTHLY_EUR, {
+    style: "currency",
+    currency: "EUR",
+    maximumFractionDigits: 0,
+  });
+
+  // Where the footer's "Sign in" comes back to: /new, with the code once it
+  // checked out (the gate there accepts it).
+  let initialCode: JoinFormCode | undefined;
+  let newFundPath = "/new";
+  if (raw) {
     const lookup = await lookupJoinCode(raw);
     if (lookup.kind === "ok") {
-      const newFundPath = `/new?code=${encodeURIComponent(lookup.code)}`;
-      const user = await getCurrentUser();
-      if (user) redirect(newFundPath);
-      returnTo = getApexUrl(newFundPath);
-      body = (
-        <div className="space-y-5">
-          <Alert>
-            <AlertDescription>{t("codeAccepted", { label: lookup.label })}</AlertDescription>
-          </Alert>
-          <JoinForm code={lookup.code} />
-          <p className="text-center text-sm">
-            <Link href="/join" className="text-muted-foreground underline">
-              {t("changeCode")}
-            </Link>
-          </p>
-        </div>
-      );
+      initialCode = { value: lookup.code, label: lookup.label };
+      newFundPath = `/new?code=${encodeURIComponent(lookup.code)}`;
     } else {
-      body = (
-        <CodeForm
-          code={raw}
-          error={t(lookup.kind === "too_many" ? "errors.tooMany" : "errors.codeInvalid")}
-        />
-      );
+      initialCode = {
+        value: raw,
+        error: t(lookup.kind === "too_many" ? "errors.tooMany" : "errors.codeInvalid"),
+      };
     }
   }
-
-  const loginHref = getAuthUrl(`/login?return_to=${encodeURIComponent(returnTo)}`);
+  const loginHref = getAuthUrl(
+    `/login?return_to=${encodeURIComponent(getApexUrl(newFundPath))}`,
+  );
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center bg-muted/40 px-4 py-12">
@@ -107,20 +97,16 @@ export default async function JoinPage({
         <Card>
           <CardHeader>
             <CardTitle>{t("title")}</CardTitle>
-            <CardDescription>{t("description")}</CardDescription>
+            <CardDescription>{t("description", { price })}</CardDescription>
           </CardHeader>
-          <CardContent>{body}</CardContent>
-          <CardFooter className="flex-col items-start gap-1.5 text-sm text-muted-foreground">
+          <CardContent>
+            <JoinForm initialCode={initialCode} />
+          </CardContent>
+          <CardFooter className="text-sm text-muted-foreground">
             <span>
               {t("haveAccount")}&nbsp;
               <a href={loginHref} className="text-foreground underline">
                 {t("signIn")}
-              </a>
-            </span>
-            <span>
-              {t("noCode")}&nbsp;
-              <a href={getApexUrl("/#get-started")} className="text-foreground underline">
-                {t("joinWaitlist")}
               </a>
             </span>
           </CardFooter>

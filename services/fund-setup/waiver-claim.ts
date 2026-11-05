@@ -14,9 +14,8 @@ import {
 // The two database halves of using a subscription waiver code, shared by every
 // door a code opens: Settings → Subscription (admin-actions.ts::
 // redeemWaiverCodeAction), the apex /join page (join-actions.ts) and
-// /new?code= (services/fund/actions.ts, gated by services/auth/dal.ts::
-// requireFundCreator). The pure rules — shape, normalisation, state — stay in
-// waiver-codes.ts.
+// /new?code= (services/fund/actions.ts). The pure rules — shape,
+// normalisation, state — stay in waiver-codes.ts.
 
 /**
  * The code a person typed, if it can be used right now: well-formed once

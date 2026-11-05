@@ -8,13 +8,16 @@ import { findUsableWaiverCode } from "./waiver-claim";
 import { formatWaiverCode } from "./waiver-codes";
 
 // The apex /join door (app/(apex)/start — proxy.ts rewrites /join there on
-// the apex): a person who holds a subscription waiver code creates their
-// account and their fund in one go, waived from the start, without anyone
-// creating the fund and inviting them first. The code is the invite. It is
-// admin-minted, limited in uses, expiring and revocable (waiver-codes.ts), so
-// this door treats it like the staff-invite token: checked without being
-// consumed when the page opens, claimed inside the transaction that creates
-// the account and the fund (join-actions.ts).
+// the apex): anyone creates their account and their fund in one go. The fund
+// starts the way one opened from /new does — unsettled, with the dashboard's
+// setup checklist asking for the Citizen Pay registration, open banking and
+// the hosting subscription. The one extra is an invite code ("I have an
+// invite code"): a subscription waiver code, admin-minted, limited in uses,
+// expiring and revocable (waiver-codes.ts), waives the subscription from the
+// start. It is treated like the staff-invite token: checked without being
+// consumed when the page opens with ?code= (a shared link) or when the field
+// is filled in, claimed inside the transaction that creates the account and
+// the fund (join-actions.ts).
 //
 // Posture of a public page:
 //   - one answer for every unusable code. Unknown, revoked, expired and used
@@ -22,7 +25,7 @@ import { formatWaiverCode } from "./waiver-codes";
 //     the page never confirms that a guessed code exists. Sixty random bits
 //     make guessing hopeless anyway; this keeps the error text from saying
 //     more than the holder needs.
-//   - the code travels in URLs by design — /join?code= (the GET form),
+//   - the code travels in URLs by design — /join?code= (a shared link),
 //     /new?code=, the login's return_to — so the pages that carry it send no
 //     Referer (`metadata.referrer: "no-referrer"`), and nothing of ours
 //     writes it to a log: the lookup and the limiters keep it in memory.
@@ -34,9 +37,12 @@ import { formatWaiverCode } from "./waiver-codes";
 //     unusable code — a classroom behind one NAT opening a shared link is
 //     not a failure) and on submits that END: refused for the code, an
 //     account and fund created, or answered by email; a form that merely
-//     needs another subdomain spends nothing. Per code on every submit, so
-//     one code cannot be turned into funds faster than people would. Per
-//     address on the "you already have an account" email.
+//     needs another subdomain spends nothing. Per code on every submit that
+//     carries one, so one code cannot be turned into funds faster than
+//     people would. Per address on the "you already have an account" email.
+//   - no code is no gate: the door is open, and a fund made here costs its
+//     maker the subscription (or a code) before it runs — the IP budget
+//     above is what keeps a script from filling the subdomain space.
 
 // 30 failed code checks per IP per 10 minutes; 10 ended submits per IP per
 // hour; 10 submits per code per 10 minutes; one existing-account email per
@@ -67,13 +73,17 @@ export async function lookupJoinCode(raw: string): Promise<JoinCodeLookup> {
 
 /**
  * Whether a submit may start, checked before anything is read: false =
- * refuse. The submit counts against the (normalised) code right away; it
- * counts against the IP only once it ends (`countJoinSubmit`).
+ * refuse. A submit that carries a (normalised) code counts against it right
+ * away; every submit counts against the IP only once it ends
+ * (`countJoinSubmit`).
  */
-export async function allowJoinSubmit(normalisedCode: string): Promise<boolean> {
+export async function allowJoinSubmit(normalisedCode: string | null): Promise<boolean> {
   const ip = await clientIp();
-  if (!submitIpLimiter.allowed(ip) || !submitCodeLimiter.allowed(normalisedCode)) return false;
-  submitCodeLimiter.fail(normalisedCode);
+  if (!submitIpLimiter.allowed(ip)) return false;
+  if (normalisedCode !== null) {
+    if (!submitCodeLimiter.allowed(normalisedCode)) return false;
+    submitCodeLimiter.fail(normalisedCode);
+  }
   return true;
 }
 

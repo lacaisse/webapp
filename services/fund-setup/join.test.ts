@@ -113,6 +113,13 @@ describe("allowJoinSubmit / countJoinSubmit", () => {
     expect(await allowJoinSubmit("SAMECODE0001")).toBe(false);
     expect(await allowJoinSubmit("OTHERCODE001")).toBe(true);
   });
+
+  it("counts a submit without a code against the address only", async () => {
+    for (let i = 0; i < 25; i++) expect(await allowJoinSubmit(null)).toBe(true);
+    for (let i = 0; i < 10; i++) await countJoinSubmit();
+    expect(await allowJoinSubmit(null)).toBe(false);
+    expect(await allowJoinSubmit("SOMECODE0001")).toBe(false);
+  });
 });
 
 describe("allowExistingAccountEmail", () => {
