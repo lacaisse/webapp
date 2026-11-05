@@ -4745,6 +4745,13 @@
     "thirdPartyLink": "Zie /licenses",
     "viewOnGithub": "Bekijk op GitHub"
   },
+  "reportIssue": {
+    "label": "Een probleem melden",
+    "whatHappened": "Wat is er gebeurd?",
+    "expected": "Wat had je verwacht?",
+    "page": "Pagina",
+    "version": "Versie"
+  },
   "periods": {
     "errors": {
       "dateInvalid": "Voer een geldige datum in.",

@@ -4734,6 +4734,13 @@
     "thirdPartyLink": "Consulta /licenses",
     "viewOnGithub": "Ver en GitHub"
   },
+  "reportIssue": {
+    "label": "Informar de un problema",
+    "whatHappened": "¿Qué ha pasado?",
+    "expected": "¿Qué esperabas que ocurriera?",
+    "page": "Página",
+    "version": "Versión"
+  },
   "periods": {
     "errors": {
       "dateInvalid": "Introduce una fecha válida.",

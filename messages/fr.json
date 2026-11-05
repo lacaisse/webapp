@@ -4821,6 +4821,13 @@
     "thirdPartyLink": "Voir /licenses",
     "viewOnGithub": "Voir sur GitHub"
   },
+  "reportIssue": {
+    "label": "Signaler un problème",
+    "whatHappened": "Que s'est-il passé ?",
+    "expected": "À quoi vous attendiez-vous ?",
+    "page": "Page",
+    "version": "Version"
+  },
   "periods": {
     "errors": {
       "dateInvalid": "Saisissez une date valide.",

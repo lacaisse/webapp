@@ -4,9 +4,10 @@ import { redirect } from "next/navigation";
 import { FundSidebar } from "@/components/fund-sidebar";
 import { PrivacyProvider } from "@/components/privacy/privacy-provider";
 import { requireFundRole } from "@/services/auth/dal";
-import { getApexUrl } from "@/services/fund/server";
+import { getApexUrl, getFundUrl } from "@/services/fund/server";
 import { getHostType } from "@/services/host/server";
 import { getPrivacyMode } from "@/services/privacy/server";
+import { getCommitSha } from "@/lib/repo";
 
 // Fund admin shell: sidebar + main content. Entry requires at least OPERATOR
 // (cards + members manager); each page self-guards beyond that — ADMIN-only
@@ -36,6 +37,8 @@ export default async function FundLayout({
           apexUrl={getApexUrl("/")}
           role={membership.role}
           privacyMode={privacy}
+          origin={getFundUrl(fund.domain)}
+          version={getCommitSha()?.slice(0, 7) ?? null}
         />
         <main className="flex-1 bg-muted/40">
           <div className="mx-auto w-full max-w-6xl space-y-6 px-6 py-8">

@@ -4,14 +4,7 @@ import Link from "next/link";
 import { CodeXml } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 import { buttonVariants } from "@/components/ui/button";
-
-const REPO_URL = "https://github.com/lacaisse/webapp";
-
-function getCommitSha(): string | null {
-  return (
-    process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GIT_COMMIT_SHA ?? null
-  );
-}
+import { getCommitSha, REPO_URL } from "@/lib/repo";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("source");
