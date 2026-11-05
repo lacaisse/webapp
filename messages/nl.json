@@ -4646,7 +4646,7 @@
   },
   "terms": {
     "title": "Algemene voorwaarden",
-    "lastUpdated": "Laatst bijgewerkt: 12 mei 2026",
+    "lastUpdated": "Laatst bijgewerkt: 5 november 2026",
     "intro": "Deze voorwaarden regelen uw gebruik van La caisse, het platform dat wordt geëxploiteerd door Citizen Pay BV. Door een account aan te maken of de dienst te gebruiken, gaat u akkoord met deze voorwaarden.",
     "about": {
       "heading": "1. Over deze voorwaarden",
@@ -4673,8 +4673,8 @@
     "billing": {
       "heading": "5. Abonnement en facturatie",
       "items": [
-        "Gehost plan: € 20/maand per fonds, maandelijks gefactureerd. Btw waar vereist toegepast.",
-        "Gratis voor non-profits en scholen: geregistreerde vzw's, liefdadigheidsinstellingen en onderwijsinstellingen gebruiken La caisse gratis. Bezorg een bewijs van registratie bij inschrijving of in uw accountinstellingen.",
+        "Gehost plan: {price} per maand per fonds, excl. btw, maandelijks gefactureerd door Citizen Pay BV. Btw wordt toegevoegd waar vereist.",
+        "Vrijstelling: Citizen Pay BV kan een fonds via een uitnodigingscode vrijstellen van de hostingkosten.",
         "Zelf gehost: La caisse staat onder de AGPL-3.0-licentie — zelf-hosten is gratis, en deze voorwaarden dekken enkel de door Citizen Pay BV aangeboden gehoste dienst.",
         "Terugbetalingen: maandelijkse kosten zijn niet terugbetaalbaar, maar u kunt op elk moment opzeggen; de opzegging gaat in op het einde van de huidige facturatieperiode."
       ]
@@ -4689,7 +4689,7 @@
     },
     "availability": {
       "heading": "8. Beschikbaarheid van de dienst",
-      "body": "We doen redelijke inspanningen om La caisse beschikbaar te houden, maar bieden geen uptime-garantie voor het gratis of standaardplan. We kunnen onderhoud uitvoeren, met kennisgeving waar mogelijk."
+      "body": "We doen redelijke inspanningen om La caisse beschikbaar te houden, maar bieden geen uptime-garantie voor de gehoste dienst. We kunnen onderhoud uitvoeren, met kennisgeving waar mogelijk."
     },
     "disclaimers": {
       "heading": "9. Disclaimers",

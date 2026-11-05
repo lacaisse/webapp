@@ -4635,7 +4635,7 @@
   },
   "terms": {
     "title": "Condiciones del servicio",
-    "lastUpdated": "Última actualización: 12 de mayo de 2026",
+    "lastUpdated": "Última actualización: 5 de noviembre de 2026",
     "intro": "Estas condiciones rigen tu uso de La caisse, la plataforma operada por Citizen Pay BV. Al crear una cuenta o usar el servicio, aceptas estas condiciones.",
     "about": {
       "heading": "1. Acerca de estas condiciones",
@@ -4662,8 +4662,8 @@
     "billing": {
       "heading": "5. Suscripción y facturación",
       "items": [
-        "Plan alojado: 20 €/mes por fondo, facturado mensualmente. Se aplica IVA cuando corresponda.",
-        "Gratis para organizaciones sin ánimo de lucro y centros educativos: las organizaciones sin ánimo de lucro registradas, las entidades benéficas y las instituciones educativas usan La caisse de forma gratuita. Aporta una prueba de registro al darte de alta o en la configuración de la cuenta.",
+        "Plan alojado: {price} al mes por fondo, sin IVA, facturado mensualmente por Citizen Pay BV. Se añade el IVA cuando corresponda.",
+        "Exención: Citizen Pay BV puede eximir a un fondo del coste de alojamiento mediante un código de invitación.",
         "Autoalojado: La caisse se licencia bajo AGPL-3.0 — el autoalojamiento es gratuito, y estas condiciones cubren únicamente el servicio alojado ofrecido por Citizen Pay BV.",
         "Reembolsos: las cuotas mensuales no son reembolsables, pero puedes cancelar en cualquier momento; la cancelación surte efecto al final del período de facturación en curso."
       ]
@@ -4678,7 +4678,7 @@
     },
     "availability": {
       "heading": "8. Disponibilidad del servicio",
-      "body": "Hacemos esfuerzos razonables para mantener La caisse disponible, pero no ofrecemos ninguna garantía de tiempo de actividad para los planes gratuito o estándar. Podemos realizar tareas de mantenimiento, con previo aviso cuando sea posible."
+      "body": "Hacemos esfuerzos razonables para mantener La caisse disponible, pero no ofrecemos ninguna garantía de tiempo de actividad para el servicio alojado. Podemos realizar tareas de mantenimiento, con previo aviso cuando sea posible."
     },
     "disclaimers": {
       "heading": "9. Exenciones de responsabilidad",

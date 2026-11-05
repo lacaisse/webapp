@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getTranslations } from "next-intl/server";
+import { getFormatter, getTranslations } from "next-intl/server";
 import { buttonVariants } from "@/components/ui/button";
+import { SUBSCRIPTION_MONTHLY_EUR } from "@/services/fund-setup/config";
 import { PolicySection } from "../_policy/section";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -11,8 +12,23 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function TermsPage() {
-  const t = await getTranslations("terms");
-  const tCommon = await getTranslations("common");
+  const [t, tCommon, format] = await Promise.all([
+    getTranslations("terms"),
+    getTranslations("common"),
+    getFormatter(),
+  ]);
+  // The hosting fee the terms quote is the one the product charges: the same
+  // constant /join, the landing and Settings → Subscription format.
+  const price = format.number(SUBSCRIPTION_MONTHLY_EUR, {
+    style: "currency",
+    currency: "EUR",
+    maximumFractionDigits: 0,
+  });
+  // `t.raw` would leave `{price}` unexpanded, so each billing item goes through
+  // the formatter; items without a placeholder come back unchanged.
+  const billingItems = (t.raw("billing.items") as string[]).map((_, i) =>
+    t(`billing.items.${i}`, { price }),
+  );
 
   return (
     <div className="flex flex-1 flex-col items-center bg-muted/40 px-4 py-12">
@@ -46,10 +62,7 @@ export default async function TermsPage() {
           intro={t("acceptableUse.intro")}
           items={t.raw("acceptableUse.items") as string[]}
         />
-        <PolicySection
-          heading={t("billing.heading")}
-          items={t.raw("billing.items") as string[]}
-        />
+        <PolicySection heading={t("billing.heading")} items={billingItems} />
         <PolicySection
           heading={t("openSource.heading")}
           body={t("openSource.body")}
