@@ -41,7 +41,8 @@ export async function GET(request: NextRequest) {
   // In dev that's `localhost` or `<sub>.localhost`; in prod it's the canonical
   // production host (or a custom domain). consumeExchangeCode requires an
   // exact match against the issuing host.
-  const reqHost = (request.headers.get("host") ?? "").split(":")[0];
+  const hostHeader = request.headers.get("host") ?? "";
+  const reqHost = hostHeader.split(":")[0];
   if (!reqHost) return errorRedirect("missing-host");
 
   const exchanged = await consumeExchangeCode({
@@ -64,16 +65,21 @@ export async function GET(request: NextRequest) {
   }
   if (!session) return errorRedirect("session-create-failed");
 
-  // Only allow same-host relative paths from return_to. An absolute URL or a
-  // path with a scheme is rejected — we always stay on the host that just
-  // received the exchange. The browser already navigated here; cross-host
-  // redirects would require another exchange round-trip.
   // Only a same-origin path from return_to. An absolute URL, a scheme or a
   // protocol-relative form (`//host`, `/\host`) is rejected — we always stay
   // on the host that just received the exchange. The browser already
   // navigated here; cross-host redirects would require another exchange.
-  const safePath = sameOriginPath(rawReturnTo, new URL(request.url).origin, "/");
-  const dest = new URL(safePath, request.url);
+  //
+  // That origin is the Host the browser asked for — the one the code was
+  // just checked against — not `request.url`: `next dev` builds request.url
+  // from its own hostname (`localhost:<port>`) whatever the Host header, so
+  // a fund host's redirect would land on the apex, which has no session for
+  // this cookie and shows the landing page. Same protocol rule as the
+  // return_to built by requireUser (services/auth/dal.ts).
+  const proto = process.env.NODE_ENV === "production" ? "https" : "http";
+  const origin = `${proto}://${hostHeader}`;
+  const safePath = sameOriginPath(rawReturnTo, origin, "/");
+  const dest = new URL(safePath, origin);
   const res = NextResponse.redirect(dest);
 
   // Set cookies on the redirect response *itself*, not via `cookies()`. In a

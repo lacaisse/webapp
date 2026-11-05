@@ -6,6 +6,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { auth } from "@/services/auth/better-auth";
+import { getCurrentUser } from "@/services/auth/dal";
 import { oauthRedirectFrom } from "@/services/auth/oauth-query";
 import {
   oauthRedirectFromError,
@@ -112,6 +113,34 @@ export async function loginAction(
       returnTo,
     }),
   );
+}
+
+// Passkey sign-in finishes in the browser: the ceremony POSTs to this host's
+// /api/auth/passkey/verify-authentication, which writes the session cookie
+// for `auth.<APP_DOMAIN>` alone — every host owns its own cookie, nothing is
+// apex-scoped. The form then asks here for the next hop: the exchange URL on
+// the target host, minted for the user that fresh cookie names, exactly what
+// the password path redirects to. A plain `window.location.href = returnTo`
+// instead lands on a host with no session: the apex shows the landing page
+// and a fund host bounces back to /login, where the user has to sign in a
+// second time. Mid-OAuth sign-ins never come here (the form re-enters the
+// authorize endpoint on this host).
+export async function passkeyHandoffAction(
+  returnTo?: string,
+): Promise<ActionResult> {
+  const user = await getCurrentUser();
+  if (!user) {
+    const t = await getTranslations("auth.errors");
+    return { error: t("signInFailed") };
+  }
+  return {
+    ok: true,
+    redirectTo: await buildPostAuthRedirect({
+      userId: user.id,
+      email: user.email,
+      returnTo,
+    }),
+  };
 }
 
 export async function signupAction(

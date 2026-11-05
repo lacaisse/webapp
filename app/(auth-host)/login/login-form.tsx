@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { signIn } from "@/services/auth/client";
 import { authorizeResumeUrl } from "@/services/auth/oauth-query";
-import { loginAction } from "../actions";
+import { loginAction, passkeyHandoffAction } from "../actions";
 import { LoginSchema, type LoginInput } from "../schemas";
 
 // `oauthQuery`: set when an MCP client's authorize request sent the user
@@ -28,9 +28,10 @@ export function LoginForm({ oauthQuery }: { oauthQuery?: string }) {
   // can resolve any key, then format the result.
   const tRoot = useTranslations();
 
-  // Where to send the user after a successful login. Better Auth's session
-  // cookie is apex-scoped, so a `window.location.href = returnTo` carries it
-  // along — no handoff needed.
+  // Where to send the user after a successful login. Every host owns its own
+  // session cookie, so the destination is never navigated to directly: both
+  // sign-in paths end on `<target>/auth/exchange?code=…`, which writes the
+  // target host's cookie (services/auth/redirects.ts).
   const searchParams = useSearchParams();
   const returnTo = searchParams.get("return_to") ?? undefined;
 
@@ -67,10 +68,21 @@ export function LoginForm({ oauthQuery }: { oauthQuery?: string }) {
         setPkError(result.error.message ?? tRoot("auth.errors.signInFailed"));
         return;
       }
-      // Hard-nav so the destination host loads with the freshly-set cookie.
-      window.location.href = oauthQuery
-        ? authorizeResumeUrl(oauthQuery)
-        : (returnTo ?? "/");
+      if (oauthQuery) {
+        // Mid-OAuth: back into the authorize endpoint on THIS host, whose
+        // cookie the ceremony just wrote. Hard-nav, like the password path.
+        window.location.href = authorizeResumeUrl(oauthQuery);
+        return;
+      }
+      // That cookie is this host's only. Ask for the cross-host exchange URL
+      // (the hop the password path redirects to) and hard-nav there — the
+      // target host writes its own cookie and lands the user on return_to.
+      const next = await passkeyHandoffAction(returnTo);
+      if ("error" in next) {
+        setPkError(next.error);
+        return;
+      }
+      if (next.redirectTo) window.location.assign(next.redirectTo);
     });
   };
 
