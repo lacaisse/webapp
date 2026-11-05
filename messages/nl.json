@@ -4160,7 +4160,9 @@
       },
       "revoke": "Intrekken",
       "revoking": "Intrekken…",
+      "revokeTitle": "Deze code intrekken?",
       "revokeConfirm": "Deze code intrekken? Kassen die hem al gebruikten blijven gratis.",
+      "revokeCancel": "Behouden",
       "errors": {
         "labelMin": "Het label moet minstens {min} tekens lang zijn.",
         "labelMax": "Het label mag hoogstens {max} tekens lang zijn.",

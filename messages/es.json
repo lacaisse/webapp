@@ -4149,7 +4149,9 @@
       },
       "revoke": "Revocar",
       "revoking": "Revocando…",
+      "revokeTitle": "¿Revocar este código?",
       "revokeConfirm": "¿Revocar este código? Las cajas que ya lo usaron siguen siendo gratuitas.",
+      "revokeCancel": "Conservarlo",
       "errors": {
         "labelMin": "La etiqueta debe tener al menos {min} caracteres.",
         "labelMax": "La etiqueta debe tener como máximo {max} caracteres.",

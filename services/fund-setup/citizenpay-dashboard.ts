@@ -7,8 +7,9 @@ import { DEFAULT_CITIZENPAY_DASHBOARD_URL } from "./config";
 // by `Fund.citizenPayBusinessId`.
 //
 // Pure: the base URL is a parameter, never read from env here, so client
-// components and tests can call it. The server data layer passes
-// `process.env.CITIZENPAY_DASHBOARD_URL ?? DEFAULT_CITIZENPAY_DASHBOARD_URL`.
+// components and tests can call it. This module owns the normalisation and
+// the default: callers pass the configured value as is (the server data
+// layer passes `process.env.CITIZENPAY_DASHBOARD_URL`, possibly unset).
 
 export type CitizenPayDashboardUrls = { home: string; banking: string; billing: string };
 
@@ -22,7 +23,7 @@ export function normaliseDashboardBaseUrl(raw: string | undefined | null): strin
 // Without a cached business id both pages fall back to the dashboard root,
 // which redirects the signed-in user to their business.
 export function citizenPayDashboardUrls(
-  baseUrl: string,
+  baseUrl: string | undefined | null,
   businessId: string | null,
 ): CitizenPayDashboardUrls {
   const base = normaliseDashboardBaseUrl(baseUrl);

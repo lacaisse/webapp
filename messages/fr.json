@@ -4236,7 +4236,9 @@
       },
       "revoke": "Révoquer",
       "revoking": "Révocation…",
+      "revokeTitle": "Révoquer ce code ?",
       "revokeConfirm": "Révoquer ce code ? Les caisses qui l'ont déjà utilisé restent gratuites.",
+      "revokeCancel": "Le garder",
       "errors": {
         "labelMin": "Le libellé doit comporter au moins {min} caractères.",
         "labelMax": "Le libellé doit comporter au plus {max} caractères.",

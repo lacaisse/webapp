@@ -51,3 +51,7 @@ ADD COLUMN "subscriptionWaiverCodeId" TEXT;
 
 -- AddForeignKey
 ALTER TABLE "Fund" ADD CONSTRAINT "Fund_subscriptionWaiverCodeId_fkey" FOREIGN KEY ("subscriptionWaiverCodeId") REFERENCES "SubscriptionWaiverCode"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- setupCompletedAt: first time all three steps were done; the dashboard
+-- checklist then skips the live banking read.
+ALTER TABLE "Fund" ADD COLUMN "setupCompletedAt" TIMESTAMP(3);

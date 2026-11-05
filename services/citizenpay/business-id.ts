@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import "server-only";
+import { cache } from "react";
 
 import { prisma } from "@/services/db/prisma";
 
@@ -15,29 +16,54 @@ import { getCitizenPayClient, type FundCredentials } from "./client";
 // so the next render skips the round-trip. Returns null when the fund isn't
 // connected (no API key, so CP isn't called) or CP has no business id —
 // callers then link to the dashboard root.
+//
+// Cached per request (React `cache()`, keyed on the fund's columns rather than
+// the object, which differs per call site): the dashboard checklist, the Bank
+// page and the Subscription tab may all ask in one render — one CP read, one
+// backfill write.
 export async function resolveCitizenPayBusinessId(
   fund: FundCredentials & { citizenPayBusinessId: string | null },
 ): Promise<string | null> {
-  if (fund.citizenPayBusinessId) return fund.citizenPayBusinessId;
-  if (!fund.citizenPayApiKeyId) return null;
-
-  let businessId: string | null = null;
-  try {
-    businessId = await getCitizenPayClient(fund).getTreasuryBusinessId();
-  } catch (e) {
-    console.warn("[citizenpay] getTreasuryBusinessId failed", fund.id, e);
-    return null;
-  }
-
-  if (businessId) {
-    try {
-      await prisma.fund.update({
-        where: { id: fund.id },
-        data: { citizenPayBusinessId: businessId },
-      });
-    } catch (e) {
-      console.warn("[citizenpay] caching business id failed", fund.id, e);
-    }
-  }
-  return businessId;
+  return resolveCached(
+    fund.id,
+    fund.citizenPayApiKeyId,
+    fund.citizenPayApiKeyEnc,
+    fund.citizenPayBusinessId,
+  );
 }
+
+const resolveCached = cache(
+  async (
+    id: string,
+    citizenPayApiKeyId: string | null,
+    citizenPayApiKeyEnc: string | null,
+    citizenPayBusinessId: string | null,
+  ): Promise<string | null> => {
+    if (citizenPayBusinessId) return citizenPayBusinessId;
+    if (!citizenPayApiKeyId) return null;
+
+    let businessId: string | null = null;
+    try {
+      businessId = await getCitizenPayClient({
+        id,
+        citizenPayApiKeyId,
+        citizenPayApiKeyEnc,
+      }).getTreasuryBusinessId();
+    } catch (e) {
+      console.warn("[citizenpay] getTreasuryBusinessId failed", id, e);
+      return null;
+    }
+
+    if (businessId) {
+      try {
+        await prisma.fund.update({
+          where: { id },
+          data: { citizenPayBusinessId: businessId },
+        });
+      } catch (e) {
+        console.warn("[citizenpay] caching business id failed", id, e);
+      }
+    }
+    return businessId;
+  },
+);
