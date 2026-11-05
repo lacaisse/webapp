@@ -781,7 +781,8 @@
       },
       "notice": {
         "connect": "Aún no hay ningún banco conectado. Conecte su banco en el panel de Citizen Pay para habilitar los pagos.",
-        "activate": "Su banco está conectado, pero la iniciación de pagos aún no está habilitada. Actívela en el panel de Citizen Pay para iniciar pagos."
+        "activate": "Su banco está conectado, pero la iniciación de pagos aún no está habilitada. Actívela en el panel de Citizen Pay para iniciar pagos.",
+        "cta": "Abrir el panel de Citizen Pay"
       },
       "balance": {
         "available": "Saldo disponible",
@@ -845,6 +846,38 @@
     "dashboard": {
       "title": "Panel",
       "description": "Resumen de la actividad y los saldos de tu fondo.",
+      "setup": {
+        "title": "Termine de configurar su fondo",
+        "description": "{done} de {total} pasos completados. Tres pasos para poner en marcha un fondo nuevo.",
+        "status": {
+          "done": "Hecho",
+          "todo": "Pendiente",
+          "in_progress": "En curso",
+          "blocked": "En espera",
+          "unknown": "Estado no disponible"
+        },
+        "citizenpay": {
+          "title": "Registrarse en Citizen Pay",
+          "description": "Crea su tesorería y su token en Citizen Pay y emite la clave API que usa este panel.",
+          "cta": "Abrir la configuración de Citizen Pay"
+        },
+        "banking": {
+          "title": "Activar open banking",
+          "description": "Conecte la cuenta bancaria de su tesorería en el panel de Citizen Pay y habilite la iniciación de pagos. A partir de entonces, las contribuciones se concilian desde esa cuenta y los comercios cobran desde ella.",
+          "descriptionInProgress": "Su banco está conectado. El banco aún está habilitando la iniciación de pagos; suele tardar unos días. Hasta entonces, no hay nada que hacer aquí.",
+          "descriptionBlocked": "Disponible cuando el fondo esté registrado en Citizen Pay.",
+          "descriptionConnectedTodo": "Su banco está conectado, pero aún le quedan pasos en el panel de Citizen Pay: complete el alta con el banco y solicite la iniciación de pagos.",
+          "descriptionUnknown": "Citizen Pay no ha respondido en este momento. Vuelva a cargar la página en un minuto o consulte la página del banco.",
+          "cta": "Conecte su banco en Citizen Pay",
+          "ctaInProgress": "Consultar en Citizen Pay",
+          "secondary": "Página del banco"
+        },
+        "subscription": {
+          "title": "Inicie su suscripción",
+          "description": "El alojamiento en La Caisse cuesta {price} al mes, facturado por Citizen Pay. Un propietario del fondo lo acepta en Configuración.",
+          "cta": "Revisar y aceptar"
+        }
+      },
       "tokenFallback": "tokens",
       "range": {
         "3m": "3 meses",
@@ -2258,6 +2291,7 @@
         "onboarding": "Incorporación",
         "terms": "Términos",
         "citizenpay": "Citizen Pay",
+        "subscription": "Suscripción",
         "fees": "Comisiones",
         "emails": "Correos",
         "documents": "Documentos",
@@ -2597,6 +2631,54 @@
             "notConnected": "Conecte primero la caja a Citizen Pay.",
             "insecureUrl": "La dirección de este despliegue no es https; Citizen Pay solo acepta webhooks https.",
             "failed": "Citizen Pay rechazó el registro: {message}"
+          }
+        }
+      },
+      "subscription": {
+        "title": "Suscripción",
+        "description": "El alojamiento de su fondo en la instancia oficial de La Caisse.",
+        "plan": {
+          "title": "Alojamiento La Caisse",
+          "price": "{price} al mes, sin IVA",
+          "line1": "El panel de su fondo y las páginas de miembros y comercios en La Caisse",
+          "line2": "Emisión de tokens, tarjetas y pagos a comercios a través de Citizen Pay",
+          "line3": "Actualizaciones, copias de seguridad y soporte",
+          "billing": "Facturado mensualmente por Citizen Pay con los datos de abajo; la factura puede pagarse por transferencia bancaria o mediante open banking. Puede cancelarse en cualquier momento a través de Citizen Pay; el mes en curso sigue siendo exigible."
+        },
+        "form": {
+          "legalName": "Razón social",
+          "legalNameHint": "La organización que figura en la factura.",
+          "email": "Correo de facturación",
+          "emailHint": "Adonde se envían las facturas.",
+          "address": "Dirección de facturación",
+          "addressHint": "Calle, código postal y ciudad, uno por línea.",
+          "vatNumber": "Número de IVA",
+          "vatNumberHint": "Opcional. Déjelo vacío si su organización no tiene.",
+          "accept": "En nombre de {fundName}, acepto pagar {price} al mes, sin IVA, por el alojamiento en La Caisse.",
+          "submit": "Iniciar la suscripción",
+          "submitting": "Iniciando…"
+        },
+        "ownerOnly": "Solo un propietario del fondo puede aceptar la suscripción. Pida a un propietario que abra esta pestaña.",
+        "accepted": {
+          "title": "Suscripción activa",
+          "since": "Aceptada el {date}",
+          "description": "Citizen Pay factura {price} al mes a {email}. Para cambiar los datos de facturación, responda al correo de su factura.",
+          "invoices": "Facturas en Citizen Pay"
+        },
+        "errors": {
+          "legalNameMin": "La razón social debe tener al menos {min} caracteres.",
+          "legalNameMax": "La razón social debe tener como máximo {max} caracteres.",
+          "emailInvalid": "Introduzca una dirección de correo válida.",
+          "addressMin": "Introduzca la dirección de facturación completa.",
+          "addressMax": "La dirección de facturación es demasiado larga.",
+          "vatInvalid": "Introduzca un número de IVA válido (p. ej. BE0123456789) o déjelo vacío.",
+          "mustAccept": "Debe dar su conformidad antes de iniciar la suscripción.",
+          "alreadyAccepted": "La suscripción de este fondo ya ha sido aceptada."
+        },
+        "email": {
+          "confirmation": {
+            "subject": "Su suscripción a La Caisse para {fundName}",
+            "body": "Hola:\n\nLa suscripción de alojamiento de {fundName} ({fundDomain}) fue aceptada el {date} por {userEmail}.\n\nPlan: alojamiento La Caisse, {price} al mes, sin IVA, facturado por Citizen Pay.\nFacturado a: {legalName}\n{address}\nNúmero de IVA: {vatNumber}\n\nCitizen Pay abrirá su cuenta de facturación y enviará la primera factura a esta dirección. Responda a este correo si tiene cualquier pregunta.\n\nLa Caisse"
           }
         }
       },

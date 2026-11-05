@@ -803,7 +803,8 @@
       },
       "notice": {
         "connect": "Aucune banque n'est encore connectée. Connectez votre banque dans le tableau de bord CitizenPay pour activer les virements.",
-        "activate": "Votre banque est connectée mais l'initiation de paiement n'est pas encore activée. Activez-la dans le tableau de bord CitizenPay pour initier des virements."
+        "activate": "Votre banque est connectée mais l'initiation de paiement n'est pas encore activée. Activez-la dans le tableau de bord CitizenPay pour initier des virements.",
+        "cta": "Ouvrir le tableau de bord Citizen Pay"
       },
       "balance": {
         "available": "Solde disponible",
@@ -867,6 +868,38 @@
     "dashboard": {
       "title": "Tableau de bord",
       "description": "Vue d'ensemble de l'activité et des soldes de la caisse.",
+      "setup": {
+        "title": "Terminez la configuration de votre caisse",
+        "description": "Étapes terminées : {done} sur {total}. Trois étapes pour mettre une nouvelle caisse en route.",
+        "status": {
+          "done": "Terminé",
+          "todo": "À faire",
+          "in_progress": "En cours",
+          "blocked": "En attente",
+          "unknown": "Statut indisponible"
+        },
+        "citizenpay": {
+          "title": "S'inscrire sur Citizen Pay",
+          "description": "Crée votre trésorerie et son jeton sur Citizen Pay, et émet la clé API qu'utilise ce tableau de bord.",
+          "cta": "Ouvrir les paramètres Citizen Pay"
+        },
+        "banking": {
+          "title": "Activer l'open banking",
+          "description": "Connectez le compte bancaire de votre trésorerie dans le tableau de bord Citizen Pay et activez l'initiation de paiement (open banking : accès sécurisé à votre compte, avec votre accord). Les cotisations sont ensuite rapprochées sur ce compte et les commerçants sont payés depuis celui-ci.",
+          "descriptionInProgress": "Votre banque est connectée. Elle active encore l'initiation de paiement — cela prend généralement quelques jours. Rien à faire ici d'ici là.",
+          "descriptionBlocked": "Disponible dès que la caisse est inscrite sur Citizen Pay.",
+          "descriptionConnectedTodo": "Votre banque est connectée, mais il vous reste des étapes dans le tableau de bord Citizen Pay : finalisez l'inscription auprès de la banque et demandez l'initiation de paiement.",
+          "descriptionUnknown": "Citizen Pay n'a pas répondu pour l'instant. Rechargez la page dans une minute, ou consultez la page Banque.",
+          "cta": "Connecter votre banque sur Citizen Pay",
+          "ctaInProgress": "Vérifier sur Citizen Pay",
+          "secondary": "Page Banque"
+        },
+        "subscription": {
+          "title": "Démarrer votre abonnement",
+          "description": "L'hébergement sur La Caisse coûte {price} par mois, facturé par Citizen Pay. Un propriétaire de la caisse l'accepte dans les Paramètres.",
+          "cta": "Consulter et accepter"
+        }
+      },
       "tokenFallback": "jetons",
       "range": {
         "3m": "3 mois",
@@ -2320,6 +2353,7 @@
         "onboarding": "Onboarding",
         "terms": "Conditions",
         "citizenpay": "Citizen Pay",
+        "subscription": "Abonnement",
         "fees": "Frais",
         "emails": "E-mails",
         "documents": "Documents",
@@ -2663,6 +2697,54 @@
             "notConnected": "Connectez d'abord la caisse à Citizen Pay.",
             "insecureUrl": "L'adresse de ce déploiement n'est pas en https ; Citizen Pay n'accepte que des webhooks https.",
             "failed": "Citizen Pay a refusé l'enregistrement : {message}"
+          }
+        }
+      },
+      "subscription": {
+        "title": "Abonnement",
+        "description": "L'hébergement de votre caisse sur l'instance officielle de La Caisse.",
+        "plan": {
+          "title": "Hébergement La Caisse",
+          "price": "{price} par mois, hors TVA",
+          "line1": "Le tableau de bord de votre caisse et ses pages membres et commerçants sur La Caisse",
+          "line2": "Émission de jetons, cartes et versements aux commerçants via Citizen Pay",
+          "line3": "Mises à jour, sauvegardes et support",
+          "billing": "Facturé chaque mois par Citizen Pay aux coordonnées ci-dessous ; la facture se règle par virement ou par open banking (paiement initié depuis votre banque). Résiliable à tout moment via Citizen Pay — le mois en cours reste dû."
+        },
+        "form": {
+          "legalName": "Dénomination légale",
+          "legalNameHint": "L'organisation qui figure sur la facture.",
+          "email": "E-mail de facturation",
+          "emailHint": "L'adresse à laquelle les factures sont envoyées.",
+          "address": "Adresse de facturation",
+          "addressHint": "Rue, code postal et ville — un élément par ligne.",
+          "vatNumber": "Numéro de TVA",
+          "vatNumberHint": "Facultatif. Laissez vide si votre organisation n'en a pas.",
+          "accept": "Au nom de {fundName}, j'accepte de payer {price} par mois, hors TVA, pour l'hébergement sur La Caisse.",
+          "submit": "Démarrer l'abonnement",
+          "submitting": "Démarrage…"
+        },
+        "ownerOnly": "Seul un propriétaire de la caisse peut accepter l'abonnement. Demandez à un propriétaire d'ouvrir cet onglet.",
+        "accepted": {
+          "title": "Abonnement actif",
+          "since": "Accepté le {date}",
+          "description": "Citizen Pay facture {price} par mois à {email}. Pour modifier les coordonnées de facturation, répondez à l'e-mail de votre facture.",
+          "invoices": "Factures sur Citizen Pay"
+        },
+        "errors": {
+          "legalNameMin": "La dénomination légale doit comporter au moins {min} caractères.",
+          "legalNameMax": "La dénomination légale doit comporter au plus {max} caractères.",
+          "emailInvalid": "Saisissez une adresse e-mail valide.",
+          "addressMin": "Saisissez l'adresse de facturation complète.",
+          "addressMax": "L'adresse de facturation est trop longue.",
+          "vatInvalid": "Saisissez un numéro de TVA valide (p. ex. BE0123456789) ou laissez le champ vide.",
+          "mustAccept": "Vous devez donner votre accord avant de démarrer l'abonnement.",
+          "alreadyAccepted": "L'abonnement de cette caisse a déjà été accepté."
+        },
+        "email": {
+          "confirmation": {
+            "subject": "Votre abonnement La Caisse pour {fundName}",
+            "body": "Bonjour,\n\nL'abonnement d'hébergement de {fundName} ({fundDomain}) a été accepté le {date} par {userEmail}.\n\nFormule : hébergement La Caisse, {price} par mois, hors TVA, facturé par Citizen Pay.\nFacturé à : {legalName}\n{address}\nNuméro de TVA : {vatNumber}\n\nCitizen Pay ouvrira votre compte de facturation et enverra la première facture à cette adresse. Pour toute question, répondez à cet e-mail.\n\nLa Caisse"
           }
         }
       },

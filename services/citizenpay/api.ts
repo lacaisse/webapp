@@ -509,6 +509,11 @@ export type TreasuryWire = {
   // it.
   id?: string;
   business_id?: string;
+  // Business that issued (operates) the treasury — CP's
+  // `treasuries.issued_by_business_id`. Its banking connection is the one
+  // `GET /v2/treasury/banking/status` reports on, and the CP dashboard's
+  // banking/billing pages live under this id.
+  issued_by_business_id?: string | null;
   name?: string;
   // Treasury slug — the `network` query param of a card's public tap URL.
   slug?: string;

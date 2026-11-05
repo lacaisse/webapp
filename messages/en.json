@@ -803,7 +803,8 @@
       },
       "notice": {
         "connect": "No bank is connected yet. Connect your bank in the CitizenPay dashboard to enable payouts.",
-        "activate": "Your bank is connected but payment initiation isn't enabled yet. Activate it in the CitizenPay dashboard to initiate payouts."
+        "activate": "Your bank is connected but payment initiation isn't enabled yet. Activate it in the CitizenPay dashboard to initiate payouts.",
+        "cta": "Open the Citizen Pay dashboard"
       },
       "balance": {
         "available": "Available balance",
@@ -867,6 +868,38 @@
     "dashboard": {
       "title": "Dashboard",
       "description": "Overview of your fund's activity and balances.",
+      "setup": {
+        "title": "Finish setting up your fund",
+        "description": "{done} of {total} steps done. Three steps to get a new fund running.",
+        "status": {
+          "done": "Done",
+          "todo": "To do",
+          "in_progress": "In progress",
+          "blocked": "Waiting",
+          "unknown": "Status unavailable"
+        },
+        "citizenpay": {
+          "title": "Register on Citizen Pay",
+          "description": "Creates your treasury and its token on Citizen Pay and issues the API key this dashboard uses.",
+          "cta": "Open Citizen Pay settings"
+        },
+        "banking": {
+          "title": "Activate open banking",
+          "description": "Connect your treasury's bank account on the Citizen Pay dashboard and enable payment initiation. Contributions are then matched from that account and merchants are paid out from it.",
+          "descriptionInProgress": "Your bank is connected. The bank is still enabling payment initiation — this usually takes a few days. Nothing to do here until then.",
+          "descriptionBlocked": "Available once the fund is registered on Citizen Pay.",
+          "descriptionConnectedTodo": "Your bank is connected, but the Citizen Pay dashboard still has steps left: finish the bank onboarding and request payment initiation.",
+          "descriptionUnknown": "Citizen Pay didn't answer just now. Reload in a minute, or check the Bank page.",
+          "cta": "Connect your bank on Citizen Pay",
+          "ctaInProgress": "Check on Citizen Pay",
+          "secondary": "Bank page"
+        },
+        "subscription": {
+          "title": "Start your subscription",
+          "description": "Hosting on La Caisse costs {price} per month, invoiced by Citizen Pay. A fund owner accepts it in Settings.",
+          "cta": "Review and accept"
+        }
+      },
       "tokenFallback": "tokens",
       "range": {
         "3m": "3 months",
@@ -2320,6 +2353,7 @@
         "onboarding": "Onboarding",
         "terms": "Terms",
         "citizenpay": "Citizen Pay",
+        "subscription": "Subscription",
         "fees": "Fees",
         "emails": "Emails",
         "documents": "Documents",
@@ -2663,6 +2697,54 @@
             "notConnected": "Connect the fund to Citizen Pay first.",
             "insecureUrl": "This deployment's address is not https; Citizen Pay only accepts https webhooks.",
             "failed": "Citizen Pay refused the registration: {message}"
+          }
+        }
+      },
+      "subscription": {
+        "title": "Subscription",
+        "description": "Hosting your fund on the official La Caisse instance.",
+        "plan": {
+          "title": "La Caisse hosting",
+          "price": "{price} per month, excl. VAT",
+          "line1": "Your fund's dashboard, member and merchant pages on La Caisse",
+          "line2": "Token issuance, cards and merchant payouts through Citizen Pay",
+          "line3": "Updates, backups and support",
+          "billing": "Invoiced monthly by Citizen Pay to the details below; the invoice can be paid by bank transfer or open banking. Cancel at any time through Citizen Pay — the current month remains due."
+        },
+        "form": {
+          "legalName": "Legal name",
+          "legalNameHint": "The organisation that appears on the invoice.",
+          "email": "Billing email",
+          "emailHint": "Where the invoices are sent.",
+          "address": "Billing address",
+          "addressHint": "Street, postal code and city — one per line.",
+          "vatNumber": "VAT number",
+          "vatNumberHint": "Optional. Leave empty if your organisation has none.",
+          "accept": "On behalf of {fundName}, I agree to pay {price} per month, excl. VAT, for hosting on La Caisse.",
+          "submit": "Start the subscription",
+          "submitting": "Starting…"
+        },
+        "ownerOnly": "Only a fund owner can accept the subscription. Ask an owner to open this tab.",
+        "accepted": {
+          "title": "Subscription active",
+          "since": "Accepted on {date}",
+          "description": "Citizen Pay invoices {price} per month to {email}. To change the billing details, reply to your invoice email.",
+          "invoices": "Invoices on Citizen Pay"
+        },
+        "errors": {
+          "legalNameMin": "The legal name must be at least {min} characters.",
+          "legalNameMax": "The legal name must be at most {max} characters.",
+          "emailInvalid": "Enter a valid email address.",
+          "addressMin": "Enter the full billing address.",
+          "addressMax": "The billing address is too long.",
+          "vatInvalid": "Enter a valid VAT number (e.g. BE0123456789) or leave it empty.",
+          "mustAccept": "You need to agree before starting the subscription.",
+          "alreadyAccepted": "This fund's subscription has already been accepted."
+        },
+        "email": {
+          "confirmation": {
+            "subject": "Your La Caisse subscription for {fundName}",
+            "body": "Hello,\n\nThe hosting subscription for {fundName} ({fundDomain}) was accepted on {date} by {userEmail}.\n\nPlan: La Caisse hosting, {price} per month, excl. VAT, invoiced by Citizen Pay.\nBilled to: {legalName}\n{address}\nVAT number: {vatNumber}\n\nCitizen Pay will open your billing account and send the first invoice to this address. Reply to this email with any question.\n\nLa Caisse"
           }
         }
       },

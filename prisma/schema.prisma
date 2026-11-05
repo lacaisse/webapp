@@ -526,6 +526,28 @@ model Fund {
   citizenPayPaymasterAddress      String?
   citizenPayPaymasterType         String?
 
+  // Citizen Pay business operating the treasury — CP's
+  // `treasuries.issued_by_business_id`, read from `GET /v2/treasury`. Written
+  // on connect / key rotation (services/citizenpay/connect.ts) and backfilled
+  // lazily for older funds by services/citizenpay/business-id.ts
+  // (resolveCitizenPayBusinessId). The fund's open-banking link (Ponto)
+  // belongs to that business, and the Citizen Pay dashboard page that connects
+  // it lives under this id — see services/fund-setup/citizenpay-dashboard.ts.
+  citizenPayBusinessId String?
+
+  // La Caisse hosting subscription — step 3 of the fund-setup checklist
+  // (services/fund-setup). Set once an OWNER accepts the monthly plan
+  // (SUBSCRIPTION_MONTHLY_EUR in services/fund-setup/config.ts) from
+  // Settings → Subscription; Citizen Pay's billing then invoices the fund's
+  // business, and the billing* columns are what that invoice needs. Null =
+  // not accepted yet. Never cleared by the app.
+  subscriptionAcceptedAt       DateTime?
+  subscriptionAcceptedByUserId String?   @db.Uuid // User.id of the accepting OWNER; no FK on purpose, the record outlives the account
+  billingLegalName             String?
+  billingEmail                 String?
+  billingAddress               String? // free text, lines separated by \n
+  billingVatNumber             String? // normalised (uppercase, no separators); null when the fund has none
+
   // Legal — links out to the fund's own ToS / privacy pages.
   termsUrl   String?
   privacyUrl String?

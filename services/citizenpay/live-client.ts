@@ -901,6 +901,12 @@ export class LiveCitizenPayClient implements CitizenPayClient {
     await apiTreasury.setEventsWebhook(this.creds, webhook);
   }
 
+  async getTreasuryBusinessId(): Promise<string | null> {
+    const wire = await apiTreasury.get(this.creds);
+    const id = wire.issued_by_business_id?.trim();
+    return id ? id : null;
+  }
+
   async deleteCard(serialNumber: string): Promise<void> {
     try {
       await apiCards.delete(this.creds, serialNumber);

@@ -54,6 +54,7 @@ import {
   FooterSkeleton,
   KpiTileSkeleton,
 } from "./skeleton";
+import { SetupChecklist, SetupChecklistSkeleton } from "./setup-checklist";
 
 // Fund analytics dashboard for the board: member + merchant activity, fund
 // balance and money flows at a glance. Every section streams in its own
@@ -93,6 +94,10 @@ export default async function FundDashboardPage({
     <>
       <Suspense fallback={<DashboardHeaderSkeleton />}>
         <DashboardHeader range={range} />
+      </Suspense>
+
+      <Suspense fallback={<SetupChecklistSkeleton />}>
+        <SetupChecklist />
       </Suspense>
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

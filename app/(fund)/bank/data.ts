@@ -3,7 +3,7 @@ import "server-only";
 import { cache } from "react";
 
 import { getCitizenPayClient } from "@/services/citizenpay/client";
-import type { BankBalance, BankingStatus } from "@/services/citizenpay/types";
+import type { BankBalance } from "@/services/citizenpay/types";
 import { prisma } from "@/services/db/prisma";
 
 export const TRANSACTIONS_PAGE_SIZE = 50;
@@ -20,38 +20,10 @@ function client(
   });
 }
 
-// Banking-connection status for the Bank page. Wrapped in `cache()` so the
-// page + any future balance/transactions sections share one read per render.
-// Degrades to a "not connected" status on error so the page can always render
-// the connect step rather than a crash.
-export const getBankingStatus = cache(
-  async (
-    fundId: string,
-    citizenPayApiKeyId: string | null,
-    citizenPayApiKeyEnc: string | null,
-  ): Promise<BankingStatus> => {
-    try {
-      return await client(
-        fundId,
-        citizenPayApiKeyId,
-        citizenPayApiKeyEnc,
-      ).getBankingStatus();
-    } catch (e) {
-      console.warn("[bank] getBankingStatus failed", e);
-      return {
-        connected: false,
-        status: "not_connected",
-        accountReference: null,
-        accountName: null,
-        onboardingComplete: false,
-        paymentInitiationEnabled: false,
-        paymentInitiationRequested: false,
-        paymentRequestsEnabled: false,
-        ready: false,
-      };
-    }
-  },
-);
+// Banking-connection status (cached, never throws). Lives in the citizenpay
+// service so the dashboard's setup checklist can share it; re-exported here
+// for the pages that already import it from this module.
+export { getBankingStatus } from "@/services/citizenpay/banking-status";
 
 // Balance — null when there's no connection (the endpoint 422s) or on error;
 // the page simply omits the balance card then.
