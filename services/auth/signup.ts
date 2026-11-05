@@ -9,8 +9,11 @@ import { auth } from "./better-auth";
 // so this is the only way an account comes into being: through a live staff
 // invite whose token the visitor holds (it reached them by email), for
 // exactly the invited address. Holding the token proves control of the
-// inbox, so the account starts email-verified. There is no other
-// self-service path — the waitlist only records interest.
+// inbox, so the account starts email-verified. The two other doors — the
+// member login (services/member/auth.ts) and the apex /join for a holder of
+// a subscription waiver code (services/fund-setup/join-actions.ts) — write
+// the same two rows through Prisma inside their own transaction, unverified.
+// The waitlist only records interest.
 
 export type CreateInvitedAccountResult =
   | { ok: true; user: { id: string; email: string } }

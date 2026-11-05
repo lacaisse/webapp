@@ -6,6 +6,7 @@ import { cache } from "react";
 import { prisma } from "@/services/db/prisma";
 import { FundRole } from "@/services/db/generated/enums";
 import { hasMinFundRole } from "@/services/auth/roles";
+import { findUsableWaiverCode } from "@/services/fund-setup/waiver-claim";
 import { requireCurrentFund } from "@/services/fund/server";
 import { getAuthUrl, getHostType } from "@/services/host/server";
 import { auth } from "./better-auth";
@@ -65,18 +66,23 @@ export const requireAdmin = cache(async () => {
 });
 
 /**
- * Who may create a fund: a platform admin, or a user who is already staff
- * of some fund (every staff account comes from an invite). A card holder's
- * member login is a plain User too (services/member/auth.ts) and must not
- * be able to open a fund of its own and become its OWNER — it has no
+ * Who may create a fund: a platform admin; a user who is already staff of
+ * some fund (every staff account comes from an invite); or, on /new?code=,
+ * the holder of a usable subscription waiver code (services/fund-setup/
+ * waiver-claim.ts) — the code is admin-minted, limited and expiring, so
+ * holding it is the invite, and createFundAction then claims a use and
+ * creates the fund waived in one transaction. A card holder's member login
+ * is a plain User too (services/member/auth.ts) and must not be able to
+ * open a fund of its own and become its OWNER without one — it has no
  * FundMember row anywhere, so it is refused here.
  */
-export const requireFundCreator = cache(async () => {
+export const requireFundCreator = cache(async (waiverCode?: string) => {
   const user = await requireUser();
   if (user.globalRole === "ADMIN") return user;
   const staffRows = await prisma.fundMember.count({ where: { userId: user.id } });
-  if (staffRows === 0) redirect("/unauthorized");
-  return user;
+  if (staffRows > 0) return user;
+  if (waiverCode && (await findUsableWaiverCode(waiverCode))) return user;
+  redirect("/unauthorized");
 });
 
 // =============================================================================

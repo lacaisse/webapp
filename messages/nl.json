@@ -132,6 +132,7 @@
       "subdomain": "Subdomein",
       "submit": "Fonds aanmaken",
       "submitting": "Aanmaken…",
+      "waived": "Hosting is gratis voor deze kas — {label}.",
       "errors": {
         "nameMin": "De naam moet minstens {min} tekens lang zijn.",
         "subdomainMin": "Het subdomein moet minstens {min} tekens lang zijn.",
@@ -3068,6 +3069,31 @@
     "accept": "Uitnodiging accepteren",
     "accepting": "Toetreden…"
   },
+  "join": {
+    "title": "Uw kas starten",
+    "description": "Een uitnodigingscode van Citizen Pay opent een kas die gratis gehost wordt. Voer hem in om uw account en uw kas in één keer aan te maken.",
+    "code": "Uitnodigingscode",
+    "continue": "Doorgaan",
+    "codeAccepted": "Code aanvaard — gratis hosting voor “{label}”.",
+    "changeCode": "Een andere code gebruiken",
+    "account": "Uw account",
+    "email": "E-mail",
+    "password": "Wachtwoord",
+    "passwordHint": "Minstens {min} tekens.",
+    "fund": "Uw kas",
+    "name": "Naam van de kas",
+    "subdomain": "Subdomein",
+    "submit": "Mijn account en kas aanmaken",
+    "submitting": "Aanmaken…",
+    "haveAccount": "Heeft u al een account?",
+    "signIn": "Inloggen",
+    "errors": {
+      "codeRequired": "Voer uw uitnodigingscode in.",
+      "codeInvalid": "Deze code is niet geldig, of niet meer. Controleer hem, of vraag een nieuwe aan wie hem u gaf.",
+      "tooMany": "Te veel pogingen. Wacht even voordat u het opnieuw probeert.",
+      "accountExists": "Er bestaat al een account voor dit e-mailadres. Log in en gebruik dan de code om uw kas aan te maken."
+    }
+  },
   "members": {
     "email": {
       "paymentConfirmation": {
@@ -4098,7 +4124,7 @@
     "waivers": {
       "create": {
         "title": "Nieuwe uitnodigingscode",
-        "description": "Maak een code voor een kas die gratis gehost wordt. De eigenaar gebruikt hem in Instellingen → Abonnement; de abonnementsstap is dan afgerond zonder betaling.",
+        "description": "Maak een code voor een kas die gratis gehost wordt. Een nieuwkomer maakt ermee een account en een kas aan op {joinUrl}; de eigenaar van een bestaande kas gebruikt hem in Instellingen → Abonnement. In beide gevallen is de abonnementsstap afgerond zonder betaling.",
         "label": "Voor wie of waarom",
         "labelHint": "Wordt aan de kas getoond als reden, bv. “Bijdrager: Alice” of “Geregistreerde vzw”.",
         "maxUses": "Gebruik",
@@ -4108,7 +4134,7 @@
         "submit": "Code aanmaken",
         "submitting": "Aanmaken…",
         "createdTitle": "Code aangemaakt voor “{label}”",
-        "createdHint": "Stuur hem naar de eigenaar van de kas. Hij blijft in de lijst hieronder staan.",
+        "createdHint": "Stuur hem naar de persoon. Nieuw op La Caisse: op {joinUrl}; eigenaar van een bestaande kas: in Instellingen → Abonnement. Hij blijft in de lijst hieronder staan.",
         "copy": "Kopiëren",
         "copied": "Gekopieerd"
       },
@@ -4122,7 +4148,9 @@
         "expires": "Verloopt",
         "never": "Nooit",
         "status": "Status",
-        "redeemedBy": "Gebruikt door"
+        "funds": "Kassen",
+        "created": "aangemaakt met deze code",
+        "redeemed": "heeft hem gebruikt"
       },
       "status": {
         "active": "Actief",

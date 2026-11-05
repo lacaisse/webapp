@@ -6,6 +6,7 @@ import { headers } from "next/headers";
 import { getLocale, getTranslations } from "next-intl/server";
 
 import { AttemptLimiter } from "@/services/auth/attempt-limiter";
+import { clientIp } from "@/services/http/client-ip";
 import { auth } from "@/services/auth/better-auth";
 import { getCurrentMember } from "@/services/auth/dal";
 import { scheduleMemberCardHolderSync } from "@/services/card/holder-sync";
@@ -60,12 +61,6 @@ const signupLimiter = new AttemptLimiter(5, 60 * 60_000);
 const loginLimiter = new AttemptLimiter(10, 10 * 60_000);
 const forgotLimiter = new AttemptLimiter(5, 60 * 60_000);
 const emailCheckLimiter = new AttemptLimiter(30, 10 * 60_000);
-
-async function clientIp(): Promise<string> {
-  const h = await headers();
-  const forwarded = h.get("x-forwarded-for");
-  return forwarded?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown";
-}
 
 // Only a path on this fund's own origin comes back from `return_to`
 // (services/http/same-origin-path.ts); anything else lands on the account.

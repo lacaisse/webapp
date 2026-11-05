@@ -148,6 +148,7 @@
       "subdomain": "Subdomain",
       "submit": "Create fund",
       "submitting": "Creating…",
+      "waived": "Hosting is free for this fund — {label}.",
       "errors": {
         "nameMin": "Name must be at least {min} characters.",
         "subdomainMin": "Subdomain must be at least {min} characters.",
@@ -3126,6 +3127,31 @@
     "accept": "Accept invitation",
     "accepting": "Joining…"
   },
+  "join": {
+    "title": "Start your fund",
+    "description": "An invite code from Citizen Pay opens a fund that hosts for free. Enter it to create your account and your fund in one go.",
+    "code": "Invite code",
+    "continue": "Continue",
+    "codeAccepted": "Code accepted — free hosting for “{label}”.",
+    "changeCode": "Use another code",
+    "account": "Your account",
+    "email": "Email",
+    "password": "Password",
+    "passwordHint": "At least {min} characters.",
+    "fund": "Your fund",
+    "name": "Fund name",
+    "subdomain": "Subdomain",
+    "submit": "Create my account and fund",
+    "submitting": "Creating…",
+    "haveAccount": "Already have an account?",
+    "signIn": "Sign in",
+    "errors": {
+      "codeRequired": "Enter your invite code.",
+      "codeInvalid": "This code is not valid, or no longer is. Check it, or ask the person who gave it to you for a new one.",
+      "tooMany": "Too many attempts. Wait a little before trying again.",
+      "accountExists": "An account already exists for this email address. Sign in, then use the code to create your fund."
+    }
+  },
   "members": {
     "email": {
       "paymentConfirmation": {
@@ -4174,7 +4200,7 @@
     "waivers": {
       "create": {
         "title": "New invite code",
-        "description": "Mint a code for a fund that hosts for free. Its owner redeems it in Settings → Subscription; the subscription step is then done without a payment.",
+        "description": "Mint a code for a fund that hosts for free. With it, a newcomer creates their account and their fund at {joinUrl}; the owner of an existing fund redeems it in Settings → Subscription. Either way the subscription step is done without a payment.",
         "label": "Who or why",
         "labelHint": "Shown to the fund as the reason, e.g. “Contributor: Alice” or “Registered non-profit”.",
         "maxUses": "Uses",
@@ -4184,7 +4210,7 @@
         "submit": "Mint code",
         "submitting": "Minting…",
         "createdTitle": "Code minted for “{label}”",
-        "createdHint": "Send it to the fund's owner. It stays in the list below.",
+        "createdHint": "Send it to the person. New to La Caisse, they use it at {joinUrl}; the owner of an existing fund, in Settings → Subscription. It stays in the list below.",
         "copy": "Copy",
         "copied": "Copied"
       },
@@ -4198,7 +4224,9 @@
         "expires": "Expires",
         "never": "Never",
         "status": "Status",
-        "redeemedBy": "Redeemed by"
+        "funds": "Funds",
+        "created": "created with this code",
+        "redeemed": "redeemed it"
       },
       "status": {
         "active": "Active",

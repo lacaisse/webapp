@@ -39,6 +39,7 @@ const prisma = vi.hoisted(() => ({
   user: { findUnique: vi.fn() },
   fundMember: { findUnique: vi.fn(), count: vi.fn() },
   member: { findFirst: vi.fn() },
+  subscriptionWaiverCode: { findUnique: vi.fn() },
 }));
 vi.mock("@/services/db/prisma", () => ({ prisma }));
 
@@ -65,6 +66,43 @@ describe("a member session", () => {
   it("cannot create a fund (and so become its OWNER)", async () => {
     await expect(requireFundCreator()).rejects.toThrow("REDIRECT:/unauthorized");
     expect(prisma.fundMember.count).toHaveBeenCalledWith({ where: { userId: memberUser.id } });
+    expect(prisma.subscriptionWaiverCode.findUnique).not.toHaveBeenCalled();
+  });
+
+  // /new?code=: a subscription waiver code is the invite (services/fund-setup/
+  // waiver-claim.ts); it opens the gate only while it can still be used.
+  it("may create a fund with a usable waiver code, looked up normalised", async () => {
+    prisma.subscriptionWaiverCode.findUnique.mockResolvedValue({
+      id: "code-1",
+      code: "7K3PM2QX9RTD",
+      label: "Contributor",
+      maxUses: 1,
+      usedCount: 0,
+      expiresAt: null,
+      revokedAt: null,
+    });
+    expect((await requireFundCreator(" 7k3p-m2qx-9rtd ")).id).toBe(memberUser.id);
+    expect(prisma.subscriptionWaiverCode.findUnique).toHaveBeenCalledWith({
+      where: { code: "7K3PM2QX9RTD" },
+    });
+  });
+
+  it("is refused with a code that is unknown, used up, expired or revoked", async () => {
+    const code = { id: "code-1", code: "7K3PM2QX9RTD", label: "x", maxUses: 1, usedCount: 0, expiresAt: null, revokedAt: null };
+    for (const row of [
+      null,
+      { ...code, usedCount: 1 },
+      { ...code, expiresAt: new Date(Date.now() - 1) },
+      { ...code, revokedAt: new Date() },
+    ]) {
+      prisma.subscriptionWaiverCode.findUnique.mockResolvedValueOnce(row);
+      await expect(requireFundCreator("7K3P-M2QX-9RTD")).rejects.toThrow("REDIRECT:/unauthorized");
+    }
+  });
+
+  it("is refused with a malformed code without a read", async () => {
+    await expect(requireFundCreator("nope")).rejects.toThrow("REDIRECT:/unauthorized");
+    expect(prisma.subscriptionWaiverCode.findUnique).not.toHaveBeenCalled();
   });
 
   it("never satisfies a staff route, even at the lowest role", async () => {

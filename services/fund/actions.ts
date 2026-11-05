@@ -2,12 +2,13 @@
 "use server";
 
 import { getLocale, getTranslations } from "next-intl/server";
+import { revalidatePath } from "next/cache";
 import { requireFundCreator } from "@/services/auth/dal";
 import { prisma } from "@/services/db/prisma";
-import { registerFundMcpResource } from "@/services/mcp/auth";
+import { claimWaiverCodeUse, findUsableWaiverCode } from "@/services/fund-setup/waiver-claim";
 import { isSupportedLocale } from "@/services/i18n/config";
-import { generateFundMinter } from "@/services/token/minter";
-import { FUND_APEX } from "./host";
+import { registerFundMcpResource } from "@/services/mcp/auth";
+import { createFundRecord } from "./create";
 import {
   CreateFundSchema,
   SUBDOMAIN_MAX_LENGTH,
@@ -19,6 +20,10 @@ import { getFundUrl } from "./server";
 export type CreateFundResult =
   | { error: string; field?: "name" | "subdomain" }
   | { ok: true; redirectTo: string };
+
+// The claimed use must go back to the code when the fund can't be created:
+// thrown inside the transaction so Prisma rolls it back.
+class WaiverCodeUnusable extends Error {}
 
 export async function createFundAction(
   input: CreateFundInput,
@@ -36,8 +41,15 @@ export async function createFundAction(
     };
   }
 
-  const user = await requireFundCreator();
-  const domain = `${parsed.data.subdomain}.${FUND_APEX}`;
+  // The gate accepts a holder of a usable waiver code besides admins and
+  // staff; a code that came along is used either way (an admin's fund with a
+  // code is waived too). It was checked when /new opened and is read again
+  // here — it may have been used up, revoked or expired since — and claimed
+  // inside the transaction below. Nothing tells those apart from a wrong
+  // code (services/fund-setup/join.ts).
+  const user = await requireFundCreator(parsed.data.code);
+  const waiverCode = parsed.data.code ? await findUsableWaiverCode(parsed.data.code) : null;
+  if (parsed.data.code && !waiverCode) return { error: t("join.errors.codeInvalid") };
 
   // Inherit the creator's session locale as the fund's default. Most cases
   // the creator's locale matches the audience's; admin can change it later.
@@ -45,41 +57,29 @@ export async function createFundAction(
   const defaultLocale = isSupportedLocale(creatorLocale)
     ? creatorLocale
     : undefined; // schema default ("fr") if not supported
+  const now = new Date();
+  const record = {
+    name: parsed.data.name,
+    subdomain: parsed.data.subdomain,
+    defaultLocale,
+    ownerUserId: user.id,
+    now,
+  };
 
-  // Mint the per-fund token-minter keypair upfront so every fund has a
-  // signing identity for UserOp-based mint/burn from day one — see
-  // services/token/minter.ts. The smart-account address is derived later
-  // (in services/citizenpay/connect.ts::consumeConnect) once CP returns
-  // the per-treasury factory address.
-  const minter = generateFundMinter();
-
+  let fund;
   try {
-    // One nested create. Default tier values come from the scoping doc's
-    // example (5.3.1): min €100 / target €150 / max €225 — admin can edit
-    // amounts and add more tiers from the settings UI.
-    const fund = await prisma.fund.create({
-      data: {
-        name: parsed.data.name,
-        domain,
-        ...(defaultLocale ? { defaultLocale } : {}),
-        tokenMinterPrivateKeyEnc: minter.privateKeyEnc,
-        tokenMinterEoaAddress: minter.eoaAddress,
-        staff: { create: { userId: user.id, role: "OWNER" } },
-        tiers: {
-          create: {
-            name: "Standard",
-            minContribution: "100.00",
-            maxContribution: "225.00",
-            allocationAmount: "150.00",
-            position: 0,
-          },
-        },
-      },
-    });
-    // The new host is an MCP OAuth resource from day one (best-effort).
-    await registerFundMcpResource(fund);
-    return { ok: true, redirectTo: getFundUrl(fund.domain) };
+    fund = waiverCode
+      ? await prisma.$transaction(async (tx) => {
+          if (!(await claimWaiverCodeUse(tx, waiverCode, now))) throw new WaiverCodeUnusable();
+          return createFundRecord(tx, {
+            ...record,
+            waiver: { codeId: waiverCode.id, label: waiverCode.label },
+          });
+        })
+      : await createFundRecord(prisma, record);
   } catch (e) {
+    if (e instanceof WaiverCodeUnusable) return { error: t("join.errors.codeInvalid") };
+    // The only unique in that write is Fund.domain.
     if (
       e instanceof Error &&
       "code" in e &&
@@ -92,4 +92,9 @@ export async function createFundAction(
     }
     throw e;
   }
+
+  // The new host is an MCP OAuth resource from day one (best-effort).
+  await registerFundMcpResource(fund);
+  if (waiverCode) revalidatePath("/admin/waivers");
+  return { ok: true, redirectTo: getFundUrl(fund.domain) };
 }

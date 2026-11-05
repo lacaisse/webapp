@@ -148,6 +148,7 @@
       "subdomain": "Sous-domaine",
       "submit": "Créer la caisse",
       "submitting": "Création…",
+      "waived": "L'hébergement est gratuit pour cette caisse — {label}.",
       "errors": {
         "nameMin": "Le nom doit contenir au moins {min} caractères.",
         "subdomainMin": "Le sous-domaine doit contenir au moins {min} caractères.",
@@ -3126,6 +3127,31 @@
     "accept": "Accepter l'invitation",
     "accepting": "Adhésion…"
   },
+  "join": {
+    "title": "Créer votre caisse",
+    "description": "Un code d'invitation de Citizen Pay ouvre une caisse hébergée gratuitement. Saisissez-le pour créer votre compte et votre caisse en une fois.",
+    "code": "Code d'invitation",
+    "continue": "Continuer",
+    "codeAccepted": "Code accepté — hébergement gratuit pour « {label} ».",
+    "changeCode": "Utiliser un autre code",
+    "account": "Votre compte",
+    "email": "Email",
+    "password": "Mot de passe",
+    "passwordHint": "Au moins {min} caractères.",
+    "fund": "Votre caisse",
+    "name": "Nom de la caisse",
+    "subdomain": "Sous-domaine",
+    "submit": "Créer mon compte et ma caisse",
+    "submitting": "Création…",
+    "haveAccount": "Vous avez déjà un compte ?",
+    "signIn": "Se connecter",
+    "errors": {
+      "codeRequired": "Saisissez votre code d'invitation.",
+      "codeInvalid": "Ce code n'est pas valide, ou ne l'est plus. Vérifiez-le, ou demandez-en un nouveau à la personne qui vous l'a remis.",
+      "tooMany": "Trop de tentatives. Patientez un peu avant de réessayer.",
+      "accountExists": "Un compte existe déjà pour cette adresse email. Connectez-vous, puis utilisez le code pour créer votre caisse."
+    }
+  },
   "members": {
     "email": {
       "paymentConfirmation": {
@@ -4174,7 +4200,7 @@
     "waivers": {
       "create": {
         "title": "Nouveau code d'invitation",
-        "description": "Créez un code pour une caisse hébergée gratuitement. Son propriétaire l'utilise dans Paramètres → Abonnement ; l'étape abonnement est alors validée sans paiement.",
+        "description": "Créez un code pour une caisse hébergée gratuitement. Avec lui, un nouveau venu crée son compte et sa caisse sur {joinUrl} ; le propriétaire d'une caisse existante l'utilise dans Paramètres → Abonnement. Dans les deux cas, l'étape abonnement est validée sans paiement.",
         "label": "Pour qui ou pourquoi",
         "labelHint": "Affiché à la caisse comme motif, p. ex. « Contributeur : Alice » ou « ASBL enregistrée ».",
         "maxUses": "Utilisations",
@@ -4184,7 +4210,7 @@
         "submit": "Créer le code",
         "submitting": "Création…",
         "createdTitle": "Code créé pour « {label} »",
-        "createdHint": "Envoyez-le au propriétaire de la caisse. Il reste dans la liste ci-dessous.",
+        "createdHint": "Envoyez-le à la personne. Nouvelle sur La Caisse, elle l'utilise sur {joinUrl} ; propriétaire d'une caisse existante, dans Paramètres → Abonnement. Il reste dans la liste ci-dessous.",
         "copy": "Copier",
         "copied": "Copié"
       },
@@ -4198,7 +4224,9 @@
         "expires": "Expire",
         "never": "Jamais",
         "status": "Statut",
-        "redeemedBy": "Utilisé par"
+        "funds": "Caisses",
+        "created": "créée avec ce code",
+        "redeemed": "l'a utilisé"
       },
       "status": {
         "active": "Actif",

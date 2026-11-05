@@ -557,7 +557,17 @@ model Fund {
   subscriptionWaivedAt     DateTime?
   subscriptionWaiverReason String?
   subscriptionWaiverCodeId String?
-  subscriptionWaiverCode   SubscriptionWaiverCode? @relation(fields: [subscriptionWaiverCodeId], references: [id], onDelete: SetNull)
+  subscriptionWaiverCode   SubscriptionWaiverCode? @relation("FundSubscriptionWaiverCode", fields: [subscriptionWaiverCodeId], references: [id], onDelete: SetNull)
+
+  // The code this fund was CREATED with — the apex /join door (a newcomer's
+  // account and fund in one go, services/fund-setup/join-actions.ts) or
+  // /new?code= for a signed-in person (services/fund/actions.ts). Set in the
+  // same write as the waiver above, never changed. Null for a fund that
+  // existed first and redeemed a code on Settings → Subscription, or was
+  // waived from the shell — so /admin/waivers can tell "created with this
+  // code" from "redeemed it".
+  createdWithWaiverCodeId String?
+  createdWithWaiverCode   SubscriptionWaiverCode? @relation("FundCreatedWithWaiverCode", fields: [createdWithWaiverCodeId], references: [id], onDelete: SetNull)
 
   // Legal — links out to the fund's own ToS / privacy pages.
   termsUrl   String?
@@ -2684,7 +2694,8 @@ model SubscriptionWaiverCode {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  funds Fund[]
+  funds        Fund[] @relation("FundSubscriptionWaiverCode") // funds whose hosting this code waived (redeemed or created)
+  createdFunds Fund[] @relation("FundCreatedWithWaiverCode") // the subset that came into being through it (/join, /new?code=)
 }
 
 // Public waitlist signups from the marketing landing. Self-serve account

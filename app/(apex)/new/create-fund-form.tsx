@@ -16,27 +16,20 @@ import {
   NAME_MIN_LENGTH,
   SUBDOMAIN_MAX_LENGTH,
   SUBDOMAIN_MIN_LENGTH,
+  toSubdomain,
   type CreateFundInput,
 } from "@/services/fund/schema";
 
-function toSubdomain(value: string): string {
-  return value
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-z0-9-]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, SUBDOMAIN_MAX_LENGTH);
-}
-
-export function CreateFundForm() {
+// `waiverCode`: /new?code= — a usable subscription waiver code the page
+// already checked; it travels with the submit and the fund is created waived.
+export function CreateFundForm({ waiverCode }: { waiverCode?: string }) {
   const t = useTranslations("funds.create");
   const tRoot = useTranslations();
 
   const [pending, startTransition] = useTransition();
   const form = useForm<CreateFundInput>({
     resolver: zodResolver(CreateFundSchema),
-    defaultValues: { name: "", subdomain: "" },
+    defaultValues: { name: "", subdomain: "", code: waiverCode },
   });
 
   // Auto-derive subdomain from name until the user edits the field.

@@ -17,6 +17,7 @@ import {
   type AcceptSubscriptionInput,
   type RedeemWaiverCodeInput,
 } from "./schema";
+import { claimWaiverCodeUse } from "./waiver-claim";
 import { waiverCodeState, type WaiverCodeState } from "./waiver-codes";
 
 type AcceptSubscriptionField = "legalName" | "email" | "address" | "vatNumber" | "accepted";
@@ -182,16 +183,7 @@ export async function redeemWaiverCodeAction(
   let outcome: "waived" | "code_unusable" | "fund_settled";
   try {
     outcome = await prisma.$transaction(async (tx) => {
-      const claimed = await tx.subscriptionWaiverCode.updateMany({
-        where: {
-          id: code.id,
-          revokedAt: null,
-          usedCount: { lt: code.maxUses },
-          OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
-        },
-        data: { usedCount: { increment: 1 } },
-      });
-      if (claimed.count === 0) return "code_unusable";
+      if (!(await claimWaiverCodeUse(tx, code, now))) return "code_unusable";
 
       const waived = await tx.fund.updateMany({
         where: { id: fund.id, subscriptionAcceptedAt: null, subscriptionWaivedAt: null },
