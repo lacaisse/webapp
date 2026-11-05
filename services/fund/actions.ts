@@ -3,8 +3,10 @@
 
 import { getLocale, getTranslations } from "next-intl/server";
 import { revalidatePath } from "next/cache";
-import { requireFundCreator } from "@/services/auth/dal";
+import { redirect } from "next/navigation";
+import { fundCreatorAccess } from "@/services/auth/dal";
 import { prisma } from "@/services/db/prisma";
+import { isUniqueViolationOn } from "@/services/db/unique-violation";
 import { claimWaiverCodeUse, findUsableWaiverCode } from "@/services/fund-setup/waiver-claim";
 import { isSupportedLocale } from "@/services/i18n/config";
 import { registerFundMcpResource } from "@/services/mcp/auth";
@@ -46,8 +48,13 @@ export async function createFundAction(
   // code is waived too). It was checked when /new opened and is read again
   // here — it may have been used up, revoked or expired since — and claimed
   // inside the transaction below. Nothing tells those apart from a wrong
-  // code (services/fund-setup/join.ts).
-  const user = await requireFundCreator(parsed.data.code);
+  // code (services/fund-setup/join.ts); a newcomer whose only key was that
+  // code gets those words, not /unauthorized.
+  const { user, access } = await fundCreatorAccess(parsed.data.code);
+  if (!access) {
+    if (parsed.data.code) return { error: t("join.errors.codeInvalid") };
+    redirect("/unauthorized");
+  }
   const waiverCode = parsed.data.code ? await findUsableWaiverCode(parsed.data.code) : null;
   if (parsed.data.code && !waiverCode) return { error: t("join.errors.codeInvalid") };
 
@@ -79,12 +86,7 @@ export async function createFundAction(
       : await createFundRecord(prisma, record);
   } catch (e) {
     if (e instanceof WaiverCodeUnusable) return { error: t("join.errors.codeInvalid") };
-    // The only unique in that write is Fund.domain.
-    if (
-      e instanceof Error &&
-      "code" in e &&
-      (e as { code?: string }).code === "P2002"
-    ) {
+    if (isUniqueViolationOn(e, "domain")) {
       return {
         error: t("funds.create.errors.subdomainTaken"),
         field: "subdomain",

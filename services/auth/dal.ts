@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 import { prisma } from "@/services/db/prisma";
+import type { User } from "@/services/db/generated/client";
 import { FundRole } from "@/services/db/generated/enums";
 import { hasMinFundRole } from "@/services/auth/roles";
 import { findUsableWaiverCode } from "@/services/fund-setup/waiver-claim";
@@ -65,6 +66,9 @@ export const requireAdmin = cache(async () => {
   return user;
 });
 
+/** What lets the signed-in user create a fund; null = nothing does. */
+export type FundCreatorAccess = "admin" | "staff" | "code" | null;
+
 /**
  * Who may create a fund: a platform admin; a user who is already staff of
  * some fund (every staff account comes from an invite); or, on /new?code=,
@@ -75,14 +79,26 @@ export const requireAdmin = cache(async () => {
  * is a plain User too (services/member/auth.ts) and must not be able to
  * open a fund of its own and become its OWNER without one — it has no
  * FundMember row anywhere, so it is refused here.
+ *
+ * `fundCreatorAccess` is the decision alone (a signed-in user is still
+ * required): /new uses it to send a newcomer whose code died meanwhile back
+ * to /join rather than to /unauthorized. `requireFundCreator` is the gate.
  */
+export const fundCreatorAccess = cache(
+  async (waiverCode?: string): Promise<{ user: User; access: FundCreatorAccess }> => {
+    const user = await requireUser();
+    if (user.globalRole === "ADMIN") return { user, access: "admin" };
+    const staffRows = await prisma.fundMember.count({ where: { userId: user.id } });
+    if (staffRows > 0) return { user, access: "staff" };
+    if (waiverCode && (await findUsableWaiverCode(waiverCode))) return { user, access: "code" };
+    return { user, access: null };
+  },
+);
+
 export const requireFundCreator = cache(async (waiverCode?: string) => {
-  const user = await requireUser();
-  if (user.globalRole === "ADMIN") return user;
-  const staffRows = await prisma.fundMember.count({ where: { userId: user.id } });
-  if (staffRows > 0) return user;
-  if (waiverCode && (await findUsableWaiverCode(waiverCode))) return user;
-  redirect("/unauthorized");
+  const { user, access } = await fundCreatorAccess(waiverCode);
+  if (!access) redirect("/unauthorized");
+  return user;
 });
 
 // =============================================================================

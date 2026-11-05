@@ -112,6 +112,14 @@
       "resetPassword": {
         "subject": "Stel je La Caisse-wachtwoord opnieuw in",
         "text": "Hallo,\n\nJe hebt gevraagd om je wachtwoord opnieuw in te stellen. Klik op de onderstaande link om een nieuw wachtwoord te kiezen:\n\n{url}\n\nAls je dit niet hebt aangevraagd, kun je deze e-mail negeren — je wachtwoord wordt niet gewijzigd.\n\nHet La Caisse-team"
+      },
+      "verifyEmail": {
+        "subject": "Bevestig uw e-mailadres voor La Caisse",
+        "text": "Hallo,\n\nBevestig dat {email} van u is door de onderstaande link te openen:\n\n{url}\n\nDe link is 24 uur geldig. Als u geen La Caisse-account hebt aangemaakt, negeer dan dit bericht.\n\nHet La Caisse-team"
+      },
+      "joinExistingAccount": {
+        "subject": "Uw La Caisse-account en een uitnodigingscode",
+        "text": "Hallo,\n\nIemand — waarschijnlijk u — heeft op La Caisse een uitnodigingscode gebruikt met dit adres, dat al een account heeft. Om met die code uw kas aan te maken, logt u hier in:\n\n{url}\n\nWas u dit niet, negeer dan dit bericht: er is niets aangemaakt of gewijzigd.\n\nHet La Caisse-team"
       }
     }
   },
@@ -885,6 +893,15 @@
           "cta": "Bekijken en aanvaarden",
           "descriptionWaived": "Hosting is gratis voor deze kas."
         }
+      },
+      "unverifiedEmail": {
+        "title": "Bevestig uw e-mailadres",
+        "description": "We hebben een bevestigingslink gestuurd naar {email}. Open hem om te bevestigen dat het adres van u is — tot dan kunnen uitnodigingen van andere kassen dit account niet bereiken.",
+        "resend": "Link opnieuw sturen",
+        "resending": "Versturen…",
+        "resent": "Verstuurd — controleer uw inbox.",
+        "tooMany": "Te veel verzoeken. Probeer het over een uur opnieuw.",
+        "error": "De e-mail kon niet worden verstuurd. Probeer het later opnieuw."
       },
       "tokenFallback": "tokens",
       "range": {
@@ -3085,13 +3102,13 @@
     "subdomain": "Subdomein",
     "submit": "Mijn account en kas aanmaken",
     "submitting": "Aanmaken…",
+    "checkInbox": "We hebben een e-mail gestuurd naar {email}. Open hem om verder te gaan.",
     "haveAccount": "Heeft u al een account?",
     "signIn": "Inloggen",
     "errors": {
       "codeRequired": "Voer uw uitnodigingscode in.",
       "codeInvalid": "Deze code is niet geldig, of niet meer. Controleer hem, of vraag een nieuwe aan wie hem u gaf.",
-      "tooMany": "Te veel pogingen. Wacht even voordat u het opnieuw probeert.",
-      "accountExists": "Er bestaat al een account voor dit e-mailadres. Log in en gebruik dan de code om uw kas aan te maken."
+      "tooMany": "Te veel pogingen. Wacht even voordat u het opnieuw probeert."
     }
   },
   "members": {

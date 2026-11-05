@@ -55,6 +55,7 @@ import {
   KpiTileSkeleton,
 } from "./skeleton";
 import { SetupChecklist, SetupChecklistSkeleton } from "./setup-checklist";
+import { UnverifiedEmailNotice } from "./unverified-email-notice";
 
 // Fund analytics dashboard for the board: member + merchant activity, fund
 // balance and money flows at a glance. Every section streams in its own
@@ -83,7 +84,7 @@ export default async function FundDashboardPage({
 }: {
   searchParams: Promise<{ range?: string | string[] }>;
 }) {
-  const { membership } = await requireFundRole("OPERATOR");
+  const { user, membership } = await requireFundRole("OPERATOR");
   if (!isFundAdmin(membership.role)) redirect("/members");
 
   const sp = await searchParams;
@@ -95,6 +96,9 @@ export default async function FundDashboardPage({
       <Suspense fallback={<DashboardHeaderSkeleton />}>
         <DashboardHeader range={range} />
       </Suspense>
+
+      {/* An account the apex /join door created starts unverified. */}
+      {!user.emailVerified && <UnverifiedEmailNotice email={user.email} />}
 
       <Suspense fallback={<SetupChecklistSkeleton />}>
         <SetupChecklist />

@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// The /join door's two checks: the page lookup never says why a code is
-// unusable and is counted per IP; the submit is counted per IP and per code.
+// The /join door's limits: the page lookup never says why a code is unusable
+// and only a miss counts per IP; a submit counts per code when it starts and
+// per IP only when it ends; the existing-account email goes once per address
+// per while.
 vi.mock("server-only", () => ({}));
 
 const { requestHeaders, findUnique } = vi.hoisted(() => ({
@@ -14,7 +16,12 @@ vi.mock("@/services/db/prisma", () => ({
   prisma: { subscriptionWaiverCode: { findUnique } },
 }));
 
-import { allowJoinSubmit, lookupJoinCode } from "./join";
+import {
+  allowExistingAccountEmail,
+  allowJoinSubmit,
+  countJoinSubmit,
+  lookupJoinCode,
+} from "./join";
 
 const activeCode = {
   id: "code-1",
@@ -65,27 +72,39 @@ describe("lookupJoinCode", () => {
     }
   });
 
-  it("stops answering an IP after 30 checks in 10 minutes, whatever the codes were", async () => {
+  it("lets an address check a usable code as often as it likes (a shared link behind one NAT)", async () => {
     findUnique.mockResolvedValue(activeCode);
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 60; i++) {
       expect((await lookupJoinCode(activeCode.code)).kind).toBe("ok");
+    }
+  });
+
+  it("stops answering an address after 30 misses in 10 minutes, whatever the codes were", async () => {
+    findUnique.mockResolvedValue(null);
+    for (let i = 0; i < 30; i++) {
+      expect(await lookupJoinCode(`WRONGCODE${String(i).padStart(3, "0")}`)).toEqual({ kind: "invalid" });
     }
     expect(await lookupJoinCode(activeCode.code)).toEqual({ kind: "too_many" });
     // Another address is unaffected.
     requestFrom(freshIp());
+    findUnique.mockResolvedValue(activeCode);
     expect((await lookupJoinCode(activeCode.code)).kind).toBe("ok");
   });
 });
 
-describe("allowJoinSubmit", () => {
-  it("allows 10 submits per IP per hour", async () => {
-    for (let i = 0; i < 10; i++) {
-      expect(await allowJoinSubmit(`CODE${i}`.padEnd(12, "0"))).toBe(true);
+describe("allowJoinSubmit / countJoinSubmit", () => {
+  it("spends the address's budget only on submits that ended: 10 per hour", async () => {
+    for (let i = 0; i < 25; i++) {
+      // Starting a submit (a different code each time) never spends it…
+      expect(await allowJoinSubmit(`CODE${String(i).padStart(8, "0")}`)).toBe(true);
     }
+    for (let i = 0; i < 10; i++) await countJoinSubmit(); // …ending one does.
     expect(await allowJoinSubmit("ANOTHERCODE1")).toBe(false);
+    requestFrom(freshIp());
+    expect(await allowJoinSubmit("ANOTHERCODE1")).toBe(true);
   });
 
-  it("allows 10 submits per code per 10 minutes across addresses", async () => {
+  it("allows 10 submits per code per 10 minutes across addresses, counted as they start", async () => {
     for (let i = 0; i < 10; i++) {
       requestFrom(freshIp());
       expect(await allowJoinSubmit("SAMECODE0001")).toBe(true);
@@ -93,5 +112,13 @@ describe("allowJoinSubmit", () => {
     requestFrom(freshIp());
     expect(await allowJoinSubmit("SAMECODE0001")).toBe(false);
     expect(await allowJoinSubmit("OTHERCODE001")).toBe(true);
+  });
+});
+
+describe("allowExistingAccountEmail", () => {
+  it("lets one email go per address per 10 minutes", () => {
+    expect(allowExistingAccountEmail("alice@example.org")).toBe(true);
+    expect(allowExistingAccountEmail("alice@example.org")).toBe(false);
+    expect(allowExistingAccountEmail("bob@example.org")).toBe(true);
   });
 });

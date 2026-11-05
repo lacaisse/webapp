@@ -128,6 +128,14 @@
       "resetPassword": {
         "subject": "Réinitialisez votre mot de passe La Caisse",
         "text": "Bonjour,\n\nVous avez demandé à réinitialiser votre mot de passe. Cliquez sur le lien ci-dessous pour en définir un nouveau :\n\n{url}\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez ce message — votre mot de passe ne sera pas modifié.\n\nL'équipe La Caisse"
+      },
+      "verifyEmail": {
+        "subject": "Confirmez votre adresse email pour La Caisse",
+        "text": "Bonjour,\n\nConfirmez que {email} est bien à vous en ouvrant le lien ci-dessous :\n\n{url}\n\nLe lien est valable 24 heures. Si vous n'avez pas créé de compte La Caisse, ignorez ce message.\n\nL'équipe La Caisse"
+      },
+      "joinExistingAccount": {
+        "subject": "Votre compte La Caisse et un code d'invitation",
+        "text": "Bonjour,\n\nQuelqu'un — probablement vous — a utilisé un code d'invitation sur La Caisse avec cette adresse, qui a déjà un compte. Pour créer votre caisse avec ce code, connectez-vous ici :\n\n{url}\n\nSi ce n'était pas vous, ignorez ce message : rien n'a été créé ni modifié.\n\nL'équipe La Caisse"
       }
     }
   },
@@ -902,6 +910,15 @@
           "cta": "Consulter et accepter",
           "descriptionWaived": "L'hébergement est gratuit pour cette caisse."
         }
+      },
+      "unverifiedEmail": {
+        "title": "Confirmez votre adresse email",
+        "description": "Nous avons envoyé un lien de confirmation à {email}. Ouvrez-le pour confirmer que l'adresse est à vous — d'ici là, les invitations d'autres caisses ne peuvent pas atteindre ce compte.",
+        "resend": "Renvoyer le lien",
+        "resending": "Envoi…",
+        "resent": "Envoyé — consultez votre boîte mail.",
+        "tooMany": "Trop de demandes. Réessayez dans une heure.",
+        "error": "L'email n'a pas pu être envoyé. Réessayez plus tard."
       },
       "tokenFallback": "jetons",
       "range": {
@@ -3143,13 +3160,13 @@
     "subdomain": "Sous-domaine",
     "submit": "Créer mon compte et ma caisse",
     "submitting": "Création…",
+    "checkInbox": "Nous avons envoyé un email à {email}. Ouvrez-le pour continuer.",
     "haveAccount": "Vous avez déjà un compte ?",
     "signIn": "Se connecter",
     "errors": {
       "codeRequired": "Saisissez votre code d'invitation.",
       "codeInvalid": "Ce code n'est pas valide, ou ne l'est plus. Vérifiez-le, ou demandez-en un nouveau à la personne qui vous l'a remis.",
-      "tooMany": "Trop de tentatives. Patientez un peu avant de réessayer.",
-      "accountExists": "Un compte existe déjà pour cette adresse email. Connectez-vous, puis utilisez le code pour créer votre caisse."
+      "tooMany": "Trop de tentatives. Patientez un peu avant de réessayer."
     }
   },
   "members": {

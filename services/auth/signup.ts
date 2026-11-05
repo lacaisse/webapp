@@ -12,8 +12,9 @@ import { auth } from "./better-auth";
 // inbox, so the account starts email-verified. The two other doors — the
 // member login (services/member/auth.ts) and the apex /join for a holder of
 // a subscription waiver code (services/fund-setup/join-actions.ts) — write
-// the same two rows through Prisma inside their own transaction, unverified.
-// The waitlist only records interest.
+// the same two rows through Prisma inside their own transaction, unverified;
+// the /join door then sends Better Auth's verification email. The waitlist
+// only records interest.
 
 export type CreateInvitedAccountResult =
   | { ok: true; user: { id: string; email: string } }

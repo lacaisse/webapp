@@ -14,25 +14,37 @@ import { formatWaiverCode } from "./waiver-codes";
 // admin-minted, limited in uses, expiring and revocable (waiver-codes.ts), so
 // this door treats it like the staff-invite token: checked without being
 // consumed when the page opens, claimed inside the transaction that creates
-// the account and the fund (join-actions.ts), never logged in full.
+// the account and the fund (join-actions.ts).
 //
 // Posture of a public page:
 //   - one answer for every unusable code. Unknown, revoked, expired and used
 //     up all read "not valid" (findUsableWaiverCode returns null for each):
 //     the page never confirms that a guessed code exists. Sixty random bits
-//     make guessing hopeless anyway; this keeps the error text and the logs
-//     from saying more than the holder needs.
+//     make guessing hopeless anyway; this keeps the error text from saying
+//     more than the holder needs.
+//   - the code travels in URLs by design — /join?code= (the GET form),
+//     /new?code=, the login's return_to — so the pages that carry it send no
+//     Referer (`metadata.referrer: "no-referrer"`), and nothing of ours
+//     writes it to a log: the lookup and the limiters keep it in memory.
+//   - an address that already has an account is answered by email, never on
+//     screen (join-actions.ts), so the form cannot be used to learn which
+//     addresses have accounts.
 //   - attempt limits, in memory per instance like the member login's
-//     (services/member/auth-actions.ts): per IP on every check and every
-//     submit, and per code on submits, so one code cannot be turned into
-//     funds faster than people would.
+//     (services/member/auth-actions.ts). Per IP on checks that FAIL (an
+//     unusable code — a classroom behind one NAT opening a shared link is
+//     not a failure) and on submits that END: refused for the code, an
+//     account and fund created, or answered by email; a form that merely
+//     needs another subdomain spends nothing. Per code on every submit, so
+//     one code cannot be turned into funds faster than people would. Per
+//     address on the "you already have an account" email.
 
-// 30 code checks per IP per 10 minutes (opening the page with ?code= is
-// one); 10 account+fund creations per IP per hour; 10 per code per 10
-// minutes.
+// 30 failed code checks per IP per 10 minutes; 10 ended submits per IP per
+// hour; 10 submits per code per 10 minutes; one existing-account email per
+// address per 10 minutes.
 const checkLimiter = new AttemptLimiter(30, 10 * 60_000);
 const submitIpLimiter = new AttemptLimiter(10, 60 * 60_000);
 const submitCodeLimiter = new AttemptLimiter(10, 10 * 60_000);
+const existingAccountEmailLimiter = new AttemptLimiter(1, 10 * 60_000);
 
 export type JoinCodeLookup =
   // `code` formatted for display (XXXX-XXXX-XXXX); `label` is the admin's
@@ -41,24 +53,38 @@ export type JoinCodeLookup =
   | { kind: "invalid" }
   | { kind: "too_many" };
 
-/** The page's check of `?code=`: rate-limited per IP, never consuming. */
+/** The page's check of `?code=`: never consuming; a miss counts per IP. */
 export async function lookupJoinCode(raw: string): Promise<JoinCodeLookup> {
   const ip = await clientIp();
   if (!checkLimiter.allowed(ip)) return { kind: "too_many" };
-  checkLimiter.fail(ip);
   const code = await findUsableWaiverCode(raw);
-  if (!code) return { kind: "invalid" };
+  if (!code) {
+    checkLimiter.fail(ip);
+    return { kind: "invalid" };
+  }
   return { kind: "ok", code: formatWaiverCode(code.code), label: code.label };
 }
 
 /**
- * The submit's limits, counted before anything is read: false = refuse. Keyed
- * by the caller's IP and by the (normalised) code the submit names.
+ * Whether a submit may start, checked before anything is read: false =
+ * refuse. The submit counts against the (normalised) code right away; it
+ * counts against the IP only once it ends (`countJoinSubmit`).
  */
 export async function allowJoinSubmit(normalisedCode: string): Promise<boolean> {
   const ip = await clientIp();
   if (!submitIpLimiter.allowed(ip) || !submitCodeLimiter.allowed(normalisedCode)) return false;
-  submitIpLimiter.fail(ip);
   submitCodeLimiter.fail(normalisedCode);
+  return true;
+}
+
+/** A submit ended (refused for the code, created, or answered by email). */
+export async function countJoinSubmit(): Promise<void> {
+  submitIpLimiter.fail(await clientIp());
+}
+
+/** Whether the existing-account email may go to `email` right now. */
+export function allowExistingAccountEmail(email: string): boolean {
+  if (!existingAccountEmailLimiter.allowed(email)) return false;
+  existingAccountEmailLimiter.fail(email);
   return true;
 }

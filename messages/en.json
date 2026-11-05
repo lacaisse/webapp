@@ -128,6 +128,14 @@
       "resetPassword": {
         "subject": "Reset your La Caisse password",
         "text": "Hi,\n\nYou requested to reset your password. Click the link below to choose a new one:\n\n{url}\n\nIf you didn't request this, ignore this message — your password won't change.\n\nThe La Caisse team"
+      },
+      "verifyEmail": {
+        "subject": "Confirm your email address for La Caisse",
+        "text": "Hi,\n\nConfirm that {email} is yours by opening the link below:\n\n{url}\n\nThe link is valid for 24 hours. If you didn't create a La Caisse account, ignore this message.\n\nThe La Caisse team"
+      },
+      "joinExistingAccount": {
+        "subject": "Your La Caisse account and an invite code",
+        "text": "Hi,\n\nSomeone — probably you — used an invite code on La Caisse with this address, which already has an account. To create your fund with that code, sign in here:\n\n{url}\n\nIf this wasn't you, ignore this message: nothing was created or changed.\n\nThe La Caisse team"
       }
     }
   },
@@ -902,6 +910,15 @@
           "cta": "Review and accept",
           "descriptionWaived": "Hosting is free for this fund."
         }
+      },
+      "unverifiedEmail": {
+        "title": "Confirm your email address",
+        "description": "We sent a confirmation link to {email}. Open it to confirm the address is yours — until then, invitations to other funds can't reach this account.",
+        "resend": "Send the link again",
+        "resending": "Sending…",
+        "resent": "Sent — check your inbox.",
+        "tooMany": "Too many requests. Try again in an hour.",
+        "error": "The email could not be sent. Try again later."
       },
       "tokenFallback": "tokens",
       "range": {
@@ -3143,13 +3160,13 @@
     "subdomain": "Subdomain",
     "submit": "Create my account and fund",
     "submitting": "Creating…",
+    "checkInbox": "We've sent an email to {email}. Open it to continue.",
     "haveAccount": "Already have an account?",
     "signIn": "Sign in",
     "errors": {
       "codeRequired": "Enter your invite code.",
       "codeInvalid": "This code is not valid, or no longer is. Check it, or ask the person who gave it to you for a new one.",
-      "tooMany": "Too many attempts. Wait a little before trying again.",
-      "accountExists": "An account already exists for this email address. Sign in, then use the code to create your fund."
+      "tooMany": "Too many attempts. Wait a little before trying again."
     }
   },
   "members": {

@@ -43,7 +43,7 @@ const prisma = vi.hoisted(() => ({
 }));
 vi.mock("@/services/db/prisma", () => ({ prisma }));
 
-import { requireFundCreator, requireFundRole, requireMember } from "./dal";
+import { fundCreatorAccess, requireFundCreator, requireFundRole, requireMember } from "./dal";
 
 const memberUser = { id: "11111111-1111-4111-8111-111111111111", email: "ada@example.org", globalRole: "USER" };
 const staffUser = { id: "22222222-2222-4222-8222-222222222222", email: "staff@example.org", globalRole: "USER" };
@@ -105,6 +105,19 @@ describe("a member session", () => {
     expect(prisma.subscriptionWaiverCode.findUnique).not.toHaveBeenCalled();
   });
 
+  // /new?code= reads the decision itself so a newcomer whose code died
+  // meanwhile is sent back to /join rather than to /unauthorized.
+  it("gets the decision without a redirect from fundCreatorAccess", async () => {
+    prisma.subscriptionWaiverCode.findUnique.mockResolvedValueOnce(null);
+    expect(await fundCreatorAccess("7K3P-M2QX-9RTD")).toEqual({ user: memberUser, access: null });
+    expect(await fundCreatorAccess()).toEqual({ user: memberUser, access: null });
+    expect(nav.redirect).not.toHaveBeenCalled();
+    prisma.subscriptionWaiverCode.findUnique.mockResolvedValueOnce({
+      id: "code-1", code: "7K3PM2QX9RTD", label: "x", maxUses: 1, usedCount: 0, expiresAt: null, revokedAt: null,
+    });
+    expect((await fundCreatorAccess("7K3P-M2QX-9RTD")).access).toBe("code");
+  });
+
   it("never satisfies a staff route, even at the lowest role", async () => {
     await expect(requireFundRole("VIEWER")).rejects.toThrow("REDIRECT:/unauthorized");
     await expect(requireFundRole("OPERATOR")).rejects.toThrow("REDIRECT:/unauthorized");
@@ -144,9 +157,11 @@ describe("a staff session", () => {
 
   it("may create a fund, as may a platform admin with no staff row", async () => {
     expect((await requireFundCreator()).id).toBe(staffUser.id);
+    expect((await fundCreatorAccess()).access).toBe("staff");
     prisma.fundMember.count.mockResolvedValue(0);
     prisma.user.findUnique.mockResolvedValue({ ...staffUser, globalRole: "ADMIN" });
     expect((await requireFundCreator()).id).toBe(staffUser.id);
+    expect((await fundCreatorAccess()).access).toBe("admin");
   });
 
   it("is sent to the member login when it has no membership here", async () => {

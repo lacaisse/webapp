@@ -21,7 +21,8 @@ import { getAuthUrl } from "@/services/host/server";
 import { isSupportedLocale } from "@/services/i18n/config";
 import { registerFundMcpResource } from "@/services/mcp/auth";
 
-import { allowJoinSubmit } from "./join";
+import { allowExistingAccountEmail, allowJoinSubmit, countJoinSubmit } from "./join";
+import { sendJoinExistingAccountEmail } from "./join-emails";
 import { JoinWithCodeSchema, PASSWORD_MIN_LENGTH, type JoinWithCodeInput } from "./schema";
 import { claimWaiverCodeUse, findUsableWaiverCode } from "./waiver-claim";
 import { formatWaiverCode } from "./waiver-codes";
@@ -37,10 +38,11 @@ export type JoinField = "code" | "email" | "password" | "name" | "subdomain";
 
 export type JoinWithCodeResult =
   | { ok: true; redirectTo: string }
-  // `signInUrl` rides with the "account exists" answer: the auth host's login,
-  // coming back to /new?code= where the gate accepts the same code, so the
-  // person signs in first and then creates the fund on their existing account.
-  | { error: string; field?: JoinField; signInUrl?: string };
+  // The address already has an account: the answer went to that inbox (the
+  // sign-in link coming back to /new?code=), the screen only says an email
+  // went out — never which of the two happened to which address.
+  | { ok: true; sentTo: string }
+  | { error: string; field?: JoinField };
 
 class WaiverCodeUnusable extends Error {}
 
@@ -71,23 +73,10 @@ export async function joinWithCodeAction(input: JoinWithCodeInput): Promise<Join
   if (!(await allowJoinSubmit(normalisedCode))) return { error: t("join.errors.tooMany") };
 
   const code = await findUsableWaiverCode(normalisedCode);
-  if (!code) return { error: t("join.errors.codeInvalid"), field: "code" };
-
-  const signInUrl = getAuthUrl(
-    `/login?return_to=${encodeURIComponent(
-      getApexUrl(`/new?code=${encodeURIComponent(formatWaiverCode(code.code))}`),
-    )}`,
-  );
-
-  // Better Auth lowercases on sign-in, so the address is stored lowercase (the
-  // schema did that) and compared without case here, in case an older row
-  // kept its capitals. A pre-check so the common case gets its answer without
-  // a failed insert; the unique index stays the truth (the catch below).
-  const existing = await prisma.user.findFirst({
-    where: { email: { equals: email, mode: "insensitive" } },
-    select: { id: true },
-  });
-  if (existing) return { error: t("join.errors.accountExists"), field: "email", signInUrl };
+  if (!code) {
+    await countJoinSubmit();
+    return { error: t("join.errors.codeInvalid"), field: "code" };
+  }
 
   const ctx = await auth.$context;
   const passwordHash = await ctx.password.hash(password);
@@ -95,13 +84,18 @@ export async function joinWithCodeAction(input: JoinWithCodeInput): Promise<Join
   const defaultLocale = isSupportedLocale(creatorLocale) ? creatorLocale : undefined;
   const now = new Date();
 
+  // The address is stored lowercase (the schema did that) like every account
+  // — Better Auth lowercases on sign-in. No "does it exist" read first: the
+  // unique index answers inside the transaction, and that answer leaves by
+  // email (below), so the form never tells one address from another.
   let created: { userId: string; fund: { id: string; name: string; domain: string } };
   try {
     created = await prisma.$transaction(async (tx) => {
       if (!(await claimWaiverCodeUse(tx, code, now))) throw new WaiverCodeUnusable();
       // Nothing proved this inbox (the staff invite's token did), so the
-      // account starts unverified like a member login; a password reset
-      // verifies it later (services/auth/better-auth.ts::onPasswordReset).
+      // account starts unverified; the verification email below, or a
+      // password reset (services/auth/better-auth.ts::onPasswordReset),
+      // verifies it.
       const user = await tx.user.create({
         data: { email, name: email.split("@")[0] ?? "", emailVerified: false },
         select: { id: true },
@@ -125,21 +119,56 @@ export async function joinWithCodeAction(input: JoinWithCodeInput): Promise<Join
       return { userId: user.id, fund: { id: fund.id, name: fund.name, domain: fund.domain } };
     });
   } catch (e) {
-    // Each race has its own answer: the code's last use went to someone else
-    // (same words as a wrong code); the address got an account meanwhile
-    // (sign in instead); the subdomain got taken meanwhile.
-    if (e instanceof WaiverCodeUnusable) return { error: t("join.errors.codeInvalid"), field: "code" };
+    // Each race has its own answer. The code's last use went to someone else:
+    // same words as a wrong code. The address has an account: an email to
+    // that inbox with the sign-in link that comes back to /new?code= (one per
+    // address per while), and a screen that says only that. The subdomain got
+    // taken: say so — that submit spends nothing of the IP's budget.
+    if (e instanceof WaiverCodeUnusable) {
+      await countJoinSubmit();
+      return { error: t("join.errors.codeInvalid"), field: "code" };
+    }
     if (isUniqueViolationOn(e, "email")) {
-      return { error: t("join.errors.accountExists"), field: "email", signInUrl };
+      await countJoinSubmit();
+      if (allowExistingAccountEmail(email)) {
+        const signInUrl = getAuthUrl(
+          `/login?return_to=${encodeURIComponent(
+            getApexUrl(`/new?code=${encodeURIComponent(formatWaiverCode(code.code))}`),
+          )}`,
+        );
+        try {
+          await sendJoinExistingAccountEmail({ email, signInUrl });
+        } catch (err) {
+          console.error("[join] existing-account email failed:", err);
+        }
+      }
+      return { ok: true, sentTo: email };
     }
     if (isUniqueViolationOn(e, "domain")) {
       return { error: t("funds.create.errors.subdomainTaken"), field: "subdomain" };
     }
     throw e;
   }
+  await countJoinSubmit();
 
   // The new host is an MCP OAuth resource from day one (best-effort inside).
   await registerFundMcpResource(created.fund);
+
+  const dashboardUrl = `${getFundUrl(created.fund.domain)}/dashboard`;
+
+  // Better Auth's verification email (emailVerification.sendVerificationEmail
+  // in better-auth.ts): the link marks the account verified and comes back
+  // to the dashboard, which offers to resend it until then. Best-effort
+  // whatever failed (the endpoint, or the mail provider behind it): the
+  // account and the fund exist, and a password reset verifies too.
+  try {
+    await auth.api.sendVerificationEmail({
+      body: { email, callbackURL: dashboardUrl },
+      headers: await headers(),
+    });
+  } catch (e) {
+    console.error("[join] verification email failed:", isAPIError(e) ? e.body : e);
+  }
 
   // Sign the new account in on this host (the apex) the way the auth host's
   // sign-up does, so the fund picker knows them next time: nextCookies writes
@@ -159,7 +188,7 @@ export async function joinWithCodeAction(input: JoinWithCodeInput): Promise<Join
   const redirectTo = await buildPostAuthRedirect({
     userId: created.userId,
     email,
-    returnTo: `${getFundUrl(created.fund.domain)}/dashboard`,
+    returnTo: dashboardUrl,
   });
   return { ok: true, redirectTo };
 }

@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
+import { headers } from "next/headers";
 import Image from "next/image";
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { permanentRedirect, redirect } from "next/navigation";
 
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -33,11 +35,21 @@ import { JoinForm } from "./join-form";
 // the (deliberately vague) reason; a usable code → the account + fund form.
 // A signed-in visitor with a usable code is sent to /new?code=, where the
 // gate accepts the code and the fund is created on the account they have.
+//
+// ?code= carries the invite code, so no Referer leaves this page.
+export const metadata: Metadata = { referrer: "no-referrer" };
+
 export default async function JoinPage({
   searchParams,
 }: {
   searchParams: Promise<{ code?: string | string[] }>;
 }) {
+  // /join is the only public URL: a visit to /start itself (typed, or the
+  // (apex) layout's cross-host bounce) is sent there for good. The proxy
+  // forwards the public path, so the rewrite never trips this.
+  const h = await headers();
+  if (h.get("x-pathname") === "/start") permanentRedirect(`/join${h.get("x-search") ?? ""}`);
+
   const params = await searchParams;
   const raw = typeof params.code === "string" ? params.code.trim() : "";
   const t = await getTranslations("join");

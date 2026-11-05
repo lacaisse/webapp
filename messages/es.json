@@ -107,6 +107,14 @@
       "resetPassword": {
         "subject": "Restablezca su contraseña de La Caisse",
         "text": "Hola,\n\nSolicitó restablecer su contraseña. Haga clic en el enlace a continuación para elegir una nueva:\n\n{url}\n\nSi no solicitó esto, ignore este mensaje — su contraseña no cambiará.\n\nEl equipo de La Caisse"
+      },
+      "verifyEmail": {
+        "subject": "Confirme su dirección de correo para La Caisse",
+        "text": "Hola:\n\nConfirme que {email} es suya abriendo el enlace siguiente:\n\n{url}\n\nEl enlace es válido durante 24 horas. Si no ha creado una cuenta en La Caisse, ignore este mensaje.\n\nEl equipo de La Caisse"
+      },
+      "joinExistingAccount": {
+        "subject": "Su cuenta de La Caisse y un código de invitación",
+        "text": "Hola:\n\nAlguien — probablemente usted — ha usado un código de invitación en La Caisse con esta dirección, que ya tiene una cuenta. Para crear su caja con ese código, inicie sesión aquí:\n\n{url}\n\nSi no fue usted, ignore este mensaje: no se ha creado ni cambiado nada.\n\nEl equipo de La Caisse"
       }
     }
   },
@@ -880,6 +888,15 @@
           "cta": "Revisar y aceptar",
           "descriptionWaived": "El alojamiento es gratuito para esta caja."
         }
+      },
+      "unverifiedEmail": {
+        "title": "Confirme su dirección de correo",
+        "description": "Hemos enviado un enlace de confirmación a {email}. Ábralo para confirmar que la dirección es suya; hasta entonces, las invitaciones de otras cajas no pueden llegar a esta cuenta.",
+        "resend": "Volver a enviar el enlace",
+        "resending": "Enviando…",
+        "resent": "Enviado. Revise su bandeja de entrada.",
+        "tooMany": "Demasiadas solicitudes. Vuelva a intentarlo dentro de una hora.",
+        "error": "No se pudo enviar el correo. Inténtelo más tarde."
       },
       "tokenFallback": "tokens",
       "range": {
@@ -3076,13 +3093,13 @@
     "subdomain": "Subdominio",
     "submit": "Crear mi cuenta y mi caja",
     "submitting": "Creando…",
+    "checkInbox": "Hemos enviado un correo a {email}. Ábralo para continuar.",
     "haveAccount": "¿Ya tiene una cuenta?",
     "signIn": "Iniciar sesión",
     "errors": {
       "codeRequired": "Introduzca su código de invitación.",
       "codeInvalid": "Este código no es válido, o ya no lo es. Compruébelo, o pida uno nuevo a quien se lo dio.",
-      "tooMany": "Demasiados intentos. Espere un poco antes de volver a intentarlo.",
-      "accountExists": "Ya existe una cuenta con esta dirección de correo. Inicie sesión y use después el código para crear su caja."
+      "tooMany": "Demasiados intentos. Espere un poco antes de volver a intentarlo."
     }
   },
   "members": {

@@ -43,9 +43,9 @@ export function JoinForm({ code }: { code: string }) {
   const tRoot = useTranslations();
 
   const [pending, startTransition] = useTransition();
-  // Set with the "account exists" answer: the auth host's login, coming back
-  // to /new?code= so the code creates the fund on the existing account.
-  const [signInUrl, setSignInUrl] = useState<string | null>(null);
+  // Set when the answer went by email (the address already has an account —
+  // the screen never says so, only that an email went out).
+  const [sentTo, setSentTo] = useState<string | null>(null);
   const form = useForm<JoinWithCodeInput, unknown, JoinWithCodeValues>({
     resolver: zodResolver(JoinWithCodeSchema),
     defaultValues: { code, email: "", password: "", name: "", subdomain: "" },
@@ -65,15 +65,17 @@ export function JoinForm({ code }: { code: string }) {
 
   const onSubmit = (values: JoinWithCodeValues) =>
     startTransition(async () => {
-      setSignInUrl(null);
       const result = await joinWithCodeAction(values);
       if ("error" in result) {
-        if (result.signInUrl) setSignInUrl(result.signInUrl);
         if (result.field && result.field !== "code") {
           form.setError(result.field, { message: result.error });
         } else {
           form.setError("root", { message: result.error });
         }
+        return;
+      }
+      if ("sentTo" in result) {
+        setSentTo(result.sentTo);
         return;
       }
       // A full navigation: the exchange lives on the fund's own host.
@@ -88,6 +90,14 @@ export function JoinForm({ code }: { code: string }) {
       ? tRoot(message as never, FIELD_PARAMS[field] as never)
       : message;
   };
+
+  if (sentTo) {
+    return (
+      <Alert>
+        <AlertDescription>{t("checkInbox", { email: sentTo })}</AlertDescription>
+      </Alert>
+    );
+  }
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -142,25 +152,8 @@ export function JoinForm({ code }: { code: string }) {
 
       {errors.root && (
         <Alert variant="destructive">
-          <AlertDescription>
-            {errors.root.message}
-            {signInUrl && (
-              <>
-                {" "}
-                <a href={signInUrl} className="font-medium underline">
-                  {t("signIn")}
-                </a>
-              </>
-            )}
-          </AlertDescription>
+          <AlertDescription>{errors.root.message}</AlertDescription>
         </Alert>
-      )}
-      {signInUrl && !errors.root && errors.email && (
-        <p className="text-sm">
-          <a href={signInUrl} className="font-medium underline">
-            {t("signIn")}
-          </a>
-        </p>
       )}
 
       <Button type="submit" className="w-full" disabled={pending}>

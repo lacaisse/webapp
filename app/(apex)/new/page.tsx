@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
+import { redirect } from "next/navigation";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Card,
@@ -8,10 +10,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { requireFundCreator } from "@/services/auth/dal";
+import { fundCreatorAccess } from "@/services/auth/dal";
 import { findUsableWaiverCode } from "@/services/fund-setup/waiver-claim";
 import { formatWaiverCode } from "@/services/fund-setup/waiver-codes";
 import { CreateFundForm } from "./create-fund-form";
+
+// ?code= may carry an invite code: no Referer leaves this page.
+export const metadata: Metadata = { referrer: "no-referrer" };
 
 export default async function NewFundPage({
   searchParams,
@@ -23,10 +28,13 @@ export default async function NewFundPage({
   // existing staff, a platform admin, or the holder of a usable subscription
   // waiver code (?code=, the apex /join door for someone who already has an
   // account) may open a fund: a member login is a User too and must not
-  // become a fund OWNER without one of those.
+  // become a fund OWNER without one of those. A newcomer whose code stopped
+  // being usable between /join and here goes back to /join, which says so —
+  // /unauthorized would be a dead end for them.
   const params = await searchParams;
   const rawCode = typeof params.code === "string" ? params.code.trim() : "";
-  await requireFundCreator(rawCode || undefined);
+  const { access } = await fundCreatorAccess(rawCode || undefined);
+  if (!access) redirect(rawCode ? `/join?code=${encodeURIComponent(rawCode)}` : "/unauthorized");
 
   // A code that came along is used whoever brought it: the fund starts
   // waived (createFundAction claims the use in the same transaction). Staff
