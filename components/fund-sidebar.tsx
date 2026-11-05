@@ -24,6 +24,7 @@ import {
 
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { PrivacyToggle } from "@/components/privacy/privacy-toggle";
+import { ReportIssueLink } from "@/components/report-issue-link";
 import { hasMinFundRole } from "@/services/auth/roles";
 import type { FundRole } from "@/services/db/generated/enums";
 import { cn } from "@/lib/utils";
@@ -43,12 +44,18 @@ export function FundSidebar({
   apexUrl,
   role,
   privacyMode,
+  origin,
+  version,
 }: {
   fundName: string;
   fundDomain: string;
   apexUrl: string;
   role: FundRole;
   privacyMode: boolean;
+  // For the issue report: this host's public origin, and the short deployed
+  // commit (null when unknown).
+  origin: string;
+  version: string | null;
 }) {
   const pathname = usePathname();
   const t = useTranslations("fund.nav");
@@ -119,6 +126,11 @@ export function FundSidebar({
           <ArrowUpRight className="size-4" />
           {t("backToApex")}
         </a>
+        <ReportIssueLink
+          origin={origin}
+          version={version}
+          className="flex h-8 items-center gap-2 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent/50 hover:text-foreground"
+        />
         <PrivacyToggle enabled={privacyMode} />
         <div className="px-2">
           <LocaleSwitcher />
