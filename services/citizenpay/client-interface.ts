@@ -347,6 +347,16 @@ export interface CitizenPayClient {
   }): Promise<void>;
 
   /**
+   * The business that operates the treasury — `issued_by_business_id` of
+   * `GET /v2/treasury`. Its Ponto connection is what `getBankingStatus`
+   * reports on, and the CP dashboard's banking/billing pages live under it.
+   * Cached on `Fund.citizenPayBusinessId` at connect time; this is the live
+   * read used to backfill that cache for funds connected before it was stored.
+   * Returns null when the treasury reports no business.
+   */
+  getTreasuryBusinessId(): Promise<string | null>;
+
+  /**
    * Draft payouts: paid/refunded orders not yet attached to a payout,
    * grouped by place. Computed live — calling it never mutates anything.
    * Optional half-open `[from, to)` window narrows the orders considered;

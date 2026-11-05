@@ -547,6 +547,11 @@ class MockCitizenPayClient implements CitizenPayClient {
     this.log("setTreasuryEventsWebhook", { url: webhook.url, secretSet: webhook.secret.length > 0 });
   }
 
+  async getTreasuryBusinessId(): Promise<string | null> {
+    this.log("getTreasuryBusinessId", {});
+    return "mock-business-1";
+  }
+
   async listPayoutDrafts(
     query: { from?: string; to?: string } = {},
   ): Promise<PayoutDraft[]> {

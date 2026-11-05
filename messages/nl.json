@@ -122,7 +122,8 @@
       "emptyTitle": "Nog geen fondsen",
       "emptyDescription": "Maak uw eerste fonds aan om te beginnen.",
       "create": "Fonds aanmaken",
-      "createAnother": "Nog een fonds aanmaken"
+      "createAnother": "Nog een fonds aanmaken",
+      "adminLink": "Platformbeheer"
     },
     "create": {
       "title": "Fonds aanmaken",
@@ -786,7 +787,8 @@
       },
       "notice": {
         "connect": "Er is nog geen bank gekoppeld. Koppel je bank in het CitizenPay-dashboard om uitbetalingen mogelijk te maken.",
-        "activate": "Je bank is gekoppeld maar betalingsinitiatie is nog niet ingeschakeld. Activeer het in het CitizenPay-dashboard om uitbetalingen te kunnen starten."
+        "activate": "Je bank is gekoppeld maar betalingsinitiatie is nog niet ingeschakeld. Activeer het in het CitizenPay-dashboard om uitbetalingen te kunnen starten.",
+        "cta": "Citizen Pay-dashboard openen"
       },
       "balance": {
         "available": "Beschikbaar saldo",
@@ -850,6 +852,39 @@
     "dashboard": {
       "title": "Dashboard",
       "description": "Overzicht van de activiteit en saldi van uw fonds.",
+      "setup": {
+        "title": "Rond de configuratie van je fonds af",
+        "description": "{done} van {total} stappen voltooid. Drie stappen om een nieuw fonds op gang te brengen.",
+        "status": {
+          "done": "Voltooid",
+          "todo": "Te doen",
+          "in_progress": "Bezig",
+          "blocked": "Wacht",
+          "unknown": "Status niet beschikbaar"
+        },
+        "citizenpay": {
+          "title": "Registreren bij Citizen Pay",
+          "description": "Maakt je treasury en het bijbehorende token aan op Citizen Pay en geeft de API-sleutel uit die dit dashboard gebruikt.",
+          "cta": "Citizen Pay-instellingen openen"
+        },
+        "banking": {
+          "title": "Open banking activeren",
+          "description": "Koppel de bankrekening van je treasury in het Citizen Pay-dashboard en schakel betalingsinitiatie in. Bijdragen worden dan vanaf die rekening gekoppeld en handelaars worden ervan uitbetaald.",
+          "descriptionInProgress": "Je bank is gekoppeld. De bank schakelt betalingsinitiatie nog in — dat duurt meestal een paar dagen. Tot dan hoef je hier niets te doen.",
+          "descriptionBlocked": "Beschikbaar zodra het fonds geregistreerd is bij Citizen Pay.",
+          "descriptionConnectedTodo": "Je bank is gekoppeld, maar in het Citizen Pay-dashboard staan nog stappen open: rond de onboarding bij de bank af en vraag betalingsinitiatie aan.",
+          "descriptionUnknown": "Citizen Pay antwoordde net niet. Herlaad over een minuutje, of kijk op de bankpagina.",
+          "cta": "Koppel je bank op Citizen Pay",
+          "ctaInProgress": "Bekijken op Citizen Pay",
+          "secondary": "Bankpagina"
+        },
+        "subscription": {
+          "title": "Start je abonnement",
+          "description": "Hosting op La Caisse kost {price} per maand, gefactureerd door Citizen Pay. Een eigenaar van het fonds aanvaardt het in Instellingen.",
+          "cta": "Bekijken en aanvaarden",
+          "descriptionWaived": "Hosting is gratis voor deze kas."
+        }
+      },
       "tokenFallback": "tokens",
       "range": {
         "3m": "3 maanden",
@@ -2263,6 +2298,7 @@
         "onboarding": "Onboarding",
         "terms": "Voorwaarden",
         "citizenpay": "Citizen Pay",
+        "subscription": "Abonnement",
         "fees": "Kosten",
         "emails": "E-mails",
         "documents": "Documenten",
@@ -2606,6 +2642,75 @@
             "notConnected": "Verbind de kas eerst met Citizen Pay.",
             "insecureUrl": "Het adres van deze omgeving is geen https; Citizen Pay aanvaardt alleen https-webhooks.",
             "failed": "Citizen Pay weigerde de registratie: {message}"
+          }
+        }
+      },
+      "subscription": {
+        "title": "Abonnement",
+        "description": "Hosting van je fonds op de officiële La Caisse-instantie.",
+        "plan": {
+          "title": "La Caisse-hosting",
+          "price": "{price} per maand, excl. btw",
+          "line1": "Het dashboard van je fonds en de pagina's voor leden en handelaars op La Caisse",
+          "line2": "Uitgifte van tokens, kaarten en uitbetalingen aan handelaars via Citizen Pay",
+          "line3": "Updates, back-ups en ondersteuning",
+          "billing": "Maandelijks gefactureerd door Citizen Pay op de onderstaande gegevens; de factuur kan per overschrijving of via open banking worden betaald. Op elk moment opzegbaar via Citizen Pay — de lopende maand blijft verschuldigd.",
+          "free": "Gratis voor deze kas"
+        },
+        "form": {
+          "legalName": "Officiële naam",
+          "legalNameHint": "De organisatie die op de factuur staat.",
+          "email": "Factuur-e-mail",
+          "emailHint": "Waar de facturen naartoe worden gestuurd.",
+          "address": "Factuuradres",
+          "addressHint": "Straat, postcode en gemeente — één per regel.",
+          "vatNumber": "Btw-nummer",
+          "vatNumberHint": "Optioneel. Laat leeg als je organisatie er geen heeft.",
+          "accept": "Namens {fundName} ga ik akkoord om {price} per maand, excl. btw, te betalen voor hosting op La Caisse.",
+          "submit": "Abonnement starten",
+          "submitting": "Bezig met starten…"
+        },
+        "ownerOnly": "Alleen een eigenaar van het fonds kan het abonnement aanvaarden. Vraag een eigenaar om dit tabblad te openen.",
+        "accepted": {
+          "title": "Abonnement actief",
+          "since": "Aanvaard op {date}",
+          "description": "Citizen Pay factureert {price} per maand aan {email}. Wil je de factuurgegevens wijzigen, antwoord dan op de e-mail van je factuur.",
+          "invoices": "Facturen op Citizen Pay"
+        },
+        "waived": {
+          "title": "Hosting is gratis voor deze kas",
+          "since": "Sinds {date}",
+          "description": "Uw kas wordt op La Caisse gehost zonder maandelijks abonnement. Citizen Pay stuurt er geen facturen voor.",
+          "reason": "Reden"
+        },
+        "redeem": {
+          "title": "Hebt u een uitnodigingscode?",
+          "description": "Citizen Pay geeft codes aan kassen die gratis gehost worden — bijdragers, vzw's, scholen. Een code vervangt het abonnement.",
+          "label": "Uitnodigingscode",
+          "submit": "Code gebruiken",
+          "submitting": "Controleren…"
+        },
+        "errors": {
+          "legalNameMin": "De officiële naam moet minstens {min} tekens bevatten.",
+          "legalNameMax": "De officiële naam mag hoogstens {max} tekens bevatten.",
+          "emailInvalid": "Voer een geldig e-mailadres in.",
+          "addressMin": "Voer het volledige factuuradres in.",
+          "addressMax": "Het factuuradres is te lang.",
+          "vatInvalid": "Voer een geldig btw-nummer in (bv. BE0123456789) of laat het veld leeg.",
+          "mustAccept": "Je moet akkoord gaan voordat je het abonnement start.",
+          "alreadyAccepted": "Het abonnement van dit fonds is al aanvaard.",
+          "waived": "Hosting is gratis voor deze kas — er is geen abonnement om te aanvaarden.",
+          "codeRequired": "Voer uw uitnodigingscode in.",
+          "codeInvalid": "Deze code is niet geldig. Controleer hem en probeer opnieuw.",
+          "codeExpired": "Deze code is verlopen. Vraag Citizen Pay om een nieuwe.",
+          "codeRevoked": "Deze code is niet meer geldig. Vraag Citizen Pay om een nieuwe.",
+          "codeExhausted": "Deze code is al gebruikt.",
+          "alreadyWaived": "Hosting is al gratis voor deze kas."
+        },
+        "email": {
+          "confirmation": {
+            "subject": "Je La Caisse-abonnement voor {fundName}",
+            "body": "Hallo,\n\nHet hostingabonnement voor {fundName} ({fundDomain}) werd op {date} aanvaard door {userEmail}.\n\nFormule: La Caisse-hosting, {price} per maand, excl. btw, gefactureerd door Citizen Pay.\nGefactureerd aan: {legalName}\n{address}\nBtw-nummer: {vatNumber}\n\nCitizen Pay opent je facturatieaccount en stuurt de eerste factuur naar dit adres. Antwoord op deze e-mail als je vragen hebt.\n\nLa Caisse"
           }
         }
       },
@@ -3984,6 +4089,58 @@
         "notFound": "Passkey niet gevonden.",
         "notAllowed": "Niet toegestaan.",
         "generic": "Er is iets misgegaan."
+      }
+    }
+  },
+  "admin": {
+    "title": "Platformbeheer",
+    "backToFunds": "Terug naar de kassen",
+    "waivers": {
+      "create": {
+        "title": "Nieuwe uitnodigingscode",
+        "description": "Maak een code voor een kas die gratis gehost wordt. De eigenaar gebruikt hem in Instellingen → Abonnement; de abonnementsstap is dan afgerond zonder betaling.",
+        "label": "Voor wie of waarom",
+        "labelHint": "Wordt aan de kas getoond als reden, bv. “Bijdrager: Alice” of “Geregistreerde vzw”.",
+        "maxUses": "Gebruik",
+        "maxUsesHint": "Hoeveel kassen hem mogen gebruiken (1–{max}).",
+        "expiresInDays": "Geldig (dagen)",
+        "expiresInDaysHint": "Leeg = verloopt nooit (max {max}).",
+        "submit": "Code aanmaken",
+        "submitting": "Aanmaken…",
+        "createdTitle": "Code aangemaakt voor “{label}”",
+        "createdHint": "Stuur hem naar de eigenaar van de kas. Hij blijft in de lijst hieronder staan.",
+        "copy": "Kopiëren",
+        "copied": "Gekopieerd"
+      },
+      "list": {
+        "title": "Uitnodigingscodes",
+        "description": "Alle aangemaakte codes, nieuwste eerst.",
+        "empty": "Nog geen codes.",
+        "code": "Code",
+        "label": "Voor wie of waarom",
+        "uses": "Gebruik",
+        "expires": "Verloopt",
+        "never": "Nooit",
+        "status": "Status",
+        "redeemedBy": "Gebruikt door"
+      },
+      "status": {
+        "active": "Actief",
+        "expired": "Verlopen",
+        "revoked": "Ingetrokken",
+        "exhausted": "Opgebruikt"
+      },
+      "revoke": "Intrekken",
+      "revoking": "Intrekken…",
+      "revokeTitle": "Deze code intrekken?",
+      "revokeConfirm": "Deze code intrekken? Kassen die hem al gebruikten blijven gratis.",
+      "revokeCancel": "Behouden",
+      "errors": {
+        "labelMin": "Het label moet minstens {min} tekens lang zijn.",
+        "labelMax": "Het label mag hoogstens {max} tekens lang zijn.",
+        "maxUsesRange": "Gebruik moet een geheel getal tussen 1 en {maxUses} zijn.",
+        "expiresRange": "De geldigheid moet een geheel aantal dagen tussen 1 en {maxDays} zijn.",
+        "notFound": "Deze code bestaat niet meer."
       }
     }
   },

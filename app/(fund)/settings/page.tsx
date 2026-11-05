@@ -35,6 +35,7 @@ import { DocumentsTab } from "./documents-tab";
 import { EmbedsTab } from "./embeds-tab";
 import { CitizenPayConnect } from "./citizenpay-connect";
 import { EventsWebhookSection } from "./events-webhook";
+import { SubscriptionTab } from "./subscription-tab";
 import { TokenInfo } from "./token-info";
 import { BalanceDisplayForm } from "./balance-display-form";
 import { CustomTokensForm } from "./custom-tokens-form";
@@ -56,6 +57,7 @@ const TABS = [
   { value: "onboarding" },
   { value: "terms" },
   { value: "citizenpay" },
+  { value: "subscription" },
   { value: "fees" },
   { value: "embeds" },
 ] as const;
@@ -155,7 +157,7 @@ function SettingsTabsSkeleton() {
   return (
     <>
       <div className="flex flex-wrap gap-2">
-        {Array.from({ length: 10 }).map((_, i) => (
+        {Array.from({ length: 11 }).map((_, i) => (
           <Skeleton key={i} className="h-8 w-20" />
         ))}
       </div>
@@ -366,6 +368,29 @@ async function SettingsContent({
             </Suspense>
           </CardContent>
         </Card>
+      )}
+
+      {active === "subscription" && (
+        <Suspense fallback={<Skeleton className="h-64 w-full" />}>
+          <SubscriptionTab
+            fund={{
+              id: fund.id,
+              name: fund.name,
+              fullName: fund.fullName,
+              domain: fund.domain,
+              citizenPayApiKeyId: fund.citizenPayApiKeyId,
+              citizenPayApiKeyEnc: fund.citizenPayApiKeyEnc,
+              citizenPayBusinessId: fund.citizenPayBusinessId,
+              subscriptionAcceptedAt: fund.subscriptionAcceptedAt,
+              subscriptionWaivedAt: fund.subscriptionWaivedAt,
+              subscriptionWaiverReason: fund.subscriptionWaiverReason,
+              billingLegalName: fund.billingLegalName,
+              billingEmail: fund.billingEmail,
+              billingAddress: fund.billingAddress,
+              billingVatNumber: fund.billingVatNumber,
+            }}
+          />
+        </Suspense>
       )}
 
       {active === "embeds" && (

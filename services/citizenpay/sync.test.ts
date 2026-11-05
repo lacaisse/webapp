@@ -35,3 +35,27 @@ describe("normaliseTreasury — chain", () => {
     warn.mockRestore();
   });
 });
+
+describe("normaliseTreasury — business id", () => {
+  it("takes issued_by_business_id", () => {
+    expect(normaliseTreasury({ issued_by_business_id: "biz-issuer" }).citizenPayBusinessId).toBe(
+      "biz-issuer",
+    );
+  });
+
+  it("trims it", () => {
+    expect(normaliseTreasury({ issued_by_business_id: "  biz-1  " }).citizenPayBusinessId).toBe(
+      "biz-1",
+    );
+  });
+
+  it("ignores business_id (CP's GET /v2/treasury never sends it for this)", () => {
+    expect(normaliseTreasury({ business_id: "biz-2" }).citizenPayBusinessId).toBeNull();
+  });
+
+  it("is null when missing, null or blank", () => {
+    expect(normaliseTreasury({}).citizenPayBusinessId).toBeNull();
+    expect(normaliseTreasury({ issued_by_business_id: null }).citizenPayBusinessId).toBeNull();
+    expect(normaliseTreasury({ issued_by_business_id: "  " }).citizenPayBusinessId).toBeNull();
+  });
+});

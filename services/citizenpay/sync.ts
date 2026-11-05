@@ -49,6 +49,10 @@ export type TokenInfo = {
   citizenPayPaymasterType: string | null;
   // Treasury slug — the `network` segment of a card's public tap URL.
   citizenPayTreasurySlug: string | null;
+  // Business operating the treasury (`issued_by_business_id`) — owns the
+  // fund's open-banking link; the fund-setup checklist deep-links its CP
+  // dashboard pages.
+  citizenPayBusinessId: string | null;
   // CP's echo of the platform fee, normalised to a 2-decimal percent string
   // (e.g. "2.50"). Canonical on our side — reconciled, not cached. See header.
   payoutFeePercentage: string | null;
@@ -146,6 +150,12 @@ export function normaliseTreasury(wire: TreasuryWire): TokenInfo {
     );
   }
 
+  // Business id: only a non-empty string counts, so a blank answer never
+  // overwrites a good cache (the persist sites skip nulls).
+  const businessIdRaw =
+    typeof wire.issued_by_business_id === "string" ? wire.issued_by_business_id.trim() : "";
+  const citizenPayBusinessId = businessIdRaw === "" ? null : businessIdRaw;
+
   return {
     tokenAddress,
     tokenChainId,
@@ -158,6 +168,7 @@ export function normaliseTreasury(wire: TreasuryWire): TokenInfo {
     citizenPayPaymasterAddress: wire.paymaster_address ?? null,
     citizenPayPaymasterType: wire.paymaster_type ?? null,
     citizenPayTreasurySlug: wire.slug ?? null,
+    citizenPayBusinessId,
     payoutFeePercentage,
     feeCollectionFrequency,
   };

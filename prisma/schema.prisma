@@ -526,6 +526,46 @@ model Fund {
   citizenPayPaymasterAddress      String?
   citizenPayPaymasterType         String?
 
+  // Citizen Pay business operating the treasury — CP's
+  // `treasuries.issued_by_business_id`, read from `GET /v2/treasury`. Written
+  // on connect / key rotation (services/citizenpay/connect.ts) and backfilled
+  // lazily for older funds by services/citizenpay/business-id.ts
+  // (resolveCitizenPayBusinessId). The fund's open-banking link (Ponto)
+  // belongs to that business, and the Citizen Pay dashboard page that connects
+  // it lives under this id — see services/fund-setup/citizenpay-dashboard.ts.
+  citizenPayBusinessId String?
+
+  // La Caisse hosting subscription — step 3 of the fund-setup checklist
+  // (services/fund-setup). Set once an OWNER accepts the monthly plan
+  // (SUBSCRIPTION_MONTHLY_EUR in services/fund-setup/config.ts) from
+  // Settings → Subscription; Citizen Pay's billing then invoices the fund's
+  // business, and the billing* columns are what that invoice needs. Null =
+  // not accepted yet. Never cleared by the app.
+  subscriptionAcceptedAt       DateTime?
+  subscriptionAcceptedByUserId String?   @db.Uuid // User.id of the accepting OWNER; no FK on purpose, the record outlives the account
+  billingLegalName             String?
+  billingEmail                 String?
+  billingAddress               String? // free text, lines separated by \n
+  billingVatNumber             String? // normalised (uppercase, no separators); null when the fund has none
+
+  // Free hosting: the subscription step counts as done without an acceptance.
+  // Set when an OWNER redeems a waiver code on Settings → Subscription
+  // (services/fund-setup/admin-actions.ts::redeemWaiverCodeAction) or by a
+  // platform admin from the shell (scripts/waive-subscription.ts). The reason
+  // is the code's label or the script's --reason, shown to the fund. Null =
+  // not waived. Never cleared by the app; a waived fund never accepts.
+  subscriptionWaivedAt     DateTime?
+  subscriptionWaiverReason String?
+  subscriptionWaiverCodeId String?
+  subscriptionWaiverCode   SubscriptionWaiverCode? @relation(fields: [subscriptionWaiverCodeId], references: [id], onDelete: SetNull)
+
+  // First time the three setup steps were all done (services/fund-setup/
+  // server.ts). From then on the dashboard checklist is settled without the
+  // live Citizen Pay banking read — a fund's bank link can regress, but that is
+  // the Bank page's business, not a reason to call Citizen Pay on every
+  // dashboard view. Never cleared.
+  setupCompletedAt DateTime?
+
   // Legal — links out to the fund's own ToS / privacy pages.
   termsUrl   String?
   privacyUrl String?
@@ -2627,6 +2667,31 @@ enum EmailStatus {
   QUEUED // row exists, send not confirmed yet
   SENT // Resend accepted; resendMessageId populated
   FAILED // Resend rejected or network failure; errorMessage populated
+}
+
+// Subscription waiver codes — a platform admin mints one on the apex
+// (/admin/waivers) and hands it to a fund that hosts for free: a contributor,
+// a non-profit, a school. An OWNER redeems it on Settings → Subscription and
+// the fund's subscription step is done without the monthly acceptance.
+// `label` says who or why and becomes the fund's waiver reason. `maxUses`
+// lets one code cover a cohort; `expiresAt` / `revokedAt` close it. Codes
+// are stored normalised (services/fund-setup/waiver-codes.ts) and shown
+// grouped, e.g. 7K3P-M2QX-9RTD.
+model SubscriptionWaiverCode {
+  id    String @id @default(cuid())
+  code  String @unique // 12 chars of Crockford base32, uppercase, no separators
+  label String
+
+  maxUses   Int       @default(1)
+  usedCount Int       @default(0)
+  expiresAt DateTime?
+  revokedAt DateTime?
+
+  createdByUserId String   @db.Uuid // platform admin who minted it (audit; no FK, outlives the account)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  funds Fund[]
 }
 
 // Public waitlist signups from the marketing landing. Self-serve account

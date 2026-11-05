@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { Suspense } from "react";
-import { Check, Info, Landmark, X } from "lucide-react";
+import { Check, ExternalLink, Info, Landmark, X } from "lucide-react";
 import { getFormatter, getTranslations } from "next-intl/server";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -14,6 +15,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { requireFundRole } from "@/services/auth/dal";
+import { resolveCitizenPayBusinessId } from "@/services/citizenpay/business-id";
+import { getCitizenPayDashboardUrls } from "@/services/fund-setup/server";
 import { requireCurrentFund } from "@/services/fund/server";
 import { cn } from "@/lib/utils";
 
@@ -58,6 +61,7 @@ export default async function BankPage({
           fundId={fund.id}
           citizenPayApiKeyId={fund.citizenPayApiKeyId}
           citizenPayApiKeyEnc={fund.citizenPayApiKeyEnc}
+          citizenPayBusinessId={fund.citizenPayBusinessId}
         />
       </Suspense>
 
@@ -175,17 +179,23 @@ async function ConnectionStatus({
   fundId,
   citizenPayApiKeyId,
   citizenPayApiKeyEnc,
+  citizenPayBusinessId,
 }: {
   fundId: string;
   citizenPayApiKeyId: string | null;
   citizenPayApiKeyEnc: string | null;
+  citizenPayBusinessId: string | null;
 }) {
   const t = await getTranslations("fund.bank");
-  const status = await getBankingStatus(
-    fundId,
-    citizenPayApiKeyId,
-    citizenPayApiKeyEnc,
-  );
+  const [status, businessId] = await Promise.all([
+    getBankingStatus(fundId, citizenPayApiKeyId, citizenPayApiKeyEnc),
+    resolveCitizenPayBusinessId({
+      id: fundId,
+      citizenPayApiKeyId,
+      citizenPayApiKeyEnc,
+      citizenPayBusinessId,
+    }),
+  ]);
 
   return (
     <section className="space-y-4 rounded-lg border border-border p-5">
@@ -234,6 +244,20 @@ async function ConnectionStatus({
               ? t("notice.activate")
               : t("notice.connect")}
           </AlertDescription>
+          {/* The bank connection is made on the Citizen Pay dashboard, on the
+              treasury's business banking page. Outside AlertDescription, whose
+              `[&_a]` link styles would underline the button. */}
+          <div className="pt-1.5 group-has-[>svg]/alert:col-start-2">
+            <a
+              href={getCitizenPayDashboardUrls(businessId).banking}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={buttonVariants({ variant: "default", size: "sm" })}
+            >
+              <ExternalLink className="size-3.5" />
+              {t("notice.cta")}
+            </a>
+          </div>
         </Alert>
       )}
     </section>

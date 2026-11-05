@@ -374,6 +374,9 @@ export async function consumeConnect(args: {
         ...(tokenInfo?.citizenPayTreasurySlug != null && {
           citizenPayTreasurySlug: tokenInfo.citizenPayTreasurySlug,
         }),
+        ...(tokenInfo?.citizenPayBusinessId != null && {
+          citizenPayBusinessId: tokenInfo.citizenPayBusinessId,
+        }),
         ...(smartAccountAddress != null && {
           tokenMinterSmartAccountAddress: smartAccountAddress,
         }),
