@@ -107,6 +107,14 @@
       "resetPassword": {
         "subject": "Restablezca su contraseña de La Caisse",
         "text": "Hola,\n\nSolicitó restablecer su contraseña. Haga clic en el enlace a continuación para elegir una nueva:\n\n{url}\n\nSi no solicitó esto, ignore este mensaje — su contraseña no cambiará.\n\nEl equipo de La Caisse"
+      },
+      "verifyEmail": {
+        "subject": "Confirme su dirección de correo para La Caisse",
+        "text": "Hola:\n\nConfirme que {email} es suya abriendo el enlace siguiente:\n\n{url}\n\nEl enlace es válido durante 24 horas. Si no ha creado una cuenta en La Caisse, ignore este mensaje.\n\nEl equipo de La Caisse"
+      },
+      "joinExistingAccount": {
+        "subject": "Su cuenta de La Caisse y un código de invitación",
+        "text": "Hola:\n\nAlguien — probablemente usted — ha usado un código de invitación en La Caisse con esta dirección, que ya tiene una cuenta. Para crear su caja con ese código, inicie sesión aquí:\n\n{url}\n\nSi no fue usted, ignore este mensaje: no se ha creado ni cambiado nada.\n\nEl equipo de La Caisse"
       }
     }
   },
@@ -127,6 +135,7 @@
       "subdomain": "Subdominio",
       "submit": "Crear fondo",
       "submitting": "Creando…",
+      "waived": "El alojamiento es gratuito para esta caja: {label}.",
       "errors": {
         "nameMin": "El nombre debe tener al menos {min} caracteres.",
         "subdomainMin": "El subdominio debe tener al menos {min} caracteres.",
@@ -879,6 +888,15 @@
           "cta": "Revisar y aceptar",
           "descriptionWaived": "El alojamiento es gratuito para esta caja."
         }
+      },
+      "unverifiedEmail": {
+        "title": "Confirme su dirección de correo",
+        "description": "Hemos enviado un enlace de confirmación a {email}. Ábralo para confirmar que la dirección es suya; hasta entonces, las invitaciones de otras cajas no pueden llegar a esta cuenta.",
+        "resend": "Volver a enviar el enlace",
+        "resending": "Enviando…",
+        "resent": "Enviado. Revise su bandeja de entrada.",
+        "tooMany": "Demasiadas solicitudes. Vuelva a intentarlo dentro de una hora.",
+        "error": "No se pudo enviar el correo. Inténtelo más tarde."
       },
       "tokenFallback": "tokens",
       "range": {
@@ -3059,6 +3077,31 @@
     "accept": "Aceptar invitación",
     "accepting": "Uniéndose…"
   },
+  "join": {
+    "title": "Cree su caja",
+    "description": "Un código de invitación de Citizen Pay abre una caja alojada gratuitamente. Introdúzcalo para crear su cuenta y su caja de una vez.",
+    "code": "Código de invitación",
+    "continue": "Continuar",
+    "codeAccepted": "Código aceptado: alojamiento gratuito para «{label}».",
+    "changeCode": "Usar otro código",
+    "account": "Su cuenta",
+    "email": "Correo electrónico",
+    "password": "Contraseña",
+    "passwordHint": "Al menos {min} caracteres.",
+    "fund": "Su caja",
+    "name": "Nombre de la caja",
+    "subdomain": "Subdominio",
+    "submit": "Crear mi cuenta y mi caja",
+    "submitting": "Creando…",
+    "checkInbox": "Hemos enviado un correo a {email}. Ábralo para continuar.",
+    "haveAccount": "¿Ya tiene una cuenta?",
+    "signIn": "Iniciar sesión",
+    "errors": {
+      "codeRequired": "Introduzca su código de invitación.",
+      "codeInvalid": "Este código no es válido, o ya no lo es. Compruébelo, o pida uno nuevo a quien se lo dio.",
+      "tooMany": "Demasiados intentos. Espere un poco antes de volver a intentarlo."
+    }
+  },
   "members": {
     "email": {
       "paymentConfirmation": {
@@ -4087,7 +4130,7 @@
     "waivers": {
       "create": {
         "title": "Nuevo código de invitación",
-        "description": "Cree un código para una caja alojada gratuitamente. Su propietario lo usa en Ajustes → Suscripción; el paso de suscripción queda completado sin pago.",
+        "description": "Cree un código para una caja alojada gratuitamente. Con él, un recién llegado crea su cuenta y su caja en {joinUrl}; el propietario de una caja existente lo usa en Ajustes → Suscripción. En ambos casos, el paso de suscripción queda completado sin pago.",
         "label": "Para quién o por qué",
         "labelHint": "Se muestra a la caja como motivo, p. ej. «Colaborador: Alice» o «Asociación registrada».",
         "maxUses": "Usos",
@@ -4097,7 +4140,7 @@
         "submit": "Crear código",
         "submitting": "Creando…",
         "createdTitle": "Código creado para «{label}»",
-        "createdHint": "Envíelo al propietario de la caja. Queda en la lista de abajo.",
+        "createdHint": "Envíelo a la persona. Si es nueva en La Caisse, lo usa en {joinUrl}; si ya tiene una caja, en Ajustes → Suscripción. Queda en la lista de abajo.",
         "copy": "Copiar",
         "copied": "Copiado"
       },
@@ -4111,7 +4154,9 @@
         "expires": "Caduca",
         "never": "Nunca",
         "status": "Estado",
-        "redeemedBy": "Usado por"
+        "funds": "Cajas",
+        "created": "creada con este código",
+        "redeemed": "lo usó"
       },
       "status": {
         "active": "Activo",

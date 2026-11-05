@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { z } from "zod";
 
+import { PASSWORD_MIN_LENGTH } from "@/app/(auth-host)/schemas";
+import { CreateFundSchema } from "@/services/fund/schema";
+
 import { isWellFormedWaiverCode, normaliseWaiverCode } from "./waiver-codes";
+
+export { PASSWORD_MIN_LENGTH };
 
 // Settings → Subscription: an OWNER accepts the La Caisse hosting plan and
 // gives the details Citizen Pay's billing invoices against. Shared by the form
@@ -52,23 +57,47 @@ export const AcceptSubscriptionSchema = z.object({
 export type AcceptSubscriptionInput = z.input<typeof AcceptSubscriptionSchema>;
 export type AcceptSubscriptionValues = z.output<typeof AcceptSubscriptionSchema>;
 
-// Settings → Subscription, "Have an invite code?": an OWNER redeems a waiver
-// code. Normalised first (case, dashes and look-alike letters don't matter),
-// then checked for shape only — whether it exists is the action's business.
-export const RedeemWaiverCodeSchema = z.object({
-  code: z
+// A waiver code as a person types it: normalised first (case, dashes and
+// look-alike letters don't matter), then checked for shape only — whether it
+// exists is the action's business. The error keys differ per door: Settings →
+// Subscription names the code's state, the public /join page never does.
+function waiverCodeField(requiredKey: string, invalidKey: string) {
+  return z
     .string()
     .transform(normaliseWaiverCode)
     .pipe(
       z
         .string()
-        .min(1, { error: "fund.settings.subscription.errors.codeRequired" })
-        .refine(isWellFormedWaiverCode, {
-          error: "fund.settings.subscription.errors.codeInvalid",
-        }),
-    ),
+        .min(1, { error: requiredKey })
+        .refine(isWellFormedWaiverCode, { error: invalidKey }),
+    );
+}
+
+// Settings → Subscription, "Have an invite code?": an OWNER redeems a waiver
+// code for a fund that already exists.
+export const RedeemWaiverCodeSchema = z.object({
+  code: waiverCodeField(
+    "fund.settings.subscription.errors.codeRequired",
+    "fund.settings.subscription.errors.codeInvalid",
+  ),
 });
 export type RedeemWaiverCodeInput = z.input<typeof RedeemWaiverCodeSchema>;
+
+// The apex /join door (join-actions.ts): a waiver code, an account and a fund
+// in one submit. The code field is the redeem field with the public page's
+// messages; the account fields are the auth host's sign-up rules (email
+// stored lowercase, like every account); the fund fields are /new's.
+export const JoinWithCodeSchema = CreateFundSchema.extend({
+  code: waiverCodeField("join.errors.codeRequired", "join.errors.codeInvalid"),
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .pipe(z.email({ error: "auth.errors.emailInvalid" })),
+  password: z.string().min(PASSWORD_MIN_LENGTH, { error: "auth.errors.passwordMin" }),
+});
+export type JoinWithCodeInput = z.input<typeof JoinWithCodeSchema>;
+export type JoinWithCodeValues = z.output<typeof JoinWithCodeSchema>;
 
 // Apex /admin/waivers: a platform admin mints a code. The label is who or why
 // ("contributor: Alice", "école communale de X") and becomes the fund's

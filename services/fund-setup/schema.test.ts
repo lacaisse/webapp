@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import {
   AcceptSubscriptionSchema,
   CreateWaiverCodeSchema,
+  JoinWithCodeSchema,
+  PASSWORD_MIN_LENGTH,
   RedeemWaiverCodeSchema,
   WAIVER_EXPIRES_DAYS_MAX,
   WAIVER_LABEL_MAX,
@@ -141,5 +143,48 @@ describe("CreateWaiverCodeSchema", () => {
       if (!parsed.success) expect(parsed.error.issues[0].message).toBe("admin.waivers.errors.expiresRange");
     }
     expect(CreateWaiverCodeSchema.safeParse({ ...valid, maxUses: 25, expiresInDays: 30 }).success).toBe(true);
+  });
+});
+
+describe("JoinWithCodeSchema", () => {
+  const VALID = {
+    code: "7k3p-m2qx-9rtd",
+    email: " Alice@Example.org ",
+    password: "x".repeat(PASSWORD_MIN_LENGTH),
+    name: "La Class",
+    subdomain: "laclass",
+  };
+  const firstError = (input: Partial<typeof VALID>) => {
+    const result = JoinWithCodeSchema.safeParse({ ...VALID, ...input });
+    return result.success ? null : result.error.issues[0];
+  };
+
+  it("normalises the code and stores the email lowercase and trimmed", () => {
+    const parsed = JoinWithCodeSchema.parse(VALID);
+    expect(parsed.code).toBe("7K3PM2QX9RTD");
+    expect(parsed.email).toBe("alice@example.org");
+    expect(parsed).toMatchObject({ name: "La Class", subdomain: "laclass" });
+  });
+
+  it("uses the public door's words for the code", () => {
+    expect(firstError({ code: "" })).toMatchObject({ path: ["code"], message: "join.errors.codeRequired" });
+    expect(firstError({ code: "7K3P-M2QX" })).toMatchObject({ path: ["code"], message: "join.errors.codeInvalid" });
+  });
+
+  it("applies the auth host's account rules and /new's fund rules", () => {
+    expect(firstError({ email: "nope" })).toMatchObject({ path: ["email"], message: "auth.errors.emailInvalid" });
+    expect(firstError({ password: "x".repeat(PASSWORD_MIN_LENGTH - 1) })).toMatchObject({
+      path: ["password"],
+      message: "auth.errors.passwordMin",
+    });
+    expect(firstError({ name: "A" })).toMatchObject({ path: ["name"], message: "funds.create.errors.nameMin" });
+    expect(firstError({ subdomain: "admin" })).toMatchObject({
+      path: ["subdomain"],
+      message: "funds.create.errors.subdomainReserved",
+    });
+    expect(firstError({ subdomain: "Not Valid" })).toMatchObject({
+      path: ["subdomain"],
+      message: "funds.create.errors.subdomainFormat",
+    });
   });
 });

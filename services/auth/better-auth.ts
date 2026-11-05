@@ -104,13 +104,35 @@ export const auth = betterAuth({
     // the handoff flow and revive the third-party-cookie problem.
   },
 
+  // The verification email itself exists (below) — the apex /join door sends
+  // one to the account it creates, and the dashboard can resend it — but a
+  // session does not yet NEED a verified email: `requireEmailVerification`
+  // stays off. It is also read by the invite rule in
+  // services/fund-team/invite-rules.ts; keep REQUIRE_EMAIL_VERIFICATION
+  // above in step when flipping it.
+  emailVerification: {
+    // `url` is `${AUTH_HOST}/api/auth/verify-email?token=…&callbackURL=…`:
+    // the route marks the account verified and sends the browser on to the
+    // callback (origin-checked against trustedOrigins). Same lazy i18n as
+    // the reset email.
+    sendVerificationEmail: async ({ user, url }) => {
+      const t = await getTranslations("auth.emails.verifyEmail");
+      const text = t("text", { email: user.email, url });
+      await sendEmail({
+        to: user.email,
+        subject: t("subject"),
+        text,
+        html: `<p>${text.replace(/\n/g, "</p><p>")}</p>`,
+      });
+    },
+    // A day, like the member-login verification: long enough to find the
+    // email the next morning.
+    expiresIn: 24 * 60 * 60,
+  },
+
   emailAndPassword: {
     enabled: true,
-    // Verification gated off — flip to true and add `sendVerificationEmail`
-    // when product wants it. Today's flow signs the user in immediately
-    // after sign-up. `requireEmailVerification` is also read by the invite
-    // rule in services/fund-team/invite-rules.ts; keep REQUIRE_EMAIL_
-    // VERIFICATION below in step.
+    // Today's flows sign the user in immediately after account creation.
     requireEmailVerification: REQUIRE_EMAIL_VERIFICATION,
     minPasswordLength: 8,
     // The public `/api/auth/sign-up/email` is closed on every host (review

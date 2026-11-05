@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { isUniqueViolationOn } from "./unique-violation";
 
 // The three places Prisma has put the violated unique's name in — the member
-// sign-up (and soon fund creation) answers "taken" from it.
+// sign-up, the apex /join door and fund creation all answer "taken" from it.
 function p2002(extra: { message?: string; meta?: unknown }) {
   return Object.assign(new Error(extra.message ?? "Unique constraint failed"), {
     code: "P2002",

@@ -51,7 +51,9 @@ function toInt(raw: unknown): number {
   return text !== "" && Number.isInteger(n) ? n : Number.NaN;
 }
 
-export function CreateWaiverCodeForm() {
+// `joinUrl`: the apex /join door, named in the hand-over hint (built
+// server-side — the page knows the apex, the browser bundle must not).
+export function CreateWaiverCodeForm({ joinUrl }: { joinUrl: string }) {
   const t = useTranslations("admin.waivers.create");
   const tRoot = useTranslations();
   const router = useRouter();
@@ -143,12 +145,12 @@ export function CreateWaiverCodeForm() {
       {errors.root?.message && (
         <p className="text-sm text-destructive">{translateError(errors.root.message)}</p>
       )}
-      {created && <CreatedCode code={created.code} label={created.label} />}
+      {created && <CreatedCode code={created.code} label={created.label} joinUrl={joinUrl} />}
     </div>
   );
 }
 
-function CreatedCode({ code, label }: { code: string; label: string }) {
+function CreatedCode({ code, label, joinUrl }: { code: string; label: string; joinUrl: string }) {
   const t = useTranslations("admin.waivers.create");
   const [copied, setCopied] = useState(false);
 
@@ -173,7 +175,7 @@ function CreatedCode({ code, label }: { code: string; label: string }) {
           {copied ? t("copied") : t("copy")}
         </Button>
       </div>
-      <p className="mt-2 text-sm text-muted-foreground">{t("createdHint")}</p>
+      <p className="mt-2 text-sm text-muted-foreground">{t("createdHint", { joinUrl })}</p>
     </div>
   );
 }

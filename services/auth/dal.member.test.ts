@@ -39,10 +39,11 @@ const prisma = vi.hoisted(() => ({
   user: { findUnique: vi.fn() },
   fundMember: { findUnique: vi.fn(), count: vi.fn() },
   member: { findFirst: vi.fn() },
+  subscriptionWaiverCode: { findUnique: vi.fn() },
 }));
 vi.mock("@/services/db/prisma", () => ({ prisma }));
 
-import { requireFundCreator, requireFundRole, requireMember } from "./dal";
+import { fundCreatorAccess, requireFundCreator, requireFundRole, requireMember } from "./dal";
 
 const memberUser = { id: "11111111-1111-4111-8111-111111111111", email: "ada@example.org", globalRole: "USER" };
 const staffUser = { id: "22222222-2222-4222-8222-222222222222", email: "staff@example.org", globalRole: "USER" };
@@ -65,6 +66,56 @@ describe("a member session", () => {
   it("cannot create a fund (and so become its OWNER)", async () => {
     await expect(requireFundCreator()).rejects.toThrow("REDIRECT:/unauthorized");
     expect(prisma.fundMember.count).toHaveBeenCalledWith({ where: { userId: memberUser.id } });
+    expect(prisma.subscriptionWaiverCode.findUnique).not.toHaveBeenCalled();
+  });
+
+  // /new?code=: a subscription waiver code is the invite (services/fund-setup/
+  // waiver-claim.ts); it opens the gate only while it can still be used.
+  it("may create a fund with a usable waiver code, looked up normalised", async () => {
+    prisma.subscriptionWaiverCode.findUnique.mockResolvedValue({
+      id: "code-1",
+      code: "7K3PM2QX9RTD",
+      label: "Contributor",
+      maxUses: 1,
+      usedCount: 0,
+      expiresAt: null,
+      revokedAt: null,
+    });
+    expect((await requireFundCreator(" 7k3p-m2qx-9rtd ")).id).toBe(memberUser.id);
+    expect(prisma.subscriptionWaiverCode.findUnique).toHaveBeenCalledWith({
+      where: { code: "7K3PM2QX9RTD" },
+    });
+  });
+
+  it("is refused with a code that is unknown, used up, expired or revoked", async () => {
+    const code = { id: "code-1", code: "7K3PM2QX9RTD", label: "x", maxUses: 1, usedCount: 0, expiresAt: null, revokedAt: null };
+    for (const row of [
+      null,
+      { ...code, usedCount: 1 },
+      { ...code, expiresAt: new Date(Date.now() - 1) },
+      { ...code, revokedAt: new Date() },
+    ]) {
+      prisma.subscriptionWaiverCode.findUnique.mockResolvedValueOnce(row);
+      await expect(requireFundCreator("7K3P-M2QX-9RTD")).rejects.toThrow("REDIRECT:/unauthorized");
+    }
+  });
+
+  it("is refused with a malformed code without a read", async () => {
+    await expect(requireFundCreator("nope")).rejects.toThrow("REDIRECT:/unauthorized");
+    expect(prisma.subscriptionWaiverCode.findUnique).not.toHaveBeenCalled();
+  });
+
+  // /new?code= reads the decision itself so a newcomer whose code died
+  // meanwhile is sent back to /join rather than to /unauthorized.
+  it("gets the decision without a redirect from fundCreatorAccess", async () => {
+    prisma.subscriptionWaiverCode.findUnique.mockResolvedValueOnce(null);
+    expect(await fundCreatorAccess("7K3P-M2QX-9RTD")).toEqual({ user: memberUser, access: null });
+    expect(await fundCreatorAccess()).toEqual({ user: memberUser, access: null });
+    expect(nav.redirect).not.toHaveBeenCalled();
+    prisma.subscriptionWaiverCode.findUnique.mockResolvedValueOnce({
+      id: "code-1", code: "7K3PM2QX9RTD", label: "x", maxUses: 1, usedCount: 0, expiresAt: null, revokedAt: null,
+    });
+    expect((await fundCreatorAccess("7K3P-M2QX-9RTD")).access).toBe("code");
   });
 
   it("never satisfies a staff route, even at the lowest role", async () => {
@@ -106,9 +157,11 @@ describe("a staff session", () => {
 
   it("may create a fund, as may a platform admin with no staff row", async () => {
     expect((await requireFundCreator()).id).toBe(staffUser.id);
+    expect((await fundCreatorAccess()).access).toBe("staff");
     prisma.fundMember.count.mockResolvedValue(0);
     prisma.user.findUnique.mockResolvedValue({ ...staffUser, globalRole: "ADMIN" });
     expect((await requireFundCreator()).id).toBe(staffUser.id);
+    expect((await fundCreatorAccess()).access).toBe("admin");
   });
 
   it("is sent to the member login when it has no membership here", async () => {

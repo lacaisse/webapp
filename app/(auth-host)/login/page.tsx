@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
+import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -16,6 +17,10 @@ import { buildPostAuthRedirect } from "@/services/auth/redirects";
 import { getApexUrl } from "@/services/fund/server";
 import { resolveMemberFundHint } from "@/services/member/fund-hint";
 import { LoginForm } from "./login-form";
+
+// return_to may carry an invite code (/new?code=, from the apex /join door):
+// no Referer leaves this page.
+export const metadata: Metadata = { referrer: "no-referrer" };
 
 export default async function LoginPage({
   searchParams,

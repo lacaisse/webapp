@@ -46,6 +46,16 @@ const RESERVED_HOSTS = new Set(["www", "api", "admin", "app"]);
 const MEMBER_PAGE_SEGMENTS = new Set(["login", "signup", "forgot", "reset", "account"]);
 const MEMBER_PAGE_PREFIX = "/member";
 
+// The apex `/join` — the invite-code door (app/(apex)/start, services/fund-
+// setup/join.ts): a holder of a subscription waiver code creates their
+// account and their fund in one go. The path is the member sign-up's on fund
+// hosts (app/(fund-public)/join) and Next refuses two route groups resolving
+// to one URL, so the page lives at `/start` and the proxy rewrites `/join`
+// there on the apex only — the browser keeps the short URL, like the member
+// pages. Every method: the page's server actions POST to the public path.
+const APEX_JOIN_PATH = "/join";
+const APEX_JOIN_PAGE = "/start";
+
 function memberPageRewrite(pathname: string): string | null {
   const [, first] = pathname.split("/");
   if (!first || !MEMBER_PAGE_SEGMENTS.has(first)) return null;
@@ -142,16 +152,19 @@ export async function proxy(request: NextRequest) {
     request.headers.set("x-host-type", hostType);
   }
 
-  // Member pages: an internal rewrite, URL unchanged. Only on an opted-in
-  // fund host — everywhere else these paths keep their existing meaning.
-  // The forwarded headers (fund, x-pathname = the public path) ride along.
-  const memberPath =
+  // Internal rewrites, URL unchanged: the member pages on an opted-in fund
+  // host, the invite-code door on the apex — everywhere else these paths keep
+  // their existing meaning. The forwarded headers (fund, x-pathname = the
+  // public path) ride along.
+  const rewritePath =
     hostType === "fund" && memberLoginEnabled
       ? memberPageRewrite(request.nextUrl.pathname)
-      : null;
-  const response = memberPath
+      : hostType === "apex" && request.nextUrl.pathname === APEX_JOIN_PATH
+        ? APEX_JOIN_PAGE
+        : null;
+  const response = rewritePath
     ? NextResponse.rewrite(
-        new URL(`${memberPath}${request.nextUrl.search}`, request.url),
+        new URL(`${rewritePath}${request.nextUrl.search}`, request.url),
         { request },
       )
     : NextResponse.next({ request });

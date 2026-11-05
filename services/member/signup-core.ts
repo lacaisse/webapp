@@ -228,7 +228,6 @@ function normalizeExtra(value: ExtraValue): ExtraValue {
   return value;
 }
 
-// The P2002 helper lives in services/db/unique-violation.ts (it must read the
-// driver adapter's error shape, see there); re-exported so existing imports
-// keep working.
+// The P2002 helper moved to services/db/unique-violation.ts (the fund-setup
+// join door needs it too); re-exported so existing imports keep working.
 export { isUniqueViolationOn } from "@/services/db/unique-violation";

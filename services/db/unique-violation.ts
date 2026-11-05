@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 // Prisma P2002 (unique constraint failed) on a unique that includes `field`,
-// e.g. "email" on User, "paymentReference" on Member — so
+// e.g. "email" on User, "domain" on Fund, "paymentReference" on Member — so
 // an insert-and-catch (no SELECT-then-INSERT) can tell which unique spoke.
 //
 // Where the column name lives depends on the Prisma version and driver:

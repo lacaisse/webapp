@@ -44,5 +44,24 @@ export const CreateFundSchema = z.object({
     .refine((s) => !RESERVED_SUBDOMAINS.has(s), {
       error: "funds.create.errors.subdomainReserved",
     }),
+  // /new?code=: the subscription waiver code the page was opened with rides
+  // along, as typed. Shape and state are the action's business
+  // (services/fund-setup/waiver-claim.ts); the fund is then created waived.
+  code: z.string().optional(),
 });
 export type CreateFundInput = z.infer<typeof CreateFundSchema>;
+
+/**
+ * A fund name typed by a person → the subdomain the form proposes for it:
+ * lowercase ASCII letters, digits and hyphens, accents stripped, cut to the
+ * maximum. Shared by the /new and /join forms.
+ */
+export function toSubdomain(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, SUBDOMAIN_MAX_LENGTH);
+}
