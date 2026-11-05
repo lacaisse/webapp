@@ -15,8 +15,9 @@ import {
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getCurrentUser } from "@/services/auth/dal";
+import { buildPostAuthRedirect } from "@/services/auth/redirects";
 import { prisma } from "@/services/db/prisma";
-import { getApexUrl, getFundUrl } from "@/services/fund/server";
+import { getFundUrl } from "@/services/fund/server";
 import { getHostType } from "@/services/host/server";
 import { LandingPage } from "./_landing/landing-page";
 import { PasskeySuggestion } from "./passkey-suggestion";
@@ -57,13 +58,16 @@ async function HomeContent({
 }) {
   const hostType = await getHostType();
 
-  // Auth host has no top-level page of its own — `/` exists only so post-
-  // login redirects to "/" don't 404 here. Signed-in users go to the apex;
-  // anonymous to /login. The apex-scoped session cookie travels with them.
+  // Auth host has no top-level page of its own. Anonymous visitors go to
+  // /login; a signed-in one is handed to the apex through the cross-host
+  // exchange, because the cookie here is this host's only — a plain redirect
+  // would land them on the apex anonymous, i.e. on the landing page.
   if (hostType === "auth") {
     const user = await getCurrentUser();
     if (!user) redirect("/login");
-    redirect(getApexUrl("/"));
+    redirect(
+      await buildPostAuthRedirect({ userId: user.id, email: user.email }),
+    );
   }
 
   // On a fund's domain (e.g. acme.lacaisse.eu) — drop the user on the admin
