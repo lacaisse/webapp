@@ -11,8 +11,9 @@
 //   npx tsx scripts/waive-subscription.ts                                  # list funds + hosting state
 //   npx tsx scripts/waive-subscription.ts <domain|id> --reason "…"          # dry run for one fund
 //   npx tsx scripts/waive-subscription.ts <domain|id> --reason "…" --apply  # write it
-//   npx tsx scripts/waive-subscription.ts --all --reason "…" [--apply]      # every fund that neither
-//                                                                           # accepted nor was waived
+//   npx tsx scripts/waive-subscription.ts --all --reason "…"                # dry run for every fund that
+//                                                                           # neither accepted nor was waived
+//   npx tsx scripts/waive-subscription.ts --all --reason "…" --apply --confirm   # write them all
 //
 // The reason is shown to the fund on Settings → Subscription ("Reason: …"),
 // so write it for them: "Founding fund — free hosting", not a ticket number.
@@ -90,6 +91,15 @@ async function main() {
 
   if (!reason) {
     console.error(`--reason "…" is required: it is shown to the fund as why hosting is free.`);
+    process.exit(1);
+  }
+  // A mass write needs a second flag on top of --apply: the dry run is what
+  // gets copied, and a stray --apply must not waive every fund with a stale
+  // reason (nothing in the app clears a waiver).
+  if (all && apply && !args.includes("--confirm")) {
+    console.error(
+      `--all --apply would waive EVERY unsettled fund with reason "${reason}". Re-run with --confirm to proceed.`,
+    );
     process.exit(1);
   }
 

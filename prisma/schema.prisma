@@ -559,6 +559,13 @@ model Fund {
   subscriptionWaiverCodeId String?
   subscriptionWaiverCode   SubscriptionWaiverCode? @relation(fields: [subscriptionWaiverCodeId], references: [id], onDelete: SetNull)
 
+  // First time the three setup steps were all done (services/fund-setup/
+  // server.ts). From then on the dashboard checklist is settled without the
+  // live Citizen Pay banking read — a fund's bank link can regress, but that is
+  // the Bank page's business, not a reason to call Citizen Pay on every
+  // dashboard view. Never cleared.
+  setupCompletedAt DateTime?
+
   // Legal — links out to the fund's own ToS / privacy pages.
   termsUrl   String?
   privacyUrl String?

@@ -4208,7 +4208,9 @@
       },
       "revoke": "Revoke",
       "revoking": "Revoking…",
+      "revokeTitle": "Revoke this code?",
       "revokeConfirm": "Revoke this code? Funds that already redeemed it stay free.",
+      "revokeCancel": "Keep it",
       "errors": {
         "labelMin": "The label must be at least {min} characters.",
         "labelMax": "The label must be at most {max} characters.",

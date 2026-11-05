@@ -4,13 +4,11 @@ import { cache } from "react";
 
 import { readBankingStatus } from "@/services/citizenpay/banking-status";
 import { resolveCitizenPayBusinessId } from "@/services/citizenpay/business-id";
+import { prisma } from "@/services/db/prisma";
 
+import { citizenPayDashboardUrls, type CitizenPayDashboardUrls } from "./citizenpay-dashboard";
 import {
-  citizenPayDashboardUrls,
-  normaliseDashboardBaseUrl,
-  type CitizenPayDashboardUrls,
-} from "./citizenpay-dashboard";
-import {
+  SETUP_STEP_KEYS,
   deriveSetupSteps,
   isCitizenPayConnected,
   isSetupComplete,
@@ -23,14 +21,12 @@ import {
 // adds the env and the Citizen Pay reads (banking status, business id).
 
 // Links into the Citizen Pay dashboard for the fund's business, against the
-// configured dashboard (CITIZENPAY_DASHBOARD_URL, default my.citizenpay.xyz).
+// configured dashboard (CITIZENPAY_DASHBOARD_URL, raw: the pure helper owns
+// the trimming and the default my.citizenpay.xyz).
 export function getCitizenPayDashboardUrls(
   businessId: string | null,
 ): CitizenPayDashboardUrls {
-  return citizenPayDashboardUrls(
-    normaliseDashboardBaseUrl(process.env.CITIZENPAY_DASHBOARD_URL),
-    businessId,
-  );
+  return citizenPayDashboardUrls(process.env.CITIZENPAY_DASHBOARD_URL, businessId);
 }
 
 export type FundSetup = {
@@ -53,6 +49,7 @@ export type FundSetupInput = {
   citizenPayBusinessId: string | null;
   subscriptionAcceptedAt: Date | null;
   subscriptionWaivedAt: Date | null;
+  setupCompletedAt: Date | null;
 };
 
 async function readBanking(fund: FundSetupInput): Promise<BankingRead> {
@@ -68,6 +65,19 @@ async function readBanking(fund: FundSetupInput): Promise<BankingRead> {
 }
 
 async function loadFundSetup(fund: FundSetupInput): Promise<FundSetup> {
+  // Settled once: after the first render that found every step done, the
+  // checklist never calls Citizen Pay again for this fund (the dashboard is
+  // the hot path; the Bank page keeps its own live read).
+  if (fund.setupCompletedAt) {
+    return {
+      steps: SETUP_STEP_KEYS.map((key) => ({ key, status: "done" as const })),
+      complete: true,
+      waived: fund.subscriptionWaivedAt != null,
+      banking: { kind: "not_read" },
+      urls: getCitizenPayDashboardUrls(fund.citizenPayBusinessId),
+    };
+  }
+
   // Both reads hit Citizen Pay only when needed: the business id is cached on
   // the fund after the first backfill, and an unconnected fund reads neither.
   const [banking, businessId] = await Promise.all([
@@ -81,9 +91,21 @@ async function loadFundSetup(fund: FundSetupInput): Promise<FundSetup> {
     subscriptionAcceptedAt: fund.subscriptionAcceptedAt,
     subscriptionWaivedAt: fund.subscriptionWaivedAt,
   });
+  const complete = isSetupComplete(steps);
+  if (complete) {
+    // Remember it (best-effort, conditional so concurrent renders write once).
+    try {
+      await prisma.fund.updateMany({
+        where: { id: fund.id, setupCompletedAt: null },
+        data: { setupCompletedAt: new Date() },
+      });
+    } catch (e) {
+      console.warn("[fund-setup] recording setupCompletedAt failed", fund.id, e);
+    }
+  }
   return {
     steps,
-    complete: isSetupComplete(steps),
+    complete,
     waived: fund.subscriptionWaivedAt != null,
     banking,
     urls: getCitizenPayDashboardUrls(businessId),
