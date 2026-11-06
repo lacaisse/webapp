@@ -28,6 +28,8 @@ const scheduleEvents = vi.hoisted(() => vi.fn());
 vi.mock("./events-webhook", () => ({
   scheduleTreasuryEventsWebhookRegistration: scheduleEvents,
 }));
+const scheduleKind = vi.hoisted(() => vi.fn());
+vi.mock("./sync-fund-kind", () => ({ scheduleTreasuryKindSync: scheduleKind }));
 const scheduleRoles = vi.hoisted(() => vi.fn());
 vi.mock("./token-roles", () => ({ scheduleEnsureMinterRoles: scheduleRoles }));
 
@@ -53,6 +55,7 @@ beforeEach(() => {
   prisma.$transaction.mockResolvedValue([]);
   schedule.mockReset();
   scheduleEvents.mockReset();
+  scheduleKind.mockReset();
   scheduleRoles.mockReset();
   deriveSmartAccountAddress.mockReset();
   deriveSmartAccountAddress.mockResolvedValue(null);
@@ -326,6 +329,7 @@ describe("consumeConnect — top-up URL", () => {
     await expect(call()).resolves.toEqual({ treasuryId: "t-1", apiKeyId: "0xkey" });
     expect(schedule).toHaveBeenCalledExactlyOnceWith(connectedFund);
     expect(scheduleEvents).toHaveBeenCalledExactlyOnceWith(connectedFund);
+    expect(scheduleKind).toHaveBeenCalledExactlyOnceWith(connectedFund);
     // Only the pre-transaction read (treasury check + fee/minter fields).
     expect(prisma.fund.findUnique).toHaveBeenCalledOnce();
   });
@@ -335,6 +339,7 @@ describe("consumeConnect — top-up URL", () => {
     await expect(code(call())).resolves.toBe("treasury_mismatch");
     expect(schedule).not.toHaveBeenCalled();
     expect(scheduleEvents).not.toHaveBeenCalled();
+    expect(scheduleKind).not.toHaveBeenCalled();
   });
 });
 

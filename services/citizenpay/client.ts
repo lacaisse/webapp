@@ -73,6 +73,7 @@ import type {
   TopUpOrderReport,
   TopUpOrderState,
   TopUpSignUrlInput,
+  TreasuryKind,
   TreasuryStats,
 } from "./types";
 
@@ -1189,6 +1190,11 @@ class MockCitizenPayClient implements CitizenPayClient {
     return mockTreasuryTopUpUrls.get(this.fundId) ?? null;
   }
 
+  async setTreasuryKind(kind: TreasuryKind): Promise<void> {
+    this.log("setTreasuryKind", { fundId: this.fundId, kind });
+    mockTreasuryKinds.set(this.fundId, kind);
+  }
+
   async listBanks(query: { country: string }): Promise<CitizenPayBank[]> {
     this.log("listBanks", query);
     return MOCK_BANKS.filter((b) => b.country === query.country);
@@ -1353,6 +1359,18 @@ export function getMockTreasuryTopUpUrl(
   fundId: string,
 ): string | null | undefined {
   return mockTreasuryTopUpUrls.get(fundId);
+}
+
+// Treasury kinds pushed per fund this session (services/citizenpay/
+// sync-fund-kind.ts). Read back with getMockTreasuryKind in tests.
+const mockTreasuryKinds = new Map<string, TreasuryKind>();
+
+/**
+ * The last kind the mock client recorded for a fund: `undefined` when nothing
+ * was pushed. Test/dev helper only — the live client has no local state.
+ */
+export function getMockTreasuryKind(fundId: string): TreasuryKind | undefined {
+  return mockTreasuryKinds.get(fundId);
 }
 
 // The pending fixtures, lifted to module scope so `completePayout` can move one

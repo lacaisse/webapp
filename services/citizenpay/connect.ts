@@ -15,6 +15,7 @@ import {
 } from "./register-prefill";
 import { scheduleTreasuryEventsWebhookRegistration } from "./events-webhook";
 import { fetchTokenInfo } from "./sync";
+import { scheduleTreasuryKindSync } from "./sync-fund-kind";
 import { scheduleTreasuryTopUpUrlSync } from "./sync-top-up-url";
 import { scheduleEnsureMinterRoles } from "./token-roles";
 
@@ -441,6 +442,12 @@ export async function consumeConnect(args: {
   // fund from day one. Same deferral; a fund that already has a secret keeps
   // it. The settings page offers the same registration by hand.
   if (connectedFund) scheduleTreasuryEventsWebhookRegistration(connectedFund);
+
+  // Mark the treasury one of ours — `kind: "fund"`, what the Citizen Wallet
+  // lists (see sync-fund-kind.ts). The api creates every treasury as a plain
+  // `token` and only La Caisse knows which are its caisses; same deferral,
+  // idempotent, best-effort.
+  if (connectedFund) scheduleTreasuryKindSync(connectedFund);
 
   return { treasuryId: creds.treasury_id, apiKeyId: creds.api_key_id };
 }

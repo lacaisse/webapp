@@ -562,6 +562,12 @@ export type TreasuryWire = {
   // answers; camelCase accepted like the fee fields.
   top_up_url?: string | null;
   topUpUrl?: string | null;
+  // Fund vs token (api#260, docs/card-freeze.md "Fund vs token"): `fund` = a
+  // La Caisse caisse that issues cards — what the Citizen Wallet lists —
+  // `token` = only a currency places may accept (the api default). We are
+  // canonical for our own funds: every connected fund is pushed as `fund`
+  // (services/citizenpay/sync-fund-kind.ts); read back only to report.
+  kind?: TreasuryKindWire;
 };
 
 // Wire spelling of the fee collection cadence. Maps 1:1 to the Prisma
@@ -571,6 +577,12 @@ export type FeeCollectionFrequencyWire = "per_payment" | "monthly";
 
 // Budget for the best-effort top-up URL sync (its GET + PATCH /v2/treasury).
 export const TOP_UP_URL_TIMEOUT_MS = 3_000;
+
+// Wire spelling of `treasuries.kind`. PATCH never takes null (400).
+export type TreasuryKindWire = "fund" | "token";
+// Budget for the best-effort kind sync (one PATCH /v2/treasury), off the
+// response path like the top-up URL.
+export const TREASURY_KIND_TIMEOUT_MS = 3_000;
 // Budget for registering the events webhook (PATCH /v2/treasury) — off the
 // response path too, but a settings button waits for it.
 export const EVENTS_WEBHOOK_TIMEOUT_MS = 5_000;
@@ -697,6 +709,20 @@ export const treasury = {
     return request(creds, "PATCH", "/v2/treasury", {
       body: { eventsWebhookUrl: webhook.url, eventsWebhookSecret: webhook.secret },
       timeoutMs: EVENTS_WEBHOOK_TIMEOUT_MS,
+    });
+  },
+  // Mark the treasury a `fund` (a La Caisse caisse that issues cards, listed
+  // by the Citizen Wallet) or a plain `token` (api#260). Same PATCH as the
+  // fee, the top-up URL and the webhook. La Caisse only ever sends `fund`:
+  // every treasury it holds a key for is one of its caisses. An api that
+  // predates the field answers 400 (none of the fields it knows is present).
+  setKind(
+    creds: CitizenPayApiCredentials,
+    kind: TreasuryKindWire,
+  ): Promise<unknown> {
+    return request(creds, "PATCH", "/v2/treasury", {
+      body: { kind },
+      timeoutMs: TREASURY_KIND_TIMEOUT_MS,
     });
   },
   // Read `account`'s minter/burner roles on the treasury's token, on chain.
