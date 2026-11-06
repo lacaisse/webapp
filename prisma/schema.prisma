@@ -58,18 +58,19 @@ model User {
   image         String? // Better Auth core field (avatar URL)
   globalRole    GlobalRole @default(USER)
 
-  memberships       FundMember[]
-  fundInvitesSent   FundInvite[] @relation("FundInvitesSent") // staff invites this user created
-  passkeys          Passkey[]
-  accounts          Account[]
-  sessions          Session[]
-  memberRecords     Member[] // demand-side member rows linked to this auth user (one per fund)
+  memberships        FundMember[]
+  fundInvitesSent    FundInvite[]        @relation("FundInvitesSent") // staff invites this user created
+  passkeys           Passkey[]
+  accounts           Account[]
+  sessions           Session[]
+  memberRecords      Member[] // demand-side member rows linked to this auth user (one per fund)
   emailVerifications EmailVerification[] // member-login sign-up verifications bound to this user
-  reviewedMerchants Merchant[] // merchants this admin reviewed (approved or rejected)
+  reviewedMerchants  Merchant[] // merchants this admin reviewed (approved or rejected)
 
   // Mint/burn audit: annotations whose underlying op this user triggered.
   triggeredAnnotations        TransactionAnnotation[] @relation("AnnotationTriggeredBy")
   cardEvents                  CardEvent[]             @relation("CardEventActor") // PIN unblocks this user did
+  decidedCardHolderClaims     CardHolderClaim[]       @relation("CardHolderClaimDecider")
   triggeredPendingAnnotations PendingAnnotation[]     @relation("PendingAnnotationTriggeredBy")
 
   // Safe multisig: this user's per-fund signer keys and what they signed/proposed.
@@ -681,6 +682,7 @@ model Fund {
 
   citizenPayEvents CitizenPayEvent[] // deliveries of the Citizen Pay events webhook
   cardEvents       CardEvent[] // PIN-block audit trail across the fund's cards
+  cardHolderClaims CardHolderClaim[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1323,6 +1325,16 @@ model Member {
   // gated by Fund.requireMemberEmailVerification.
   emailVerifiedAt DateTime?
 
+  // Last time Citizen Pay accepted this member's declaration (PUT or DELETE
+  // on /v2/treasury/members/{holder_ref} — services/member/api-sync.ts).
+  // Null until the first successful push, and left null on a 404 (route not
+  // deployed) so `scripts/sync-members.ts` can replay it. Not an "is
+  // declared" flag: a successful DELETE stamps it too.
+  apiSyncedAt DateTime?
+
+  // Claims of the fund's cards from the wallet that name this member's login.
+  holderClaims CardHolderClaim[]
+
   emailVerifications EmailVerification[]
 
   // Transactional emails this member is the recipient of.
@@ -1432,14 +1444,18 @@ model Card {
   // DELETE stamps it too.
   holderSyncedAt DateTime?
 
-  issuedAt  DateTime?
-  blockedAt DateTime?
+  issuedAt      DateTime?
+  blockedAt     DateTime?
   // Set with status BLOCKED — see CardBlockedReason. A PIN block carries the
   // api's `pin_blocked_at` in `blockedAt`.
   blockedReason CardBlockedReason?
 
-  // PIN-block audit trail (blocks imported from Citizen Pay, admin unblocks).
+  // Audit trail: PIN blocks imported from Citizen Pay, admin unblocks, holder
+  // login attachments and detachments.
   events CardEvent[]
+
+  // Wallet claims of this card (services/card/holder-claims.ts).
+  holderClaims CardHolderClaim[]
 
   // Inverse of Member.primaryCard (one-to-one).
   primaryOf Member? @relation("MemberPrimaryCard")
@@ -1539,7 +1555,10 @@ model CitizenPayEvent {
   outcome CitizenPayEventOutcome @default(RECEIVED)
   detail  String? // what was applied, or why not / the error
 
-  @@unique([fundId, eventId])
+  // The api draws ids from several sequences (PIN events, holder events,
+  // claims) and namespaces them as strings; the key carries the type too so
+  // the receiver never depends on the sender's namespacing.
+  @@unique([fundId, type, eventId])
   @@index([fundId, receivedAt])
 }
 
@@ -1575,6 +1594,9 @@ model CardEvent {
   terminalId        String?
   // The api event this came from (CitizenPayEvent.eventId), when any.
   citizenPayEventId String?
+  // Short free text about the event: the claim proof (`app`, `bound`,
+  // `payment`, `fund`) on the holder events. Never personal data.
+  detail            String?
 
   at        DateTime @default(now())
   createdAt DateTime @default(now())
@@ -1584,9 +1606,71 @@ model CardEvent {
   @@index([actorUserId])
 }
 
+// A wallet holder's claim of one of the fund's cards that Citizen Pay could
+// not settle on its own (`card.attached` with proof `pending` / a
+// `card.claim_pending` event, plan D13): the issuer's inbox on /cards offers
+// Confirm (`POST /v2/treasury/cards/{serial}/holder/confirm {holder_ref}`)
+// and Refuse (`DELETE …/holder`). One PENDING row per (fund, serial); a
+// claim the api settled by itself (`card.attached`) closes it as ATTACHED.
+// `cardId` is null while La Caisse has no row for the serial (it is created
+// on attach / confirm, never for a refused claim).
+model CardHolderClaim {
+  id     String @id @default(cuid())
+  fundId String
+  fund   Fund   @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  serial String
+  cardId String?
+  card   Card?   @relation(fields: [cardId], references: [id], onDelete: SetNull)
+
+  // The wallet login (La Caisse User id, the JWT `sub`) and the Member of
+  // this fund it resolved to at receipt (null = not a member here: shown as
+  // such, never confirmable).
+  holderRef String
+  memberId  String?
+  member    Member? @relation(fields: [memberId], references: [id], onDelete: SetNull)
+
+  // The api's proof word (`pending` while the fund must decide).
+  proof  String?
+  status CardHolderClaimStatus @default(PENDING)
+
+  // The api event that opened it (CitizenPayEvent.eventId), when any.
+  citizenPayEventId String?
+
+  requestedAt DateTime  @default(now())
+  decidedAt   DateTime?
+  decidedById String?   @db.Uuid
+  decidedBy   User?     @relation("CardHolderClaimDecider", fields: [decidedById], references: [id], onDelete: SetNull)
+
+  // Plus a partial unique index (fundId, serial) WHERE status = 'PENDING' in
+  // the migration — one open claim per card — which Prisma cannot express.
+  @@index([fundId, status, requestedAt])
+  @@index([cardId])
+  @@index([memberId])
+  @@index([decidedById])
+}
+
+enum CardHolderClaimStatus {
+  PENDING
+  CONFIRMED // the fund confirmed it (the api attached the card)
+  REFUSED // the fund refused it
+  ATTACHED // the api settled it without the fund (proof app/bound/payment)
+  SUPERSEDED // a newer claim or a detachment replaced it
+}
+
 enum CardEventKind {
   PIN_BLOCKED
   PIN_UNBLOCKED
+  // Holder login attachments (plan "Bread card-holder voting", PR W-2): a
+  // card claimed from the wallet (`detail` = the api's proof: app, bound,
+  // payment, fund), a claim that waits for the fund's confirmation, the
+  // fund's decision on it, and a detachment (by the fund from the card page,
+  // source ADMIN, or reported by the api, source WEBHOOK).
+  HOLDER_ATTACHED
+  HOLDER_DETACHED
+  CLAIM_PENDING
+  CLAIM_CONFIRMED
+  CLAIM_REFUSED
 }
 
 enum CardEventSource {
@@ -2671,6 +2755,11 @@ enum EmailType {
   // they have an email. Both are linked to the card (Card.emails).
   CARD_PIN_BLOCKED
   CARD_PIN_BLOCKED_HOLDER
+
+  // A holder claimed one of the fund's cards from the card wallet (events
+  // webhook `card.attached`): to the fund's OWNER/ADMIN staff, linked to the
+  // card.
+  CARD_CLAIMED_FROM_WALLET
 }
 
 enum EmailStatus {

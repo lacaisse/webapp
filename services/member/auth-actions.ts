@@ -11,6 +11,7 @@ import { auth } from "@/services/auth/better-auth";
 import { getCurrentMember } from "@/services/auth/dal";
 import { scheduleMemberCardHolderSync } from "@/services/card/holder-sync";
 import { prisma } from "@/services/db/prisma";
+import { scheduleMemberApiSync } from "@/services/member/api-sync";
 import { dispatchMemberWelcomeSafe } from "@/services/email/member-welcome";
 import { consumeVerificationToken } from "@/services/email/verification";
 import { requireCurrentFund } from "@/services/fund/server";
@@ -246,6 +247,9 @@ export async function confirmMemberVerificationAction(token: string): Promise<Me
     // An existing member who merely created a login is not a new applicant.
     if (!result.wasLinked) await dispatchMemberWelcomeSafe(fund, result.memberId);
     if (result.linkedUserId) scheduleMemberCardHolderSync(result.memberId);
+    // Declare the now-verified login as a member at the api. Unconditional:
+    // the sync recomputes from the rows and skips a member with no login.
+    scheduleMemberApiSync(result.memberId);
   }
   return { ok: true, redirectTo: "/account" };
 }

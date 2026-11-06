@@ -5,6 +5,7 @@ import { auth } from "@/services/auth/better-auth";
 import { syncMemberCardHolders } from "@/services/card/holder-sync";
 import type { AllocationMode } from "@/services/db/generated/enums";
 import { prisma } from "@/services/db/prisma";
+import { syncMemberAtApi } from "@/services/member/api-sync";
 import { sendMemberLoginVerification } from "@/services/email/transactional";
 import {
   generateVerificationToken,
@@ -341,5 +342,8 @@ export async function removeMemberLogin(args: {
   // The member's cards are public again; tell Citizen Pay now (awaited:
   // the caller is about to redirect, there is no response to defer behind).
   await syncMemberCardHolders(args.memberId);
+  // And withdraw the member declaration. The ref comes from the args: the
+  // Member row no longer names the login and the User row may be gone.
+  await syncMemberAtApi(args.memberId, { removedHolderRef: args.userId });
   return { userDeleted };
 }

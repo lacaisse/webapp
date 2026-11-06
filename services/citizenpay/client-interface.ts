@@ -57,6 +57,7 @@ import type {
   TopUpSignUrlInput,
   TreasuryKind,
   TreasuryStats,
+  CardHolderInfo,
 } from "./types";
 
 export interface CitizenPayClient {
@@ -291,6 +292,43 @@ export interface CitizenPayClient {
    * tolerates it).
    */
   setCardHolder(serialNumber: string, holderRef: string | null): Promise<void>;
+
+  /**
+   * The card's holder state at Citizen Pay (`GET
+   * /v2/treasury/cards/{serial}/holder`, api PR A): the attached login, how
+   * it was proven, a claim waiting for the fund's confirmation, the legacy
+   * phone link. Throws `CitizenPayApiError` on a non-2xx — 404 when the
+   * serial is not the treasury's own, or while the route is not deployed.
+   */
+  getCardHolder(serialNumber: string): Promise<CardHolderInfo>;
+
+  /**
+   * Confirm a wallet claim the api left for the fund (D13 `needs_proof`):
+   * `POST /v2/treasury/cards/{serial}/holder/confirm {holder_ref}`. The api
+   * attaches the card and posts `card.attached {proof: "fund"}`. Throws
+   * `CitizenPayApiError` on a non-2xx (404 route / card, 409 no such claim).
+   */
+  confirmCardHolder(serialNumber: string, holderRef: string): Promise<void>;
+
+  /**
+   * Refuse ONE login's pending claim and keep the card's holder (`POST
+   * /v2/treasury/cards/{serial}/holder/refuse {holder_ref}`). Throws
+   * `CitizenPayApiError` on a non-2xx — 404 `no pending claim` when that
+   * login has none (the caller reads it as already gone).
+   */
+  refuseCardHolder(serialNumber: string, holderRef: string): Promise<void>;
+
+  /**
+   * Declare a wallet login as a member of this fund, with the serials of the
+   * fund's own cards bound to them (`PUT /v2/treasury/members/{holder_ref}
+   * {cards}`): a claim from that login needs no proof for those cards.
+   * Throws `CitizenPayApiError` on a non-2xx — 404 while the route is not
+   * deployed (services/member/api-sync.ts tolerates it).
+   */
+  setTreasuryMember(holderRef: string, cards: string[]): Promise<void>;
+
+  /** Undeclare a login (`DELETE /v2/treasury/members/{holder_ref}`). */
+  removeTreasuryMember(holderRef: string): Promise<void>;
 
   /**
    * Set (or clear, with null or 0) the weekly cap in cents on what the card

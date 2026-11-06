@@ -1080,7 +1080,8 @@
         "status": "Statut",
         "tier": "Palier",
         "cards": "Cartes",
-        "joined": "Inscrit le"
+        "joined": "Inscrit le",
+        "login": "Accès"
       },
       "contribution": {
         "target": "Cible",
@@ -1202,6 +1203,11 @@
           "joinedAt": "Inscrit le",
           "notes": "Notes"
         }
+      },
+      "login": {
+        "yes": "Accès",
+        "unverified": "Accès · non vérifié",
+        "none": "Pas d'accès"
       }
     },
     "cards": {
@@ -1361,6 +1367,35 @@
         "forMember": "Pour {name}",
         "holder": "Porteur : {name}",
         "viewCard": "Voir la carte"
+      },
+      "holderClaims": {
+        "title": "Revendications depuis le portefeuille de carte",
+        "description": "Des porteurs ont revendiqué une de vos cartes avec leur accès. Confirmez si vous savez que la carte est la leur ; sinon refusez — la carte reste publique.",
+        "anchor": "Revendications",
+        "columns": {
+          "serial": "Série",
+          "number": "N° carte",
+          "member": "Membre",
+          "proof": "Preuve",
+          "requested": "Demandée le",
+          "status": "Statut"
+        },
+        "status": {
+          "PENDING": "En attente",
+          "CONFIRMED": "Confirmée",
+          "REFUSED": "Refusée",
+          "ATTACHED": "Rattachée",
+          "SUPERSEDED": "Remplacée"
+        },
+        "notMember": "Pas membre de cette caisse",
+        "confirm": "Confirmer",
+        "confirming": "Confirmation…",
+        "refuse": "Refuser",
+        "refusing": "Refus…",
+        "refuseTitle": "Refuser cette revendication ?",
+        "refuseDescription": "La carte {serial} reste publique sur le portefeuille et n'est pas rattachée à l'accès de {member}. Cette personne pourra la revendiquer à nouveau plus tard.",
+        "confirmRefuse": "Refuser la revendication",
+        "dismiss": "Retour"
       }
     },
     "allocations": {
@@ -3884,6 +3919,70 @@
             "ctaLabel": "Ouvrir ma carte",
             "unknownPlace": "un terminal"
           }
+        }
+      },
+      "holderClaims": {
+        "email": {
+          "staff": {
+            "subject": "Carte {serial} revendiquée depuis le portefeuille par {holder}",
+            "textBody": "Bonjour,\n\n{holder} a revendiqué la carte {serial} depuis le portefeuille de carte le {date}, avec son accès {fundName}. Preuve de possession : {proof}.\n\nLa carte est désormais rattachée à cet accès : elle est privée sur le portefeuille et peut voter. Si ce n'est pas correct, un admin de {fundName} peut la détacher depuis la page de la carte :\n\n{cardUrl}\n\nL'équipe {fundName}",
+            "ctaLabel": "Ouvrir la carte",
+            "proof": {
+              "treasury": "rattachée par la caisse",
+              "fund": "la carte lui était attribuée ici, sans preuve nécessaire",
+              "payment": "un paiement récent effectué avec la carte",
+              "confirmed": "confirmée par la caisse",
+              "unknown": "non précisée"
+            }
+          }
+        },
+        "proof": {
+          "treasury": "Rattachée par la caisse",
+          "fund": "Attribuée ici, sans preuve",
+          "payment": "Paiement récent",
+          "confirmed": "Confirmée par la caisse",
+          "pending": "En attente",
+          "unknown": "Non précisée"
+        },
+        "errors": {
+          "notFound": "Cette revendication n'existe plus.",
+          "notPending": "Cette revendication a déjà été traitée.",
+          "notMember": "Cet accès n'appartient à aucun membre de cette caisse.",
+          "loginRemoved": "Ce membre n'a plus d'accès vérifié.",
+          "notAttached": "Cette carte n'est rattachée à aucun accès.",
+          "apiNotDeployed": "Citizen Pay ne propose pas encore cette fonction. Réessayez après la prochaine mise à jour de l'api.",
+          "apiRefused": "Citizen Pay a refusé : la carte a été rattachée à un autre accès entre-temps.",
+          "failed": "Une erreur s'est produite. Réessayez.",
+          "loginDisabled": "L'accès des membres est désactivé pour cette caisse : activez-le dans Paramètres → Inscription avant de confirmer une demande.",
+          "legacyOwner": "Citizen Pay a refusé : un compte téléphone détient encore cette carte. Détachez-le d'abord, puis confirmez."
+        },
+        "card": {
+          "title": "Accès du porteur",
+          "description": "L'accès membre qui détient cette carte sur le portefeuille.",
+          "login": "Accès",
+          "attached": "Rattachée chez Citizen Pay",
+          "proof": "Preuve",
+          "pendingClaim": "Un accès du portefeuille attend votre confirmation.",
+          "pendingClaimLink": "Voir les revendications",
+          "noMember": "Aucun membre",
+          "noLogin": "Pas d'accès",
+          "loginVerified": "Accès · vérifié",
+          "loginUnverified": "Accès · email non vérifié",
+          "attachedSince": "Oui · depuis le {date}",
+          "attachedOther": "Rattachée à un autre accès",
+          "claimPending": "Revendication en attente · {date}",
+          "notAttached": "Non",
+          "notAvailable": "Pas encore disponible",
+          "assignedHere": "Attribuée ici (caisse)",
+          "adminOnly": "Seul un admin de la caisse peut la détacher."
+        },
+        "detach": {
+          "button": "Détacher",
+          "title": "Détacher cette carte de l'accès ?",
+          "description": "La carte de {holderLabel} quitte son accès : elle redevient publique sur le portefeuille et n'est plus attribuée au membre ici. Il vous sera demandé de confirmer votre identité.",
+          "cancel": "Annuler",
+          "confirm": "Détacher la carte",
+          "detaching": "Détachement…"
         }
       }
     }

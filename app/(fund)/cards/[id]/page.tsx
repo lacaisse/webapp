@@ -42,6 +42,7 @@ import { CardWeeklyLimitInput } from "./weekly-limit";
 import { NotifyCardButton } from "./notify-card-button";
 import { PinBlockBanner } from "./pin-block-banner";
 import { ChargeCardDialog } from "./charge-card-dialog";
+import { HolderLoginCard } from "./holder-login-card";
 import { TransferDialog } from "./transfer-dialog";
 import { UnassignCardButton } from "../unassign-card-button";
 
@@ -72,6 +73,8 @@ export default async function CardDetailPage({
           lastName: true,
           email: true,
           primaryCardId: true,
+          userId: true,
+          emailVerifiedAt: true,
         },
       },
     },
@@ -108,8 +111,15 @@ export default async function CardDetailPage({
   // behind the step-up (the re-auth dialog offers a passkey only to users
   // who registered one).
   const pinBlocked = isPinBlocked(card);
-  const canUnblock = pinBlocked && hasMinFundRole(membership.role, "ADMIN");
-  const hasPasskey = canUnblock ? await userHasPasskey(user.id) : false;
+  const isAdmin = hasMinFundRole(membership.role, "ADMIN");
+  const canUnblock = pinBlocked && isAdmin;
+  // Member login on: the "Holder login" block, whose Detach (ADMIN, step-up)
+  // shows only for a card bound to a member with a login.
+  const showHolderLogin = fund.memberLoginEnabled;
+  const canDetach =
+    showHolderLogin && isAdmin && Boolean(card.member?.userId);
+  const hasPasskey =
+    canUnblock || canDetach ? await userHasPasskey(user.id) : false;
   const lastPinBlock = pinBlocked
     ? await prisma.cardEvent.findFirst({
         where: { cardId: card.id, kind: "PIN_BLOCKED" },
@@ -139,6 +149,36 @@ export default async function CardDetailPage({
           })
         ).map((m) => ({ id: m.id, name: m.name, placeId: m.citizenPayPlaceId! }))
       : null;
+
+  const balanceCard = (
+    <Card size="sm">
+      <CardHeader>
+        <CardTitle>{t("balance.title")}</CardTitle>
+        <CardDescription>{t("balance.description")}</CardDescription>
+      </CardHeader>
+      <CardContent className="pb-3">
+        {canShowBalance ? (
+          <Suspense
+            fallback={
+              <span className="inline-block h-7 w-32 animate-pulse rounded bg-muted" />
+            }
+          >
+            <BalanceDisplay
+              chainId={fund.tokenChainId}
+              contractAddress={fund.tokenAddress!}
+              account={card.account!}
+              decimals={fund.tokenDecimals!}
+              symbol={fund.tokenSymbol}
+            />
+          </Suspense>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            {t("balance.unavailable")}
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
 
   return (
     <>
@@ -224,33 +264,29 @@ export default async function CardDetailPage({
       </header>
 
       <section className="grid gap-3 lg:grid-cols-[1fr_1.5fr]">
-        <Card size="sm">
-          <CardHeader>
-            <CardTitle>{t("balance.title")}</CardTitle>
-            <CardDescription>{t("balance.description")}</CardDescription>
-          </CardHeader>
-          <CardContent className="pb-3">
-            {canShowBalance ? (
-              <Suspense
-                fallback={
-                  <span className="inline-block h-7 w-32 animate-pulse rounded bg-muted" />
-                }
-              >
-                <BalanceDisplay
-                  chainId={fund.tokenChainId}
-                  contractAddress={fund.tokenAddress!}
-                  account={card.account!}
-                  decimals={fund.tokenDecimals!}
-                  symbol={fund.tokenSymbol}
-                />
-              </Suspense>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                {t("balance.unavailable")}
-              </p>
-            )}
-          </CardContent>
-        </Card>
+        {showHolderLogin ? (
+          <div className="flex flex-col gap-3">
+            {balanceCard}
+            <HolderLoginCard
+              fund={{
+                id: fund.id,
+                citizenPayApiKeyId: fund.citizenPayApiKeyId,
+                citizenPayApiKeyEnc: fund.citizenPayApiKeyEnc,
+              }}
+              card={{
+                id: card.id,
+                serialNumber: card.serialNumber,
+                memberId: card.memberId,
+                member: card.member,
+              }}
+              holderLabel={holderDisplay}
+              canDetach={isAdmin}
+              hasPasskey={hasPasskey}
+            />
+          </div>
+        ) : (
+          balanceCard
+        )}
 
         <Card size="sm">
           <CardHeader>

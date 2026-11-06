@@ -27,6 +27,7 @@ import type {
   CardChargeCardInput,
   CardChargeOnPlaceInput,
   CardChargeRefusal,
+  CardHolderInfo,
   CardChargeResult,
   CardOperationInput,
   CardOperationResult,
@@ -479,8 +480,93 @@ class MockCitizenPayClient implements CitizenPayClient {
   ): Promise<void> {
     // The holder ref is a user id — fine to log; it is not personal data.
     this.log("setCardHolder", { serialNumber, holderRef });
-    if (holderRef === null) mockCardHolders.delete(serialNumber);
-    else mockCardHolders.set(serialNumber, holderRef);
+    const key = serialNumber.toUpperCase();
+    mockPendingClaims.delete(key);
+    if (holderRef === null) {
+      mockCardHolders.delete(key);
+      mockCardHolderMeta.delete(key);
+    } else {
+      mockCardHolders.set(key, holderRef);
+      mockCardHolderMeta.set(key, { attachedAt: new Date().toISOString(), proof: "treasury" });
+    }
+  }
+
+  async getCardHolder(serialNumber: string): Promise<CardHolderInfo> {
+    this.log("getCardHolder", { serialNumber });
+    const key = serialNumber.toUpperCase();
+    // Bench knobs (dev mock only): a serial ending in `CLAIMED` reads as
+    // attached to CITIZENPAY_MOCK_CLAIM_HOLDER_REF (proof `payment`) and one
+    // ending in `PENDING` as claimed-but-pending by
+    // CITIZENPAY_MOCK_PENDING_HOLDER_REF, unless this process already holds a
+    // state for it. They let a signed `card.attached` / `card.claim_pending`
+    // be posted at the local receiver without first attaching the card.
+    // Each knob seeds a serial once per process: after the fund's own
+    // DELETE (Detach, Refuse) the card stays public, as at the real api.
+    if (!mockKnobSeeded.has(key)) {
+      const claimEnv = process.env.CITIZENPAY_MOCK_CLAIM_HOLDER_REF;
+      const pendingEnv = process.env.CITIZENPAY_MOCK_PENDING_HOLDER_REF;
+      if (claimEnv && /CLAIMED$/i.test(key)) {
+        mockKnobSeeded.add(key);
+        mockCardHolders.set(key, claimEnv);
+        mockCardHolderMeta.set(key, { attachedAt: MOCK_CLAIM_AT, proof: "payment" });
+      } else if (pendingEnv && /PENDING$/i.test(key)) {
+        mockKnobSeeded.add(key);
+        mockPendingClaims.set(key, { holderRef: pendingEnv, requestedAt: MOCK_CLAIM_AT });
+      }
+    }
+    const holderRef = mockCardHolders.get(key) ?? null;
+    const meta = mockCardHolderMeta.get(key);
+    const pending = mockPendingClaims.get(key);
+    return {
+      holderRef,
+      attachedAt: holderRef ? (meta?.attachedAt ?? MOCK_CLAIM_AT) : null,
+      proof: holderRef ? (meta?.proof ?? "treasury") : null,
+      pendingHolderRef: pending?.holderRef ?? null,
+      pendingProof: pending ? "pending" : null,
+      pendingSince: pending?.requestedAt ?? null,
+      pendingKnown: true,
+      appOwnerLinked: false,
+    };
+  }
+
+  async confirmCardHolder(serialNumber: string, holderRef: string): Promise<void> {
+    this.log("confirmCardHolder", { serialNumber, holderRef });
+    const key = serialNumber.toUpperCase();
+    const current = mockCardHolders.get(key);
+    if (current === holderRef) return; // already this login's: 200
+    if (current) {
+      throw new CitizenPayApiError("card is attached to another member", 409, {
+        error: "card is attached to another member",
+      });
+    }
+    const pending = mockPendingClaims.get(key);
+    if (!pending || pending.holderRef !== holderRef) {
+      // The api's 404 when that login has no pending claim.
+      throw new CitizenPayApiError("no pending claim", 404, { error: "no pending claim" });
+    }
+    mockPendingClaims.delete(key);
+    mockCardHolders.set(key, holderRef);
+    mockCardHolderMeta.set(key, { attachedAt: new Date().toISOString(), proof: "confirmed" });
+  }
+
+  async refuseCardHolder(serialNumber: string, holderRef: string): Promise<void> {
+    this.log("refuseCardHolder", { serialNumber, holderRef });
+    const key = serialNumber.toUpperCase();
+    const pending = mockPendingClaims.get(key);
+    if (!pending || pending.holderRef !== holderRef) {
+      throw new CitizenPayApiError("no pending claim", 404, { error: "no pending claim" });
+    }
+    mockPendingClaims.delete(key);
+  }
+
+  async setTreasuryMember(holderRef: string, cards: string[]): Promise<void> {
+    this.log("setTreasuryMember", { holderRef, cards: cards.length });
+    mockTreasuryMembers.set(holderRef, [...cards]);
+  }
+
+  async removeTreasuryMember(holderRef: string): Promise<void> {
+    this.log("removeTreasuryMember", { holderRef });
+    mockTreasuryMembers.delete(holderRef);
   }
 
   async setCardSourceLimit(
@@ -1411,6 +1497,25 @@ const mockCardSourceLimits = new Map<string, number>();
 export const mockCardHolders: Map<string, string> = ((
   globalThis as { __cpMockCardHolders?: Map<string, string> }
 ).__cpMockCardHolders ??= new Map());
+// When / how the mock attached each card (serial, uppercased → meta), the
+// claims waiting for the fund (serial → claimant), and the logins the fund
+// declared as members (holder ref → bound serials). Same lifetime and
+// globalThis rule as mockCardHolders.
+const mockCardHolderMeta: Map<string, { attachedAt: string; proof: string }> = ((
+  globalThis as { __cpMockCardHolderMeta?: Map<string, { attachedAt: string; proof: string }> }
+).__cpMockCardHolderMeta ??= new Map());
+export const mockPendingClaims: Map<string, { holderRef: string; requestedAt: string }> = ((
+  globalThis as {
+    __cpMockPendingClaims?: Map<string, { holderRef: string; requestedAt: string }>;
+  }
+).__cpMockPendingClaims ??= new Map());
+export const mockTreasuryMembers: Map<string, string[]> = ((
+  globalThis as { __cpMockTreasuryMembers?: Map<string, string[]> }
+).__cpMockTreasuryMembers ??= new Map());
+const MOCK_CLAIM_AT = "2026-11-03T11:30:00.000Z";
+const mockKnobSeeded: Set<string> = ((
+  globalThis as { __cpMockKnobSeeded?: Set<string> }
+).__cpMockKnobSeeded ??= new Set());
 
 // Next Monday 00:00 Europe/Brussels — where CP's weekly source cap resets.
 function nextBrusselsMonday(now: Date): Date {
