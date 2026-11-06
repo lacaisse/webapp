@@ -753,3 +753,10 @@ export type CardChargeResult = {
   settled: boolean;
   existing: boolean;
 };
+
+// `treasuries.kind` on Citizen Pay (api#260): `fund` = a La Caisse caisse that
+// issues cards (what the Citizen Wallet lists), `token` = only a currency
+// places may accept (the api default; Monerium EURe, business tokens…). La
+// Caisse pushes `fund` for every treasury it holds a key for
+// (services/citizenpay/sync-fund-kind.ts) and never sends `token`.
+export type TreasuryKind = "fund" | "token";

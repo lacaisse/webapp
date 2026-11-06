@@ -55,6 +55,7 @@ import type {
   TopUpOrderReport,
   TopUpOrderState,
   TopUpSignUrlInput,
+  TreasuryKind,
   TreasuryStats,
 } from "./types";
 
@@ -660,6 +661,16 @@ export interface CitizenPayClient {
    * that isn't ours to touch. Backed by GET /v2/treasury (`top_up_url`).
    */
   getTreasuryTopUpUrl(): Promise<string | null>;
+
+  /**
+   * Mark the treasury a La Caisse fund on Citizen Pay (`PATCH /v2/treasury
+   * { kind: "fund" }`, api#260) so the Citizen Wallet lists it; `token` is
+   * what a plain currency (Monerium EURe, a business token) stays. We are
+   * canonical: every treasury La Caisse holds a key for is one of its
+   * caisses, so services/citizenpay/sync-fund-kind.ts only ever sends
+   * `fund`. Idempotent on the api.
+   */
+  setTreasuryKind(kind: TreasuryKind): Promise<void>;
 
   /**
    * CP's public bank directory (Ponto financial institutions) for one

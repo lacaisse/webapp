@@ -102,6 +102,7 @@ import type {
   TopUpOrderReport,
   TopUpOrderState,
   TopUpSignUrlInput,
+  TreasuryKind,
   TreasuryStats,
 } from "./types";
 
@@ -1313,6 +1314,10 @@ export class LiveCitizenPayClient implements CitizenPayClient {
       timeoutMs: TOP_UP_URL_TIMEOUT_MS,
     });
     return wire.top_up_url ?? wire.topUpUrl ?? null;
+  }
+
+  async setTreasuryKind(kind: TreasuryKind): Promise<void> {
+    await apiTreasury.setKind(this.creds, kind);
   }
 
   async listBanks(query: { country: string }): Promise<CitizenPayBank[]> {

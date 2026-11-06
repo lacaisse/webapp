@@ -10,6 +10,7 @@ import { z } from "zod";
 import { requireFundRole } from "@/services/auth/dal";
 import { scheduleFundCardHolderSync } from "@/services/card/holder-sync";
 import { getCitizenPayClient } from "@/services/citizenpay/client";
+import { scheduleTreasuryKindSync } from "@/services/citizenpay/sync-fund-kind";
 import { scheduleTreasuryTopUpUrlSync } from "@/services/citizenpay/sync-top-up-url";
 import {
   ensureMinterRoles,
@@ -160,6 +161,10 @@ export async function updateGeneralSettingsAction(
   // every save so re-saving also repairs a treasury that drifted; runs after
   // the response and never fails the save.
   scheduleTreasuryTopUpUrlSync(updated);
+  // Same deferral for the treasury kind (`fund`, what the Citizen Wallet
+  // lists — services/citizenpay/sync-fund-kind.ts): re-saving repairs a
+  // treasury the api still holds as a plain token.
+  scheduleTreasuryKindSync(updated);
   revalidatePath("/settings");
   return { ok: true };
 }

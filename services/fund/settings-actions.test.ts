@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// Pins the top-up URL wiring on the general settings save: the save commits
-// and returns ok, and the CitizenPay push is deferred to after() — so a
-// failing (or hung) CP can't fail or stall it.
+// Pins the top-up URL and treasury kind wiring on the general settings save:
+// the save commits and returns ok, and both CitizenPay pushes are deferred to
+// after() — so a failing (or hung) CP can't fail or stall it.
 vi.mock("server-only", () => ({}));
 const { afterCallbacks, fundUpdate } = vi.hoisted(() => ({
   afterCallbacks: [] as Array<() => Promise<void>>,
@@ -55,26 +55,31 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("updateGeneralSettingsAction → top-up URL", () => {
-  it("saves, returns ok, and schedules the sync for after the response", async () => {
+describe("updateGeneralSettingsAction → top-up URL + treasury kind", () => {
+  it("saves, returns ok, and schedules both syncs for after the response", async () => {
     const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
     // FIXED_PERIOD publishes its cotisation page; PAY_AND_GO publishes nothing
     // (CP serves its checkout link) — see services/citizenpay/top-up-url.ts.
+    // The kind is pushed whatever the mode (services/citizenpay/sync-fund-kind.ts).
     await expect(
       updateGeneralSettingsAction({ ...input, allocationMode: "FIXED_PERIOD" }),
     ).resolves.toEqual({ ok: true });
     expect(fundUpdate).toHaveBeenCalledOnce();
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(afterCallbacks).toHaveLength(1);
+    expect(afterCallbacks).toHaveLength(2);
 
-    await afterCallbacks[0]();
-    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(new URL(url).pathname).toBe("/v2/treasury");
-    expect(JSON.parse(String(init.body))).toEqual({
-      topUpUrl: "https://laclass.lacaisse.eu/pay/{serial}",
-    });
+    for (const cb of afterCallbacks) await cb();
+    const calls = fetchMock.mock.calls as unknown as [string, RequestInit][];
+    expect(calls.map(([url, init]) => [new URL(url).pathname, init.method])).toEqual([
+      ["/v2/treasury", "PATCH"],
+      ["/v2/treasury", "PATCH"],
+    ]);
+    expect(calls.map(([, init]) => JSON.parse(String(init.body)))).toEqual([
+      { topUpUrl: "https://laclass.lacaisse.eu/pay/{serial}" },
+      { kind: "fund" },
+    ]);
   });
 
   it("still returns ok when CitizenPay fails", async () => {
@@ -87,7 +92,8 @@ describe("updateGeneralSettingsAction → top-up URL", () => {
     await expect(
       updateGeneralSettingsAction({ ...input, allocationMode: "FIXED_PERIOD" }),
     ).resolves.toEqual({ ok: true });
-    await expect(afterCallbacks[0]()).resolves.toBeUndefined();
-    expect(warn).toHaveBeenCalled();
+    expect(afterCallbacks).toHaveLength(2);
+    for (const cb of afterCallbacks) await expect(cb()).resolves.toBeUndefined();
+    expect(warn).toHaveBeenCalledTimes(2);
   });
 });
