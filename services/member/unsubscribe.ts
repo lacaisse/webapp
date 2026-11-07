@@ -18,6 +18,22 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 // minting a new secret — the worst a leaked unsubscribe MAC enables is opting
 // a member out of reminders, which they can undo, so it shares the app secret
 // without widening the blast radius.
+//
+// Key rotation: links already sent carry a MAC under the old key, and they
+// must keep working for the life of the membership. While
+// `APP_CRED_KEY_PREVIOUS` is set (see services/crypto/secret.ts) verification
+// accepts a MAC under either key; new links are always signed with the
+// current key. Once the previous key is dropped from the env, links signed
+// under it stop verifying — that is the one thing the rotation script cannot
+// re-encrypt, so keep the previous key around for as long as old emails
+// should stay actionable.
+
+function parseKey(name: string, hex: string): Buffer {
+  if (!/^[0-9a-fA-F]{64}$/.test(hex)) {
+    throw new Error(`[unsubscribe] ${name} must be 64 hex characters (32 bytes)`);
+  }
+  return Buffer.from(hex, "hex");
+}
 
 function loadKey(): Buffer {
   const hex = process.env.APP_CRED_KEY;
@@ -26,18 +42,27 @@ function loadKey(): Buffer {
       "[unsubscribe] APP_CRED_KEY is not set — generate with `openssl rand -hex 32`",
     );
   }
-  if (!/^[0-9a-fA-F]{64}$/.test(hex)) {
-    throw new Error(
-      "[unsubscribe] APP_CRED_KEY must be 64 hex characters (32 bytes)",
-    );
-  }
-  return Buffer.from(hex, "hex");
+  return parseKey("APP_CRED_KEY", hex);
+}
+
+function loadPreviousKey(): Buffer | null {
+  const hex = process.env.APP_CRED_KEY_PREVIOUS;
+  if (!hex) return null;
+  return parseKey("APP_CRED_KEY_PREVIOUS", hex);
+}
+
+function signWith(key: Buffer, memberId: string): string {
+  return createHmac("sha256", key).update(memberId).digest("base64url");
 }
 
 function sign(memberId: string): string {
-  return createHmac("sha256", loadKey())
-    .update(memberId)
-    .digest("base64url");
+  return signWith(loadKey(), memberId);
+}
+
+function matches(provided: string, expected: string): boolean {
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 export function buildUnsubscribeToken(memberId: string): string {
@@ -45,7 +70,8 @@ export function buildUnsubscribeToken(memberId: string): string {
 }
 
 // Returns the member id if the token is well-formed and the signature checks
-// out, otherwise null. Never throws on malformed input — callers treat null as
+// out under the current key — or, during a rotation, under the previous key —
+// otherwise null. Never throws on malformed input — callers treat null as
 // "invalid link".
 export function verifyUnsubscribeToken(token: string): string | null {
   const dot = token.lastIndexOf(".");
@@ -54,15 +80,16 @@ export function verifyUnsubscribeToken(token: string): string | null {
   const provided = token.slice(dot + 1);
   if (!memberId || !provided) return null;
 
-  let expected: string;
+  let key: Buffer;
+  let previous: Buffer | null;
   try {
-    expected = sign(memberId);
+    key = loadKey();
+    previous = loadPreviousKey();
   } catch {
     return null;
   }
 
-  const a = Buffer.from(provided);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length) return null;
-  return timingSafeEqual(a, b) ? memberId : null;
+  if (matches(provided, signWith(key, memberId))) return memberId;
+  if (previous && matches(provided, signWith(previous, memberId))) return memberId;
+  return null;
 }
