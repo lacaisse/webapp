@@ -339,6 +339,7 @@ From [`.env.example`](../.env.example):
 | `DIRECT_URL` | Direct Postgres (:5432) — Prisma CLI migrations/studio. |
 | `BETTER_AUTH_SECRET` | Better Auth session signing key. |
 | `APP_CRED_KEY` | AES-256-GCM key for `*Enc` secret columns (32 bytes / 64 hex). |
+| `APP_CRED_KEY_PREVIOUS` | Retiring key during a rotation (decrypt fallback only); see `.env.example` and `scripts/rotate-app-cred-key.ts`. |
 | `CRON_SECRET` | Authorizes Vercel cron requests. |
 | `RESEND_API_KEY` / `EMAIL_FROM` | Transactional email. |
 | `CITIZENPAY_API_BASE_URL` | Treasury API root (unset ⇒ mock mode). |
