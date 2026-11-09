@@ -112,6 +112,7 @@ function order(orderId: number, overrides: Partial<TopUpOrder> = {}): TopUpOrder
   return {
     orderId,
     serial: `S-${orderId}`,
+    account: null,
     cardAddress: "0xKNOWN",
     amountCents: 1250,
     token: "0xtoken",
@@ -213,6 +214,25 @@ describe("runTopUpOrders", () => {
       topUpOrdersRunMinted: 1,
       topUpOrdersRunFailed: 0,
       topUpOrdersRunError: null,
+    });
+  });
+
+  it("mints an account top-up to the account itself and records no serial", async () => {
+    // The Citizen Pay app loading its own account: no card, `cardAddress` is
+    // the account. Minted like a card; the op names no serial and no member.
+    const { client: cp, calls } = client({
+      pending: [order(3, { serial: "", account: "0xACC", cardAddress: "0xACC" })],
+    });
+    const stats = await runTopUpOrders(fund, { ...base, client: cp });
+    expect(stats).toMatchObject({ minted: 1, failed: 0 });
+    expect(okMint).toHaveBeenCalledWith({ fund, to: "0xACC", amount: BigInt(12_500_000) });
+    expect(calls).toContain("credit:3:c-3:0xuo-mint");
+    expect(db.tokenOperation[0]).toMatchObject({
+      type: "TOPUP",
+      memberId: null,
+      account: "0xACC",
+      topUpOrderId: 3,
+      topUpSerial: null,
     });
   });
 

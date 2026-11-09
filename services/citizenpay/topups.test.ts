@@ -101,6 +101,7 @@ describe("LiveCitizenPayClient top-ups", () => {
     ).toEqual({
       orderId: 42,
       serial: "04A2",
+      account: null,
       cardAddress: "0xcard",
       amountCents: 1250,
       token: "0xtoken",
@@ -110,6 +111,37 @@ describe("LiveCitizenPayClient top-ups", () => {
       state: "pending",
       claimedAt: null,
     });
+  });
+
+  it("reads an account top-up: no serial, the account is the target", () => {
+    expect(
+      topUpOrderFromWire({
+        orderId: 43,
+        serial: "",
+        account: "0xAbC0000000000000000000000000000000000001",
+        cardAddress: "0xAbC0000000000000000000000000000000000001",
+        amount: 500,
+        token: "0xtoken",
+        state: "pending",
+      }),
+    ).toMatchObject({
+      orderId: 43,
+      serial: "",
+      account: "0xAbC0000000000000000000000000000000000001",
+      cardAddress: "0xAbC0000000000000000000000000000000000001",
+      amountCents: 500,
+    });
+    // A card row (older api, no `account` key) reads account null.
+    expect(
+      topUpOrderFromWire({
+        orderId: 44,
+        serial: "04A2",
+        cardAddress: "0xcard",
+        amount: 100,
+        token: "0xt",
+        state: "pending",
+      }),
+    ).toMatchObject({ serial: "04A2", account: null });
   });
 
   it("tolerates a null list and missing optionals", async () => {

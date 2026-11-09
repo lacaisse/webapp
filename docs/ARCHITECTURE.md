@@ -262,13 +262,18 @@ are authorized with `CRON_SECRET`.
 | `citizenpay-period-close` | every 30 min | Batch-mint allocations for periods past cutoff (FIXED_PERIOD). |
 | `annotation-resolve` | every 2 min | Resolve queued transaction annotations against the chain. |
 | `payment-reminders` | monthly | Remind members with unpaid contributions. |
-| `topups` | every minute | Terminal top-ups: claim each `pending` order on `GET /v2/treasury/topups`, mint it to the card with the fund's minter Safe, report `credit {claimId, txHash}`; burn + `reverse` the `reversal_pending` ones. |
+| `topups` | every minute | Top-ups by payment: claim each `pending` order on `GET /v2/treasury/topups`, mint it to the holder (`cardAddress`: a card's account, or the Citizen Pay app's own account) with the fund's minter Safe, report `credit {claimId, txHash}`; burn + `reverse` the `reversal_pending` ones. |
 
-### Terminal top-ups (top-up by payment, issuer mints)
+### Top-ups by payment (issuer mints)
 
 A member taps a card on a Citizen Pay pay-pos terminal in top-up mode and pays
-by Viva or QR. On a real chain Citizen Pay does not mint: the settled order
-stays `pending` on its side until the issuer moves the tokens. The `topups`
+by Viva or QR, or pays Citizen Pay's checkout (`/top-up/<fund>`) from the card
+wallet or the Citizen Pay app. The app can also load its own account instead
+of a card: Citizen Pay then lists the order with an empty `serial`, the
+`account`, and that account as `cardAddress` — the cron mints to it like any
+card and records no serial on the `TokenOperation`. On a real chain Citizen
+Pay does not mint: the settled order stays `pending` on its side until the
+issuer moves the tokens. The `topups`
 cron (`services/topup-orders/run.ts`) does that per connected fund, bounded to
 25 orders a run, each fund isolated from the others. Citizen Pay's 10-minute
 claim is the lock between concurrent runs; the local `TokenOperation` of type

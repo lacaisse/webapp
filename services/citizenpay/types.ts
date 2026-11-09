@@ -689,15 +689,21 @@ export type PaymentRequestState = {
   orderId: number | null;
 };
 
-// A top-up a member paid at a Citizen Pay terminal (pay-pos in `topup` mode),
-// settled on CP's side and waiting for the issuer to move tokens on chain:
-// `pending` → mint `amountCents` to `cardAddress`; `reversal_pending` → the
-// credited top-up was refunded, burn it back. See services/topup-orders/.
+// A top-up a member paid at a Citizen Pay terminal (pay-pos in `topup` mode)
+// or through Citizen Pay's checkout (the card wallet's Add funds, the Citizen
+// Pay app loading a card or its own account), settled on CP's side and
+// waiting for the issuer to move tokens on chain: `pending` → mint
+// `amountCents` to `cardAddress`; `reversal_pending` → the credited top-up
+// was refunded, burn it back. See services/topup-orders/.
 export type TopUpOrderState = "pending" | "reversal_pending";
 
 export type TopUpOrder = {
   orderId: number;
+  // Exactly one holder: a card (`serial`, `account` null) or an account
+  // (`account`, `serial` ""). `cardAddress` is the mint / burn target in
+  // both cases — the card's account, or the account itself.
   serial: string;
+  account: string | null;
   cardAddress: string;
   amountCents: number;
   token: string;
