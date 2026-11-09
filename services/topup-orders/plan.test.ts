@@ -19,6 +19,7 @@ function order(
   return {
     orderId,
     serial: `S-${orderId}`,
+    account: null,
     cardAddress: `0x${String(orderId).padStart(40, "0")}`,
     amountCents: 1250,
     token: "0xtoken",

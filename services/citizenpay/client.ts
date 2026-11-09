@@ -1311,7 +1311,9 @@ function refuseTopUp(error: string): never {
 /** Dev / test seam: register a settled terminal top-up the mock will list. */
 export function seedMockTopUpOrder(input: {
   orderId: number;
-  serial: string;
+  // A card (serial) or an account top-up (account; serial "").
+  serial?: string;
+  account?: string | null;
   cardAddress: string;
   amountCents: number;
   token?: string;
@@ -1323,7 +1325,8 @@ export function seedMockTopUpOrder(input: {
   mockTopUpOrders.set(input.orderId, {
     order: {
       orderId: input.orderId,
-      serial: input.serial,
+      serial: input.serial ?? "",
+      account: input.account ?? null,
       cardAddress: input.cardAddress,
       amountCents: input.amountCents,
       token: input.token ?? "0xmock-token",

@@ -1413,7 +1413,8 @@ function parseDate(value: string | null | undefined): Date | null {
 export function topUpOrderFromWire(w: TopUpOrderWire): TopUpOrder {
   return {
     orderId: Number(w.orderId),
-    serial: w.serial,
+    serial: w.serial ?? "",
+    account: w.account ?? null,
     cardAddress: w.cardAddress,
     amountCents: Number(w.amount),
     token: w.token,

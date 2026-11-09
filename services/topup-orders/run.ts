@@ -31,13 +31,16 @@ import {
   type TopUpAction,
 } from "./plan";
 
-// One run of the terminal top-up settlement for one fund (app/api/cron/topups,
-// every minute). Top-up by payment: a member taps a card on a Citizen Pay
-// pay-pos terminal and pays by Viva or QR; on a real chain Citizen Pay does
-// not mint — it lists the settled order on GET /v2/treasury/topups and the
-// issuer (this fund) moves the tokens with its own minter Safe and reports the
-// hash. Pending orders are minted to the card; reversal_pending ones (credited
-// then refunded) are burned back from it.
+// One run of the top-up settlement for one fund (app/api/cron/topups, every
+// minute). Top-up by payment: a member taps a card on a Citizen Pay pay-pos
+// terminal and pays by Viva or QR, or pays Citizen Pay's checkout from the
+// card wallet or the Citizen Pay app (which also loads its own account, not
+// a card); on a real chain Citizen Pay does not mint — it lists the settled
+// order on GET /v2/treasury/topups and the issuer (this fund) moves the
+// tokens with its own minter Safe and reports the hash. Pending orders are
+// minted to the holder (`cardAddress`: the card's account, or the account
+// itself); reversal_pending ones (credited then refunded) are burned back
+// from it.
 //
 // Per order: claim (CP's 10-minute lock — a 409 means another attempt holds
 // it, skip) → TokenOperation PENDING keyed by the order id → submit the
@@ -347,7 +350,8 @@ async function settleOne(
       amount: centsToEuroString(order.amountCents),
       status: "PENDING",
       topUpOrderId: order.orderId,
-      topUpSerial: order.serial,
+      // An account top-up names no card.
+      topUpSerial: order.serial || null,
       topUpPlaceName: order.placeName,
     },
     select: { id: true },

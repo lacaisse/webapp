@@ -1745,9 +1745,13 @@ export type TopUpOrderStateWire =
 
 export type TopUpOrderWire = {
   orderId: number;
+  // The card the top-up loads; "" for an account top-up (the Citizen Pay
+  // app loading its own account, api migration 176), which carries
+  // `account` instead.
   serial: string;
-  // The card's account under the treasury's card instance — mint / burn
-  // target, nothing to derive on our side.
+  account?: string | null;
+  // The mint / burn target, nothing to derive on our side: the card's
+  // account under the treasury's card instance, or the account itself.
   cardAddress: string;
   amount: number; // cents
   token: string; // token contract address
