@@ -66,6 +66,27 @@ export type TopUpRunFund = FundMinterContext &
     tokenDecimals: number | null;
   };
 
+// The columns a run reads, shared by the cron (app/api/cron/topups) and the
+// events webhook's immediate settle (`settleTopUpOrderNow`) so both hand the
+// runner the same fund.
+export const TOPUP_RUN_FUND_SELECT = {
+  id: true,
+  citizenPayFundId: true,
+  citizenPayApiKeyId: true,
+  citizenPayApiKeyEnc: true,
+  tokenAddress: true,
+  tokenChainId: true,
+  tokenDecimals: true,
+  tokenMinterPrivateKeyEnc: true,
+  tokenMinterEoaAddress: true,
+  tokenMinterSmartAccountAddress: true,
+  tokenMintEnabledAt: true,
+  citizenPayEntrypointAddress: true,
+  citizenPayAccountFactoryAddress: true,
+  citizenPayPaymasterAddress: true,
+  citizenPayPaymasterType: true,
+} as const satisfies Prisma.FundSelect;
+
 export type TopUpRunStats = {
   listed: number;
   minted: number; // mint userops the bundler accepted this run
@@ -75,6 +96,9 @@ export type TopUpRunStats = {
   skipped: number;
   failed: number;
   errors: string[];
+  // Why each skipped order was skipped (`<orderId>: <reason>`), so a
+  // single-order settle can say why nothing happened.
+  skipReasons: string[];
 };
 
 // Injectable seams for the unit test (and nothing else): the CP client and
@@ -85,6 +109,10 @@ export type TopUpRunDeps = {
   submitBurn: typeof submitBurnFromToken;
   resolve: typeof getUserOpTx;
   now: Date;
+  // Settle only this order id (the events webhook's `topup.*`): every listed
+  // state is filtered to it right after the list, so no other order is
+  // claimed or touched. Undefined = the cron's full run.
+  only?: number;
 };
 
 const STATES: TopUpOrderState[] = ["pending", "reversal_pending"];
@@ -116,6 +144,7 @@ export async function runTopUpOrders(
     skipped: 0,
     failed: 0,
     errors: [],
+    skipReasons: [],
   };
   const deps: TopUpRunDeps = {
     client: overrides.client ?? getCitizenPayClient(fund),
@@ -123,6 +152,7 @@ export async function runTopUpOrders(
     submitBurn: overrides.submitBurn ?? submitBurnFromToken,
     resolve: overrides.resolve ?? getUserOpTx,
     now: overrides.now ?? new Date(),
+    only: overrides.only,
   };
 
   try {
@@ -142,6 +172,9 @@ export async function runTopUpOrders(
       let orders: TopUpOrder[];
       try {
         orders = await deps.client.listTopUpOrders(state);
+        if (deps.only !== undefined) {
+          orders = orders.filter((o) => o.orderId === deps.only);
+        }
       } catch (e) {
         stats.failed += 1;
         stats.errors.push(`list ${state}: ${errorText(e)}`);
@@ -177,6 +210,7 @@ export async function runTopUpOrders(
       for (const action of actions) {
         if (action.kind === "skip") {
           stats.skipped += 1;
+          stats.skipReasons.push(`${action.order.orderId}: ${action.reason}`);
           if (action.reason !== "bounded") {
             console.log("[topup-orders] skipped", {
               fundId: fund.id,
@@ -217,6 +251,56 @@ export async function runTopUpOrders(
     );
   }
   return stats;
+}
+
+export type TopUpNowResult = {
+  kind: "minted" | "reversed" | "reported" | "not_listed" | "skipped" | "cannot_mint";
+  reason?: string;
+};
+
+/**
+ * Settle one top-up order now — the events webhook's `topup.pending` /
+ * `topup.reversal_pending`, so a member waits seconds rather than up to the
+ * next cron minute. It is the cron's run restricted to that order id
+ * (`only`), so the claim, the TokenOperation keyed by the order id and the
+ * report are the same and a cron tick racing it gets CP's 409 and skips. The
+ * order is listed from Citizen Pay itself: nothing from the event is trusted.
+ * Throws when the list, or this order's submit or report, failed without
+ * moving anything, so the webhook records FAILED and the api redelivers; the
+ * cron remains the safety net either way.
+ */
+export async function settleTopUpOrderNow(
+  fundId: string,
+  orderId: number,
+  overrides: Partial<TopUpRunDeps> = {},
+): Promise<TopUpNowResult> {
+  const fund = await prisma.fund.findUnique({
+    where: { id: fundId },
+    select: TOPUP_RUN_FUND_SELECT,
+  });
+  if (!fund) return { kind: "cannot_mint", reason: "fund not found" };
+  if (!fund.citizenPayFundId || !fundCanMint(fund) || fund.tokenDecimals == null) {
+    // Without this the run would still record itself on the Fund row as a
+    // failure on every event; the cron already reports a fund that cannot mint.
+    return { kind: "cannot_mint" };
+  }
+
+  const stats = await runTopUpOrders(fund, { ...overrides, only: orderId });
+  if (stats.minted > 0) return { kind: "minted" };
+  if (stats.reversed > 0) return { kind: "reversed" };
+  if (stats.reported > 0) return { kind: "reported" };
+  // Only a failure of this order (or of the list itself) fails the event: the
+  // run also resolves the fund's other submitted ops, and one of those going
+  // stale is the cron's business, not this delivery's.
+  const failure = stats.errors.find(
+    (e) =>
+      e.startsWith("list ") ||
+      e.startsWith(`order ${orderId}:`) ||
+      e.startsWith(`order ${orderId} report:`),
+  );
+  if (failure) throw new Error(failure);
+  if (stats.listed === 0) return { kind: "not_listed" };
+  return { kind: "skipped", reason: stats.skipReasons[0] ?? "no action" };
 }
 
 // Resolve the fund's submitted top-up userops (PENDING with a hash) against
@@ -319,6 +403,7 @@ async function settleOne(
       // `claim in progress` → another attempt holds it; `already credited` /
       // `not pending` → CP settled it between the list and the claim.
       stats.skipped += 1;
+      stats.skipReasons.push(`${order.orderId}: claim refused (${e.message})`);
       console.log("[topup-orders] claim refused", { ...ids, error: e.message });
       return;
     }

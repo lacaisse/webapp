@@ -29,7 +29,8 @@ import { prisma } from "@/services/db/prisma";
 // first (unique per fund), so a redelivery is answered from that row without
 // being applied twice — unless the first attempt FAILED, which the api
 // retries for exactly that reason. The payload is never applied: for any
-// `card.*` event the card is re-read from the api and that read decides
+// `card.*` event the card is re-read from the api and that read decides, and a
+// `topup.*` event settles the order as listed by the api
 // (services/citizenpay/events.ts). 200 once handled (applied or ignored), 500
 // when the re-read or the write failed so the api delivers again.
 
@@ -80,7 +81,8 @@ export async function POST(request: NextRequest) {
         fundId: fund.id,
         eventId: payload.id,
         type: payload.type,
-        serial: payload.serial ?? null,
+        // An account top-up event carries serial "" (no card).
+        serial: payload.serial || null,
         occurredAt,
       },
       select: { id: true, outcome: true },

@@ -9,6 +9,7 @@ import {
   resolvePlaceName,
 } from "@/services/card/pin-block";
 import { prisma } from "@/services/db/prisma";
+import { settleTopUpOrderNow } from "@/services/topup-orders/run";
 
 import { getCitizenPayClient } from "./client";
 
@@ -25,6 +26,13 @@ import { getCitizenPayClient } from "./client";
 // (services/card/pin-block.ts, which also sends the notifications for a
 // block it imports). The payload only lends the place and terminal for the
 // audit line and the emails.
+//
+// `topup.pending` / `topup.reversal_pending` (`{id:"topup-<order>-pending"|
+// "topup-<order>-reversal", order_id, serial, account, amount, token, state}`)
+// say a paid top-up order (or its refund) waits for the issuer: the fund
+// settles that one order at once through the top-up cron's own machinery
+// (services/topup-orders/run.ts::settleTopUpOrderNow), which lists the order
+// from the api itself — the amount and addresses on the event are never used.
 
 export const CitizenPayEventPayloadSchema = z.looseObject({
   // The api serialises its event id as a JSON number (api#251
@@ -32,12 +40,19 @@ export const CitizenPayEventPayloadSchema = z.looseObject({
   id: z.union([z.string().min(1).max(200), z.number().int()]).transform(String),
   type: z.string().min(1).max(100),
   project: z.string().min(1).max(200).nullish(),
-  serial: z.string().min(1).max(100).nullish(),
+  // "" on an account top-up (no card); read as null.
+  serial: z.string().max(100).nullish(),
   at: z.string().max(100).nullish(),
   place_id: z.union([z.string(), z.number()]).nullish(),
   terminal_id: z.union([z.string(), z.number()]).nullish(),
   pin_block_count: z.number().int().nullish(),
   by: z.string().max(100).nullish(),
+  // topup.* only. Informational: the settle re-lists the order from the api.
+  order_id: z.union([z.string(), z.number()]).nullish(),
+  account: z.string().max(100).nullish(),
+  amount: z.number().int().nullish(),
+  token: z.string().max(100).nullish(),
+  state: z.string().max(50).nullish(),
 });
 
 export type CitizenPayEventPayload = z.infer<typeof CitizenPayEventPayloadSchema>;
@@ -110,10 +125,14 @@ export async function handleCitizenPayEvent(
   fund: EventFund,
   payload: CitizenPayEventPayload,
 ): Promise<CitizenPayEventOutcome> {
+  if (payload.type === "topup.pending" || payload.type === "topup.reversal_pending") {
+    return handleTopUpEvent(fund, payload);
+  }
   if (!payload.type.startsWith("card.")) {
     return { outcome: "IGNORED", detail: `unhandled type ${payload.type}` };
   }
-  if (!payload.serial) {
+  const serial = str(payload.serial);
+  if (!serial) {
     return { outcome: "IGNORED", detail: "no serial on the event" };
   }
   // A fund that disconnected from Citizen Pay but still has the webhook
@@ -126,7 +145,7 @@ export async function handleCitizenPayEvent(
   const card = await prisma.card.findFirst({
     where: {
       fundId: fund.id,
-      serialNumber: { equals: payload.serial, mode: "insensitive" },
+      serialNumber: { equals: serial, mode: "insensitive" },
     },
     select: RECONCILABLE_CARD_SELECT,
   });
@@ -171,6 +190,40 @@ export async function handleCitizenPayEvent(
       };
     case "none":
       return { outcome: "IGNORED", detail: "already in sync" };
+  }
+}
+
+// A paid top-up order (or its refund) waits for this fund: settle it now
+// instead of at the next cron minute. Idempotent with the cron through CP's
+// claim and the TokenOperation keyed by the order id.
+async function handleTopUpEvent(
+  fund: EventFund,
+  payload: CitizenPayEventPayload,
+): Promise<CitizenPayEventOutcome> {
+  const raw = str(payload.order_id);
+  const orderId = raw && /^\d+$/.test(raw) ? Number(raw) : null;
+  if (orderId === null || !Number.isSafeInteger(orderId) || orderId <= 0) {
+    return { outcome: "IGNORED", detail: "no order id" };
+  }
+  if (!fund.citizenPayApiKeyId || !fund.citizenPayApiKeyEnc) {
+    return { outcome: "IGNORED", detail: "fund not connected to Citizen Pay" };
+  }
+
+  const result = await settleTopUpOrderNow(fund.id, orderId);
+  switch (result.kind) {
+    case "minted":
+    case "reversed":
+    case "reported":
+      return { outcome: "APPLIED", detail: result.kind };
+    case "not_listed":
+      return {
+        outcome: "IGNORED",
+        detail: "not listed by Citizen Pay (already settled, or not this fund's)",
+      };
+    case "skipped":
+      return { outcome: "IGNORED", detail: `skipped: ${result.reason ?? "no action"}` };
+    case "cannot_mint":
+      return { outcome: "IGNORED", detail: "fund cannot mint" };
   }
 }
 

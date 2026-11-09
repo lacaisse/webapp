@@ -290,6 +290,18 @@ is failed and surfaced.
 There is no alert channel: failures go to the logs and to `Fund.topUpOrdersRun*`,
 shown on Settings → Token; the member's history shows "Top-up paid at <place>".
 
+The api also posts `topup.pending` / `topup.reversal_pending` to the fund's
+events webhook (`POST /api/citizenpay/events`, same signature and
+`CitizenPayEvent` dedupe as the card events) the moment an order waits, so the
+member waits seconds, not up to a minute: `services/citizenpay/events.ts`
+calls `settleTopUpOrderNow(fundId, orderId)`, which is the cron's run
+restricted to that one order (`only`) — the order is listed from the api
+itself (the event's amount and addresses are never used), and the claim and
+the `TokenOperation` keep it idempotent with a racing cron tick (CP's 409, the
+loser skips). Nothing listed → IGNORED; a failed list / submit / report → 500
+and the api redelivers. The cron stays the safety net for a lost or failed
+delivery.
+
 ---
 
 ## 8. Key end-to-end flows

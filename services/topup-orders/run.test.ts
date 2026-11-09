@@ -17,6 +17,8 @@ type Row = Record<string, unknown> & { id: string };
 const db = vi.hoisted(() => ({
   tokenOperation: [] as Row[],
   fund: [] as Row[],
+  // What prisma.fund.findUnique returns (settleTopUpOrderNow's load).
+  fundRow: null as Record<string, unknown> | null,
   seq: 0,
   // txHash values that collide on update (simulates the unique index).
   takenTx: new Set<string>(),
@@ -71,6 +73,7 @@ vi.mock("@/services/db/prisma", () => ({
         where.account.equals.toLowerCase() === "0xknown" ? { memberId: "m1" } : null,
     },
     fund: {
+      findUnique: async () => db.fundRow,
       update: async ({ data }: { data: Record<string, unknown> }) => {
         db.fund.push({ id: "f1", ...data });
         return data;
@@ -85,6 +88,7 @@ vi.mock("@/services/transaction-annotation/pending", () => ({
 
 import {
   runTopUpOrders,
+  settleTopUpOrderNow,
   STALE_SUBMISSION_MS,
   type TopUpRunFund,
 } from "./run";
@@ -174,6 +178,7 @@ beforeEach(() => {
   db.tokenOperation.length = 0;
   db.fund.length = 0;
   db.seq = 0;
+  db.fundRow = fund;
   db.takenTx.clear();
   okMint.mockClear();
   okBurn.mockClear();
@@ -388,5 +393,76 @@ describe("runTopUpOrders", () => {
     );
     expect(calls).toEqual([]);
     expect(stats.errors[0]).toMatch(/cannot mint/);
+  });
+});
+
+describe("settleTopUpOrderNow", () => {
+  it("settles only the named order: the others listed are neither claimed nor submitted", async () => {
+    const { client: cp, calls } = client({
+      pending: [order(1), order(2), order(3)],
+      reversal: [order(4, { state: "reversal_pending" })],
+    });
+    const result = await settleTopUpOrderNow("f1", 2, { ...base, client: cp });
+
+    expect(result).toEqual({ kind: "minted" });
+    expect(calls).toEqual([
+      "list:pending",
+      "claim:2",
+      "credit:2:c-2:0xuo-mint",
+      "list:reversal_pending",
+    ]);
+    expect(okMint).toHaveBeenCalledTimes(1);
+    expect(okBurn).not.toHaveBeenCalled();
+    expect(db.tokenOperation.map((r) => r.topUpOrderId)).toEqual([2]);
+  });
+
+  it("reverses a listed refund", async () => {
+    const { client: cp } = client({
+      reversal: [order(4, { state: "reversal_pending" })],
+    });
+    expect(await settleTopUpOrderNow("f1", 4, { ...base, client: cp })).toEqual({
+      kind: "reversed",
+    });
+  });
+
+  it("says not_listed when Citizen Pay does not list the order, touching nothing", async () => {
+    const { client: cp, calls } = client({ pending: [order(1)] });
+    const result = await settleTopUpOrderNow("f1", 9, { ...base, client: cp });
+    expect(result).toEqual({ kind: "not_listed" });
+    expect(calls).toEqual(["list:pending", "list:reversal_pending"]);
+    expect(db.tokenOperation).toEqual([]);
+  });
+
+  it("says skipped with the reason when the claim is held elsewhere (a racing cron tick)", async () => {
+    const { client: cp } = client({
+      pending: [order(1)],
+      claim: async () => {
+        throw refuse("claim in progress");
+      },
+    });
+    const result = await settleTopUpOrderNow("f1", 1, { ...base, client: cp });
+    expect(result.kind).toBe("skipped");
+    expect(result.reason).toMatch(/claim in progress/);
+    expect(okMint).not.toHaveBeenCalled();
+  });
+
+  it("throws when this order's submission fails, so the event is redelivered", async () => {
+    const { client: cp } = client({ pending: [order(1)] });
+    const failMint = vi.fn(async () => {
+      throw new UserOpError("config", "bundler down");
+    });
+    await expect(
+      settleTopUpOrderNow("f1", 1, { ...base, submitMint: failMint, client: cp }),
+    ).rejects.toThrow(/bundler down/);
+  });
+
+  it("says cannot_mint without listing anything for a fund that cannot mint", async () => {
+    db.fundRow = { ...fund, tokenMinterSmartAccountAddress: null };
+    const { client: cp, calls } = client({ pending: [order(1)] });
+    expect(await settleTopUpOrderNow("f1", 1, { ...base, client: cp })).toEqual({
+      kind: "cannot_mint",
+    });
+    expect(calls).toEqual([]);
+    expect(db.fund).toEqual([]);
   });
 });
