@@ -3,7 +3,10 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { cronGate } from "@/services/cron/guard";
 import { prisma } from "@/services/db/prisma";
-import { runTopUpOrders } from "@/services/topup-orders/run";
+import {
+  runTopUpOrders,
+  TOPUP_RUN_FUND_SELECT,
+} from "@/services/topup-orders/run";
 
 // Vercel cron entry — see vercel.json (every minute). Terminal top-ups: for
 // every fund connected to a Citizen Pay treasury with a minter Safe, list the
@@ -24,6 +27,7 @@ export async function GET(request: NextRequest) {
       tokenMinterSmartAccountAddress: { not: null },
     },
     orderBy: { createdAt: "asc" },
+    select: TOPUP_RUN_FUND_SELECT,
   });
 
   const results: Record<string, unknown> = {};
