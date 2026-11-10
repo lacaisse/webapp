@@ -12,7 +12,7 @@ import { sendPaymentReminder } from "@/services/email/transactional";
 import { resolveRequestedContribution } from "@/services/member/contribution";
 import { buildPaymentPageUrl } from "@/services/payment/pay-link";
 import { REMINDER_ELIGIBLE_STATUS } from "@/services/member/eligibility";
-import { manualReminderKey, utcDayStart } from "./manual-reminder";
+import { manualReminderKey, reminderDayStart } from "./manual-reminder";
 
 // Manual "remind the unpaid members" action, driven from the period detail
 // page's Missing tab (issue #34, on top of the #18 unpaid report). The monthly
@@ -20,7 +20,8 @@ import { manualReminderKey, utcDayStart } from "./manual-reminder";
 // (PAYMENT_REMINDER_FIRST) on the 1st; this is the admin's manual follow-up
 // nudge, recorded as PAYMENT_REMINDER_SECOND so:
 //   - it can be sent even after the cron already sent the first reminder,
-//   - it can be repeated within a period, at most once per member per UTC day:
+//   - it can be repeated within a period, at most once per member per day in
+//     the fund's timezone (Fund.timezone):
 //     the idempotency key carries the day (manual-reminder.ts), so re-clicking
 //     "remind all" the same day is safe (no second SENT row that day), and the
 //     next day it sends again.
@@ -51,6 +52,8 @@ const FUND_SELECT = {
   citizenPayTreasurySlug: true,
   // Fund-wide member-email pause; blocks the manual reminder (see above).
   confirmationEmailsPausedAt: true,
+  // The "day" of the one-manual-reminder-per-day rule.
+  timezone: true,
 } satisfies Prisma.FundSelect;
 
 const MEMBER_SELECT = {
@@ -187,7 +190,7 @@ export async function remindPeriodUnpaidAction(input: {
 }
 
 // Queue + send one PAYMENT_REMINDER_SECOND, idempotent per (period, member,
-// UTC day). Mirrors services/member/reminders.ts::remindOne and the
+// day in the fund's timezone). Mirrors services/member/reminders.ts::remindOne and the
 // notify-actions send path: P2002 on the idempotency key means a row already
 // exists today — SENT → skip, otherwise reuse the row and retry.
 async function remindOne(
@@ -197,11 +200,17 @@ async function remindOne(
 ): Promise<SingleStatus> {
   if (!member.email) return "failed";
   const now = new Date();
-  const idempotencyKey = manualReminderKey(period.id, member.id, now);
+  const idempotencyKey = manualReminderKey(
+    period.id,
+    member.id,
+    now,
+    fund.timezone,
+  );
 
-  // A row SENT today under the pre-per-day key (no `:day:`) doesn't collide
-  // with today's key, so check the rows too, like the period page does.
-  const dayStart = utcDayStart(now);
+  // A row SENT today under another key format (the pre-per-day key, or a day
+  // counted differently) doesn't collide with today's key, so check the rows
+  // too, like the period page does.
+  const dayStart = reminderDayStart(now, fund.timezone);
   const sentToday = await prisma.email.findFirst({
     where: {
       type: "PAYMENT_REMINDER_SECOND",

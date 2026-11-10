@@ -9,11 +9,12 @@ import {
 // mean the member can't be reminded (no send button); the rest drive the badge
 // and cover both kinds (FIRST = the monthly cron's automatic request, SECOND =
 // a manual admin nudge):
+//   - failed:  the latest manual nudge didn't go out (even if the automatic
+//              one or an earlier nudge did), or only FAILED/QUEUED attempts
 //   - sent:    a SENT reminder of either kind exists for this period
-//   - failed:  only FAILED/QUEUED attempts so far
 //   - notSent: emailable, no reminder yet
-// The button follows `manual` alone: a manual nudge can be sent once per UTC
-// day, whatever was sent before (see manual-reminder.ts).
+// The button follows `manual` alone: a manual nudge can be sent once per day
+// in the fund's timezone, whatever was sent before (see manual-reminder.ts).
 export type ReminderState =
   | "noEmail"
   | "optedOut"
@@ -49,6 +50,8 @@ export function reminderInfo(args: {
   optedOut: boolean;
   emails: ReminderEmail[];
   now: Date;
+  // Fund.timezone — the "day" of the one-nudge-per-day rule.
+  timeZone: string;
 }): ReminderInfo {
   const sent = args.emails.filter((e) => e.status === "SENT");
   const autoSent = sent.some((e) => e.type === "PAYMENT_REMINDER_FIRST");
@@ -73,16 +76,20 @@ export function reminderInfo(args: {
     }
   }
 
+  const manual = manualReminderToday(args.emails, args.now, args.timeZone);
+
   let state: ReminderState;
   if (!args.hasEmail) state = "noEmail";
   else if (args.optedOut) state = "optedOut";
+  // A failed nudge must show even when an earlier reminder went out.
+  else if (manual === "failed") state = "failed";
   else if (sent.length > 0) state = "sent";
   else if (args.emails.length > 0) state = "failed";
   else state = "notSent";
 
   return {
     state,
-    manual: manualReminderToday(args.emails, args.now),
+    manual,
     nudgedBefore: manualSentCount > 0,
     sentCount: sent.length,
     lastSentAt,
@@ -91,7 +98,8 @@ export function reminderInfo(args: {
 }
 
 // Can a manual reminder be sent now: emailable, not opted out, and none SENT
-// yet today (the automatic one and earlier days' nudges don't count).
+// yet today in the fund's timezone (the automatic one and earlier days' nudges
+// don't count).
 export function canSendManualReminder(info: ReminderInfo): boolean {
   return (
     info.state !== "noEmail" &&

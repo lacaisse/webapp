@@ -184,7 +184,7 @@ async function AllocationPeriodDetail({
       // Payment reminders already sent for this period drive the per-member
       // reminder badge + send/retry button on the Missing tab (FIRST = the
       // monthly cron's automatic request, SECOND = a manual nudge, at most one
-      // per UTC day). type + sentAt feed the richer cell (auto/manual breakdown
+      // per day in the fund's timezone). type + sentAt feed the richer cell (auto/manual breakdown
       // + last-sent date) and today's manual state.
       emails: {
         where: {
@@ -212,7 +212,7 @@ async function AllocationPeriodDetail({
     reminder: ReminderInfo;
     canRemind: boolean;
   };
-  // "Today" for the one-manual-reminder-per-UTC-day rule.
+  // "Today" (in Fund.timezone) for the one-manual-reminder-per-day rule.
   const now = new Date();
   const missing: MissingRow[] = [];
   const belowMin: ExpectedRow[] = [];
@@ -235,6 +235,7 @@ async function AllocationPeriodDetail({
         optedOut: m.emailUnsubscribed,
         emails: m.emails,
         now,
+        timeZone: fund.timezone,
       });
       missing.push({
         ...row,
