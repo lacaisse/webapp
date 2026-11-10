@@ -20,15 +20,15 @@ import {
 } from "@/components/ui/dialog";
 import { remindPeriodUnpaidAction } from "@/services/allocation-periods/remind-actions";
 
-// Send a payment reminder to every unpaid member who can still be reminded
-// (has an email, not opted out, not already reminded). Already-reminded members
+// Send a manual payment reminder to every unpaid member who can be reminded
+// (has an email, not opted out, not already nudged today). Members nudged today
 // are skipped server-side. Mirrors NotifyAllButton.
 export function RemindUnpaidButton({
   periodId,
   pendingCount,
 }: {
   periodId: string;
-  // How many unpaid members can still be reminded (drives the confirm copy +
+  // How many unpaid members can be reminded today (drives the confirm copy +
   // disables the button when there's nothing to do). Snapshot at render.
   pendingCount: number;
 }) {

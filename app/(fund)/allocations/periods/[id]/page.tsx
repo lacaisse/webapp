@@ -42,6 +42,13 @@ import { NotifyAllButton } from "./notify-all-button";
 import { NotifyAllocationButton } from "./notify-allocation-button";
 import { RemindMemberButton } from "./remind-member-button";
 import { RemindUnpaidButton } from "./remind-unpaid-button";
+import {
+  canSendManualReminder,
+  reminderBadgeVariant,
+  reminderInfo,
+  remindButtonLabel,
+  type ReminderInfo,
+} from "./reminder-info";
 import { RemoveDepositButton } from "./remove-deposit-button";
 import { RunAllocation } from "./run-allocation";
 
@@ -176,8 +183,9 @@ async function AllocationPeriodDetail({
       },
       // Payment reminders already sent for this period drive the per-member
       // reminder badge + send/retry button on the Missing tab (FIRST = the
-      // monthly cron's automatic request, SECOND = a manual nudge). type +
-      // sentAt feed the richer cell (auto/manual breakdown + last-sent date).
+      // monthly cron's automatic request, SECOND = a manual nudge, at most one
+      // per UTC day). type + sentAt feed the richer cell (auto/manual breakdown
+      // + last-sent date) and today's manual state.
       emails: {
         where: {
           allocationPeriodId: period.id,
@@ -204,6 +212,8 @@ async function AllocationPeriodDetail({
     reminder: ReminderInfo;
     canRemind: boolean;
   };
+  // "Today" for the one-manual-reminder-per-UTC-day rule.
+  const now = new Date();
   const missing: MissingRow[] = [];
   const belowMin: ExpectedRow[] = [];
   for (const m of expectedMembers) {
@@ -224,15 +234,14 @@ async function AllocationPeriodDetail({
         hasEmail: Boolean(m.email),
         optedOut: m.emailUnsubscribed,
         emails: m.emails,
+        now,
       });
       missing.push({
         ...row,
         reminder,
-        // Can be sent now: emailable, and not already successfully reminded.
-        canRemind:
-          reminder.state !== "noEmail" &&
-          reminder.state !== "optedOut" &&
-          reminder.state !== "sent",
+        // Can be sent now: emailable, and no manual reminder SENT today (the
+        // automatic one and earlier days' nudges don't block it).
+        canRemind: canSendManualReminder(reminder),
       });
     } else if (total.lt(m.tier.minContribution)) {
       belowMin.push(row);
@@ -724,7 +733,7 @@ async function AllocationPeriodDetail({
                           periodId={period.id}
                           memberId={m.id}
                           memberName={maskName(m.name)}
-                          isRetry={m.reminder.state === "failed"}
+                          label={remindButtonLabel(m.reminder)}
                         />
                       )}
                     </TableCell>
@@ -839,85 +848,6 @@ function mintNotification(op: {
     };
   }
   return { badge: { variant: "outline", key: "notSent" }, action: "send" };
-}
-
-// Per-member payment-reminder state for the Missing tab. "noEmail"/"optedOut"
-// mean the member can't be reminded (no send button); the rest drive the badge:
-//   - sent:    a SENT reminder exists for this period → no action
-//   - failed:  only FAILED/QUEUED attempts so far → "Retry"
-//   - notSent: emailable, no reminder yet → "Send"
-type ReminderState = "noEmail" | "optedOut" | "sent" | "failed" | "notSent";
-
-// Widened to the generated enum types — the query already filters `type` to the
-// two reminder kinds, so we only branch on the values, not the full union.
-type ReminderEmail = {
-  type: string;
-  status: string;
-  sentAt: Date | null;
-  createdAt: Date;
-};
-
-// Richer reminder info for the Missing-tab cell: the collapsed `state` (badge
-// colour + action), how many reminders actually went out, when the last one
-// was sent, and an auto/manual breakdown. FIRST = the monthly cron's automatic
-// request, SECOND = a manual admin nudge.
-type ReminderInfo = {
-  state: ReminderState;
-  sentCount: number;
-  lastSentAt: Date | null;
-  // Derived purely from sent history, independent of `state` — so a member who
-  // was reminded and then unsubscribed shows the "Opted out" badge AND the
-  // sent-history subline. null only when nothing has actually been sent.
-  breakdown: {
-    key: "auto" | "autoAndNudges" | "nudgesOnly";
-    count: number; // manual-nudge count (the only pluralised token)
-  } | null;
-};
-
-function reminderInfo(args: {
-  hasEmail: boolean;
-  optedOut: boolean;
-  emails: ReminderEmail[];
-}): ReminderInfo {
-  const sent = args.emails.filter((e) => e.status === "SENT");
-  const autoSent = sent.some((e) => e.type === "PAYMENT_REMINDER_FIRST");
-  const manualSentCount = sent.filter(
-    (e) => e.type === "PAYMENT_REMINDER_SECOND",
-  ).length;
-  // Most recent successful send; fall back to createdAt on the off chance a
-  // SENT row predates the sentAt column being populated.
-  const lastSentAt = sent.reduce<Date | null>((latest, e) => {
-    const at = e.sentAt ?? e.createdAt;
-    return !latest || at > latest ? at : latest;
-  }, null);
-
-  let breakdown: ReminderInfo["breakdown"] = null;
-  if (sent.length > 0) {
-    if (autoSent && manualSentCount > 0) {
-      breakdown = { key: "autoAndNudges", count: manualSentCount };
-    } else if (autoSent) {
-      breakdown = { key: "auto", count: 0 };
-    } else {
-      breakdown = { key: "nudgesOnly", count: manualSentCount };
-    }
-  }
-
-  let state: ReminderState;
-  if (!args.hasEmail) state = "noEmail";
-  else if (args.optedOut) state = "optedOut";
-  else if (sent.length > 0) state = "sent";
-  else if (args.emails.length > 0) state = "failed";
-  else state = "notSent";
-
-  return { state, sentCount: sent.length, lastSentAt, breakdown };
-}
-
-function reminderBadgeVariant(
-  state: ReminderState,
-): "success" | "destructive" | "outline" {
-  if (state === "sent") return "success";
-  if (state === "failed") return "destructive";
-  return "outline";
 }
 
 function AllocationPeriodDetailSkeleton() {

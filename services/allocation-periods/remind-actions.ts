@@ -12,15 +12,18 @@ import { sendPaymentReminder } from "@/services/email/transactional";
 import { resolveRequestedContribution } from "@/services/member/contribution";
 import { buildPaymentPageUrl } from "@/services/payment/pay-link";
 import { REMINDER_ELIGIBLE_STATUS } from "@/services/member/eligibility";
+import { manualReminderKey, utcDayStart } from "./manual-reminder";
 
 // Manual "remind the unpaid members" action, driven from the period detail
 // page's Missing tab (issue #34, on top of the #18 unpaid report). The monthly
 // cron (services/member/reminders.ts) sends the automatic first request
 // (PAYMENT_REMINDER_FIRST) on the 1st; this is the admin's manual follow-up
 // nudge, recorded as PAYMENT_REMINDER_SECOND so:
-//   - it can be sent even after the cron already sent the first reminder, and
-//   - it has its own idempotency key, so re-clicking "remind all" is safe
-//     (a second SENT row is never created for the same period + member).
+//   - it can be sent even after the cron already sent the first reminder,
+//   - it can be repeated within a period, at most once per member per UTC day:
+//     the idempotency key carries the day (manual-reminder.ts), so re-clicking
+//     "remind all" the same day is safe (no second SENT row that day), and the
+//     next day it sends again.
 //
 // Eligibility mirrors the cron's exclusions AND the Missing-tab definition: an
 // ACTIVE member with a tier and a primary card who has no INCOMING deposit
@@ -183,17 +186,36 @@ export async function remindPeriodUnpaidAction(input: {
   return { ok: true, sent, skipped, failed };
 }
 
-// Queue + send one PAYMENT_REMINDER_SECOND, idempotent per (period, member).
-// Mirrors services/member/reminders.ts::remindOne and the notify-actions send
-// path: P2002 on the idempotency key means a row already exists — SENT → skip,
-// otherwise reuse the row and retry.
+// Queue + send one PAYMENT_REMINDER_SECOND, idempotent per (period, member,
+// UTC day). Mirrors services/member/reminders.ts::remindOne and the
+// notify-actions send path: P2002 on the idempotency key means a row already
+// exists today — SENT → skip, otherwise reuse the row and retry.
 async function remindOne(
   fund: FundForReminder,
   period: { id: string; label: string },
   member: MemberForReminder,
 ): Promise<SingleStatus> {
   if (!member.email) return "failed";
-  const idempotencyKey = `PAYMENT_REMINDER_SECOND:period:${period.id}:member:${member.id}`;
+  const now = new Date();
+  const idempotencyKey = manualReminderKey(period.id, member.id, now);
+
+  // A row SENT today under the pre-per-day key (no `:day:`) doesn't collide
+  // with today's key, so check the rows too, like the period page does.
+  const dayStart = utcDayStart(now);
+  const sentToday = await prisma.email.findFirst({
+    where: {
+      type: "PAYMENT_REMINDER_SECOND",
+      memberId: member.id,
+      allocationPeriodId: period.id,
+      status: "SENT",
+      OR: [
+        { sentAt: { gte: dayStart } },
+        { sentAt: null, createdAt: { gte: dayStart } },
+      ],
+    },
+    select: { id: true },
+  });
+  if (sentToday) return "alreadySent";
 
   let emailId: string;
   try {

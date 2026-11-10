@@ -19,19 +19,20 @@ import {
 } from "@/components/ui/dialog";
 import { remindUnpaidMemberAction } from "@/services/allocation-periods/remind-actions";
 
-// Send (or retry) the payment reminder for one unpaid member. Sending reaches
-// an external service, so it's behind a confirm step. Mirrors
-// NotifyAllocationButton.
+// Send (retry, or send again on a later day) the manual payment reminder for
+// one unpaid member. Sending reaches an external service, so it's behind a
+// confirm step. Mirrors NotifyAllocationButton.
 export function RemindMemberButton({
   periodId,
   memberId,
   memberName,
-  isRetry,
+  label,
 }: {
   periodId: string;
   memberId: string;
   memberName: string;
-  isRetry: boolean;
+  // "retry" = today's attempt failed; "sendAgain" = nudged on an earlier day.
+  label: "send" | "retry" | "sendAgain";
 }) {
   const t = useTranslations("fund.allocations.periodDetail.remind");
   const router = useRouter();
@@ -77,7 +78,7 @@ export function RemindMemberButton({
     >
       <DialogTrigger render={<Button variant="outline" size="sm" />}>
         <Mail className="size-3.5" />
-        {isRetry ? t("retry") : t("send")}
+        {t(label)}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
