@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import "server-only";
 
+import { createHash, timingSafeEqual } from "node:crypto";
+
 import { NextResponse, type NextRequest } from "next/server";
 
 // Shared gate for the cron routes, and for the internal / maintenance routes
@@ -44,7 +46,7 @@ export function cronGate(request: NextRequest): NextResponse | null {
     return new NextResponse("Cron secret not configured", { status: 503 });
   }
   if (expected) {
-    if (auth !== `Bearer ${expected}`) {
+    if (!bearerMatches(auth, expected)) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
   }
@@ -58,7 +60,32 @@ export function cronGate(request: NextRequest): NextResponse | null {
  */
 export function isProductionDeployment(): boolean {
   return (
-    process.env.VERCEL_ENV === "production" ||
-    process.env.DEPLOY_TARGET === "container"
+    process.env.VERCEL_ENV === "production" || isContainerDeployment()
   );
+}
+
+/**
+ * `Authorization` equals `Bearer <secret>`, compared in constant time: both
+ * sides are hashed to the same length first, so neither the content nor the
+ * length of the secret leaks through timing.
+ */
+export function bearerMatches(header: string | null, secret: string): boolean {
+  const got = createHash("sha256").update(header ?? "").digest();
+  const want = createHash("sha256").update(`Bearer ${secret}`).digest();
+  return timingSafeEqual(got, want);
+}
+
+/** The container image (Dockerfile). Never true on Vercel. */
+export function isContainerDeployment(): boolean {
+  return process.env.DEPLOY_TARGET === "container";
+}
+
+/**
+ * The platform-only routes (hostname-allowed, re-encryption, readiness)
+ * exist only in the container image; anywhere else they answer like a
+ * missing route, with an empty 404.
+ */
+export function containerOnly(): NextResponse | null {
+  if (isContainerDeployment()) return null;
+  return new NextResponse(null, { status: 404, headers: { "Cache-Control": "no-store" } });
 }

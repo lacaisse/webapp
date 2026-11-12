@@ -4,7 +4,7 @@ import { NextRequest } from "next/server";
 
 vi.mock("server-only", () => ({}));
 
-import { cronGate } from "./guard";
+import { bearerMatches, cronGate } from "./guard";
 
 const req = (auth?: string) =>
   new NextRequest("https://lacaisse.eu/api/cron/topups", {
@@ -62,5 +62,60 @@ describe("cronGate in the container image (DEPLOY_TARGET=container)", () => {
   it("any other DEPLOY_TARGET value is not production", async () => {
     env({ DEPLOY_TARGET: "vercel", CRON_SECRET: "s" });
     expect(await cronGate(req("Bearer s"))?.json()).toEqual({ skipped: "non-production" });
+  });
+});
+
+// The decision table, every combination of environment and header. The
+// constant-time comparison must not change a single cell.
+describe("cronGate decision table", () => {
+  const envs = {
+    "vercel-production": { VERCEL_ENV: "production" },
+    "vercel-preview": { VERCEL_ENV: "preview" },
+    container: { DEPLOY_TARGET: "container" },
+    "local-allow": { CRON_ALLOW_NONPROD: "true" },
+    none: {},
+  } as const;
+  const secrets = { "secret set": "s3cret", "secret unset": undefined } as const;
+  const headers = {
+    right: "Bearer s3cret",
+    wrong: "Bearer nope",
+    "wrong length": "Bearer s3cret-and-more",
+    "no Bearer prefix": "s3cret",
+    "lower-case bearer": "bearer s3cret",
+    missing: undefined,
+  } as const;
+
+  function expected(envName: keyof typeof envs, secret: string | undefined, header: string | undefined) {
+    const production = envName === "vercel-production" || envName === "container";
+    if (!production && envName !== "local-allow") return "skipped";
+    if (!secret && production) return 503;
+    if (secret && header !== `Bearer ${secret}`) return 401;
+    return "pass";
+  }
+
+  for (const [envName, vars] of Object.entries(envs)) {
+    for (const [secretName, secret] of Object.entries(secrets)) {
+      for (const [headerName, header] of Object.entries(headers)) {
+        it(`${envName}, ${secretName}, ${headerName} header`, async () => {
+          env({ ...vars, CRON_SECRET: secret });
+          const res = cronGate(req(header));
+          const want = expected(envName as keyof typeof envs, secret, header);
+          if (want === "pass") expect(res).toBeNull();
+          else if (want === "skipped") expect(await res?.json()).toEqual({ skipped: "non-production" });
+          else expect(res?.status).toBe(want);
+        });
+      }
+    }
+  }
+});
+
+describe("bearerMatches", () => {
+  it("matches only the exact header", () => {
+    expect(bearerMatches("Bearer abc", "abc")).toBe(true);
+    expect(bearerMatches("Bearer abd", "abc")).toBe(false);
+    expect(bearerMatches("Bearer abc ", "abc")).toBe(false);
+    expect(bearerMatches("Bearer ab", "abc")).toBe(false);
+    expect(bearerMatches(null, "abc")).toBe(false);
+    expect(bearerMatches("", "abc")).toBe(false);
   });
 });

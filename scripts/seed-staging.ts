@@ -10,22 +10,28 @@
 // In the container image it is bundled to release/seed-staging.mjs and run
 // by `node release/release.mjs --seed` after the migrations.
 //
-// Two guards, both refuse with exit code 2 before anything is written:
-//   1. SEED_SYNTHETIC_OK must be exactly "1".
-//   2. The database holds no fund the seed did not create. Seeded funds have
-//      fixed ids (SEED_FUNDS below); any other Fund row means this is not a
-//      synthetic database (production, or a staging someone has used for
-//      real), and the seed stops.
+// Guards, checked before anything is written:
+//   1. SEED_SYNTHETIC_OK must be exactly "1", else it refuses (exit 2).
+//   2. The database holds no fund and no user the seed did not create
+//      (seeded funds have fixed ids, seeded users fixed example.org
+//      addresses). If it does (someone created a fund or an account by hand
+//      on staging, or this is not a synthetic database at all), the seed
+//      SKIPS: it writes nothing, says so in one line and exits 0, so the
+//      deploy goes on.
+//   3. APP_CRED_KEY is required (exit 1 without it): every fund gets its
+//      encrypted cells, none is seeded half.
 //
 // Idempotent: every row is found by a natural key and created only when
-// missing; a second run writes nothing new. Encrypted columns are written
+// missing, and a password is rewritten only when the stored hash does not
+// verify it; a second run writes nothing. Encrypted columns are written
 // once, under the APP_CRED_KEY of the first run, and never touched again, so
 // a key rotation's re-encryption has real cells to walk (they hold a fake
 // API key and a freshly generated, never-funded minter key).
 //
-// Optional SEED_STAFF_PASSWORD: the password of the seeded staff accounts
-// (set on creation, and reset to it on each run). Unset, the staff accounts
-// have no password; with email disabled on staging they then cannot sign in.
+// Passwords, both optional (unset = the account has no password; with email
+// disabled on staging it then cannot sign in):
+//   SEED_STAFF_PASSWORD  the seeded fund staff (OWNER / OPERATOR)
+//   SEED_ADMIN_PASSWORD  the seeded platform admin (User.globalRole ADMIN)
 //
 // Works with the Citizen Pay client in mock mode (CITIZENPAY_API_BASE_URL
 // unset): the funds carry a fake treasury id so the crons pick them up, and
@@ -34,7 +40,7 @@
 import "dotenv/config";
 import { createHash, randomBytes } from "node:crypto";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { hashPassword } from "better-auth/crypto";
+import { hashPassword, verifyPassword } from "better-auth/crypto";
 import { privateKeyToAccount } from "viem/accounts";
 
 import {
@@ -140,6 +146,16 @@ export function foreignFundIds(existingIds: string[]): string[] {
   return existingIds.filter((id) => !SEED_FUND_IDS.has(id));
 }
 
+/** Every address the seed creates a User for. */
+export const SEED_USER_EMAILS = new Set([
+  PLATFORM_ADMIN_EMAIL,
+  ...SEED_FUNDS.flatMap((f) => staffFor(f).map((s) => s.email)),
+]);
+
+export function foreignUserEmails(existingEmails: string[]): string[] {
+  return existingEmails.filter((email) => !SEED_USER_EMAILS.has(email));
+}
+
 // -----------------------------------------------------------------------------
 // Seed
 // -----------------------------------------------------------------------------
@@ -150,7 +166,7 @@ async function upsertUser(
   db: Db,
   email: string,
   name: string,
-  passwordHash: string | null,
+  password: string | null,
   globalRole: "USER" | "ADMIN" = "USER",
 ): Promise<string> {
   const user =
@@ -159,22 +175,26 @@ async function upsertUser(
       data: { email, name, emailVerified: true, globalRole },
       select: { id: true },
     }));
-  if (passwordHash) {
-    // Better Auth's credential account: accountId = the user id.
+  if (password) {
+    // Better Auth's credential account: accountId = the user id. Written
+    // only when missing or when the stored hash does not verify `password`.
     const existing = await db.account.findFirst({
       where: { userId: user.id, providerId: "credential" },
-      select: { id: true },
+      select: { id: true, password: true },
     });
-    if (existing) {
-      await db.account.update({ where: { id: existing.id }, data: { password: passwordHash } });
-    } else {
+    if (!existing) {
       await db.account.create({
         data: {
           userId: user.id,
           providerId: "credential",
           accountId: user.id,
-          password: passwordHash,
+          password: await hashPassword(password),
         },
+      });
+    } else if (!existing.password || !(await verifyPassword({ hash: existing.password, password }))) {
+      await db.account.update({
+        where: { id: existing.id },
+        data: { password: await hashPassword(password) },
       });
     }
   }
@@ -184,8 +204,8 @@ async function upsertUser(
 async function seedFund(
   db: Db,
   fund: SeedFund,
-  appCredKey: Buffer | null,
-  passwordHash: string | null,
+  appCredKey: Buffer,
+  staffPassword: string | null,
 ): Promise<{ created: boolean }> {
   const existing = await db.fund.findUnique({ where: { id: fund.id }, select: { id: true } });
   let created = false;
@@ -210,12 +230,10 @@ async function seedFund(
         websiteUrl: "https://example.org/",
         citizenPayFundId: fakeUuid(`${fund.id}:treasury`),
         citizenPayTreasurySlug: fund.id.replace("seed-synthetic-fund-", "syn-"),
-        citizenPayApiKeyId: appCredKey ? fakeAddress(`${fund.id}:api-key`) : null,
-        citizenPayApiKeyEnc: appCredKey
-          ? encryptWith(appCredKey, `synthetic-api-key-${fund.id}`, "v1")
-          : null,
-        tokenMinterEoaAddress: appCredKey ? privateKeyToAccount(minterKey).address : null,
-        tokenMinterPrivateKeyEnc: appCredKey ? encryptWith(appCredKey, minterKey, "v1") : null,
+        citizenPayApiKeyId: fakeAddress(`${fund.id}:api-key`),
+        citizenPayApiKeyEnc: encryptWith(appCredKey, `synthetic-api-key-${fund.id}`, "v1"),
+        tokenMinterEoaAddress: privateKeyToAccount(minterKey).address,
+        tokenMinterPrivateKeyEnc: encryptWith(appCredKey, minterKey, "v1"),
         subscriptionWaivedAt: fund.waived ? new Date() : null,
         subscriptionWaiverReason: fund.waived ? "Synthetic staging fund" : null,
         billingEmail: `billing.${fund.id.replace("seed-synthetic-fund-", "")}@example.org`,
@@ -224,7 +242,7 @@ async function seedFund(
   }
 
   for (const s of staffFor(fund)) {
-    const userId = await upsertUser(db, s.email, s.name, passwordHash);
+    const userId = await upsertUser(db, s.email, s.name, staffPassword);
     await db.fundMember.upsert({
       where: { userId_fundId: { userId, fundId: fund.id } },
       create: { userId, fundId: fund.id, role: s.role },
@@ -333,34 +351,42 @@ async function seedFund(
   return { created };
 }
 
-export async function runSeed(db: Db, env: NodeJS.ProcessEnv): Promise<void> {
+export type SeedOutcome = "seeded" | "skipped";
+
+export async function runSeed(db: Db, env: NodeJS.ProcessEnv): Promise<SeedOutcome> {
   checkSeedAllowed(env);
+  if (!env.APP_CRED_KEY) {
+    throw new Error("APP_CRED_KEY is not set: the seed needs it to write the funds' encrypted cells.");
+  }
+  const appCredKey = parseHexKey("APP_CRED_KEY", env.APP_CRED_KEY);
 
-  const existing = await db.fund.findMany({ select: { id: true } });
-  const foreign = foreignFundIds(existing.map((f) => f.id));
-  if (foreign.length > 0) {
-    throw new SeedRefused(
-      `Refusing to seed: the database holds ${foreign.length} fund(s) the synthetic seed did not create. ` +
-        "This is not a synthetic database; run the migration-only release command instead.",
+  const [funds, users] = await Promise.all([
+    db.fund.findMany({ select: { id: true } }),
+    db.user.findMany({ select: { email: true } }),
+  ]);
+  const foreignFunds = foreignFundIds(funds.map((f) => f.id));
+  const foreignUsers = foreignUserEmails(users.map((u) => u.email));
+  if (foreignFunds.length > 0 || foreignUsers.length > 0) {
+    console.log(
+      `Synthetic seed skipped: the database holds ${foreignFunds.length} fund(s) and ` +
+        `${foreignUsers.length} user(s) the seed did not create. Nothing written.`,
     );
+    return "skipped";
   }
 
-  const appCredKey = env.APP_CRED_KEY ? parseHexKey("APP_CRED_KEY", env.APP_CRED_KEY) : null;
-  if (!appCredKey) {
-    console.log("APP_CRED_KEY is not set: funds are seeded without encrypted columns.");
-  }
-  const passwordHash = env.SEED_STAFF_PASSWORD
-    ? await hashPassword(env.SEED_STAFF_PASSWORD)
-    : null;
+  const staffPassword = env.SEED_STAFF_PASSWORD || null;
+  const adminPassword = env.SEED_ADMIN_PASSWORD || null;
 
-  await upsertUser(db, PLATFORM_ADMIN_EMAIL, "Test Platform Admin", passwordHash, "ADMIN");
+  await upsertUser(db, PLATFORM_ADMIN_EMAIL, "Test Platform Admin", adminPassword, "ADMIN");
   for (const fund of SEED_FUNDS) {
-    const { created } = await seedFund(db, fund, appCredKey, passwordHash);
+    const { created } = await seedFund(db, fund, appCredKey, staffPassword);
     console.log(`${created ? "created" : "kept   "} ${fund.domain} (${fund.id})`);
   }
   console.log(
-    `Synthetic seed done: ${SEED_FUNDS.length} funds${passwordHash ? ", staff passwords set" : ""}.`,
+    `Synthetic seed done: ${SEED_FUNDS.length} funds` +
+      `${staffPassword ? ", staff password set" : ""}${adminPassword ? ", admin password set" : ""}.`,
   );
+  return "seeded";
 }
 
 async function main(): Promise<number> {
@@ -375,9 +401,15 @@ async function main(): Promise<number> {
     console.error("DATABASE_URL is not set.");
     return 1;
   }
-  const db = new PrismaClient({
-    adapter: new PrismaPg(pgTlsConfig(url, process.env.DATABASE_CA_CERT)),
-  });
+  let db: PrismaClient;
+  try {
+    db = new PrismaClient({
+      adapter: new PrismaPg(pgTlsConfig(url, process.env.DATABASE_CA_CERT)),
+    });
+  } catch (e) {
+    console.error((e as Error).message);
+    return 1;
+  }
   try {
     await runSeed(db, process.env);
     return 0;

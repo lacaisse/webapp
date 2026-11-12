@@ -9,6 +9,10 @@ import { decryptWith, encryptWith } from "@/scripts/lib/app-cred-rotation";
 // applyRotation (findMany with the not-null filters, conditioned
 // updateMany, an interactive transaction).
 vi.mock("server-only", () => ({}));
+vi.mock("next/server", async (orig) => ({
+  ...(await orig<typeof import("next/server")>()),
+  connection: vi.fn(async () => undefined),
+}));
 const { db } = vi.hoisted(() => {
   type FundRow = Record<string, string | null> & { id: string };
   type SignerRow = { id: string; fundId: string; userId: string; privateKeyEnc: string | null };
@@ -142,9 +146,18 @@ describe("POST /api/maintenance/reencrypt-app-cred", () => {
     expect(decryptWith(OLD, db.state.funds[0]!.tokenMinterPrivateKeyEnc!)).toBe("minter-0");
   });
 
-  it("503, never a done-shaped answer, where a cron route would answer skipped", async () => {
+  it.each([
+    ["unset", {}],
+    ["Vercel production", { VERCEL_ENV: "production" }],
+    ["Vercel preview", { VERCEL_ENV: "preview" }],
+  ])("empty 404 and nothing written without DEPLOY_TARGET=container (%s)", async (_, vars) => {
+    seed(2, 0, OLD);
+    const before = JSON.stringify(db.state);
     vi.stubEnv("DEPLOY_TARGET", "");
+    for (const [k, v] of Object.entries(vars)) vi.stubEnv(k, v as string);
     const res = await POST(req());
-    expect(res.status).toBe(503);
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("");
+    expect(JSON.stringify(db.state)).toBe(before);
   });
 });

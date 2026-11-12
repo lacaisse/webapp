@@ -63,3 +63,25 @@ describe("stripTlsParams", () => {
     );
   });
 });
+
+describe("malformed URL", () => {
+  it("throws an error that carries no part of the URL", () => {
+    const secret = "pa55-very-secret";
+    const bad = `postgres://user:${secret}@[not-a-host:5432/db`;
+    let thrown: unknown;
+    try {
+      pgTlsConfig(bad, PEM);
+    } catch (e) {
+      thrown = e;
+    }
+    expect(thrown).toBeInstanceOf(Error);
+    const err = thrown as Error & Record<string, unknown>;
+    expect(err.message).toBe("The database URL is not a valid URL");
+    expect(err.cause).toBeUndefined();
+    const everything = JSON.stringify(
+      Object.fromEntries(Object.getOwnPropertyNames(err).map((k) => [k, String(err[k])])),
+    );
+    expect(everything).not.toContain(secret);
+    expect(String(err.stack)).not.toContain(secret);
+  });
+});

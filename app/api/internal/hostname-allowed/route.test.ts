@@ -3,6 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 vi.mock("server-only", () => ({}));
+vi.mock("next/server", async (orig) => ({
+  ...(await orig<typeof import("next/server")>()),
+  connection: vi.fn(async () => undefined),
+}));
 const { prisma } = vi.hoisted(() => ({
   prisma: { fund: { findUnique: vi.fn() } },
 }));
@@ -80,9 +84,17 @@ describe("GET /api/internal/hostname-allowed", () => {
     expect((await GET(req("?hostname=staging.lacaisse.eu"))).status).toBe(503);
   });
 
-  it("404, never 200, where a cron route would answer skipped", async () => {
+  it.each([
+    ["unset", {}],
+    ["Vercel production", { VERCEL_ENV: "production" }],
+    ["Vercel preview", { VERCEL_ENV: "preview" }],
+    ["CRON_ALLOW_NONPROD", { CRON_ALLOW_NONPROD: "true" }],
+  ])("empty 404 without DEPLOY_TARGET=container (%s), even with the bearer", async (_, vars) => {
     vi.stubEnv("DEPLOY_TARGET", "");
-    vi.stubEnv("VERCEL_ENV", "preview");
-    expect((await GET(req("?hostname=staging.lacaisse.eu"))).status).toBe(404);
+    for (const [k, v] of Object.entries(vars)) vi.stubEnv(k, v as string);
+    const res = await GET(req("?hostname=staging.lacaisse.eu"));
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe("");
+    expect(prisma.fund.findUnique).not.toHaveBeenCalled();
   });
 });

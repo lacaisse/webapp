@@ -5,6 +5,31 @@ import { prisma } from "./prisma";
 
 export const READY_TIMEOUT_MS = 2_000;
 
+// At most one `SELECT 1` in flight per process: callers that arrive while it
+// runs wait for the same query (each with its own deadline). A database that
+// hangs therefore holds one pool connection, not one per health poll.
+let pendingProbe: Promise<unknown> | null = null;
+
+function probe(): Promise<unknown> {
+  if (!pendingProbe) {
+    // A plain promise around Prisma's lazy one: started once, shared.
+    const query: Promise<unknown> = (async () => prisma.$queryRaw`SELECT 1`)();
+    pendingProbe = query;
+    // Cleared when it settles, whoever still waits. The no-op catch keeps a
+    // failure nobody awaits any more (every caller timed out) from becoming
+    // an unhandled rejection.
+    query.then(
+      () => {
+        pendingProbe = null;
+      },
+      () => {
+        pendingProbe = null;
+      },
+    );
+  }
+  return pendingProbe;
+}
+
 /**
  * `SELECT 1` against the app's own Prisma client (same pool, same TLS
  * settings as every query), bounded by `timeoutMs`. Never throws: a failure
@@ -16,7 +41,7 @@ export async function databaseReady(timeoutMs = READY_TIMEOUT_MS): Promise<boole
     timer = setTimeout(() => resolve("timeout"), timeoutMs);
   });
   try {
-    const result = await Promise.race([prisma.$queryRaw`SELECT 1`, timeout]);
+    const result = await Promise.race([probe(), timeout]);
     if (result === "timeout") {
       console.error(`[health] database did not answer within ${timeoutMs} ms`);
       return false;

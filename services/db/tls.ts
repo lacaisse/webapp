@@ -53,16 +53,29 @@ export function normalizeCaPem(raw: string): string {
   return pem.trim() + "\n";
 }
 
+/**
+ * Parse a connection string. A malformed one throws a fresh error that
+ * carries no part of the input (no message text, no `cause`, no `input`
+ * property): the string holds the database password.
+ */
+function parseDatabaseUrl(connectionString: string): URL {
+  try {
+    return new URL(connectionString);
+  } catch {
+    throw new Error("The database URL is not a valid URL");
+  }
+}
+
 /** The URL without the TLS query parameters (the PEM decides TLS instead). */
 export function stripTlsParams(connectionString: string): string {
-  const url = new URL(connectionString);
+  const url = parseDatabaseUrl(connectionString);
   for (const name of TLS_URL_PARAMS) url.searchParams.delete(name);
   return url.toString();
 }
 
 /** The host of a Postgres URL, IPv6 brackets removed. */
 export function urlHost(connectionString: string): string {
-  return new URL(connectionString).hostname.replace(/^\[(.*)\]$/, "$1");
+  return parseDatabaseUrl(connectionString).hostname.replace(/^\[(.*)\]$/, "$1");
 }
 
 /**

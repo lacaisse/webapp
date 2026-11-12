@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { NextResponse, type NextRequest } from "next/server";
+import { connection, NextResponse, type NextRequest } from "next/server";
 
-import { cronGate } from "@/services/cron/guard";
+import { containerOnly, cronGate } from "@/services/cron/guard";
 import { reencryptStep } from "@/services/crypto/reencrypt";
 
 // APP_CRED_KEY rotation step for the self-hosted platform
@@ -10,22 +10,21 @@ import { reencryptStep } from "@/services/crypto/reencrypt";
 // `{"done": bool, "reencrypted": int, "remaining": int}`. The rotation
 // recipe calls it until `done` is true, then drops the previous key.
 //
-// Guarded exactly like the cron routes (services/cron/guard.ts); outside
-// production, where a cron route answers 200 `{"skipped": …}`, this one
-// answers 503 so a caller waiting for `done` never mistakes it for progress.
-// Any answer other than 200 means "not done, look at the app's log": 409
+// Exists only in the container image (DEPLOY_TARGET=container): anywhere
+// else, Vercel included, an empty 404 (there is no rotation through this
+// route on Vercel). Then guarded exactly like the cron routes
+// (services/cron/guard.ts). Any answer other than 200 means "not done, look at the app's log": 409
 // when a cell opens with neither key (nothing written) or changed under the
 // write (rolled back, call again), 500 when the keys are misconfigured.
 
 const NO_STORE = { "Cache-Control": "no-store" };
 
 export async function POST(request: NextRequest) {
+  await connection();
+  const missing = containerOnly();
+  if (missing) return missing;
   const gate = cronGate(request);
-  if (gate) {
-    return gate.status === 200
-      ? NextResponse.json({ error: "not_enabled" }, { status: 503, headers: NO_STORE })
-      : gate;
-  }
+  if (gate) return gate;
 
   const step = await reencryptStep();
   switch (step.kind) {
