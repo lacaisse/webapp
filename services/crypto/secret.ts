@@ -28,10 +28,26 @@ import {
 //
 // Key source: `APP_CRED_KEY` env, 32 raw bytes encoded as 64 hex chars.
 // Generate with:  openssl rand -hex 32
+//
+// Rotation (zero downtime): set the new key as `APP_CRED_KEY` and the old
+// one as `APP_CRED_KEY_PREVIOUS` (same format). Encrypt always uses the
+// current key; decrypt tries the current key first and, when the GCM tag does
+// not verify, the previous one — so rows sealed under either key keep
+// working while `scripts/rotate-app-cred-key.ts` re-encrypts them. Once that
+// script's dry run reports every row current, drop `APP_CRED_KEY_PREVIOUS`.
+// The fallback never relaxes the v2 binding: the aad is checked under both
+// keys. (See .env.example for the full recipe.)
 
 const ALGORITHM = "aes-256-gcm";
 const IV_LEN = 12;
 const TAG_LEN = 16;
+
+function parseKey(name: string, hex: string): Buffer {
+  if (!/^[0-9a-fA-F]{64}$/.test(hex)) {
+    throw new Error(`[crypto] ${name} must be 64 hex characters (32 bytes)`);
+  }
+  return Buffer.from(hex, "hex");
+}
 
 function loadKey(): Buffer {
   const hex = process.env.APP_CRED_KEY;
@@ -40,12 +56,14 @@ function loadKey(): Buffer {
       "[crypto] APP_CRED_KEY is not set — generate with `openssl rand -hex 32`",
     );
   }
-  if (!/^[0-9a-fA-F]{64}$/.test(hex)) {
-    throw new Error(
-      "[crypto] APP_CRED_KEY must be 64 hex characters (32 bytes)",
-    );
-  }
-  return Buffer.from(hex, "hex");
+  return parseKey("APP_CRED_KEY", hex);
+}
+
+/** The retiring key during a rotation, or null when none is configured. */
+function loadPreviousKey(): Buffer | null {
+  const hex = process.env.APP_CRED_KEY_PREVIOUS;
+  if (!hex) return null;
+  return parseKey("APP_CRED_KEY_PREVIOUS", hex);
 }
 
 /** Encrypt; with `aad` the envelope is `v2:` and bound to that string. */
@@ -69,9 +87,29 @@ export function envelopeVersion(envelope: string): "v1" | "v2" | null {
   return v === "v1" || v === "v2" ? v : null;
 }
 
+function openWith(
+  key: Buffer,
+  version: "v1" | "v2",
+  iv: Buffer,
+  tag: Buffer,
+  ct: Buffer,
+  aad?: string,
+): string {
+  const decipher = createDecipheriv(ALGORITHM, key, iv);
+  if (version === "v2") decipher.setAAD(Buffer.from(aad!, "utf8"));
+  decipher.setAuthTag(tag);
+  return Buffer.concat([decipher.update(ct), decipher.final()]).toString("utf8");
+}
+
 /**
  * Decrypt. A `v2` envelope needs the `aad` it was sealed with (wrong or
  * missing → "unable to authenticate data"); `v1` ignores it.
+ *
+ * Tries `APP_CRED_KEY`, then `APP_CRED_KEY_PREVIOUS` when set (rotation in
+ * progress). A GCM tag failure is indistinguishable between "wrong key" and
+ * "wrong aad / tampered", so the fallback re-checks the same aad under the
+ * previous key and the error of the current key is what surfaces when
+ * neither matches.
  */
 export function decryptSecret(envelope: string, aad?: string): string {
   const sep = envelope.indexOf(":");
@@ -93,8 +131,15 @@ export function decryptSecret(envelope: string, aad?: string): string {
   const tag = blob.subarray(IV_LEN, IV_LEN + TAG_LEN);
   const ct = blob.subarray(IV_LEN + TAG_LEN);
   const key = loadKey();
-  const decipher = createDecipheriv(ALGORITHM, key, iv);
-  if (version === "v2") decipher.setAAD(Buffer.from(aad!, "utf8"));
-  decipher.setAuthTag(tag);
-  return Buffer.concat([decipher.update(ct), decipher.final()]).toString("utf8");
+  try {
+    return openWith(key, version, iv, tag, ct, aad);
+  } catch (e) {
+    const previous = loadPreviousKey();
+    if (!previous || previous.equals(key)) throw e;
+    try {
+      return openWith(previous, version, iv, tag, ct, aad);
+    } catch {
+      throw e;
+    }
+  }
 }
