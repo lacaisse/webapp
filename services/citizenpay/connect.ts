@@ -241,6 +241,8 @@ export async function consumeConnect(args: {
       tokenMinterEoaAddress: true,
       payoutFeePercentage: true,
       feeCollectionFrequency: true,
+      payoutFixedFeeCents: true,
+      payoutFeeSynced: true,
     },
   });
 
@@ -278,6 +280,7 @@ export async function consumeConnect(args: {
     | {
         payoutFeePercentage?: string;
         feeCollectionFrequency?: FeeCollectionFrequency;
+        payoutFixedFeeCents?: number;
         payoutFeeSynced: boolean;
       }
     | null = null;
@@ -320,10 +323,34 @@ export async function consumeConnect(args: {
     const effectiveFrequency = seededFrequency ?? localFrequency;
     const frequencySynced = cpFrequency == null || cpFrequency === effectiveFrequency;
 
+    // Fixed fee per order (cents). The column defaults to 0 = none. A local
+    // non-zero value wins and only counts as synced when CP echoes exactly
+    // it — an api that predates the fixed fee reports nothing (null), which
+    // can't confirm a fee that must be charged. A local 0 is synced when CP
+    // reports nothing or 0. CP reporting a non-zero fee against our 0 is
+    // seeded only while nothing is pending here (`payoutFeeSynced`, so a
+    // cleared fee that failed to reach CP is not resurrected from CP's stale
+    // copy); otherwise it is flagged for a re-push.
+    const localFixed = fundRow?.payoutFixedFeeCents ?? 0;
+    const cpFixed = tokenInfo.fixedFeeCents;
+    let seededFixed: number | undefined;
+    let fixedSynced: boolean;
+    if (localFixed > 0) {
+      fixedSynced = cpFixed === localFixed;
+    } else if (cpFixed == null || cpFixed === 0) {
+      fixedSynced = true;
+    } else if (fundRow?.payoutFeeSynced ?? true) {
+      seededFixed = cpFixed;
+      fixedSynced = true;
+    } else {
+      fixedSynced = false;
+    }
+
     feeWrite = {
       ...(seededFee != null && { payoutFeePercentage: seededFee }),
       ...(seededFrequency != null && { feeCollectionFrequency: seededFrequency }),
-      payoutFeeSynced: rateSynced && frequencySynced,
+      ...(seededFixed != null && { payoutFixedFeeCents: seededFixed }),
+      payoutFeeSynced: rateSynced && frequencySynced && fixedSynced,
     };
   }
 

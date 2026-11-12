@@ -18,6 +18,7 @@ import { eventsWebhookUrlFor } from "@/services/citizenpay/events-webhook-url";
 import { parseVisibleIf } from "@/services/onboarding/visibility";
 import { alchemyNetwork } from "@/services/alchemy/client";
 import { listCustomDisplayTokens } from "@/services/token/display-tokens";
+import { loadFeeWaiverState } from "@/services/fund/fee-waivers";
 import { EXTRA_TOKENS_BY_CHAIN } from "@/services/token/extra-tokens";
 import {
   OnboardingFields,
@@ -39,6 +40,7 @@ import { SubscriptionTab } from "./subscription-tab";
 import { TokenInfo } from "./token-info";
 import { BalanceDisplayForm } from "./balance-display-form";
 import { CustomTokensForm } from "./custom-tokens-form";
+import { FeeWaiversForm } from "./fee-waivers-form";
 import {
   BrandingForm,
   CitizenPayForm,
@@ -138,6 +140,32 @@ async function EventsWebhookSettings({
   );
 }
 
+// Businesses exempt from the fixed fee (Settings → Fees): read from Citizen
+// Pay, with the fund's merchants as names and candidates.
+async function FeeWaiversSection({
+  fund,
+}: {
+  fund: {
+    id: string;
+    citizenPayFundId: string | null;
+    citizenPayApiKeyId: string | null;
+    citizenPayApiKeyEnc: string | null;
+  };
+}) {
+  const state = await loadFeeWaiverState(fund);
+  return <FeeWaiversForm state={state} />;
+}
+
+function FeeWaiversSkeleton() {
+  return (
+    <div className="space-y-3">
+      <Skeleton className="h-4 w-56" />
+      <Skeleton className="h-3 w-80 max-w-full" />
+      <Skeleton className="h-10 w-full" />
+    </div>
+  );
+}
+
 // The fund's registered custom display tokens (Settings → Token).
 async function CustomTokensSection({ fundId }: { fundId: string }) {
   const tokens = await listCustomDisplayTokens(fundId);
@@ -194,6 +222,7 @@ async function SettingsContent({
     payoutFeePercentage: fund.payoutFeePercentage?.toString() ?? null,
     payoutFeeSynced: fund.payoutFeeSynced,
     feeCollectionFrequency: fund.feeCollectionFrequency,
+    payoutFixedFeeCents: fund.payoutFixedFeeCents,
     memberSignupSuccessUrl: fund.memberSignupSuccessUrl,
     merchantSignupSuccessUrl: fund.merchantSignupSuccessUrl,
     memberSignupCancelUrl: fund.memberSignupCancelUrl,
@@ -412,8 +441,20 @@ async function SettingsContent({
             <CardTitle>{t("fees.title")}</CardTitle>
             <CardDescription>{t("fees.description")}</CardDescription>
           </CardHeader>
-          <CardContent className="pb-4">
+          <CardContent className="space-y-6 pb-4">
             <FeeForm fund={fundForForms} />
+            <div className="border-t border-border pt-6">
+              <Suspense fallback={<FeeWaiversSkeleton />}>
+                <FeeWaiversSection
+                  fund={{
+                    id: fund.id,
+                    citizenPayFundId: fund.citizenPayFundId,
+                    citizenPayApiKeyId: fund.citizenPayApiKeyId,
+                    citizenPayApiKeyEnc: fund.citizenPayApiKeyEnc,
+                  }}
+                />
+              </Suspense>
+            </div>
           </CardContent>
         </Card>
       )}

@@ -9,6 +9,8 @@ import {
   banks as apiBanks,
   businesses as apiBusinesses,
   cards as apiCards,
+  feeWaivers as apiFeeWaivers,
+  fixedFeeCentsFromWire,
   invites as apiInvites,
   payments as apiPayments,
   orders as apiOrders,
@@ -37,6 +39,7 @@ import {
   type CardAllowanceWire,
   type CardChargeResultWire,
   type FeeCollectionFrequencyWire,
+  type FeeWaiverListWire,
   type OpenOrderWire,
   type TopUpOrderWire,
   type OrderStatsBucketWire,
@@ -71,6 +74,7 @@ import type {
   CreatePayoutOrderInput,
   CreatePayoutPaymentResult,
   FeeTransferResult,
+  FeeWaiver,
   ListBankTransactionsInput,
   ListBankTransactionsResult,
   ListCardsInput,
@@ -88,6 +92,7 @@ import type {
   PayoutDraft,
   PayoutDraftPreview,
   PayoutFeeConfig,
+  PayoutFeeConfigEcho,
   PayoutOrder,
   PayoutOrdersPage,
   PayoutPeriod,
@@ -439,6 +444,29 @@ const FEE_FREQUENCY_WIRE: Record<
   PER_PAYMENT: "per_payment",
   MONTHLY: "monthly",
 };
+
+// `GET /v2/treasury/fee-waivers` → FeeWaiver[]. A bare array is the contract;
+// an object wrapping it is accepted. Rows without a business id are dropped.
+export function feeWaiversFromWire(wire: FeeWaiverListWire): FeeWaiver[] {
+  const rows = Array.isArray(wire)
+    ? wire
+    : wire && typeof wire === "object"
+      ? (wire.waivers ?? wire.items ?? wire.data ?? [])
+      : [];
+  if (!Array.isArray(rows)) return [];
+  const out: FeeWaiver[] = [];
+  for (const row of rows) {
+    if (!row || typeof row !== "object") continue;
+    const businessId = (row.businessId ?? row.business_id ?? "").trim();
+    if (!businessId) continue;
+    out.push({
+      businessId,
+      businessName: (row.businessName ?? row.business_name ?? "").trim(),
+      createdAt: row.createdAt ?? row.created_at ?? null,
+    });
+  }
+  return out;
+}
 
 export class LiveCitizenPayClient implements CitizenPayClient {
   // `fundId` scopes the Prisma lookups this client does on its own (submitMint's
@@ -1293,16 +1321,34 @@ export class LiveCitizenPayClient implements CitizenPayClient {
     await apiPayouts.complete(this.creds, payoutId);
   }
 
-  async setPayoutFeeConfig(config: PayoutFeeConfig): Promise<void> {
+  async setPayoutFeeConfig(config: PayoutFeeConfig): Promise<PayoutFeeConfigEcho> {
     // Decimal percent → integer basis points (2.5% → 250). The local column
     // caps at 2 decimals, so the result is always integral; round anyway to
     // shed any float dust from the multiply.
-    const bps = Math.round(Number(config.percent) * 100);
-    await apiTreasury.updateFee(
+    // No local rate: send the fixed fee alone so CP keeps its own rate.
+    const res = await apiTreasury.updateFee(
       this.creds,
-      bps,
-      FEE_FREQUENCY_WIRE[config.collectionFrequency],
+      config.percent === null
+        ? { fixedFeeCents: config.fixedFeeCents }
+        : {
+            feePercentageBps: Math.round(Number(config.percent) * 100),
+            feeCollectionFrequency: FEE_FREQUENCY_WIRE[config.collectionFrequency],
+            fixedFeeCents: config.fixedFeeCents,
+          },
     );
+    return { fixedFeeCents: fixedFeeCentsFromWire(res) };
+  }
+
+  async listFeeWaivers(): Promise<FeeWaiver[]> {
+    return feeWaiversFromWire(await apiFeeWaivers.list(this.creds));
+  }
+
+  async addFeeWaiver(businessId: string): Promise<void> {
+    await apiFeeWaivers.add(this.creds, businessId);
+  }
+
+  async removeFeeWaiver(businessId: string): Promise<void> {
+    await apiFeeWaivers.remove(this.creds, businessId);
   }
 
   async setTreasuryTopUpUrl(url: string | null): Promise<void> {

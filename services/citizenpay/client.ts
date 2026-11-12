@@ -41,6 +41,7 @@ import type {
   CreatePayoutOrderInput,
   CreatePayoutPaymentResult,
   FeeTransferResult,
+  FeeWaiver,
   ListBankTransactionsInput,
   ListBankTransactionsResult,
   ListCardsInput,
@@ -58,6 +59,7 @@ import type {
   PayoutDraft,
   PayoutDraftPreview,
   PayoutFeeConfig,
+  PayoutFeeConfigEcho,
   PayoutOrder,
   PayoutOrdersPage,
   PayoutPeriod,
@@ -1173,11 +1175,43 @@ class MockCitizenPayClient implements CitizenPayClient {
     completedMockPayouts.add(payoutId);
   }
 
-  async setPayoutFeeConfig(config: PayoutFeeConfig): Promise<void> {
+  async setPayoutFeeConfig(config: PayoutFeeConfig): Promise<PayoutFeeConfigEcho> {
     this.log("setPayoutFeeConfig", {
       percent: config.percent,
       collectionFrequency: config.collectionFrequency,
+      fixedFeeCents: config.fixedFeeCents,
     });
+    // The mock is an up-to-date api: it stores and echoes the fixed fee.
+    return { fixedFeeCents: config.fixedFeeCents };
+  }
+
+  async listFeeWaivers(): Promise<FeeWaiver[]> {
+    this.log("listFeeWaivers", { fundId: this.fundId });
+    return [...(mockFeeWaivers.get(this.fundId)?.values() ?? [])];
+  }
+
+  async addFeeWaiver(businessId: string): Promise<void> {
+    this.log("addFeeWaiver", { fundId: this.fundId, businessId });
+    let waivers = mockFeeWaivers.get(this.fundId);
+    if (!waivers) {
+      waivers = new Map();
+      mockFeeWaivers.set(this.fundId, waivers);
+    }
+    // Idempotent like the api: a second PUT keeps the first row.
+    if (!waivers.has(businessId)) {
+      waivers.set(businessId, {
+        businessId,
+        // The mock has no business directory; La Caisse shows its own
+        // merchant names next to it anyway.
+        businessName: "",
+        createdAt: new Date().toISOString(),
+      });
+    }
+  }
+
+  async removeFeeWaiver(businessId: string): Promise<void> {
+    this.log("removeFeeWaiver", { fundId: this.fundId, businessId });
+    mockFeeWaivers.get(this.fundId)?.delete(businessId);
   }
 
   async setTreasuryTopUpUrl(url: string | null): Promise<void> {
@@ -1352,6 +1386,10 @@ export function getMockTopUpOrder(
 // Top-up URLs pushed per fund this session (same process lifetime as the other
 // mock state). Read back with getMockTreasuryTopUpUrl in tests.
 const mockTreasuryTopUpUrls = new Map<string, string | null>();
+
+// Fixed-fee waivers per fund (fundId → businessId → waiver), same process
+// lifetime as the other mock state.
+const mockFeeWaivers = new Map<string, Map<string, FeeWaiver>>();
 
 /**
  * The last top-up URL the mock client recorded for a fund: `undefined` when

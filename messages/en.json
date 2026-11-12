@@ -2795,12 +2795,38 @@
         "description": "Commission taken on payments to merchants. Configured here, then pushed to Citizen Pay.",
         "rate": "Fee rate (%)",
         "rateHint": "Percentage taken on each payment (e.g. 2.5 for 2.5%). Leave empty to use Citizen Pay's default rate.",
+        "fixedFee": "Fixed fee per order (€)",
+        "fixedFeeHint": "Amount charged on every order, on top of the rate (e.g. 0.10). Leave empty for no fixed fee. Maximum €10.",
         "frequency": "Collection frequency",
         "frequencyHint": "On every payment, or once at the end of the month. The collection itself is handled by Citizen Pay.",
         "frequencyPerPayment": "On every payment",
         "frequencyMonthly": "Monthly (end of month)",
         "syncPending": "Saved locally, but not yet confirmed by Citizen Pay. Save again to retry the sync.",
-        "syncFailed": "Rate saved, but the sync to Citizen Pay failed. Save again to retry."
+        "syncFailed": "Fees saved, but the sync to Citizen Pay failed. Save again to retry.",
+        "waivers": {
+          "title": "Businesses exempt from the fixed fee",
+          "description": "These businesses don't pay the fixed fee per order. The rate above still applies to them.",
+          "empty": "No business is exempt yet.",
+          "places": "Places: {places}",
+          "business": "Business",
+          "businessPlaceholder": "Choose a business…",
+          "add": "Exempt",
+          "adding": "Saving…",
+          "remove": "Remove exemption",
+          "confirmRemove": "{business} will pay the fixed fee on its next orders again. Past orders don't change.",
+          "noMerchants": "None of the fund's merchants is connected to Citizen Pay yet, so there is no business to exempt.",
+          "allExempt": "All the fund's businesses are already exempt.",
+          "notConnected": "Connect the fund to Citizen Pay to manage exemptions.",
+          "unavailable": "Citizen Pay doesn't support exemptions for this fund yet. Try again after its next update.",
+          "loadFailed": "Couldn't load the exemptions from Citizen Pay. Reload the page to try again.",
+          "errors": {
+            "notFound": "This business isn't one of the fund's merchants.",
+            "notAccepting": "This business doesn't accept the fund's token (any more), so it can't be exempted.",
+            "notConnected": "The fund isn't connected to Citizen Pay.",
+            "unavailable": "Citizen Pay doesn't support exemptions for this fund yet.",
+            "failed": "Citizen Pay didn't accept the change. Try again in a moment."
+          }
+        }
       },
       "emails": {
         "title": "Member emails",
@@ -3067,6 +3093,8 @@
       "urlInvalid": "Enter a valid URL (must start with http:// or https://).",
       "feeInvalid": "Fee rate must be a number with up to 2 decimal places.",
       "feeTooHigh": "Fee rate can't exceed 100%.",
+      "fixedFeeInvalid": "The fixed fee must be an amount in euros with up to 2 decimals (e.g. 0.10).",
+      "fixedFeeTooHigh": "The fixed fee can't exceed €10.",
       "cutoffDayInvalid": "Cutoff day must be a whole number between 1 and 31.",
       "nameTooLong": "The name is too long.",
       "embedDomainInvalid": "Enter one domain per line (example.org, *.example.org, localhost:3000).",

@@ -4,6 +4,7 @@ import "server-only";
 import type { FeeCollectionFrequency } from "@/services/db/generated/enums";
 
 import {
+  fixedFeeCentsFromWire,
   treasury as treasuryApi,
   type CitizenPayApiCredentials,
   type TreasuryWire,
@@ -18,8 +19,8 @@ import {
 //   tokenAddress, tokenDecimals, tokenName, tokenSymbol, tokenChainId.
 // We do NOT expose these as editable in the UI.
 //
-// The one EXCEPTION is the fee pair `payoutFeePercentage` /
-// `feeCollectionFrequency`: those values are canonical on our side (admin sets
+// The one EXCEPTION is the fee config `payoutFeePercentage` /
+// `feeCollectionFrequency` / `payoutFixedFeeCents`: those values are canonical on our side (admin sets
 // them in settings → we push them to CP). We surface CP's echo here only so
 // the caller can reconcile (confirm sync / seed) — it must NOT blindly
 // overwrite a locally-set fee or cadence. See consumeConnect in connect.ts.
@@ -60,6 +61,10 @@ export type TokenInfo = {
   // `FeeCollectionFrequency` spelling. Null when CP reports nothing (or
   // something we don't recognise). Same reconcile-don't-cache rule as above.
   feeCollectionFrequency: FeeCollectionFrequency | null;
+  // CP's echo of the fixed fee per order, integer euro cents. Null when CP
+  // reports nothing (an api that predates the fixed fee). Same
+  // reconcile-don't-cache rule as the rate.
+  fixedFeeCents: number | null;
 };
 
 /**
@@ -150,6 +155,8 @@ export function normaliseTreasury(wire: TreasuryWire): TokenInfo {
     );
   }
 
+  const fixedFeeCents = fixedFeeCentsFromWire(wire);
+
   // Business id: only a non-empty string counts, so a blank answer never
   // overwrites a good cache (the persist sites skip nulls).
   const businessIdRaw =
@@ -171,5 +178,6 @@ export function normaliseTreasury(wire: TreasuryWire): TokenInfo {
     citizenPayBusinessId,
     payoutFeePercentage,
     feeCollectionFrequency,
+    fixedFeeCents,
   };
 }

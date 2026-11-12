@@ -556,6 +556,13 @@ export type TreasuryWire = {
   // CP confirms the contract.
   fee_collection_frequency?: string;
   feeCollectionFrequency?: string;
+  // Fixed fee per order in integer euro cents, set in the same PATCH as the
+  // rate. camelCase is the contract; snake_case accepted like the fields
+  // above. Absent on an api that predates the fixed fee — which also
+  // silently drops it from a PATCH body, so its absence in the PATCH echo
+  // means "not stored".
+  fixedFeeCents?: number | null;
+  fixed_fee_cents?: number | null;
   // The wallet's "Add funds" link (api#221), `{serial}` placeholder intact —
   // whatever is set right now, which may be a value CP manages itself (e.g.
   // its own checkout) rather than one we published. snake_case is what CP
@@ -569,6 +576,17 @@ export type TreasuryWire = {
   // (services/citizenpay/sync-fund-kind.ts); read back only to report.
   kind?: TreasuryKindWire;
 };
+
+// The fixed fee per order CP says it stored (PATCH echo or GET): a
+// non-negative integer, else null ("CP said nothing" — an api that predates
+// the field). camelCase is the contract, snake_case tolerated.
+export function fixedFeeCentsFromWire(
+  wire: Pick<TreasuryWire, "fixedFeeCents" | "fixed_fee_cents"> | null | undefined,
+): number | null {
+  if (!wire || typeof wire !== "object") return null;
+  const raw = wire.fixedFeeCents ?? wire.fixed_fee_cents;
+  return typeof raw === "number" && Number.isInteger(raw) && raw >= 0 ? raw : null;
+}
 
 // Wire spelling of the fee collection cadence. Maps 1:1 to the Prisma
 // `FeeCollectionFrequency` enum (PER_PAYMENT / MONTHLY); the live client owns
@@ -664,14 +682,28 @@ export const treasury = {
   // Treasury-level (per fund); per-business overrides are future work.
   // This is the rate behind a payout's `payoutFees` — the cut CP charges at
   // settlement, not the processor commission withheld at source.
+  //
+  // `fixedFeeCents` (integer 0–1000) is the fixed fee per order, in the same
+  // PATCH. The api decodes leniently, so one that predates the field answers
+  // 2xx and drops it: the response (the stored treasury) is returned so the
+  // caller can confirm `fixedFeeCents` was echoed.
+  // Rate and cadence are optional together: omitted (no keys in the body),
+  // CP keeps the ones it holds and only the fixed fee changes.
   updateFee(
     creds: CitizenPayApiCredentials,
-    feePercentageBps: number,
-    feeCollectionFrequency: FeeCollectionFrequencyWire,
-  ): Promise<{ success: boolean }> {
-    return request(creds, "PATCH", "/v2/treasury", {
-      body: { feePercentageBps, feeCollectionFrequency },
-    });
+    fee: {
+      feePercentageBps?: number;
+      feeCollectionFrequency?: FeeCollectionFrequencyWire;
+      fixedFeeCents: number;
+    },
+  ): Promise<TreasuryWire | null> {
+    const body: Record<string, unknown> = {};
+    if (fee.feePercentageBps !== undefined) body.feePercentageBps = fee.feePercentageBps;
+    if (fee.feeCollectionFrequency !== undefined) {
+      body.feeCollectionFrequency = fee.feeCollectionFrequency;
+    }
+    body.fixedFeeCents = fee.fixedFeeCents;
+    return request(creds, "PATCH", "/v2/treasury", { body });
   },
   // Sales statistics over an optional half-open `[from, to)` window (RFC3339,
   // on the order's creation time): grand total, per-month series and
@@ -749,6 +781,54 @@ export const treasury = {
       body: { account: body.account, roles: body.roles },
       timeoutMs: opts.timeoutMs ?? TOKEN_ROLES_GRANT_TIMEOUT_MS,
     });
+  },
+};
+
+// =============================================================================
+// Fee waivers (businesses exempt from the treasury's fixed fee per order)
+// =============================================================================
+
+// One waiver as `GET /v2/treasury/fee-waivers` lists it. The contract is a
+// bare JSON array; an object wrapping it (`{ waivers | items | data: [...] }`)
+// is accepted too, like other tolerant readers here.
+export type FeeWaiverWire = {
+  businessId?: string;
+  business_id?: string;
+  businessName?: string | null;
+  business_name?: string | null;
+  createdAt?: string | null;
+  created_at?: string | null;
+};
+
+export type FeeWaiverListWire =
+  | FeeWaiverWire[]
+  | {
+      waivers?: FeeWaiverWire[] | null;
+      items?: FeeWaiverWire[] | null;
+      data?: FeeWaiverWire[] | null;
+    }
+  | null;
+
+export const feeWaivers = {
+  // An api that predates the fixed fee answers 404 on all three.
+  list(creds: CitizenPayApiCredentials): Promise<FeeWaiverListWire> {
+    return request(creds, "GET", "/v2/treasury/fee-waivers");
+  },
+  // Idempotent: waiving an already-waived business is a 2xx. The api refuses
+  // a business that has no place accepting the treasury's token.
+  add(creds: CitizenPayApiCredentials, businessId: string): Promise<unknown> {
+    return request(
+      creds,
+      "PUT",
+      `/v2/treasury/fee-waivers/${encodeURIComponent(businessId)}`,
+    );
+  },
+  remove(creds: CitizenPayApiCredentials, businessId: string): Promise<unknown> {
+    return request(
+      creds,
+      "DELETE",
+      `/v2/treasury/fee-waivers/${encodeURIComponent(businessId)}`,
+    );
   },
 };
 

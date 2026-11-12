@@ -27,6 +27,7 @@ import type {
   CreatePayoutOrderInput,
   CreatePayoutPaymentResult,
   FeeTransferResult,
+  FeeWaiver,
   ListBankTransactionsInput,
   ListBankTransactionsResult,
   ListCardsInput,
@@ -42,6 +43,7 @@ import type {
   PayoutDraft,
   PayoutDraftPreview,
   PayoutFeeConfig,
+  PayoutFeeConfigEcho,
   PayoutOrdersPage,
   PayoutPeriod,
   PayoutStatusDetail,
@@ -641,8 +643,31 @@ export interface CitizenPayClient {
    * takes them in a single PATCH. We are canonical for both values — they're
    * persisted locally first, then synced here. This is the rate behind a
    * payout's `payoutFees`, not the processor commission withheld at source.
+   * The fixed fee per order (`fixedFeeCents`) rides in the same PATCH. An api
+   * that predates it drops the field without an error, so the call answers
+   * CP's echo: the fixed fee only counts as synced when
+   * `echo.fixedFeeCents` equals what was sent.
    */
-  setPayoutFeeConfig(config: PayoutFeeConfig): Promise<void>;
+  setPayoutFeeConfig(config: PayoutFeeConfig): Promise<PayoutFeeConfigEcho>;
+
+  /**
+   * Businesses exempt from the treasury's fixed fee per order (the
+   * percentage still applies). Held by CP only. Backed by
+   * `GET /v2/treasury/fee-waivers`; an api that predates the fixed fee
+   * answers 404 (`CitizenPayApiError`, status 404) — callers treat that as
+   * "not available yet".
+   */
+  listFeeWaivers(): Promise<FeeWaiver[]>;
+
+  /**
+   * Exempt a business from the fixed fee (`PUT /v2/treasury/fee-waivers/{id}`,
+   * idempotent). Callers must first check the business belongs to one of the
+   * fund's own merchants.
+   */
+  addFeeWaiver(businessId: string): Promise<void>;
+
+  /** Remove a business's exemption (`DELETE /v2/treasury/fee-waivers/{id}`). */
+  removeFeeWaiver(businessId: string): Promise<void>;
 
   /**
    * Set (or clear, with null) the treasury's top-up URL — what the public

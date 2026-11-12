@@ -17,6 +17,10 @@ import {
   updateReferralSettingsAction,
   updateSignupRedirectsAction,
 } from "@/services/fund/settings-actions";
+import {
+  centsToEuroInput,
+  normaliseFixedFeeInput,
+} from "@/services/fund/fee-schema";
 import type { SupportedLocale } from "@/services/i18n/config";
 
 // Reusable form scaffold. Each tab passes its own fields + submit action;
@@ -39,9 +43,13 @@ function SettingsForm<T extends Record<string, string>>({
   action,
   saveLabel,
   savingLabel,
+  normaliseOnSave,
 }: {
   fields: FieldSpec<T>[];
   initial: T;
+  // Optional: rewrite the shown values after a successful save (e.g. the
+  // canonical spelling the server stored), without a reload.
+  normaliseOnSave?: (values: T) => T;
   action: (
     data: T,
   ) => Promise<{ ok: true; warning?: string } | { error: string }>;
@@ -67,6 +75,7 @@ function SettingsForm<T extends Record<string, string>>({
         return;
       }
       setSaved(true);
+      if (normaliseOnSave) setValues(normaliseOnSave);
       setWarning("warning" in result ? (result.warning ?? null) : null);
     });
   };
@@ -198,6 +207,7 @@ type Fund = {
   payoutFeePercentage: string | null;
   payoutFeeSynced: boolean;
   feeCollectionFrequency: "PER_PAYMENT" | "MONTHLY";
+  payoutFixedFeeCents: number;
   memberSignupSuccessUrl: string | null;
   merchantSignupSuccessUrl: string | null;
   memberSignupCancelUrl: string | null;
@@ -422,9 +432,12 @@ export function SignupRedirectsForm({ fund }: { fund: Fund }) {
 export function FeeForm({ fund }: { fund: Fund }) {
   const t = useTranslations("fund.settings.fees");
   const tRoot = useTranslations("fund.settings");
-  // DB may lead CP: if a value is set but hasn't been accepted by CP yet,
-  // tell the admin it isn't live — saving again retries the push.
-  const showSyncPending = Boolean(fund.payoutFeePercentage) && !fund.payoutFeeSynced;
+  // DB may lead CP: if a value (rate, cadence or fixed fee — including a
+  // fixed fee) hasn't been accepted by CP yet, tell the admin it isn't
+  // live — saving again retries the push.
+  const showSyncPending =
+    (Boolean(fund.payoutFeePercentage) || fund.payoutFixedFeeCents > 0) &&
+    !fund.payoutFeeSynced;
   return (
     <div className="space-y-4">
       {showSyncPending && (
@@ -437,11 +450,17 @@ export function FeeForm({ fund }: { fund: Fund }) {
         savingLabel={tRoot("saving")}
         initial={{
           payoutFeePercentage: fund.payoutFeePercentage ?? "",
+          payoutFixedFee: centsToEuroInput(fund.payoutFixedFeeCents),
           feeCollectionFrequency: fund.feeCollectionFrequency,
         }}
+        normaliseOnSave={(v) => ({
+          ...v,
+          payoutFixedFee: normaliseFixedFeeInput(v.payoutFixedFee),
+        })}
         action={async (v) =>
           updatePayoutFeeAction({
             payoutFeePercentage: v.payoutFeePercentage,
+            payoutFixedFee: v.payoutFixedFee,
             // The SettingsForm state holds plain `string`; the action's
             // schema narrows this to the FeeCollectionFrequency enum, so
             // cast back at the call boundary.
@@ -455,6 +474,12 @@ export function FeeForm({ fund }: { fund: Fund }) {
             key: "payoutFeePercentage",
             label: t("rate"),
             hint: t("rateHint"),
+            type: "decimal",
+          },
+          {
+            key: "payoutFixedFee",
+            label: t("fixedFee"),
+            hint: t("fixedFeeHint"),
             type: "decimal",
           },
           {
