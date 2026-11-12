@@ -2729,12 +2729,38 @@
         "description": "Comisión cobrada sobre los pagos a comercios. Se configura aquí y luego se envía a Citizen Pay.",
         "rate": "Tasa de comisión (%)",
         "rateHint": "Porcentaje cobrado en cada pago (p. ej. 2.5 para 2.5%). Déjalo vacío para usar la tasa predeterminada de Citizen Pay.",
+        "fixedFee": "Comisión fija por pedido (€)",
+        "fixedFeeHint": "Importe cobrado en cada pedido, además de la tasa (p. ej. 0.10). Déjalo vacío para no cobrar comisión fija. Máximo 10 €.",
         "frequency": "Frecuencia de cobro",
         "frequencyHint": "En cada pago, o una sola vez a fin de mes. El cobro lo realiza Citizen Pay.",
         "frequencyPerPayment": "En cada pago",
         "frequencyMonthly": "Mensual (fin de mes)",
         "syncPending": "Guardado localmente, pero aún no confirmado por Citizen Pay. Guarda de nuevo para reintentar la sincronización.",
-        "syncFailed": "Tasa guardada, pero la sincronización con Citizen Pay falló. Guarda de nuevo para reintentar."
+        "syncFailed": "Comisiones guardadas, pero la sincronización con Citizen Pay falló. Guarda de nuevo para reintentar.",
+        "waivers": {
+          "title": "Comercios exentos de la comisión fija",
+          "description": "Estos comercios no pagan la comisión fija por pedido. La tasa de arriba se les sigue aplicando.",
+          "empty": "Todavía no hay ningún comercio exento.",
+          "places": "Locales: {places}",
+          "business": "Comercio",
+          "businessPlaceholder": "Elige un comercio…",
+          "add": "Eximir",
+          "adding": "Guardando…",
+          "remove": "Quitar la exención",
+          "confirmRemove": "{business} volverá a pagar la comisión fija en sus próximos pedidos. Los pedidos anteriores no cambian.",
+          "noMerchants": "Ningún comercio del fondo está conectado todavía a Citizen Pay, así que no hay nada que eximir.",
+          "allExempt": "Todos los comercios del fondo ya están exentos.",
+          "notConnected": "Conecta el fondo a Citizen Pay para gestionar las exenciones.",
+          "unavailable": "Citizen Pay aún no admite exenciones para este fondo. Vuelve a intentarlo tras su próxima actualización.",
+          "loadFailed": "No se pudieron cargar las exenciones desde Citizen Pay. Recarga la página para reintentar.",
+          "errors": {
+            "notFound": "Este comercio no es uno de los comercios del fondo.",
+            "notAccepting": "Este comercio no acepta (o ya no acepta) el token del fondo, así que no se puede eximir.",
+            "notConnected": "El fondo no está conectado a Citizen Pay.",
+            "unavailable": "Citizen Pay aún no admite exenciones para este fondo.",
+            "failed": "Citizen Pay no aceptó el cambio. Inténtalo de nuevo en un momento."
+          }
+        }
       },
       "emails": {
         "title": "Correos a los miembros",
@@ -3000,6 +3026,8 @@
       "urlInvalid": "Introduzca una URL válida (debe empezar por http:// o https://).",
       "feeInvalid": "La tasa de comisión debe ser un número con hasta 2 decimales.",
       "feeTooHigh": "La tasa de comisión no puede superar el 100%.",
+      "fixedFeeInvalid": "La comisión fija debe ser un importe en euros con hasta 2 decimales (p. ej. 0.10).",
+      "fixedFeeTooHigh": "La comisión fija no puede superar los 10 €.",
       "cutoffDayInvalid": "El día de corte debe ser un número entero entre 1 y 31.",
       "nameTooLong": "El nombre es demasiado largo.",
       "embedDomainInvalid": "Introduce un dominio por línea (ejemplo.org, *.ejemplo.org, localhost:3000).",

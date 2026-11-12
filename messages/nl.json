@@ -2738,12 +2738,38 @@
         "description": "Commissie op betalingen aan handelaren. Hier ingesteld en vervolgens naar Citizen Pay gestuurd.",
         "rate": "Kostentarief (%)",
         "rateHint": "Percentage dat op elke betaling wordt ingehouden (bijv. 2,5 voor 2,5%). Laat leeg om het standaardtarief van Citizen Pay te gebruiken.",
+        "fixedFee": "Vaste kosten per bestelling (€)",
+        "fixedFeeHint": "Bedrag dat op elke bestelling wordt aangerekend, bovenop het tarief (bijv. 0,10). Laat leeg voor geen vaste kosten. Maximaal € 10.",
         "frequency": "Inningsfrequentie",
         "frequencyHint": "Bij elke betaling, of één keer aan het einde van de maand. De inning zelf gebeurt door Citizen Pay.",
         "frequencyPerPayment": "Bij elke betaling",
         "frequencyMonthly": "Maandelijks (einde van de maand)",
         "syncPending": "Lokaal opgeslagen, maar nog niet bevestigd door Citizen Pay. Sla opnieuw op om de synchronisatie te herhalen.",
-        "syncFailed": "Tarief opgeslagen, maar de synchronisatie met Citizen Pay is mislukt. Sla opnieuw op om opnieuw te proberen."
+        "syncFailed": "Kosten opgeslagen, maar de synchronisatie met Citizen Pay is mislukt. Sla opnieuw op om opnieuw te proberen.",
+        "waivers": {
+          "title": "Handelaars vrijgesteld van vaste kosten",
+          "description": "Deze handelaars betalen geen vaste kosten per bestelling. Het tarief hierboven blijft voor hen gelden.",
+          "empty": "Nog geen enkele handelaar is vrijgesteld.",
+          "places": "Verkooppunten: {places}",
+          "business": "Handelaar",
+          "businessPlaceholder": "Kies een handelaar…",
+          "add": "Vrijstellen",
+          "adding": "Opslaan…",
+          "remove": "Vrijstelling intrekken",
+          "confirmRemove": "{business} betaalt opnieuw vaste kosten op zijn volgende bestellingen. Eerdere bestellingen veranderen niet.",
+          "noMerchants": "Geen enkele handelaar van het fonds is al met Citizen Pay verbonden, dus er valt niemand vrij te stellen.",
+          "allExempt": "Alle handelaars van het fonds zijn al vrijgesteld.",
+          "notConnected": "Verbind het fonds met Citizen Pay om vrijstellingen te beheren.",
+          "unavailable": "Citizen Pay ondersteunt nog geen vrijstellingen voor dit fonds. Probeer het opnieuw na de volgende update.",
+          "loadFailed": "De vrijstellingen konden niet bij Citizen Pay worden opgehaald. Herlaad de pagina om het opnieuw te proberen.",
+          "errors": {
+            "notFound": "Deze handelaar hoort niet bij de handelaars van het fonds.",
+            "notAccepting": "Deze handelaar aanvaardt het token van het fonds niet (meer), dus hij kan niet worden vrijgesteld.",
+            "notConnected": "Het fonds is niet verbonden met Citizen Pay.",
+            "unavailable": "Citizen Pay ondersteunt nog geen vrijstellingen voor dit fonds.",
+            "failed": "Citizen Pay heeft de wijziging niet aanvaard. Probeer het zo meteen opnieuw."
+          }
+        }
       },
       "emails": {
         "title": "E-mails aan leden",
@@ -3009,6 +3035,8 @@
       "urlInvalid": "Voer een geldige URL in (moet beginnen met http:// of https://).",
       "feeInvalid": "Kostentarief moet een getal met maximaal 2 decimalen zijn.",
       "feeTooHigh": "Kostentarief mag niet hoger zijn dan 100%.",
+      "fixedFeeInvalid": "De vaste kosten moeten een bedrag in euro zijn met maximaal 2 decimalen (bijv. 0,10).",
+      "fixedFeeTooHigh": "De vaste kosten mogen niet hoger zijn dan € 10.",
       "cutoffDayInvalid": "Afkapdag moet een geheel getal tussen 1 en 31 zijn.",
       "nameTooLong": "De naam is te lang.",
       "embedDomainInvalid": "Voer één domein per regel in (voorbeeld.org, *.voorbeeld.org, localhost:3000).",

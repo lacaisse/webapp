@@ -59,3 +59,18 @@ describe("normaliseTreasury — business id", () => {
     expect(normaliseTreasury({ issued_by_business_id: "  " }).citizenPayBusinessId).toBeNull();
   });
 });
+
+describe("normaliseTreasury — fixed fee", () => {
+  it("reads fixedFeeCents (camelCase contract, snake_case tolerated)", () => {
+    expect(normaliseTreasury({ fixedFeeCents: 10 }).fixedFeeCents).toBe(10);
+    expect(normaliseTreasury({ fixed_fee_cents: 25 }).fixedFeeCents).toBe(25);
+    expect(normaliseTreasury({ fixedFeeCents: 0 }).fixedFeeCents).toBe(0);
+  });
+
+  it("is null when the api says nothing or something unusable", () => {
+    expect(normaliseTreasury({}).fixedFeeCents).toBeNull();
+    expect(normaliseTreasury({ fixedFeeCents: null }).fixedFeeCents).toBeNull();
+    expect(normaliseTreasury({ fixedFeeCents: 1.5 }).fixedFeeCents).toBeNull();
+    expect(normaliseTreasury({ fixedFeeCents: -1 }).fixedFeeCents).toBeNull();
+  });
+});

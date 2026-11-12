@@ -481,6 +481,16 @@ model Fund {
   // CP yet).
   feeCollectionFrequency FeeCollectionFrequency @default(PER_PAYMENT)
 
+  // Fixed platform fee per order, in euro cents (10 = €0.10), charged by CP
+  // on top of the percentage above. 0 = none (the default, today's
+  // behaviour). Same canonical-here treatment as the rate: persisted first,
+  // pushed in the SAME PATCH /v2/treasury as rate + cadence (field
+  // `fixedFeeCents`, 0–1000), and `payoutFeeSynced` covers it too — it only
+  // flips back to true once CP's response echoes the value sent. Businesses
+  // exempt from it are held by CP only (GET/PUT/DELETE
+  // /v2/treasury/fee-waivers), not here.
+  payoutFixedFeeCents Int @default(0)
+
   // Defaults
   defaultLocale String @default("fr")
   timezone      String @default("Europe/Brussels")

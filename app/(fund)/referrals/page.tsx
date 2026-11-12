@@ -81,6 +81,7 @@ export default async function ReferralsPage() {
                 fund.payoutFeePercentage?.toString() ?? null,
               payoutFeeSynced: fund.payoutFeeSynced,
               feeCollectionFrequency: fund.feeCollectionFrequency,
+              payoutFixedFeeCents: fund.payoutFixedFeeCents,
               memberSignupSuccessUrl: fund.memberSignupSuccessUrl,
               merchantSignupSuccessUrl: fund.merchantSignupSuccessUrl,
               memberSignupCancelUrl: fund.memberSignupCancelUrl,

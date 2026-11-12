@@ -646,9 +646,35 @@ export type CreatePayoutPaymentResult =
 // payment, MONTHLY accrues it and collects once at month end. Kept as a
 // literal union here (like `CardStatus`) so the shared types module stays
 // free of generated-client imports.
+//
+// `fixedFeeCents` is the fixed fee per order in integer euro cents (0–1000,
+// 0 = none), sent in the same PATCH. An api that predates it accepts the body
+// and drops the field, so the call answers what CP echoed back
+// (`PayoutFeeConfigEcho`): callers confirm the fixed fee landed from that,
+// never from the absence of an error.
+//
+// `percent` null = La Caisse has no rate: the PATCH then carries neither
+// `feePercentageBps` nor `feeCollectionFrequency` (exactly what was sent
+// before the fixed fee existed: nothing), so a rate CP holds is left alone and
+// only the fixed fee is updated. The cadence rides along with a rate only.
 export type PayoutFeeConfig = {
-  percent: string;
+  percent: string | null;
   collectionFrequency: "PER_PAYMENT" | "MONTHLY";
+  fixedFeeCents: number;
+};
+
+// What CP's PATCH response says it stored. `fixedFeeCents` is null when the
+// response does not carry the field (an api older than the fixed fee).
+export type PayoutFeeConfigEcho = {
+  fixedFeeCents: number | null;
+};
+
+// A business exempt from the treasury's fixed fee per order (the percentage
+// still applies). Held by CP only (`/v2/treasury/fee-waivers`).
+export type FeeWaiver = {
+  businessId: string;
+  businessName: string;
+  createdAt: string | null; // RFC3339 as CP sent it
 };
 
 // =============================================================================

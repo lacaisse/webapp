@@ -410,3 +410,67 @@ describe("consumeConnect — minter roles", () => {
     await expect(call()).resolves.toEqual({ treasuryId: "t-1", apiKeyId: "0xkey" });
   });
 });
+
+// Fixed fee per order: canonical here like the rate. A local non-zero value
+// is synced only when CP's GET reports exactly it (an api that predates the
+// field reports nothing); a local 0 is synced against nothing or 0; CP's
+// non-zero value seeds a local 0 only while nothing is pending locally.
+describe("consumeConnect — fixed fee reconcile", () => {
+  const attempt = {
+    state: "fs",
+    fundId: "f1",
+    returnHost: "acme.lacaisse.eu",
+    consumedAt: null,
+    expiresAt: new Date(T0.getTime() + 60_000),
+  };
+  const call = () =>
+    consumeConnect({
+      fundState: "fs",
+      cpState: "cp",
+      pickupToken: "pt",
+      callbackHost: "acme.lacaisse.eu",
+    });
+  const tokenInfo = (fixedFeeCents: number | null) => ({
+    citizenPayAccountFactoryAddress: null,
+    payoutFeePercentage: "2.50",
+    feeCollectionFrequency: "PER_PAYMENT",
+    fixedFeeCents,
+  });
+  const written = () => prisma.fund.update.mock.calls[0][0].data;
+
+  beforeEach(() => {
+    prisma.citizenPayConnectAttempt.findUnique.mockResolvedValue(attempt);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({ treasury_id: "t-1", api_key_id: "0xkey", api_key: "secret" }),
+      ),
+    );
+  });
+
+  it.each([
+    // [local cents, local synced flag, CP cents, expected synced, expected seed]
+    [10, true, 10, true, undefined],
+    [10, true, null, false, undefined],
+    [10, true, 25, false, undefined],
+    [0, true, null, true, undefined],
+    [0, true, 0, true, undefined],
+    [0, true, 15, true, 15],
+    [0, false, 15, false, undefined],
+  ])(
+    "local %i (synced %s) vs CP %s → synced %s, seed %s",
+    async (local, localSynced, cp, synced, seed) => {
+      prisma.fund.findUnique.mockResolvedValue({
+        citizenPayFundId: "t-1",
+        payoutFeePercentage: "2.50",
+        feeCollectionFrequency: "PER_PAYMENT",
+        payoutFixedFeeCents: local,
+        payoutFeeSynced: localSynced,
+      });
+      fetchTokenInfo.mockResolvedValue(tokenInfo(cp));
+      await call();
+      expect(written().payoutFeeSynced).toBe(synced);
+      expect(written().payoutFixedFeeCents).toBe(seed);
+    },
+  );
+});

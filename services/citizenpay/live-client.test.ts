@@ -6,8 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 vi.mock("@/services/db/prisma", () => ({ prisma: {} }));
 
-import { cards, payouts } from "./api";
-import { burnClaimFromWire, LiveCitizenPayClient } from "./live-client";
+import { cards, CitizenPayApiError, feeWaivers, payouts, treasury } from "./api";
+import { burnClaimFromWire, feeWaiversFromWire, LiveCitizenPayClient } from "./live-client";
 
 const creds = { baseUrl: "https://cp.test", apiKeyId: "0xkey", apiKey: "secret" };
 type Call = { url: URL; method: string; body: unknown };
@@ -253,5 +253,102 @@ describe("LiveCitizenPayClient card source info / weekly limit", () => {
     expect(calls[0].method).toBe("PATCH");
     expect(calls[0].url.pathname).toBe("/v2/treasury/cards/S1");
     expect(calls[0].body).toEqual({ source_weekly_limit: wire });
+  });
+});
+
+describe("fixed fee wire (PATCH /v2/treasury)", () => {
+  const client = new LiveCitizenPayClient(creds);
+
+  it("sends bps, cadence and fixedFeeCents in one PATCH", async () => {
+    reply = { status: 200, body: { feePercentageBps: 250, fixedFeeCents: 10 } };
+    await treasury.updateFee(creds, {
+      feePercentageBps: 250,
+      feeCollectionFrequency: "monthly",
+      fixedFeeCents: 10,
+    });
+    expect(calls[0].method).toBe("PATCH");
+    expect(calls[0].url.pathname).toBe("/v2/treasury");
+    expect(calls[0].body).toEqual({
+      feePercentageBps: 250,
+      feeCollectionFrequency: "monthly",
+      fixedFeeCents: 10,
+    });
+  });
+
+  it("converts the config and answers CP's echo", async () => {
+    reply = { status: 200, body: { fixedFeeCents: 10 } };
+    await expect(
+      client.setPayoutFeeConfig({ percent: "2.5", collectionFrequency: "PER_PAYMENT", fixedFeeCents: 10 }),
+    ).resolves.toEqual({ fixedFeeCents: 10 });
+    expect(calls[0].body).toEqual({
+      feePercentageBps: 250,
+      feeCollectionFrequency: "per_payment",
+      fixedFeeCents: 10,
+    });
+  });
+
+  it("sends the fixed fee alone when there is no local rate", async () => {
+    reply = { status: 200, body: { feePercentageBps: 300, fixedFeeCents: 10 } };
+    await expect(
+      client.setPayoutFeeConfig({ percent: null, collectionFrequency: "MONTHLY", fixedFeeCents: 10 }),
+    ).resolves.toEqual({ fixedFeeCents: 10 });
+    expect(calls[0].body).toEqual({ fixedFeeCents: 10 });
+  });
+
+  it("answers null when the response doesn't carry the field (older api)", async () => {
+    reply = { status: 200, body: { success: true } };
+    await expect(
+      client.setPayoutFeeConfig({ percent: "1", collectionFrequency: "PER_PAYMENT", fixedFeeCents: 10 }),
+    ).resolves.toEqual({ fixedFeeCents: null });
+    reply = { status: 204 };
+    await expect(
+      client.setPayoutFeeConfig({ percent: "1", collectionFrequency: "MONTHLY", fixedFeeCents: 0 }),
+    ).resolves.toEqual({ fixedFeeCents: null });
+  });
+
+  it("accepts a snake_case echo", async () => {
+    reply = { status: 200, body: { fixed_fee_cents: 0 } };
+    await expect(
+      client.setPayoutFeeConfig({ percent: "1", collectionFrequency: "MONTHLY", fixedFeeCents: 0 }),
+    ).resolves.toEqual({ fixedFeeCents: 0 });
+  });
+});
+
+describe("fee waivers wire (/v2/treasury/fee-waivers)", () => {
+  const client = new LiveCitizenPayClient(creds);
+  const row = { businessId: "b-1", businessName: "Mazette", createdAt: "2026-11-12T10:00:00Z" };
+
+  it("lists a bare array", async () => {
+    reply = { status: 200, body: [row] };
+    await expect(client.listFeeWaivers()).resolves.toEqual([row]);
+    expect(calls[0].method).toBe("GET");
+    expect(calls[0].url.pathname).toBe("/v2/treasury/fee-waivers");
+  });
+
+  it("accepts a wrapped array and snake_case rows, drops rows without an id", () => {
+    const snake = { business_id: "b-2", business_name: "Cafe", created_at: null };
+    expect(feeWaiversFromWire({ waivers: [row] })).toEqual([row]);
+    expect(feeWaiversFromWire({ items: [snake, { businessName: "no id" }] })).toEqual([
+      { businessId: "b-2", businessName: "Cafe", createdAt: null },
+    ]);
+    expect(feeWaiversFromWire({ data: [] })).toEqual([]);
+    expect(feeWaiversFromWire(null)).toEqual([]);
+  });
+
+  it("adds with PUT and removes with DELETE on the encoded business id", async () => {
+    await client.addFeeWaiver("b/1");
+    await client.removeFeeWaiver("b/1");
+    expect(calls.map((c) => [c.method, c.url.pathname])).toEqual([
+      ["PUT", "/v2/treasury/fee-waivers/b%2F1"],
+      ["DELETE", "/v2/treasury/fee-waivers/b%2F1"],
+    ]);
+    expect(calls[0].body).toBeUndefined();
+  });
+
+  it("surfaces a 404 (api without the route) as CitizenPayApiError", async () => {
+    reply = { status: 404, body: { error: "not found" } };
+    const err = await feeWaivers.list(creds).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(CitizenPayApiError);
+    expect((err as CitizenPayApiError).status).toBe(404);
   });
 });

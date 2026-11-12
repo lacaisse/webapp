@@ -2795,12 +2795,38 @@
         "description": "Commission prélevée sur les paiements aux commerces. Configurée ici, puis transmise à Citizen Pay.",
         "rate": "Taux de commission (%)",
         "rateHint": "Pourcentage prélevé sur chaque paiement (ex. 2,5 pour 2,5 %). Laissez vide pour utiliser le taux par défaut de Citizen Pay.",
+        "fixedFee": "Frais fixes par commande (€)",
+        "fixedFeeHint": "Montant prélevé sur chaque commande, en plus du taux (ex. 0,10). Laissez vide pour ne pas appliquer de frais fixes. Maximum 10 €.",
         "frequency": "Fréquence de prélèvement",
         "frequencyHint": "À chaque paiement, ou une seule fois en fin de mois. Le prélèvement lui-même est effectué par Citizen Pay.",
         "frequencyPerPayment": "À chaque paiement",
         "frequencyMonthly": "Mensuel (fin de mois)",
         "syncPending": "Enregistré localement, mais pas encore confirmé par Citizen Pay. Enregistrez à nouveau pour réessayer la synchronisation.",
-        "syncFailed": "Taux enregistré, mais la synchronisation avec Citizen Pay a échoué. Enregistrez à nouveau pour réessayer."
+        "syncFailed": "Frais enregistrés, mais la synchronisation avec Citizen Pay a échoué. Enregistrez à nouveau pour réessayer.",
+        "waivers": {
+          "title": "Commerces exemptés des frais fixes",
+          "description": "Ces commerces ne paient pas les frais fixes par commande. Le taux ci-dessus leur reste appliqué.",
+          "empty": "Aucun commerce n'est exempté pour l'instant.",
+          "places": "Points de vente : {places}",
+          "business": "Commerce",
+          "businessPlaceholder": "Choisissez un commerce…",
+          "add": "Exempter",
+          "adding": "Enregistrement…",
+          "remove": "Retirer l'exemption",
+          "confirmRemove": "{business} paiera à nouveau les frais fixes sur ses prochaines commandes. Les commandes passées ne changent pas.",
+          "noMerchants": "Aucun commerce de la caisse n'est encore connecté à Citizen Pay : il n'y a donc rien à exempter.",
+          "allExempt": "Tous les commerces de la caisse sont déjà exemptés.",
+          "notConnected": "Connectez la caisse à Citizen Pay pour gérer les exemptions.",
+          "unavailable": "Citizen Pay ne gère pas encore les exemptions pour cette caisse. Réessayez après sa prochaine mise à jour.",
+          "loadFailed": "Impossible de charger les exemptions depuis Citizen Pay. Rechargez la page pour réessayer.",
+          "errors": {
+            "notFound": "Ce commerce ne fait pas partie des commerces de la caisse.",
+            "notAccepting": "Ce commerce n'accepte pas (ou plus) le jeton de la caisse : il ne peut pas être exempté.",
+            "notConnected": "La caisse n'est pas connectée à Citizen Pay.",
+            "unavailable": "Citizen Pay ne gère pas encore les exemptions pour cette caisse.",
+            "failed": "Citizen Pay n'a pas accepté la modification. Réessayez dans un instant."
+          }
+        }
       },
       "emails": {
         "title": "E-mails aux membres",
@@ -3067,6 +3093,8 @@
       "urlInvalid": "Saisissez une URL valide (doit commencer par http:// ou https://).",
       "feeInvalid": "Le taux doit être un nombre avec jusqu'à 2 décimales.",
       "feeTooHigh": "Le taux ne peut pas dépasser 100 %.",
+      "fixedFeeInvalid": "Les frais fixes doivent être un montant en euros avec au plus 2 décimales (ex. 0,10).",
+      "fixedFeeTooHigh": "Les frais fixes ne peuvent pas dépasser 10 €.",
       "cutoffDayInvalid": "Le jour de clôture doit être un entier entre 1 et 31.",
       "nameTooLong": "Le nom est trop long.",
       "embedDomainInvalid": "Saisissez un domaine par ligne (exemple.org, *.exemple.org, localhost:3000).",

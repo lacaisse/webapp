@@ -21,6 +21,8 @@ import { isSupportedLocale } from "@/services/i18n/config";
 import { Erc20MetadataError, readErc20Metadata } from "@/services/token/erc20-metadata";
 import { EXTRA_TOKENS_BY_CHAIN } from "@/services/token/extra-tokens";
 
+import { euroToCents, payoutFixedFeeField } from "./fee-schema";
+
 export type SettingsResult = { ok: true } | { error: string };
 
 // --- Onboarding toggles --------------------------------------------------
@@ -434,15 +436,21 @@ export async function updateReferralSettingsAction(
 }
 
 // --- Payout fee ----------------------------------------------------------
-// Per-fund platform fee on merchant payments: the rate, and the cadence at
-// which CitizenPay collects it (per payment, or once at month end — the
-// collection itself runs CP-side, we only mirror the choice). We are
-// canonical for both: persist locally first (the DB may lead CP), then push
-// rate + cadence together in one call. A failed push leaves
-// `payoutFeeSynced = false` and returns a warning so the admin can retry by
-// saving again. Clearing the rate stores null (keeping the cadence locally)
-// and skips the push — the assumed CP endpoint takes a concrete bps value,
-// not a "reset to default" signal.
+// Per-fund platform fee on merchant payments: the rate, the cadence at which
+// CitizenPay collects it (per payment, or once at month end — the collection
+// itself runs CP-side, we only mirror the choice) and a fixed fee per order
+// (integer cents). We are canonical for all three: persist locally first (the
+// DB may lead CP), then push them together in one PATCH. A failed push — or a
+// response that doesn't echo the fixed fee we sent, which is how an api that
+// predates the field answers — leaves `payoutFeeSynced = false` and returns
+// a warning so the admin can retry by saving again.
+//
+// When to push: whenever there is a rate OR a non-zero fixed fee, and also
+// when the fixed fee was non-zero and is being cleared, so the 0 reaches CP.
+// Without a local rate the PATCH carries the fixed fee alone (no rate, no
+// cadence), so a rate CP holds is never reset to 0 from here. With no rate and no
+// fixed fee before or after, nothing is pushed (the cadence stays stored
+// locally and rides along with the next push), exactly as before.
 
 export type FeeSettingsResult =
   | { ok: true; warning?: string }
@@ -459,10 +467,13 @@ const PayoutFeeSchema = z.object({
   // Optional: callers that don't send it keep whatever the fund already has
   // (so an older client can't silently reset a fund to per-payment).
   feeCollectionFrequency: z.enum(["PER_PAYMENT", "MONTHLY"]).optional(),
+  // Euros as typed ("0.10"); "" / null = none. Optional for the same reason
+  // as the cadence: not sent = keep the stored value.
+  payoutFixedFee: payoutFixedFeeField,
 });
 
 export async function updatePayoutFeeAction(
-  input: z.infer<typeof PayoutFeeSchema>,
+  input: z.input<typeof PayoutFeeSchema>,
 ): Promise<FeeSettingsResult> {
   const t = await getTranslations();
   const { fund } = await requireFundRole("ADMIN");
@@ -474,32 +485,55 @@ export async function updatePayoutFeeAction(
   const raw = parsed.data.payoutFeePercentage;
   const value = raw && raw !== "" ? raw : null;
   const frequency = parsed.data.feeCollectionFrequency ?? fund.feeCollectionFrequency;
+  const previousFixedCents = fund.payoutFixedFeeCents;
+  const rawFixed = parsed.data.payoutFixedFee;
+  const fixedFeeCents =
+    rawFixed === undefined
+      ? previousFixedCents
+      : rawFixed
+        ? euroToCents(rawFixed)
+        : 0;
+
+  const mustPush = value !== null || fixedFeeCents > 0 || previousFixedCents > 0;
 
   // DB-first: the local values are authoritative even if the CP push fails.
-  // Mark unsynced up front; flip to synced only once CP accepts them.
+  // Mark unsynced up front; flip to synced only once CP confirms them.
   await prisma.fund.update({
     where: { id: fund.id },
     data: {
       payoutFeePercentage: value,
       feeCollectionFrequency: frequency,
-      payoutFeeSynced: value === null,
+      payoutFixedFeeCents: fixedFeeCents,
+      payoutFeeSynced: !mustPush,
     },
   });
 
-  // Nothing to push when the rate is cleared — the cadence alone isn't a
-  // valid fee config for the assumed CP endpoint. It stays stored locally
-  // and rides along with the next push that sets a rate.
-  if (value === null) {
+  if (!mustPush) {
     revalidatePath("/settings");
     return { ok: true };
   }
 
   try {
     const client = getCitizenPayClient(fund);
-    await client.setPayoutFeeConfig({
+    const echo = await client.setPayoutFeeConfig({
       percent: value,
       collectionFrequency: frequency,
+      fixedFeeCents,
     });
+    // Synced only when CP stored the fixed fee we sent. An api that
+    // predates the field echoes nothing (null): fine for a 0 — it can't
+    // charge a fixed fee at all — but a non-zero fee did not land.
+    const landed =
+      echo.fixedFeeCents === fixedFeeCents ||
+      (echo.fixedFeeCents === null && fixedFeeCents === 0);
+    if (!landed) {
+      console.warn("[settings] payout fixed fee not echoed by CP", fund.id, {
+        sent: fixedFeeCents,
+        echoed: echo.fixedFeeCents,
+      });
+      revalidatePath("/settings");
+      return { ok: true, warning: t("fund.settings.fees.syncFailed") };
+    }
     await prisma.fund.update({
       where: { id: fund.id },
       data: { payoutFeeSynced: true },
