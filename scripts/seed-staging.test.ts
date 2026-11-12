@@ -9,6 +9,7 @@ import {
   SEED_FUNDS,
   SEED_USER_EMAILS,
   SeedRefused,
+  upsertUser,
 } from "./seed-staging";
 
 describe("seed-staging guards", () => {
@@ -87,5 +88,71 @@ describe("runSeed", () => {
     expect(log).toHaveBeenCalledTimes(1);
     expect(log.mock.calls[0]![0]).toMatch(/^Synthetic seed skipped/);
     log.mockRestore();
+  });
+});
+
+// upsertUser's password handling on an in-memory user / account / session store.
+function accountsDb() {
+  const state = {
+    accounts: [] as { id: string; userId: string; providerId: string; password: string | null }[],
+    sessions: [{ id: "s1", userId: "u1" }] as { id: string; userId: string }[],
+    writes: 0,
+  };
+  const db = {
+    user: { findUnique: async () => ({ id: "u1" }), create: async () => ({ id: "u1" }) },
+    account: {
+      findFirst: async ({ where }: { where: { userId: string; providerId: string } }) =>
+        state.accounts.find((a) => a.userId === where.userId && a.providerId === where.providerId) ?? null,
+      create: async ({ data }: { data: { userId: string; providerId: string; password: string } }) => {
+        state.writes++;
+        state.accounts.push({ id: `a${state.accounts.length}`, ...data });
+      },
+      update: async ({ where, data }: { where: { id: string }; data: { password: string } }) => {
+        state.writes++;
+        state.accounts.find((a) => a.id === where.id)!.password = data.password;
+      },
+      deleteMany: async ({ where }: { where: { userId: string; providerId: string } }) => {
+        const before = state.accounts.length;
+        state.accounts = state.accounts.filter(
+          (a) => !(a.userId === where.userId && a.providerId === where.providerId),
+        );
+        const count = before - state.accounts.length;
+        if (count) state.writes++;
+        return { count };
+      },
+    },
+    session: {
+      deleteMany: async ({ where }: { where: { userId: string } }) => {
+        state.writes++;
+        state.sessions = state.sessions.filter((x) => x.userId !== where.userId);
+        return { count: 1 };
+      },
+    },
+  };
+  return { db: db as never, state };
+}
+
+describe("upsertUser passwords", () => {
+  it("sets, keeps, then removes the password when the variable is unset", async () => {
+    const { db, state } = accountsDb();
+    await upsertUser(db, "owner.alpha@example.org", "Test", "first-fake-pw");
+    expect(state.accounts).toHaveLength(1);
+    const hash = state.accounts[0]!.password;
+
+    // Same password again: the stored hash verifies, nothing is written.
+    const writes = state.writes;
+    await upsertUser(db, "owner.alpha@example.org", "Test", "first-fake-pw");
+    expect(state.writes).toBe(writes);
+    expect(state.accounts[0]!.password).toBe(hash);
+
+    // Variable removed: the credential account and the sessions go.
+    await upsertUser(db, "owner.alpha@example.org", "Test", null);
+    expect(state.accounts).toHaveLength(0);
+    expect(state.sessions).toHaveLength(0);
+
+    // And again: idempotent, nothing written.
+    const after = state.writes;
+    await upsertUser(db, "owner.alpha@example.org", "Test", null);
+    expect(state.writes).toBe(after);
   });
 });

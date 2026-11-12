@@ -25,7 +25,7 @@ docker build -t lacaisse-webapp .
 | Port | `3000` (`PORT`), on `0.0.0.0` (`HOSTNAME`, set in the image) |
 | Command | `node server.js` (Next's standalone server) |
 | Liveness | `GET /api/health`: 200 `{"ok":true}`, no database |
-| Readiness | `GET /api/health/ready`: 200 when the database answers `SELECT 1` within 2 s, 503 otherwise. At most one `SELECT 1` is in flight; concurrent checks share it, so a hung database holds one connection. Use this one for the runner's `health.path` |
+| Readiness | `GET /api/health/ready`: 200 when the database answers `SELECT 1` within 2 s, 503 otherwise. The probe runs on its own connection (same URL and TLS), with a 2 s client-side bound on connecting and on the query, and is closed afterwards; concurrent checks share one probe, and a probe past its deadline is dropped so the next check starts fresh. Use this one for the runner's `health.path` |
 | Stop | `SIGTERM`: Next stops accepting connections, finishes in-flight requests and pending `after()` callbacks, then exits with 143 |
 | User | `node` (uid 1000) |
 
@@ -49,6 +49,7 @@ The seed:
 - needs `APP_CRED_KEY` (exit 1 without it, nothing written);
 - skips (exit 0, one line "Synthetic seed skipped", nothing written) when the database holds any fund or any user it did not create (seeded funds have fixed ids, seeded users fixed `example.org` addresses). A fund or an account created by hand on staging therefore stops the seeding but not the deploys;
 - is idempotent: a second run writes nothing, passwords included (a stored hash that already verifies is kept).
+- removes passwords it set before: on a run with `SEED_STAFF_PASSWORD` (or `SEED_ADMIN_PASSWORD`) unset, the seeded staff (or the seeded admin) lose their credential account and their sessions, so an old password stops working. Only the seed's own `example.org` users are touched.
 
 What the seed creates: three funds (`alpha.lacaisse.eu` and `beta.lacaisse.eu`, served at `alpha.<APP_DOMAIN>` and `beta.<APP_DOMAIN>`, and `caisse-gamma.example.org` as a custom domain value; alpha has member login on; beta's hosting subscription is left to accept, the others are waived), an OWNER and an OPERATOR per fund (`owner.alpha@example.org`, `operator.alpha@example.org`, and so on; password `SEED_STAFF_PASSWORD` when set), a platform admin (`platform-admin@example.org`, `User.globalRole` ADMIN; password `SEED_ADMIN_PASSWORD` when set, never the staff one), members with cards, spare cards, tiers and merchants. All names say "Synthetic" or "Test"; all addresses are under `example.org`. Each fund gets a fake Citizen Pay treasury id (so the crons pick it up in mock mode) and two encrypted cells (a fake API key and a freshly generated minter key that holds nothing), so a key rotation has something to re-encrypt.
 

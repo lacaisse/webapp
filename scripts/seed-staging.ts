@@ -29,7 +29,8 @@
 // API key and a freshly generated, never-funded minter key).
 //
 // Passwords, both optional (unset = the account has no password; with email
-// disabled on staging it then cannot sign in):
+// disabled on staging it then cannot sign in). Unsetting one later removes
+// the password (credential account) an earlier run gave those users:
 //   SEED_STAFF_PASSWORD  the seeded fund staff (OWNER / OPERATOR)
 //   SEED_ADMIN_PASSWORD  the seeded platform admin (User.globalRole ADMIN)
 //
@@ -162,7 +163,7 @@ export function foreignUserEmails(existingEmails: string[]): string[] {
 
 type Db = PrismaClient;
 
-async function upsertUser(
+export async function upsertUser(
   db: Db,
   email: string,
   name: string,
@@ -175,7 +176,15 @@ async function upsertUser(
       data: { email, name, emailVerified: true, globalRole },
       select: { id: true },
     }));
-  if (password) {
+  if (!password) {
+    // No password in the bundle (any more): a password set by an earlier run
+    // must stop working. Remove this seeded user's credential account and,
+    // when there was one, its sessions. Nothing to remove = nothing written.
+    const removed = await db.account.deleteMany({
+      where: { userId: user.id, providerId: "credential" },
+    });
+    if (removed.count > 0) await db.session.deleteMany({ where: { userId: user.id } });
+  } else {
     // Better Auth's credential account: accountId = the user id. Written
     // only when missing or when the stored hash does not verify `password`.
     const existing = await db.account.findFirst({

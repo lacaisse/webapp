@@ -6,8 +6,11 @@ vi.mock("next/server", async (orig) => ({
   ...(await orig<typeof import("next/server")>()),
   connection: vi.fn(async () => undefined),
 }));
-const { prisma } = vi.hoisted(() => ({ prisma: { $queryRaw: vi.fn() } }));
-vi.mock("@/services/db/prisma", () => ({ prisma }));
+// The probe itself (its own bounded pg connection) is stubbed; this file
+// checks the route and the sharing / deadline logic around it.
+const { probe } = vi.hoisted(() => ({ probe: { selectOne: vi.fn() } }));
+vi.mock("@/services/db/health-probe", () => probe);
+const prisma = { $queryRaw: probe.selectOne };
 
 import { GET } from "./route";
 import { GET as LIVE } from "../route";
@@ -61,20 +64,24 @@ describe("GET /api/health/ready", () => {
     await vi.advanceTimersByTimeAsync(0);
   });
 
-  it("keeps at most one SELECT 1 in flight while the database hangs", async () => {
+  it("shares one probe between concurrent checks", async () => {
     vi.useFakeTimers();
     let release!: (v: unknown) => void;
     prisma.$queryRaw.mockReturnValue(new Promise((r) => (release = r)));
     const calls = [GET(), GET(), GET()];
-    await vi.advanceTimersByTimeAsync(2_000);
-    const later = GET();
-    await vi.advanceTimersByTimeAsync(2_000);
-    for (const res of await Promise.all([...calls, later])) expect(res.status).toBe(503);
+    release(undefined);
+    for (const res of await Promise.all(calls)) expect(res.status).toBe(200);
     expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
-    // Once it settles, the next check runs a fresh query.
-    release([{ "?column?": 1 }]);
-    await vi.advanceTimersByTimeAsync(0);
-    prisma.$queryRaw.mockResolvedValue([{ "?column?": 1 }]);
+  });
+
+  it("after a probe that never settles, the next check starts a fresh one and can answer 200", async () => {
+    vi.useFakeTimers();
+    prisma.$queryRaw.mockReturnValueOnce(new Promise(() => {})); // never settles
+    const first = GET();
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect((await first).status).toBe(503);
+
+    prisma.$queryRaw.mockResolvedValueOnce(undefined); // the database is back
     expect((await GET()).status).toBe(200);
     expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
   });

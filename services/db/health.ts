@@ -1,38 +1,36 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import "server-only";
 
-import { prisma } from "./prisma";
+import { selectOne } from "./health-probe";
 
 export const READY_TIMEOUT_MS = 2_000;
 
 // At most one `SELECT 1` in flight per process: callers that arrive while it
-// runs wait for the same query (each with its own deadline). A database that
-// hangs therefore holds one pool connection, not one per health poll.
+// runs wait for the same query (each with its own deadline). The query runs
+// on its own short-lived connection, bounded on the client side
+// (./health-probe.ts), so it always settles; and a caller whose deadline
+// passes drops the shared probe, so the next check starts a fresh one even
+// if the old one somehow never settles.
 let pendingProbe: Promise<unknown> | null = null;
 
-function probe(): Promise<unknown> {
+function probe(timeoutMs: number): Promise<unknown> {
   if (!pendingProbe) {
-    // A plain promise around Prisma's lazy one: started once, shared.
-    const query: Promise<unknown> = (async () => prisma.$queryRaw`SELECT 1`)();
+    const query: Promise<unknown> = selectOne(timeoutMs);
     pendingProbe = query;
     // Cleared when it settles, whoever still waits. The no-op catch keeps a
     // failure nobody awaits any more (every caller timed out) from becoming
     // an unhandled rejection.
-    query.then(
-      () => {
-        pendingProbe = null;
-      },
-      () => {
-        pendingProbe = null;
-      },
-    );
+    const clear = () => {
+      if (pendingProbe === query) pendingProbe = null;
+    };
+    query.then(clear, clear);
   }
   return pendingProbe;
 }
 
 /**
- * `SELECT 1` against the app's own Prisma client (same pool, same TLS
- * settings as every query), bounded by `timeoutMs`. Never throws: a failure
+ * `SELECT 1` against the app's database (same URL and TLS settings as the
+ * Prisma client, its own bounded connection), within `timeoutMs`. Never throws: a failure
  * or a timeout is `false`, with the reason logged.
  */
 export async function databaseReady(timeoutMs = READY_TIMEOUT_MS): Promise<boolean> {
@@ -41,8 +39,10 @@ export async function databaseReady(timeoutMs = READY_TIMEOUT_MS): Promise<boole
     timer = setTimeout(() => resolve("timeout"), timeoutMs);
   });
   try {
-    const result = await Promise.race([probe(), timeout]);
+    const p = probe(timeoutMs);
+    const result = await Promise.race([p, timeout]);
     if (result === "timeout") {
+      if (pendingProbe === p) pendingProbe = null;
       console.error(`[health] database did not answer within ${timeoutMs} ms`);
       return false;
     }
