@@ -25,5 +25,13 @@ const nextConfig: NextConfig = {
   },
 };
 
+// Container builds (Dockerfile, docs/container.md) set NEXT_OUTPUT=standalone
+// to get a self-contained `server.js` with traced node_modules. Anything else
+// (Vercel, CI, local) leaves the variable unset and gets exactly the object
+// above: no `output` key at all, not even `undefined`.
+if (process.env.NEXT_OUTPUT === "standalone") {
+  nextConfig.output = "standalone";
+}
+
 const withNextIntl = createNextIntlPlugin();
 export default withNextIntl(nextConfig);

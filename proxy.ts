@@ -2,6 +2,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/services/db/prisma";
 import { toCanonicalFundDomain } from "@/services/fund/host";
+import { isPlatformPath } from "@/services/host/platform-paths";
 import {
   LOCALE_COOKIE,
   LOCALE_COOKIE_OPTIONS,
@@ -76,6 +77,18 @@ export async function proxy(request: NextRequest) {
   request.headers.set("x-pathname", request.nextUrl.pathname);
   if (request.nextUrl.search) {
     request.headers.set("x-search", request.nextUrl.search);
+  }
+
+  // Platform endpoints (docs/container.md): liveness / readiness and the
+  // routes the self-hosted runner calls with the cron bearer. They don't
+  // depend on the host, and the platform may call them with any Host (the
+  // container's address, the apex): skip the host classification so they
+  // never wait on, or fail with, the fund lookup — `/api/health` must answer
+  // without the database. No `?lang=` redirect either.
+  if (isPlatformPath(request.nextUrl.pathname)) {
+    const response = NextResponse.next({ request });
+    response.headers.set("Content-Security-Policy", "frame-ancestors 'self'");
+    return response;
   }
 
   // `?lang=` from another origin (the Citizen Pay wallet's "Add funds" link):

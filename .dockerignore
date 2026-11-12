@@ -1,0 +1,30 @@
+# Build context for the container image (Dockerfile, docs/container.md).
+# Never send env files, local state or build output to the builder.
+# (.dockerignore patterns match from the context root; **/ reaches
+# every directory.)
+**/.env
+**/.env.*
+!.env.example
+**/*.pem
+**/*.key
+**/*.p12
+**/.npmrc
+.vscode
+.idea
+.git
+.github
+.claude
+.vercel
+.next
+.bench
+node_modules
+coverage
+out
+build
+services/db/generated
+app/licenses/data.json
+npm-debug.log*
+*.tsbuildinfo
+next-env.d.ts
+Dockerfile
+.dockerignore

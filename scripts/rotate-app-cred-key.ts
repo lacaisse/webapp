@@ -55,16 +55,10 @@ import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 
 import { PrismaClient } from "../services/db/generated/client";
+import { pgTlsConfig } from "../services/db/tls";
 
-import {
-  countOutcome,
-  emptyCounts,
-  parseHexKey,
-  rotateEnvelope,
-  signerBinding,
-  type ColumnCounts,
-  type RowOutcome,
-} from "./lib/app-cred-rotation";
+import { parseHexKey } from "./lib/app-cred-rotation";
+import { applyRotation, scanRotation } from "./lib/app-cred-rotation-db";
 
 const APPLY = process.argv.includes("--apply");
 
@@ -93,100 +87,11 @@ if (keys.current.equals(keys.previous)) {
 }
 
 const prisma = new PrismaClient({
-  adapter: new PrismaPg({ connectionString: DATABASE_URL }),
+  adapter: new PrismaPg(pgTlsConfig(DATABASE_URL, process.env.DATABASE_CA_CERT)),
 });
 
-type FundColumn =
-  | "tokenMinterPrivateKeyEnc"
-  | "citizenPayApiKeyEnc"
-  | "citizenPayEventsSecretEnc";
-const FUND_COLUMNS: FundColumn[] = [
-  "tokenMinterPrivateKeyEnc",
-  "citizenPayApiKeyEnc",
-  "citizenPayEventsSecretEnc",
-];
-
-type Planned =
-  | { table: "Fund"; id: string; column: FundColumn; from: string; to: string }
-  | {
-      table: "FundSigner";
-      id: string;
-      fundId: string;
-      userId: string;
-      column: "privateKeyEnc";
-      from: string;
-      to: string;
-    };
-
-type Failure = { table: string; id: string; column: string; reason: string };
-
 async function main() {
-  const counts = new Map<string, ColumnCounts>();
-  const planned: Planned[] = [];
-  const failures: Failure[] = [];
-
-  const record = (
-    table: "Fund" | "FundSigner",
-    column: string,
-    id: string,
-    outcome: RowOutcome,
-  ) => {
-    const label = `${table}.${column}`;
-    const c = counts.get(label) ?? emptyCounts();
-    countOutcome(c, outcome);
-    counts.set(label, c);
-    if (outcome.status === "failed") {
-      failures.push({ table, id, column, reason: outcome.reason });
-    }
-  };
-
-  const funds = await prisma.fund.findMany({
-    where: {
-      OR: FUND_COLUMNS.map((column) => ({ [column]: { not: null } })),
-    },
-    select: {
-      id: true,
-      tokenMinterPrivateKeyEnc: true,
-      citizenPayApiKeyEnc: true,
-      citizenPayEventsSecretEnc: true,
-    },
-    orderBy: { id: "asc" },
-  });
-  for (const column of FUND_COLUMNS) counts.set(`Fund.${column}`, emptyCounts());
-  for (const fund of funds) {
-    for (const column of FUND_COLUMNS) {
-      const from = fund[column];
-      if (!from) continue;
-      const outcome = rotateEnvelope(from, keys);
-      record("Fund", column, fund.id, outcome);
-      if (outcome.status === "migrate") {
-        planned.push({ table: "Fund", id: fund.id, column, from, to: outcome.next });
-      }
-    }
-  }
-
-  const signers = await prisma.fundSigner.findMany({
-    where: { privateKeyEnc: { not: null } },
-    select: { id: true, fundId: true, userId: true, privateKeyEnc: true },
-    orderBy: { id: "asc" },
-  });
-  counts.set("FundSigner.privateKeyEnc", emptyCounts());
-  for (const signer of signers) {
-    const from = signer.privateKeyEnc!;
-    const outcome = rotateEnvelope(from, keys, signerBinding(signer.fundId, signer.userId));
-    record("FundSigner", "privateKeyEnc", signer.id, outcome);
-    if (outcome.status === "migrate") {
-      planned.push({
-        table: "FundSigner",
-        id: signer.id,
-        fundId: signer.fundId,
-        userId: signer.userId,
-        column: "privateKeyEnc",
-        from,
-        to: outcome.next,
-      });
-    }
-  }
+  const { counts, planned, failures } = await scanRotation(prisma, keys);
 
   console.log(`${APPLY ? "APPLY" : "DRY RUN"} — APP_CRED_KEY rotation`);
   console.log("");
@@ -232,36 +137,9 @@ async function main() {
     return;
   }
 
-  // One transaction. Each update is conditioned on the cell still holding
-  // the envelope we read; a count of 0 means the row changed underneath and
-  // the whole batch rolls back.
-  await prisma.$transaction(
-    async (tx) => {
-      for (const row of planned) {
-        const result =
-          row.table === "Fund"
-            ? await tx.fund.updateMany({
-                where: { id: row.id, [row.column]: row.from },
-                data: { [row.column]: row.to },
-              })
-            : await tx.fundSigner.updateMany({
-                where: {
-                  id: row.id,
-                  fundId: row.fundId,
-                  userId: row.userId,
-                  privateKeyEnc: row.from,
-                },
-                data: { privateKeyEnc: row.to },
-              });
-        if (result.count !== 1) {
-          throw new Error(
-            `${row.table}.${row.column} id=${row.id} changed while rotating (matched ${result.count}) — rolled back, re-run`,
-          );
-        }
-      }
-    },
-    { maxWait: 10_000, timeout: 120_000 },
-  );
+  // One transaction, each update conditioned on the cell still holding the
+  // envelope we read; a changed row rolls the whole batch back.
+  await applyRotation(prisma, planned);
 
   console.log(`Re-encrypted ${totalMigrate} row(s) under APP_CRED_KEY.`);
   console.log("Run the dry run again: it must report 0 to migrate and 0 failed before");
