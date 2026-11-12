@@ -23,14 +23,10 @@ export async function databaseReady(timeoutMs = READY_TIMEOUT_MS): Promise<boole
     }
     return true;
   } catch (e) {
-    // Driver-adapter errors often carry an empty message and the reason
-    // (refused, TLS verification, auth) in `cause`. Never the URL.
-    const err = e as { message?: string; name?: string; cause?: { message?: string; code?: string } };
-    console.error(
-      "[health] database check failed:",
-      err.message || err.name || "unknown error",
-      err.cause?.message ?? err.cause?.code ?? "",
-    );
+    // The whole error: driver-adapter errors often carry an empty message
+    // and the reason (refused, TLS verification, auth) in nested fields.
+    // Neither Prisma nor pg puts the connection string in them.
+    console.error("[health] database check failed:", e);
     return false;
   } finally {
     clearTimeout(timer);
