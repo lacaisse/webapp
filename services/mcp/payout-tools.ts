@@ -205,7 +205,7 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
     "list_payouts",
     {
       description:
-        "Payouts that already exist, with their id, place, period, totals and live status: `pending` (created), `payment-pending` (bank transfer created, not yet accepted by the bank), `burnt` (burn recorded), `complete` (Citizen Pay sets it within seconds of the bank accepting the signed transfer, burned or not). The burn must be recorded before the transfer is signed; get_payout's `burnOutstanding` flags a payout where it is not. Use it to find the `payoutId` every other payout tool needs. Requires ADMIN.",
+        "Payouts that already exist, with their id, place, period, totals and live status: `pending` (created), `payment-pending` (bank transfer created, not yet accepted by the bank), `burnt` (burn recorded), `complete` (Citizen Pay sets it within seconds of the bank accepting the signed transfer, burned or not). The burn must be finished (burn_payout returned success, or status `burnt`) before the transfer is signed; get_payout's `burnOutstanding` flags a `payment-pending` payout where it is not. On a `complete` payout this list cannot tell whether it was burned; get_payout reports `burnRecorded: null` when it cannot either. Use it to find the `payoutId` every other payout tool needs. Requires ADMIN.",
       inputSchema: {
         fund: FUND_PARAM,
         state: z
@@ -289,7 +289,7 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
         currency: "EUR",
         status: "pending",
         backing,
-        hint: "Next: get_payout to review, fix_payout_orders for any unconfirmed orders, then pay_payout (creates the transfer, returns the signing link — do not hand it over yet), then burn_payout, and only once the burn is recorded give the operator the signing link.",
+        hint: "Next: get_payout to review, fix_payout_orders for any unconfirmed orders, then pay_payout (creates the transfer, returns the signing link — do not hand it over yet), then burn_payout, and only once burn_payout has returned success (or get_payout shows status `burnt` with no `burnClaim`) give the operator the signing link.",
       });
     }),
   );
@@ -298,7 +298,7 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
     "get_payout",
     {
       description:
-        "Everything about one payout: totals (gross / processor fees withheld at source / platform payout fees / manual deduction / net, where net = total − fees − payoutFees − manualDeduction), the live status, the bank signing link while a payment exists (`payment-pending`), `burnRecorded` (a burn hash is on the payout), `burnOutstanding` (a payment exists or the payout is complete, and no burn is recorded — while `payment-pending`, burn_payout before the operator signs; once `complete`, Citizen Pay refuses the burn and it must be done by hand from the token page), whether the retained fee sweep is still outstanding, any burn attempt still in flight (`burnClaim`: never burn, and never let the operator sign, while it is set), `backing` while the payout is pending / payment-pending with no burn recorded (warnings, and `blocking` = pay_payout will refuse), and optionally the confirmed / issues split of its orders. Reading the status also nudges settlement forward on CitizenPay's side (an accepted payment completes the payout here). Requires ADMIN.",
+        "Everything about one payout: totals (gross / processor fees withheld at source / platform payout fees / manual deduction / net, where net = total − fees − payoutFees − manualDeduction), the live status, the bank signing link while a payment exists (`payment-pending`), `burnRecorded` (true = evidence of a burn: status `burnt` or a fee sweep done or pending; false = `pending` / `payment-pending` with no such evidence; null = `complete` with no evidence — Citizen Pay does not report burn hashes here, so whether it was burned cannot be determined by this tool), `burnOutstanding` (true only when `payment-pending` with no burn: run burn_payout before the operator signs), whether the retained fee sweep is still outstanding, any burn attempt still in flight (`burnClaim`: never burn, and never let the operator sign, while it is set), and, with `includeOrderCheck`, `backing` while the payout is pending / payment-pending with no burn (warnings, and `blocking` = pay_payout will refuse) and the confirmed / issues split of its orders. A `complete` payout with `burnRecorded: null`: Citizen Pay refuses burn and sweep on it; check the place wallet balance / token history on chain before any manual burn from the token page. Reading the status also nudges settlement forward on CitizenPay's side (an accepted payment completes the payout here). Requires ADMIN.",
       inputSchema: {
         fund: FUND_PARAM,
         payoutId: PAYOUT_ID,
@@ -306,7 +306,7 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
           .boolean()
           .default(false)
           .describe(
-            "Also verify every order's settlement hash on-chain and report the confirmed / issues split. Off by default because it costs one bundler round-trip per handful of orders — on a payout with hundreds of them, prefer list_payout_orders.",
+            "Also verify every order's settlement hash on-chain and report the confirmed / issues split, and run the backing check (`backing`). Off by default because it costs one bundler round-trip per handful of orders — on a payout with hundreds of them, prefer list_payout_orders.",
           ),
       },
     },
@@ -337,16 +337,22 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
               };
       }
 
-      const burnRecorded = (p.burnTxHashes ?? []).length > 0;
-      const burnOutstanding =
-        !burnRecorded &&
-        (detail.liveStatus === "payment-pending" || detail.liveStatus === "complete");
-      // The backing check only while it can still change what happens next.
-      // Burnt / complete payouts get none: the balance no longer applies and
-      // re-reading every shared hash there decides nothing.
+      // Evidence-based: the live client never fills burnTxHashes, so an empty
+      // list proves nothing. null = complete with no evidence (unknown).
+      const burnRecorded = ops.burnRecordedFrom({
+        status: detail.liveStatus,
+        burnTxHashes: p.burnTxHashes,
+        feeTransferTxHash: detail.feeTransferTxHash || p.feeTransferTxHash,
+        feeTransferPending: detail.feeTransferPending || p.feeTransferPending,
+      });
+      const burnOutstanding = burnRecorded === false && detail.liveStatus === "payment-pending";
+      // The backing check only on request (it reads every shared hash on
+      // chain) and only while it can still change what happens next.
+      const backingApplies =
+        burnRecorded === false &&
+        (detail.liveStatus === "pending" || detail.liveStatus === "payment-pending");
       const backing =
-        !burnRecorded &&
-        (detail.liveStatus === "pending" || detail.liveStatus === "payment-pending")
+        includeOrderCheck && backingApplies
           ? backingView(
               await ops.checkPayoutBacking(c, payoutId, {
                 payout: p,
@@ -377,11 +383,14 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
         ...(burnOutstanding
           ? {
               burnHint:
-                detail.liveStatus === "payment-pending"
-                  ? "No burn is recorded yet: run burn_payout now, and do not let the operator sign the transfer until it has succeeded."
-                  : "Paid at the bank and complete with no burn recorded: Citizen Pay refuses burn_payout and sweep_payout_fees on a complete payout. The tokens are still in the place wallet; an admin burns them by hand from the token page.",
+                "No burn is recorded yet: run burn_payout now, and do not let the operator sign the transfer until it has succeeded.",
             }
-          : {}),
+          : burnRecorded === null
+            ? {
+                burnHint:
+                  "Complete, and whether it was burned cannot be determined from this tool (Citizen Pay does not report burn hashes here). Citizen Pay refuses burn_payout and sweep_payout_fees on a complete payout. Before any manual burn from the token page, check the place wallet balance and token history on chain against this payout's net + retained cut.",
+              }
+            : {}),
         feeTransferPending: detail.feeTransferPending,
         feeTransferTxHash: detail.feeTransferTxHash,
         // Non-null while a burn attempt holds the payout and nothing is
@@ -394,7 +403,9 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
         ...(orders
           ? {}
           : {
-              hint: "Call list_payout_orders for the per-order breakdown and the on-chain verification of each one.",
+              hint: backingApplies
+                ? "The backing check did not run: call get_payout with `includeOrderCheck: true`, or list_payout_orders (per-order breakdown, on-chain verification of each one, and `backing`)."
+                : "Call list_payout_orders for the per-order breakdown and the on-chain verification of each one.",
             }),
       });
     }),
@@ -765,8 +776,8 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
         signingUrl: res.signingUrl,
         ...(res.backing.warnings.length > 0 ? { backing: backingView(res.backing) } : {}),
         hint: res.signingUrl
-          ? "Do NOT give this link to the operator yet: run burn_payout now, and hand the link over only once the burn is recorded (get_payout `burnRecorded`, no `burnClaim`). The transfer only goes out once they sign it at their bank."
-          : "No signing link came back. Re-read get_payout: the payment may already be signed, or the bank connection may not have payment initiation enabled. If no burn is recorded and the status is still payment-pending, run burn_payout.",
+          ? "Do NOT give this link to the operator yet: run burn_payout now, and hand the link over only once burn_payout has returned success (or get_payout shows status `burnt` with no `burnClaim`). The transfer only goes out once they sign it at their bank."
+          : "No signing link came back. Re-read get_payout: the payment may already be signed, or the bank connection may not have payment initiation enabled. If the status is still payment-pending (`burnOutstanding`), run burn_payout.",
       });
     }),
   );
@@ -775,7 +786,7 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
     "burn_payout",
     {
       description:
-        "IRREVERSIBLE. Burn the tokens backing a payout: destroys the payout's net from the merchant place's wallet with the fund's minter, reports the burn to CitizenPay (which marks the payout burnt), and sweeps the retained cut — the platform payout fees plus any manual deduction — to the fund's treasury account. Processor fees withheld at source are in neither figure; they never entered the wallet. Works while the payout is `pending` or `payment-pending`. Run it right after pay_payout and BEFORE the operator signs the transfer: Citizen Pay marks the payout `complete` within seconds of the bank accepting it and from then on refuses both the burn and the fee sweep. Never let the operator sign while this is running or while get_payout shows a `burnClaim`. A payout already `complete` with `burnOutstanding` cannot be burned here (it answers that the tokens are still in the place wallet) — an admin burns them by hand from the token page until Citizen Pay accepts burns on completed payouts. Refuses, burning nothing, when the place's wallet holds less than settlement removes (net + retained cut) — top up the place or adjust the deduction first. A second call is rejected — the burn first takes Citizen Pay's burn claim, so only one attempt can run. If it fails saying the burn may have been sent or another attempt is in progress, do NOT retry: an admin checks the chain and records or releases the attempt from the payout page. A timeout or dropped connection does NOT mean the burn failed — the burn can take over a minute and may still land. Never call this again after an unclear outcome; read get_payout instead (status `burnt`, or a non-null `burnClaim` = an attempt still in flight). Requires ADMIN.",
+        "IRREVERSIBLE. Burn the tokens backing a payout: destroys the payout's net from the merchant place's wallet with the fund's minter, reports the burn to CitizenPay (which marks the payout burnt), and sweeps the retained cut — the platform payout fees plus any manual deduction — to the fund's treasury account. Processor fees withheld at source are in neither figure; they never entered the wallet. Works while the payout is `pending` or `payment-pending`. Run it right after pay_payout and BEFORE the operator signs the transfer: Citizen Pay marks the payout `complete` within seconds of the bank accepting it and from then on refuses both the burn and the fee sweep. Never let the operator sign while this is running or while get_payout shows a `burnClaim`. A payout already `complete` cannot be burned here: with no evidence of a burn it answers that whether it was burned cannot be confirmed here, and the place wallet must be checked on chain (balance / token history) before an admin burns by hand from the token page. Refuses, burning nothing, when the place's wallet holds less than settlement removes (net + retained cut) — top up the place or adjust the deduction first. A second call is rejected — the burn first takes Citizen Pay's burn claim, so only one attempt can run. If it fails saying the burn may have been sent or another attempt is in progress, do NOT retry: an admin checks the chain and records or releases the attempt from the payout page. A timeout or dropped connection does NOT mean the burn failed — the burn can take over a minute and may still land. Never call this again after an unclear outcome; read get_payout instead (status `burnt`, or a non-null `burnClaim` = an attempt still in flight). Requires ADMIN.",
       inputSchema: {
         fund: FUND_PARAM,
         payoutId: PAYOUT_ID,

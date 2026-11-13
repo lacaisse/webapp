@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildBackingReport,
+  burnRecordedFrom,
   decodeTransferLogs,
   evaluateBalance,
   evaluateSharedSettlements,
@@ -44,7 +45,19 @@ describe("sharedSettlementGroups", () => {
       order({ id: 2, txHash: H1.toUpperCase().replace("0X", "0x"), total: "12.00", fees: "0.50" }),
       order({ id: 3, txHash: H2 }),
     ]);
-    expect(groups).toEqual([{ txHash: H1, orderIds: [1, 2], required: "23.00" }]);
+    expect(groups).toEqual([
+      { txHash: H1, orderIds: [1, 2], required: "23.00", minimum: "23.00" },
+    ]);
+  });
+
+  it("carries the lower bound total − fees − payoutFee", () => {
+    const groups = sharedSettlementGroups([
+      order({ id: 1, txHash: H1, total: "55.50", payoutFee: "0.94" }),
+      order({ id: 2, txHash: H1, total: "40.00", payoutFee: "0.88" }),
+    ]);
+    expect(groups).toEqual([
+      { txHash: H1, orderIds: [1, 2], required: "95.50", minimum: "93.68" },
+    ]);
   });
 
   it("never groups refund / correction / topup legs or hashless orders", () => {
@@ -76,9 +89,28 @@ describe("evaluateSharedSettlements", () => {
       txHash: H1,
       orderIds: [1, 2, 3, 4],
       required: "80.00",
+      minimum: "80.00",
       found: "20",
       verdict: "uncovered",
     });
+  });
+
+  it("covered when the tx credited total − fees − payoutFee (historical mints)", () => {
+    const groups = sharedSettlementGroups([
+      order({ id: 1, txHash: H1, total: "55.50", payoutFee: "0.94" }),
+      order({ id: 2, txHash: H1, total: "40.00", payoutFee: "0.88" }),
+    ]);
+    const map = (...amounts: string[]) => new Map([[H1, amounts.map((a) => mint(PLACE, a))]]);
+    expect(evaluateSharedSettlements(groups, map("54.56", "39.12"), OPTS)[0]).toMatchObject({
+      verdict: "covered",
+      required: "95.50",
+      minimum: "93.68",
+      found: "93.68",
+    });
+    // One cent below the lower bound is not.
+    expect(evaluateSharedSettlements(groups, map("54.56", "39.11"), OPTS)[0].verdict).toBe(
+      "uncovered",
+    );
   });
 
   it("a hash whose only transfer went to another account → uncovered, found 0", () => {
@@ -207,6 +239,7 @@ describe("buildBackingReport", () => {
     txHash: H1,
     orderIds: [1, 2, 3, 4],
     required: "80.00",
+    minimum: "80.00",
     found: "20",
     verdict: "uncovered" as const,
   };
@@ -218,6 +251,16 @@ describe("buildBackingReport", () => {
     expect(r.warnings).toEqual([
       `Orders 1, 2, 3, 4 share settlement tx ${H1}: together they need 80.00 EURb credited to the place, but that tx moved only 20 EURb to the place account. Paying all of them overpays the merchant by up to 60.00 EURb (likely duplicate order rows).`,
     ]);
+  });
+
+  it("names the lower bound when the payout fee lowers it", () => {
+    const r = buildBackingReport({
+      settlements: [{ ...uncovered, minimum: "78.00" }],
+      balance: ok,
+      ordersRead: "ok",
+      symbol: "EURb",
+    });
+    expect(r.warnings[0]).toContain("need 80.00 EURb (at least 78.00 EURb where the mint left out the payout fee) credited");
   });
 
   it("blocks on an unverified group", () => {
@@ -263,5 +306,38 @@ describe("buildBackingReport", () => {
       expect(r.blocking).toBe(true);
       expect(r.warnings).toHaveLength(1);
     }
+  });
+});
+
+describe("burnRecordedFrom", () => {
+  it("evidence of a burn: hashes, status burnt, a fee sweep done or pending", () => {
+    expect(burnRecordedFrom({ status: "complete", burnTxHashes: [H1] })).toBe(true);
+    expect(burnRecordedFrom({ status: "burnt", burnTxHashes: [] })).toBe(true);
+    expect(burnRecordedFrom({ status: "complete", feeTransferTxHash: H2 })).toBe(true);
+    expect(burnRecordedFrom({ status: "complete", feeTransferPending: true })).toBe(true);
+  });
+
+  it("certainly none while pending / payment-pending with no evidence (outstanding)", () => {
+    expect(burnRecordedFrom({ status: "pending", burnTxHashes: [] })).toBe(false);
+    expect(
+      burnRecordedFrom({
+        status: "payment-pending",
+        burnTxHashes: [],
+        feeTransferTxHash: null,
+        feeTransferPending: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("unknown on a complete payout with no evidence (live client has no hashes)", () => {
+    expect(
+      burnRecordedFrom({
+        status: "complete",
+        burnTxHashes: [],
+        feeTransferTxHash: null,
+        feeTransferPending: false,
+      }),
+    ).toBeNull();
+    expect(burnRecordedFrom({ status: null })).toBeNull();
   });
 });

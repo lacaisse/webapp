@@ -18,7 +18,9 @@ import { fromCents, orderWalletCredit, payoutWalletOutflow, toCents } from "./mo
 //
 //   1. Shared settlement hashes. Orders that are not adjustment legs and that
 //      carry the same tx hash must, together, have credited the place their
-//      summed wallet credit (total − fees) in that one transaction. A real
+//      summed wallet credit (total − fees) in that one transaction — or at
+//      least total − fees − payoutFee, which is what historical mints
+//      credited (e.g. 55.50 with payoutFee 0.94 → 54.56 to the place). A real
 //      batch (one tx, N transfers to the place that add up) is `covered`; a
 //      duplicated row (one transfer for N orders, or a transfer that went to
 //      another account) is `uncovered`; a tx whose logs we could not read is
@@ -40,6 +42,8 @@ export type BackingOrder = {
   txHash: string | null;
   total: string;
   fees: string;
+  /** The order's platform payout fee (PayoutOrder.payoutFee); missing = 0. */
+  payoutFee?: string | null;
 };
 
 export type SharedSettlementGroup = {
@@ -48,6 +52,9 @@ export type SharedSettlementGroup = {
   orderIds: number[];
   /** Sum of the orders' wallet credits (total − fees), EUR decimal. */
   required: string;
+  /** Sum of total − fees − payoutFee: the least a historical mint credited
+   *  (some minted net of the payout fee). The verdict compares against it. */
+  minimum: string;
 };
 
 /** A decoded ERC-20 Transfer log. Addresses as they came (compared lower-cased). */
@@ -62,8 +69,10 @@ export type TokenTransfer = {
 export type SharedSettlementCheck = {
   txHash: string;
   orderIds: number[];
-  /** Token amount the orders need credited to the place. */
+  /** Token amount the orders need credited to the place (total − fees). */
   required: string;
+  /** Lower bound the verdict uses (total − fees − payoutFee). */
+  minimum: string;
   /** Token amount the tx moved to the place; null when unverified. */
   found: string | null;
   verdict: Coverage;
@@ -114,7 +123,13 @@ export function sharedSettlementGroups(
   for (const [txHash, list] of byHash) {
     if (list.length < 2) continue;
     const cents = list.reduce((sum, o) => sum + toCents(orderWalletCredit(o)), 0);
-    groups.push({ txHash, orderIds: list.map((o) => o.id), required: fromCents(cents) });
+    const feeCents = list.reduce((sum, o) => sum + toCents(o.payoutFee || "0"), 0);
+    groups.push({
+      txHash,
+      orderIds: list.map((o) => o.id),
+      required: fromCents(cents),
+      minimum: fromCents(cents - feeCents),
+    });
   }
   return groups;
 }
@@ -168,11 +183,13 @@ export function evaluateSharedSettlements(
     const foundUnits = transfers
       .filter((x) => x.token.toLowerCase() === t && x.to.toLowerCase() === to)
       .reduce((sum, x) => sum + x.value, BigInt(0));
-    const requiredUnits = parseUnits(g.required, decimals);
+    // Covered at the lower bound: historical mints credited total − fees −
+    // payoutFee, so the full total − fees would flag genuine batches.
+    const minimumUnits = parseUnits(g.minimum, decimals);
     return {
       ...g,
       found: formatUnits(foundUnits, decimals),
-      verdict: foundUnits >= requiredUnits ? ("covered" as const) : ("uncovered" as const),
+      verdict: foundUnits >= minimumUnits ? ("covered" as const) : ("uncovered" as const),
     };
   });
 }
@@ -233,8 +250,12 @@ export function buildBackingReport(args: {
     const ids = d.orderIds.join(", ");
     if (d.verdict === "uncovered") {
       const over = fromCents(toCents(d.required) - toCents(d.found ?? "0"));
+      const atLeast =
+        d.minimum !== d.required
+          ? ` (at least ${d.minimum}${sym} where the mint left out the payout fee)`
+          : "";
       warnings.push(
-        `Orders ${ids} share settlement tx ${d.txHash}: together they need ${d.required}${sym} credited to the place, but that tx moved only ${d.found ?? "0"}${sym} to the place account. Paying all of them overpays the merchant by up to ${over}${sym} (likely duplicate order rows).`,
+        `Orders ${ids} share settlement tx ${d.txHash}: together they need ${d.required}${sym}${atLeast} credited to the place, but that tx moved only ${d.found ?? "0"}${sym} to the place account. Paying all of them overpays the merchant by up to ${over}${sym} (likely duplicate order rows).`,
       );
     } else {
       warnings.push(
@@ -270,6 +291,34 @@ export function buildBackingReport(args: {
     warnings,
     settlements: [...args.settlements],
   };
+}
+
+/**
+ * Is a burn recorded on this payout? The live client never fills
+ * `burnTxHashes` (neither the list, the detail nor the status wire carries
+ * them), so an empty list proves nothing. Evidence of a burn: a hash, the live
+ * status `burnt`, or a fee sweep (done or pending — it only exists on a burned
+ * payout). `true` = evidence; `false` = certainly none (`pending` /
+ * `payment-pending` without evidence: CP would say `burnt`); `null` = cannot
+ * be told from here (`complete`, or an unknown status, without evidence — the
+ * place wallet / token history on chain decides).
+ */
+export function burnRecordedFrom(e: {
+  status: string | null | undefined;
+  burnTxHashes?: readonly string[] | null;
+  feeTransferTxHash?: string | null;
+  feeTransferPending?: boolean | null;
+}): boolean | null {
+  if (
+    (e.burnTxHashes?.length ?? 0) > 0 ||
+    e.status === "burnt" ||
+    !!e.feeTransferTxHash ||
+    e.feeTransferPending === true
+  ) {
+    return true;
+  }
+  if (e.status === "pending" || e.status === "payment-pending") return false;
+  return null;
 }
 
 /** One line per warning, for embedding in an error message. */

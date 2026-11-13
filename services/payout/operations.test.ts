@@ -720,6 +720,36 @@ describe("burnPayout — payment-pending and complete", () => {
     expect(burnDirect).not.toHaveBeenCalled();
   });
 
+  it("refuses a complete payout whose fee sweep ran (evidence of a burn; the live client has no hashes)", async () => {
+    cp.getPayoutStatus.mockResolvedValue({
+      status: "complete",
+      burnClaim: null,
+      feeTransferTxHash: "0xsweep",
+      feeTransferPending: false,
+    });
+    cp.getPayout.mockResolvedValue({
+      id: PAYOUT,
+      net: "48.75",
+      burnTxHashes: [],
+      feeTransferTxHash: null,
+      feeTransferPending: false,
+    } as unknown as Payout);
+    expect(await burnPayout(ctx, PAYOUT)).toEqual({ error: `${E}.notBurnable` });
+    expect(cp.claimPayoutBurn).not.toHaveBeenCalled();
+  });
+
+  it("refuses a complete payout with a sweep still pending on the payout row", async () => {
+    cp.getPayoutStatus.mockResolvedValue({ status: "complete", burnClaim: null });
+    cp.getPayout.mockResolvedValue({
+      id: PAYOUT,
+      net: "48.75",
+      burnTxHashes: [],
+      feeTransferPending: true,
+    } as unknown as Payout);
+    expect(await burnPayout(ctx, PAYOUT)).toEqual({ error: `${E}.notBurnable` });
+    expect(cp.claimPayoutBurn).not.toHaveBeenCalled();
+  });
+
   it("still tries the claim on a complete payout with no burn; CP's 'already complete' → paidNotBurnt", async () => {
     cp.getPayoutStatus.mockResolvedValue({ status: "complete", burnClaim: null });
     cp.getPayout.mockResolvedValue({
@@ -871,6 +901,8 @@ describe("createPayoutPayment — backing check", () => {
     const res = await createPayoutPayment(ctx, PAYOUT, { redirectUrl: "https://x/payout-signed" });
     expect(res).toMatchObject({ backing: { blocking: true } });
     expect(cp.createPayoutPayment).not.toHaveBeenCalled();
+    // No /status read before the guard (it can mint a fresh bank payment).
+    expect(cp.getPayoutStatus).not.toHaveBeenCalled();
   });
 
   it("refuses a blocking report and creates no bank payment", async () => {
@@ -904,9 +936,39 @@ describe("createPayoutPayment — backing check", () => {
         logs: [mintLog(PLACE, "10.00"), mintLog(PLACE, "10.00")],
       },
     });
-    const res = await createPayoutPayment(ctx, PAYOUT);
+    const res = await createPayoutPayment(ctx, PAYOUT, { redirectUrl: "https://x/payout-signed" });
     expect(res).toMatchObject({ ok: true, backing: { blocking: false, warnings: [] } });
     expect(cp.createPayoutPayment).toHaveBeenCalledTimes(1);
+    // Status is read only once, after the payment exists, with the redirect URL.
+    expect(cp.getPayoutStatus).toHaveBeenCalledTimes(1);
+    expect(cp.getPayoutStatus).toHaveBeenCalledWith(PAYOUT, { redirectUrl: "https://x/payout-signed" });
+    expect(cp.createPayoutPayment.mock.invocationCallOrder[0]).toBeLessThan(
+      cp.getPayoutStatus.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("counts a shared tx as covered at total − fees − payoutFee (historical mints)", async () => {
+    // 55.50 (payoutFee 0.94) + 40.00 (payoutFee 0.88) minted 54.56 + 39.12.
+    pageOf([
+      order({ id: 1, status: "paid", txHash: DUP, total: "55.50", payoutFee: "0.94" }),
+      order({ id: 2, status: "paid", txHash: DUP, total: "40.00", payoutFee: "0.88" }),
+    ]);
+    resolveReceiptWithLogs.mockResolvedValue({
+      kind: "receipt",
+      receipt: {
+        transactionHash: DUP,
+        status: "success",
+        logs: [mintLog(PLACE, "54.56"), mintLog(PLACE, "39.12")],
+      },
+    });
+    const report = await checkPayoutBacking(ctx, PAYOUT, { status: "burnt" });
+    expect(report.settlements[0]).toMatchObject({
+      verdict: "covered",
+      required: "95.50",
+      minimum: "93.68",
+      found: "93.68",
+    });
+    expect(report.blocking).toBe(false);
   });
 
   it("treats an unreadable balance as blocking", async () => {
