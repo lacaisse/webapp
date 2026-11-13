@@ -86,6 +86,7 @@ export function PayoutProcess({
   signingQr,
   feeTransferPending,
   burnClaim,
+  burnRecorded,
 }: {
   payoutId: string;
   status: PayoutStatus;
@@ -103,6 +104,11 @@ export function PayoutProcess({
   // be running or it was interrupted. Replaces the Burn button with the
   // record / release panel so no second burn can start from here.
   burnClaim: BurnClaimView | null;
+  // A burn hash is recorded on the payout. While `payment-pending` without
+  // one (the payment was created first, e.g. by an agent), the burn is still
+  // open and must land before the transfer is signed: Citizen Pay refuses it
+  // once the bank has accepted the transfer.
+  burnRecorded: boolean;
 }) {
   const t = useTranslations("fund.payments.settlement.process");
   const tFee = useTranslations("fund.payments.settlement.feeTransfer");
@@ -147,6 +153,17 @@ export function PayoutProcess({
               </AlertDescription>
             </Alert>
           ))}
+        {status === "payment-pending" && !burnRecorded && (
+          <div className="mb-4 border-b border-border pb-4">
+            {burnClaim ? (
+              <BurnClaimPanel payoutId={payoutId} claim={burnClaim} />
+            ) : (
+              <ActionRow hint={t("burn.beforeSigning")}>
+                <BurnDialog payoutId={payoutId} />
+              </ActionRow>
+            )}
+          </div>
+        )}
         {status === "payment-pending" && (
           <SignPayment
             payoutId={payoutId}
@@ -411,16 +428,24 @@ function SignPayment({
 }) {
   const t = useTranslations("fund.payments.settlement.process");
   const router = useRouter();
+  const tRoot = useTranslations();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  // The backing check refused: its message, shown in the "Pay anyway" dialog.
+  const [unbacked, setUnbacked] = useState<string | null>(null);
 
-  const create = () => {
+  const create = (allowUnbacked = false) => {
     setError(null);
     startTransition(async () => {
-      const result = await createPayoutPaymentAction({ payoutId });
+      const result = await createPayoutPaymentAction({ payoutId, allowUnbacked });
       // On success the action revalidates → page re-renders at
       // payment-pending with the signing URL from /status.
-      if ("error" in result) setError(result.error);
+      if ("error" in result) {
+        if (result.unbacked && !allowUnbacked) setUnbacked(result.error);
+        else setError(result.error);
+        return;
+      }
+      setUnbacked(null);
     });
   };
 
@@ -516,12 +541,48 @@ function SignPayment({
   return (
     <div className="space-y-2">
       <ActionRow hint={t("pay.hint")}>
-        <Button variant="default" size="sm" onClick={create} disabled={pending}>
+        <Button variant="default" size="sm" onClick={() => create()} disabled={pending}>
           {pending && <Loader2 className="size-4 animate-spin" />}
           {t("sign.create")}
         </Button>
       </ActionRow>
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error && !unbacked && <p className="text-xs text-destructive">{error}</p>}
+      <Dialog open={unbacked !== null} onOpenChange={(next) => !next && setUnbacked(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("pay.unbackedTitle")}</DialogTitle>
+            <DialogDescription>{unbacked}</DialogDescription>
+          </DialogHeader>
+          <Alert variant="destructive">
+            <AlertTriangle className="size-4" />
+            <AlertDescription>{t("pay.unbackedWarning")}</AlertDescription>
+          </Alert>
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setUnbacked(null)}
+              disabled={pending}
+            >
+              {tRoot("common.cancel")}
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => create(true)}
+              disabled={pending}
+            >
+              {pending && <Loader2 className="size-4 animate-spin" />}
+              {t("pay.payAnyway")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

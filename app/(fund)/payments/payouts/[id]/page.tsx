@@ -106,7 +106,9 @@ export default async function PayoutDetailPage({
   // are formatted here so server and client render the same strings.
   const burnClaim = live ? live.burnClaim : payout.burnClaim;
   let burnClaimView: BurnClaimView | null = null;
-  if (burnClaim && liveStatus === "pending") {
+  // A claim can be taken while payment-pending too (the burn is still open
+  // there until the bank accepts the transfer).
+  if (burnClaim && (liveStatus === "pending" || liveStatus === "payment-pending")) {
     const claimedAtMs = Date.parse(burnClaim.claimedAt);
     const known = !Number.isNaN(claimedAtMs);
     const releasableAtMs = known ? claimedAtMs + FORCED_RELEASE_MIN_AGE_MS : 0;
@@ -266,6 +268,7 @@ export default async function PayoutDetailPage({
         signingQr={signingQr}
         feeTransferPending={live?.feeTransferPending ?? payout.feeTransferPending}
         burnClaim={burnClaimView}
+        burnRecorded={(payout.burnTxHashes ?? []).length > 0}
       />
 
       <section className="space-y-3">

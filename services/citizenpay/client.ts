@@ -1085,6 +1085,12 @@ class MockCitizenPayClient implements CitizenPayClient {
     claimId?: string,
   ): Promise<PayoutBurnReport> {
     this.log("burnPayout", { payoutId, txHash, destination, claimId });
+    // As live: a completed payout takes no burn report, burned or not.
+    if (completedMockPayouts.has(payoutId)) {
+      throw new CitizenPayApiError("payout is already complete", 409, {
+        error: "payout is already complete",
+      });
+    }
     // Recording the burn closes whatever claim was in flight and marks the
     // payout burnt, as CP does. Same hash again is idempotent; a different
     // one is appended and flagged as a double burn.
@@ -1123,7 +1129,11 @@ class MockCitizenPayClient implements CitizenPayClient {
         source: "external",
       });
     }
-    if (status !== "pending") refuse("payout is not pending");
+    // Live accepts a claim while the stored status is pending, which covers
+    // the live `payment-pending` (a payment exists, not yet accepted).
+    if (status !== "pending" && status !== "payment-pending") {
+      refuse("payout is not pending");
+    }
     const claim = {
       claimId: randomBytes(16).toString("hex"),
       claimedAt: new Date().toISOString(),
@@ -1163,6 +1173,12 @@ class MockCitizenPayClient implements CitizenPayClient {
     destination: string,
   ): Promise<FeeTransferResult> {
     this.log("feeTransfer", { payoutId, destination });
+    // As live: the sweep needs a recorded burn.
+    if ((await this.getPayout(payoutId)).burnTxHashes.length === 0) {
+      throw new CitizenPayApiError("payout has not been burned", 409, {
+        error: "payout has not been burned",
+      });
+    }
     return {
       feeAmount: null,
       feeTransferTxHash: `0x${randomBytes(32).toString("hex")}`,

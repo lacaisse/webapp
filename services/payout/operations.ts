@@ -35,7 +35,20 @@ import { burnDirect, mintDirect, type Translate } from "@/services/token-operati
 
 import { findBurnAttempt } from "./burn-attempt";
 import { attemptBurnedNothing } from "./burn-claim-config";
-import { verifyPayoutBurn } from "./burn-verify";
+import { resolveReceiptWithLogs, verifyPayoutBurn } from "./burn-verify";
+import {
+  backingSummary,
+  buildBackingReport,
+  decodeTransferLogs,
+  evaluateBalance,
+  evaluateSharedSettlements,
+  sharedSettlementGroups,
+  type OrdersRead,
+  type PayoutBackingReport,
+  type TokenTransfer,
+} from "./backing";
+
+export type { PayoutBackingReport } from "./backing";
 import {
   buildPayoutExportCsv,
   PayoutExportRangeSchema,
@@ -1481,11 +1494,15 @@ export async function addOrders(
 }
 
 // =============================================================================
-// Settlement — pay the merchant, then burn the tokens
+// Settlement — create the bank payment, burn the tokens, then the operator signs
 // =============================================================================
 
 export type CreatePayoutPaymentOutcome =
-  | { error: string }
+  | {
+      error: string;
+      /** Set when the refusal is the backing check (see checkPayoutBacking). */
+      backing?: PayoutBackingReport;
+    }
   | {
       ok: true;
       /** True when CP already had a live payment — no fresh link was minted. */
@@ -1493,22 +1510,55 @@ export type CreatePayoutPaymentOutcome =
       /** The bank's signing link the operator must open to authorise the SEPA transfer. */
       signingUrl: string | null;
       paymentId: string | null;
+      /** The backing check run before creating it (warnings when overridden). */
+      backing: PayoutBackingReport;
     };
 
 /**
  * Step 1 of settlement: ask CP to create the SEPA payment. The signing URL is
  * re-read from `/status` afterwards because that read is canonical and survives
  * reloads (the create response only carries it the first time).
+ *
+ * Guarded by the backing check: when the payout is not provably backed by the
+ * place's tokens (orders sharing a settlement hash that credited less than
+ * they claim, a wallet short of what settlement removes, or anything we could
+ * not read), no bank payment is created unless `allowUnbacked` — an operator
+ * who has seen the warnings and agreed. That holds for a payout that already
+ * has a payment too (`payment-pending`): this call would hand its signing link
+ * back, and CP mints a fresh payment when the stored link went stale. The
+ * report rides along either way.
  */
 export async function createPayoutPayment(
   ctx: PayoutContext,
   payoutId: string,
-  opts?: { redirectUrl?: string },
+  opts?: { redirectUrl?: string; allowUnbacked?: boolean },
 ): Promise<CreatePayoutPaymentOutcome> {
   const c = client(ctx);
+  const cpOpts = opts?.redirectUrl !== undefined ? { redirectUrl: opts.redirectUrl } : undefined;
+
+  let liveStatus: PayoutStatus | null = null;
+  try {
+    liveStatus = (await c.getPayoutStatus(payoutId)).status;
+  } catch (e) {
+    console.warn("[payout] pay: status pre-read failed", logSafe(payoutId), e);
+  }
+  const backing = await checkPayoutBacking(ctx, payoutId, {
+    ...(liveStatus ? { status: liveStatus } : {}),
+  });
+  if (backing.blocking && !opts?.allowUnbacked) {
+    console.warn(
+      "[payout] pay refused: payout not backed",
+      logSafe({ payoutId, warnings: backing.warnings }),
+    );
+    return {
+      error: err(ctx, "payUnbacked", { summary: backingSummary(backing) }),
+      backing,
+    };
+  }
+
   let created: Awaited<ReturnType<CitizenPayClient["createPayoutPayment"]>>;
   try {
-    created = await c.createPayoutPayment(payoutId, opts);
+    created = await c.createPayoutPayment(payoutId, cpOpts);
   } catch (e) {
     console.error("[payout] createPayoutPayment failed", logSafe(payoutId), e);
     return { error: toMessage(e, err(ctx, "payFailed")) };
@@ -1516,7 +1566,7 @@ export async function createPayoutPayment(
 
   let signingUrl = created.alreadyCreated ? null : created.signingUrl;
   try {
-    const live = await c.getPayoutStatus(payoutId, opts);
+    const live = await c.getPayoutStatus(payoutId, cpOpts);
     signingUrl = live.signingUrl ?? signingUrl;
   } catch (e) {
     console.warn("[payout] signing-url re-read failed", logSafe(payoutId), e);
@@ -1529,7 +1579,117 @@ export async function createPayoutPayment(
     alreadyCreated: created.alreadyCreated,
     signingUrl,
     paymentId: created.alreadyCreated ? null : created.paymentId,
+    backing,
   };
+}
+
+// How many shared settlement hashes one backing check reads on chain. Each is
+// a receipt read (two when it is a userOp hash); past the cap the remaining
+// groups are reported unverified, which blocks like any other doubt.
+const MAX_BACKING_HASH_READS = 25;
+
+/**
+ * Is this payout backed by the place's tokens? Loads the payout and ALL its
+ * orders (unless passed in), groups the orders that share a settlement hash
+ * and reads each such tx's Transfer logs to see whether it credited the place
+ * what the group claims, and reads the place wallet's balance against what
+ * settling removes (skipped once a burn is recorded or the payout is
+ * burnt/complete). Verdicts and sentences come from the pure ./backing.ts.
+ *
+ * Never throws: any read that fails makes its part `unverified`, which is
+ * blocking — the caller decides whether an operator may override.
+ */
+export async function checkPayoutBacking(
+  ctx: PayoutContext,
+  payoutId: string,
+  opts?: { payout?: Payout; orders?: AllPayoutOrders; status?: PayoutStatus },
+): Promise<PayoutBackingReport> {
+  const { fund } = ctx;
+  const c = client(ctx);
+
+  let payout: Payout | null = opts?.payout ?? null;
+  if (!payout) {
+    try {
+      payout = await c.getPayout(payoutId);
+    } catch (e) {
+      console.warn("[payout] backing: payout read failed", logSafe(payoutId), e);
+    }
+  }
+  const status = opts?.status ?? payout?.status ?? null;
+
+  let loaded: AllPayoutOrders | null = opts?.orders ?? null;
+  if (!loaded) {
+    try {
+      loaded = await loadAllPayoutOrders(c, payoutId);
+    } catch (e) {
+      console.warn("[payout] backing: orders read failed", logSafe(payoutId), e);
+    }
+  }
+  const ordersRead: OrdersRead = !loaded ? "failed" : loaded.truncated ? "truncated" : "ok";
+  const placeAccount = loaded?.placeAccountAddress ?? null;
+  const decimals = fund.tokenDecimals ?? null;
+
+  // Shared settlement hashes → their Transfer logs (bounded).
+  const groups = sharedSettlementGroups(loaded?.orders ?? []);
+  const transfersByHash = new Map<string, TokenTransfer[] | null>();
+  if (fund.tokenAddress && placeAccount) {
+    for (const g of groups.slice(0, MAX_BACKING_HASH_READS)) {
+      try {
+        const r = await resolveReceiptWithLogs(fund.tokenChainId, g.txHash);
+        transfersByHash.set(
+          g.txHash,
+          r.kind === "receipt"
+            ? r.receipt.status === "success"
+              ? decodeTransferLogs(r.receipt.logs)
+              : [] // reverted: it moved nothing
+            : r.kind === "notSuccessful"
+              ? []
+              : null, // not found (yet): unverified
+        );
+      } catch (e) {
+        console.warn("[payout] backing: receipt read failed", logSafe({ payoutId, hash: g.txHash }), e);
+        transfersByHash.set(g.txHash, null);
+      }
+    }
+  }
+  const settlements = evaluateSharedSettlements(groups, transfersByHash, {
+    token: fund.tokenAddress ?? null,
+    placeAccount,
+    decimals,
+  });
+
+  // Balance — read only when it applies.
+  let balance: ReturnType<typeof evaluateBalance>;
+  if (!payout) {
+    balance = { verdict: "unverified", required: null };
+  } else {
+    const probe = evaluateBalance({ balanceUnits: null, payout, status, decimals });
+    let balanceUnits: bigint | null = null;
+    if (probe.verdict !== "notApplicable" && placeAccount && fund.tokenAddress) {
+      try {
+        const [row] = await getBalances({
+          chainId: fund.tokenChainId,
+          contractAddress: fund.tokenAddress,
+          addresses: [placeAccount],
+        });
+        if (row) balanceUnits = BigInt(row.rawBalance);
+      } catch (e) {
+        console.warn("[payout] backing: balance read failed", logSafe(payoutId), e);
+      }
+    }
+    balance =
+      probe.verdict === "notApplicable"
+        ? probe
+        : evaluateBalance({ balanceUnits, payout, status, decimals });
+  }
+
+  return buildBackingReport({
+    settlements,
+    balance,
+    ordersRead,
+    symbol: fund.tokenSymbol ?? null,
+    placeAccount,
+  });
 }
 
 export type BurnPayoutResult =
@@ -1559,7 +1719,11 @@ export type BurnPayoutResult =
 
 // CP's 409 messages on `burn-claim` (plan §4.2). Matched loosely — the
 // status code is what says "refused"; the text only picks the explanation.
-const CLAIM_NOT_BURNABLE = /already (burnt|burned|complete)|not pending/i;
+// "already complete" is told apart: the bank payment completed the payout
+// (CP's cron does so within seconds of the bank accepting the transfer) and
+// CP then refuses the burn whether or not one happened — see paidNotBurnt.
+const CLAIM_COMPLETE = /already complete/i;
+const CLAIM_NOT_BURNABLE = /already (burnt|burned)|not pending/i;
 const CLAIM_IN_PROGRESS = /burn already in progress/i;
 // …and on a forced `DELETE burn-claim`.
 const CLAIM_TOO_RECENT = /too recent/i;
@@ -1589,10 +1753,60 @@ async function releaseOwnClaim(
   }
 }
 
+// The answer for a payout CP marked `complete` with no burn recorded: paid at
+// the bank, tokens still in the place wallet, and CP refuses both the burn and
+// the fee sweep on a completed payout. Says where the tokens are and how much,
+// best-effort (the figures are left out when a read fails). A payout that does
+// have a burn recorded is just not burnable.
+async function paidNotBurnt(
+  ctx: PayoutContext,
+  c: CitizenPayClient,
+  payoutId: string,
+  known?: Payout,
+): Promise<BurnPayoutResult> {
+  let payout: Payout | null = known ?? null;
+  if (!payout) {
+    try {
+      payout = await c.getPayout(payoutId);
+    } catch (e) {
+      console.warn("[payout] paidNotBurnt: payout read failed", logSafe(payoutId), e);
+    }
+  }
+  if (payout && (payout.burnTxHashes ?? []).length > 0) {
+    return { error: err(ctx, "notBurnable") };
+  }
+  let wallet: string | null = null;
+  try {
+    wallet = (await c.getPayoutOrders(payoutId, { limit: 1 })).placeAccountAddress ?? null;
+  } catch (e) {
+    console.warn("[payout] paidNotBurnt: place read failed", logSafe(payoutId), e);
+  }
+  console.error("[payout] paid but not burnt: Citizen Pay refuses the burn", logSafe(payoutId));
+  if (!payout || !wallet) return { error: err(ctx, "paidNotBurntNoDetail") };
+  const symbol = ctx.fund.tokenSymbol ?? "";
+  const label = (v: string) => (symbol ? `${v} ${symbol}` : v);
+  return {
+    error: err(ctx, "paidNotBurnt", {
+      net: label(payout.net),
+      cut: label(fromCents(toCents(payoutWalletOutflow(payout)) - toCents(payout.net))),
+      wallet,
+    }),
+  };
+}
+
 /**
  * Burn step. CP no longer burns server-side — we burn the place's tokens (the
  * payout `net`) with the fund's minter wallet, then report the hash so CP marks
- * the payout `burnt`. Only valid while the payout is `pending`. IRREVERSIBLE.
+ * the payout `burnt`. IRREVERSIBLE.
+ *
+ * Burnable while `pending` or `payment-pending` (a bank payment exists but the
+ * bank has not accepted it): CP accepts the claim and the burn report in both.
+ * Once the bank accepts the transfer CP's cron marks the payout `complete`
+ * within seconds and refuses burn and sweep from then on — so the burn must
+ * be finished before the operator signs. A `complete` payout with a burn
+ * recorded is not burnable; one with none still takes the claim (an api that
+ * accepts it then works unchanged), and CP's "already complete" answer comes
+ * back as `paidNotBurnt`.
  *
  * Double-burn guard: before touching the chain we take CP's burn claim, which
  * exactly one concurrent attempt can win (two admins, a double click across
@@ -1613,7 +1827,23 @@ export async function burnPayout(
     // Cheap early exit with the familiar message; the claim below is the
     // actual guard.
     const { status } = await c.getPayoutStatus(payoutId);
-    if (status !== "pending") return { error: err(ctx, "notBurnable") };
+    if (status === "burnt") return { error: err(ctx, "notBurnable") };
+    let completedPayout: Payout | undefined;
+    if (status === "complete") {
+      // Paid at the bank. Burned too? Then there's nothing to do. If not, the
+      // claim below still runs: it is what tells us whether CP takes it.
+      try {
+        completedPayout = await c.getPayout(payoutId);
+      } catch (e) {
+        console.error("[payout] burn: complete payout read failed", logSafe(payoutId), e);
+        return { error: err(ctx, "payoutNotFound") };
+      }
+      if ((completedPayout.burnTxHashes ?? []).length > 0) {
+        return { error: err(ctx, "notBurnable") };
+      }
+    } else if (status !== "pending" && status !== "payment-pending") {
+      return { error: err(ctx, "notBurnable") };
+    }
 
     // Claim. Fails CLOSED: if we can't get a claim for any reason — a 409, a
     // network error, a 5xx, or a 404 from an api that predates the route
@@ -1624,6 +1854,9 @@ export async function burnPayout(
       ({ claimId } = await c.claimPayoutBurn(payoutId));
     } catch (e) {
       if (e instanceof CitizenPayApiError && e.status === 409) {
+        if (CLAIM_COMPLETE.test(e.message)) {
+          return await paidNotBurnt(ctx, c, payoutId, completedPayout);
+        }
         if (CLAIM_NOT_BURNABLE.test(e.message)) {
           return { error: err(ctx, "notBurnable") };
         }
@@ -1756,6 +1989,11 @@ export async function burnPayout(
   }
 }
 
+// The live statuses CP accepts a burn claim and a burn report in.
+function isBurnableStatus(status: PayoutStatus): boolean {
+  return status === "pending" || status === "payment-pending";
+}
+
 // Report a burn's hash to CP and run the post-burn handling. Shared by the
 // burn itself and by `recordPayoutBurn` (an interrupted attempt's hash
 // recorded by an admin), so both settle the payout identically.
@@ -1782,6 +2020,12 @@ async function reportPayoutBurn(
     );
   } catch (e) {
     console.error("[payout] reporting burn to CP failed", logSafe(payoutId), e);
+    // CP's cron completed the payout (the bank accepted the transfer) while
+    // the burn was running: the tokens are gone, CP will not record it, and
+    // nothing here can make it. Say exactly that — never "retry".
+    if (e instanceof CitizenPayApiError && e.status === 409 && CLAIM_COMPLETE.test(e.message)) {
+      return { error: err(ctx, "burnReportRefusedComplete", { txHash }), txHash };
+    }
     return { error: `${err(ctx, "reportFailed")} (tx ${txHash})` };
   }
 
@@ -1854,9 +2098,11 @@ export async function recordPayoutBurn(
     const c = client(ctx);
     // Only while a claim is in flight: that's the one state where a burn may
     // exist unrecorded. Re-read it so a stale page can't record a hash on a
-    // payout that's already burned (CP would book it as a second burn).
+    // payout that's already burned (CP would book it as a second burn). A
+    // claim can be taken while `payment-pending` too, so it must stay
+    // resolvable there.
     const live = await c.getPayoutStatus(input.payoutId);
-    if (live.status !== "pending" || !live.burnClaim) {
+    if (!isBurnableStatus(live.status) || !live.burnClaim) {
       return { error: err(ctx, "noBurnClaim") };
     }
 
@@ -2037,7 +2283,7 @@ async function attemptProvablyBurnedNothing(
 ): Promise<boolean> {
   try {
     const live = await c.getPayoutStatus(payoutId);
-    if (live.status !== "pending" || live.burnClaim?.claimId !== claimId) return false;
+    if (!isBurnableStatus(live.status) || live.burnClaim?.claimId !== claimId) return false;
     const [payout, { placeAccountAddress }] = await Promise.all([
       c.getPayout(payoutId),
       c.getPayoutOrders(payoutId, { limit: 1 }),
@@ -2102,8 +2348,13 @@ export async function feeTransfer(
   } catch (e) {
     // CP surfaces sweep failures as HTTP status with a descriptive message
     // (402 insufficient, 409 not-burnt/in-progress, 422 config, 503 bundler).
-    // toMessage forwards that message so the operator sees the real reason.
+    // toMessage forwards that message so the operator sees the real reason —
+    // except "has not been burned", which on a completed payout can never be
+    // fixed by a retry: say why.
     console.error("[payout] feeTransfer failed", logSafe(payoutId), e);
+    if (e instanceof CitizenPayApiError && e.status === 409 && /has not been burned/i.test(e.message)) {
+      return { error: err(ctx, "feeTransferNotBurned") };
+    }
     return { error: toMessage(e, err(ctx, "feeTransferFailed")) };
   }
 }

@@ -31,6 +31,15 @@ import { FUND_PARAM, fail, guarded, ok, TX_HASH } from "./tool-kit";
 // in their description and require an explicit `confirm` — burn_payout above
 // all, since it is irreversible from the dashboard too.
 //
+// Settlement order: create_payout → reconcile (list/fix_payout_orders) →
+// pay_payout (creates the bank transfer, returns its signing link; nothing
+// leaves the account) → burn_payout → only then the operator signs. Citizen
+// Pay marks a payout `complete` within seconds of the bank accepting the
+// signed transfer and refuses burn and fee sweep from then on, so the burn
+// must be recorded before anyone signs. pay_payout refuses a payout the
+// backing check (operations.ts::checkPayoutBacking) can't vouch for unless the
+// operator explicitly overrides.
+//
 // Every result below reports BOTH fee figures, because they are different money
 // and an agent that adds them up gets the wrong answer:
 //   • `fees` / `payoutFee` on an order, `fees` on a payout — the payment
@@ -81,6 +90,32 @@ async function payoutCtx(
 // domain — the same public "you can close this tab" page the dashboard uses.
 function signedRedirectUrl(fund: Fund): string {
   return `https://${fund.domain}/payout-signed`;
+}
+
+// The backing report as agents see it (the per-group list of covered
+// settlements stays internal; list_payout_orders puts it on the rows).
+function backingView(r: ops.PayoutBackingReport) {
+  return {
+    blocking: r.blocking,
+    warnings: r.warnings,
+    balance: r.balance,
+    duplicates: r.duplicates,
+  };
+}
+
+// Per order: the other orders sharing its settlement hash, and whether that
+// one tx covered them all. Only orders in a shared group appear.
+function sharedHashIndex(r: ops.PayoutBackingReport) {
+  const out = new Map<number, { sharedTxHashWith: number[]; settlementCoverage: string }>();
+  for (const g of r.settlements) {
+    for (const id of g.orderIds) {
+      out.set(id, {
+        sharedTxHashWith: g.orderIds.filter((other) => other !== id),
+        settlementCoverage: g.verdict,
+      });
+    }
+  }
+  return out;
 }
 
 // The order fields an agent needs to reason about an issue, without the opaque
@@ -170,7 +205,7 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
     "list_payouts",
     {
       description:
-        "Payouts that already exist, with their id, place, period, totals and lifecycle status (pending → payment-pending → burnt → complete). Use it to find the `payoutId` every other payout tool needs. Requires ADMIN.",
+        "Payouts that already exist, with their id, place, period, totals and live status: `pending` (created), `payment-pending` (bank transfer created, not yet accepted by the bank), `burnt` (burn recorded), `complete` (Citizen Pay sets it within seconds of the bank accepting the signed transfer, burned or not). The burn must be recorded before the transfer is signed; get_payout's `burnOutstanding` flags a payout where it is not. Use it to find the `payoutId` every other payout tool needs. Requires ADMIN.",
       inputSchema: {
         fund: FUND_PARAM,
         state: z
@@ -227,7 +262,7 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
     "create_payout",
     {
       description:
-        "Create a pending payout for one place over a date range — atomically claims that place's unassigned orders in `[from, to)`, so they leave the drafts and become a settlement the treasury can pay and burn. Check the amount first with list_payout_drafts. Fails when the range holds no payable orders. Requires ADMIN.",
+        "Create a pending payout for one place over a date range — atomically claims that place's unassigned orders in `[from, to)`, so they leave the drafts and become a settlement the treasury can pay and burn. Check the amount first with list_payout_drafts. Fails when the range holds no payable orders. The result carries `backing`: whether the place's tokens back the payout (orders sharing one settlement hash that credited less than they claim, a place wallet holding less than settlement removes); read its warnings before paying. Requires ADMIN.",
       inputSchema: {
         fund: FUND_PARAM,
         placeId: z.string().min(1).describe("Place id from list_payout_drafts"),
@@ -239,13 +274,22 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
       const c = await payoutCtx(ctx, fundDomain);
       const res = await ops.createPayout(c, { placeId, from, to });
       if ("error" in res) return fail(res.error);
+      // Best-effort: the payout exists whatever the check says.
+      let backing: ReturnType<typeof backingView> | { error: string };
+      try {
+        backing = backingView(await ops.checkPayoutBacking(c, res.payoutId));
+      } catch (e) {
+        console.warn("[mcp] create_payout: backing check failed", e);
+        backing = { error: "The backing check could not run; get_payout repeats it." };
+      }
       return ok({
         payoutId: res.payoutId,
         orderCount: res.orderCount,
         net: res.net,
         currency: "EUR",
         status: "pending",
-        hint: "Next: get_payout to review, fix_payout_orders for any unconfirmed orders, then pay_payout and burn_payout.",
+        backing,
+        hint: "Next: get_payout to review, fix_payout_orders for any unconfirmed orders, then pay_payout (creates the transfer, returns the signing link — do not hand it over yet), then burn_payout, and only once the burn is recorded give the operator the signing link.",
       });
     }),
   );
@@ -254,7 +298,7 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
     "get_payout",
     {
       description:
-        "Everything about one payout: totals (gross / processor fees withheld at source / platform payout fees / manual deduction / net, where net = total − fees − payoutFees − manualDeduction), the live lifecycle status, the bank signing link while it is awaiting signature, whether the retained fee sweep is still outstanding, any burn attempt still in flight (`burnClaim`: when it was started — never burn while it is set), and how many of its orders are confirmed on-chain vs. sitting in Issues. Reading the status also nudges settlement forward on CitizenPay's side (a signed payment finalises here). Requires ADMIN.",
+        "Everything about one payout: totals (gross / processor fees withheld at source / platform payout fees / manual deduction / net, where net = total − fees − payoutFees − manualDeduction), the live status, the bank signing link while a payment exists (`payment-pending`), `burnRecorded` (a burn hash is on the payout), `burnOutstanding` (a payment exists or the payout is complete, and no burn is recorded — while `payment-pending`, burn_payout before the operator signs; once `complete`, Citizen Pay refuses the burn and it must be done by hand from the token page), whether the retained fee sweep is still outstanding, any burn attempt still in flight (`burnClaim`: never burn, and never let the operator sign, while it is set), `backing` while the payout is pending / payment-pending with no burn recorded (warnings, and `blocking` = pay_payout will refuse), and optionally the confirmed / issues split of its orders. Reading the status also nudges settlement forward on CitizenPay's side (an accepted payment completes the payout here). Requires ADMIN.",
       inputSchema: {
         fund: FUND_PARAM,
         payoutId: PAYOUT_ID,
@@ -293,6 +337,24 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
               };
       }
 
+      const burnRecorded = (p.burnTxHashes ?? []).length > 0;
+      const burnOutstanding =
+        !burnRecorded &&
+        (detail.liveStatus === "payment-pending" || detail.liveStatus === "complete");
+      // The backing check only while it can still change what happens next.
+      // Burnt / complete payouts get none: the balance no longer applies and
+      // re-reading every shared hash there decides nothing.
+      const backing =
+        !burnRecorded &&
+        (detail.liveStatus === "pending" || detail.liveStatus === "payment-pending")
+          ? backingView(
+              await ops.checkPayoutBacking(c, payoutId, {
+                payout: p,
+                status: detail.liveStatus,
+              }),
+            )
+          : undefined;
+
       return ok({
         payoutId: p.id,
         placeId: p.placeId,
@@ -310,6 +372,16 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
         // their bank to authorise the SEPA transfer.
         signingUrl: detail.signingUrl,
         burnTxHashes: p.burnTxHashes,
+        burnRecorded,
+        burnOutstanding,
+        ...(burnOutstanding
+          ? {
+              burnHint:
+                detail.liveStatus === "payment-pending"
+                  ? "No burn is recorded yet: run burn_payout now, and do not let the operator sign the transfer until it has succeeded."
+                  : "Paid at the bank and complete with no burn recorded: Citizen Pay refuses burn_payout and sweep_payout_fees on a complete payout. The tokens are still in the place wallet; an admin burns them by hand from the token page.",
+            }
+          : {}),
         feeTransferPending: detail.feeTransferPending,
         feeTransferTxHash: detail.feeTransferTxHash,
         // Non-null while a burn attempt holds the payout and nothing is
@@ -317,6 +389,7 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
         burnClaim: detail.burnClaim,
         emailRecipient: p.emailRecipient,
         emailSentAt: p.emailSentAt,
+        ...(backing ? { backing } : {}),
         orders,
         ...(orders
           ? {}
@@ -331,7 +404,7 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
     "list_payout_orders",
     {
       description:
-        "The orders inside a payout, each with its on-chain verification verdict. `filter: \"issues\"` returns exactly the orders that failed verification — a sale with no settlement hash, or a hash that never mined / reverted — which is what fix_payout_orders acts on. A refund / correction / topup leg is the subtract side of the payout (it nets a refunded sale out); one without a hash is a ledger entry and counts as confirmed, never an issue. Read-only. Requires ADMIN.",
+        "The orders inside a payout, each with its on-chain verification verdict. `filter: \"issues\"` returns exactly the orders that failed verification — a sale with no settlement hash, or a hash that never mined / reverted — which is what fix_payout_orders acts on. A refund / correction / topup leg is the subtract side of the payout (it nets a refunded sale out); one without a hash is a ledger entry and counts as confirmed, never an issue. \"Confirmed\" only means the hash mined: several orders can carry the SAME hash. Such orders get `sharedTxHashWith` (the other order ids) and `settlementCoverage` (`covered` = that one tx credited the place what they all claim, `uncovered` = it did not — likely duplicate rows that would overpay the merchant, `unverified` = its transfers could not be read), and the top-level `backing` summarises it with the place wallet's balance. Read-only. Requires ADMIN.",
       inputSchema: {
         fund: FUND_PARAM,
         payoutId: PAYOUT_ID,
@@ -349,6 +422,16 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
       });
       if ("error" in classified) return fail(classified.error);
 
+      const backing = await ops.checkPayoutBacking(c, payoutId, {
+        status: status.status,
+        orders: {
+          orders: [...classified.confirmed, ...classified.issues],
+          placeAccountAddress: classified.placeAccountAddress,
+          truncated: classified.truncated,
+        },
+      });
+      const shared = sharedHashIndex(backing);
+
       const pool =
         filter === "issues"
           ? classified.issues
@@ -364,8 +447,12 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
           issues: classified.issues.length,
         },
         truncated: classified.truncated,
+        backing: backingView(backing),
         returned: Math.min(pool.length, limit),
-        orders: pool.slice(0, limit).map(orderRow),
+        orders: pool.slice(0, limit).map((o) => ({
+          ...orderRow(o),
+          ...(shared.get(o.id) ?? {}),
+        })),
         ...(pool.length > limit
           ? { hint: `${pool.length - limit} more order(s) not shown — raise \`limit\` to see them.` }
           : {}),
@@ -641,23 +728,45 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
     "pay_payout",
     {
       description:
-        "Start the fiat leg: ask CitizenPay to create the SEPA bank transfer paying the merchant this payout's net, and return the bank signing link the operator must open to authorise it. Nothing leaves the account until a human signs at the bank. Safe to call again — if a payment already exists you get the existing link back rather than a second transfer. After it is signed, the status moves on and burn_payout becomes the next step. Requires ADMIN.",
-      inputSchema: { fund: FUND_PARAM, payoutId: PAYOUT_ID },
+        "Create the fiat leg: ask CitizenPay to create the SEPA bank transfer paying the merchant this payout's net, and return the bank signing link. Nothing leaves the account until a human signs at the bank — and the operator must NOT sign yet: run burn_payout first (it works while the payout is `payment-pending`). Citizen Pay marks the payout complete within seconds of the bank accepting the signed transfer and then refuses the burn. Before creating anything it checks that the place's tokens back the payout (orders sharing one settlement hash that credited less than they claim; a place wallet holding less than net + retained cut; anything it could not read) and refuses, creating nothing, when they don't; the refusal lists every warning. Set `overrideBackingCheck: true` only after the operator has seen those warnings and explicitly agreed to pay anyway. Safe to call again — if a payment already exists you get the existing link back rather than a second transfer (after the same backing check). Requires ADMIN.",
+      inputSchema: {
+        fund: FUND_PARAM,
+        payoutId: PAYOUT_ID,
+        overrideBackingCheck: z
+          .boolean()
+          .optional()
+          .describe(
+            "Pay even though the backing check found problems. Only after the operator has seen the warnings and explicitly agreed.",
+          ),
+      },
     },
-    guarded(async ({ fund: fundDomain, payoutId }) => {
+    guarded(async ({ fund: fundDomain, payoutId, overrideBackingCheck }) => {
       const c = await payoutCtx(ctx, fundDomain);
       const res = await ops.createPayoutPayment(c, payoutId, {
         redirectUrl: signedRedirectUrl(c.fund),
+        allowUnbacked: overrideBackingCheck === true,
       });
-      if ("error" in res) return fail(res.error);
+      if ("error" in res) {
+        if (res.backing?.blocking) {
+          return fail(
+            [
+              "No bank payment was created: the payout is not provably backed by the place's tokens.",
+              ...res.backing.warnings.map((w) => `- ${w}`),
+              "Fix the orders (fix_payout_orders mode \"archive\" for duplicate rows; list_payout_orders shows `sharedTxHashWith` / `settlementCoverage`) or, only if the operator has seen these warnings and explicitly agrees to pay anyway, call pay_payout again with `overrideBackingCheck: true`.",
+            ].join("\n"),
+          );
+        }
+        return fail(res.error);
+      }
       return ok({
         payoutId,
         alreadyCreated: res.alreadyCreated,
         paymentId: res.paymentId,
         signingUrl: res.signingUrl,
+        ...(res.backing.warnings.length > 0 ? { backing: backingView(res.backing) } : {}),
         hint: res.signingUrl
-          ? "Give this link to the operator — the transfer only goes out once they sign it at their bank. Poll get_payout for the status afterwards."
-          : "No signing link came back. Re-read get_payout: the payment may already be signed, or the bank connection may not have payment initiation enabled.",
+          ? "Do NOT give this link to the operator yet: run burn_payout now, and hand the link over only once the burn is recorded (get_payout `burnRecorded`, no `burnClaim`). The transfer only goes out once they sign it at their bank."
+          : "No signing link came back. Re-read get_payout: the payment may already be signed, or the bank connection may not have payment initiation enabled. If no burn is recorded and the status is still payment-pending, run burn_payout.",
       });
     }),
   );
@@ -666,7 +775,7 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
     "burn_payout",
     {
       description:
-        "IRREVERSIBLE. Burn the tokens backing a payout: destroys the payout's net from the merchant place's wallet with the fund's minter, reports the burn to CitizenPay (which marks the payout burnt), and sweeps the retained cut — the platform payout fees plus any manual deduction — to the fund's treasury account. Processor fees withheld at source are in neither figure; they never entered the wallet. Run this once the fiat leg is paid — burning before the merchant is paid destroys their balance with nothing sent. Refuses, burning nothing, when the place's wallet holds less than settlement removes (net + retained cut) — top up the place or adjust the deduction first. Only valid while the payout is pending; a second call is rejected — the burn first takes Citizen Pay's burn claim, so only one attempt can run. If it fails saying the burn may have been sent or another attempt is in progress, do NOT retry: an admin checks the chain and records or releases the attempt from the payout page. A timeout or dropped connection does NOT mean the burn failed — the burn can take over a minute and may still land. Never call this again after an unclear outcome; read get_payout instead (status `burnt`, or a non-null `burnClaim` = an attempt still in flight). Requires ADMIN.",
+        "IRREVERSIBLE. Burn the tokens backing a payout: destroys the payout's net from the merchant place's wallet with the fund's minter, reports the burn to CitizenPay (which marks the payout burnt), and sweeps the retained cut — the platform payout fees plus any manual deduction — to the fund's treasury account. Processor fees withheld at source are in neither figure; they never entered the wallet. Works while the payout is `pending` or `payment-pending`. Run it right after pay_payout and BEFORE the operator signs the transfer: Citizen Pay marks the payout `complete` within seconds of the bank accepting it and from then on refuses both the burn and the fee sweep. Never let the operator sign while this is running or while get_payout shows a `burnClaim`. A payout already `complete` with `burnOutstanding` cannot be burned here (it answers that the tokens are still in the place wallet) — an admin burns them by hand from the token page until Citizen Pay accepts burns on completed payouts. Refuses, burning nothing, when the place's wallet holds less than settlement removes (net + retained cut) — top up the place or adjust the deduction first. A second call is rejected — the burn first takes Citizen Pay's burn claim, so only one attempt can run. If it fails saying the burn may have been sent or another attempt is in progress, do NOT retry: an admin checks the chain and records or releases the attempt from the payout page. A timeout or dropped connection does NOT mean the burn failed — the burn can take over a minute and may still land. Never call this again after an unclear outcome; read get_payout instead (status `burnt`, or a non-null `burnClaim` = an attempt still in flight). Requires ADMIN.",
       inputSchema: {
         fund: FUND_PARAM,
         payoutId: PAYOUT_ID,
@@ -701,7 +810,7 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
     "sweep_payout_fees",
     {
       description:
-        "Run (or retry) just the fee sweep on an already-burnt payout — moves the retained cut (the platform payout fees plus any manual deduction) from the place's wallet to the fund's treasury account. Idempotent: if an earlier sweep already went through you get that transfer back instead of a second one. Use it when burn_payout reported `feeTransferPending`. Requires ADMIN.",
+        "Run (or retry) just the fee sweep on a payout whose burn is recorded — moves the retained cut (the platform payout fees plus any manual deduction) from the place's wallet to the fund's treasury account. Needs a recorded burn: refused on a payout without one, and on a `complete` payout with none it can never succeed (Citizen Pay no longer accepts the burn there). Idempotent: if an earlier sweep already went through you get that transfer back instead of a second one. Use it when burn_payout reported `feeTransferPending`. Requires ADMIN.",
       inputSchema: { fund: FUND_PARAM, payoutId: PAYOUT_ID },
     },
     guarded(async ({ fund: fundDomain, payoutId }) => {

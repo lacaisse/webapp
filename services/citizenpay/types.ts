@@ -299,12 +299,15 @@ export type FeeTransferResult = {
 // Merchant payouts (settlement)
 // =============================================================================
 // CitizenPay aggregates the token payments a merchant place received over a
-// period into a "payout" the treasury then settles in two steps:
-//   1. createPayoutPayment → the admin signs a SEPA transfer to the merchant
-//      (CP returns a signing URL the admin opens at their bank).
-//   2. burnPayout → the matching tokens are burned on-chain once the fiat
-//      leg is paid.
-// Lifecycle: pending → payment-pending → burnt → complete.
+// period into a "payout" the treasury then settles in two legs:
+//   - createPayoutPayment → CP creates the SEPA transfer to the merchant and
+//     returns a signing URL the admin opens at their bank;
+//   - burnPayout → the matching tokens are burned on-chain.
+// The burn must be recorded BEFORE the transfer is signed: CP marks a payout
+// `complete` within seconds of the bank accepting the transfer, burned or
+// not, and refuses burn and fee sweep on a complete payout. CP accepts the
+// burn while `pending` or `payment-pending` (payment created, not accepted).
+// Statuses: pending, payment-pending, burnt, complete.
 
 export type PayoutStatus = "pending" | "payment-pending" | "burnt" | "complete";
 

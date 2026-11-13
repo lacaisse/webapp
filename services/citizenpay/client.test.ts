@@ -68,10 +68,20 @@ describe("mock client burn claim", () => {
     expect(await refusal(c.claimPayoutBurn(id))).toBe("burn already in progress");
   });
 
-  it("refuses to claim complete and not-pending payouts", async () => {
+  it("refuses to claim a complete payout, but takes one while payment-pending (as live)", async () => {
     const c = getCitizenPayClient(fund);
     expect(await refusal(c.claimPayoutBurn("mock-payout-0"))).toBe("payout is already complete");
-    expect(await refusal(c.claimPayoutBurn("mock-payout-2"))).toBe("payout is not pending");
+    const claim = await c.claimPayoutBurn("mock-payout-2");
+    expect(claim.claimId).toBeTruthy();
+    await c.releasePayoutBurn("mock-payout-2", { claimId: claim.claimId });
+  });
+
+  it("refuses the burn report and the sweep the way live does", async () => {
+    const c = getCitizenPayClient(fund);
+    const id = freshPayout();
+    expect(await refusal(c.feeTransfer(id, TX))).toBe("payout has not been burned");
+    await c.completePayout(id);
+    expect(await refusal(c.burnPayout(id, TX))).toBe("payout is already complete");
   });
 
   it("releases by claim id at once, but a forced release only after 10 minutes and pinned", async () => {
