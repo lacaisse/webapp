@@ -448,6 +448,21 @@ describe("consumeConnect — fixed fee reconcile", () => {
     );
   });
 
+  it("marks the payment settings unconfirmed when the fund connects to a treasury (W6), not on a re-key", async () => {
+    fetchTokenInfo.mockResolvedValue(tokenInfo(null));
+    prisma.fund.findUnique.mockResolvedValue({ citizenPayFundId: null, payoutFixedFeeCents: 0 });
+    await call();
+    expect(written()).toMatchObject({
+      feeAccountSynced: false,
+      platformPayoutFeeSynced: false,
+      earlyPaidMaxCentsSynced: false,
+    });
+    prisma.fund.update.mockClear();
+    prisma.fund.findUnique.mockResolvedValue({ citizenPayFundId: "t-1", payoutFixedFeeCents: 0 });
+    await call();
+    expect(written()).not.toHaveProperty("feeAccountSynced");
+  });
+
   it.each([
     // [local cents, local synced flag, CP cents, expected synced, expected seed]
     [10, true, 10, true, undefined],

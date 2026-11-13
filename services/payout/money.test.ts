@@ -6,6 +6,8 @@ import {
   maxManualDeductionCents,
   orderWalletCredit,
   payoutNet,
+  payoutSweepAmount,
+  payoutWalletOutflow,
   suggestPayoutFee,
   toCents,
 } from "./money";
@@ -129,5 +131,51 @@ describe("suggestPayoutFee", () => {
     expect(suggestPayoutFee("204.00", null)).toBe("0.00");
     expect(suggestPayoutFee("204.00", "0")).toBe("0.00");
     expect(suggestPayoutFee("204.00", "not-a-rate")).toBe("0.00");
+  });
+});
+
+describe("fees collected at payment (citizenpay/api#277)", () => {
+  it("lower what settling takes from the wallet", () => {
+    expect(
+      payoutWalletOutflow({
+        totalAmount: "10.00",
+        totalFees: "0.00",
+        totalPayoutFees: "0.40",
+        feesCollectedAtPayment: "0.20",
+      }),
+    ).toBe("9.80");
+    expect(payoutWalletOutflow({ totalAmount: "10.00", totalFees: "0.00" })).toBe("10.00");
+  });
+
+  it("are not swept again: sweep = payoutFees + deduction − collected, never below 0", () => {
+    // The api doc's worked example: 0.20 transaction + 0.20 platform, 0.20 collected.
+    expect(
+      payoutSweepAmount({ totalPayoutFees: "0.40", manualDeduction: "0.00", feesCollectedAtPayment: "0.20" }),
+    ).toBe("0.20");
+    expect(payoutSweepAmount({ totalPayoutFees: "0.40", manualDeduction: "1.00" })).toBe("1.40");
+    expect(
+      payoutSweepAmount({ totalPayoutFees: "0.20", manualDeduction: "0.00", feesCollectedAtPayment: "0.25" }),
+    ).toBe("0.00");
+  });
+});
+
+describe("an inflated feesCollectedAtPayment from the api (W3)", () => {
+  it("is clamped to payoutFees and never takes the requirement below net + deduction", () => {
+    const p = {
+      totalAmount: "100.00",
+      totalFees: "0.00",
+      totalPayoutFees: "2.00",
+      manualDeduction: "5.00",
+      net: "93.00",
+    };
+    // 100 credited; at most the 2.00 of fees may have left at payment.
+    expect(payoutWalletOutflow({ ...p, feesCollectedAtPayment: "60.00" })).toBe("98.00");
+    // Sweep never drops below the deduction.
+    expect(payoutSweepAmount({ ...p, feesCollectedAtPayment: "60.00" })).toBe("5.00");
+    // Floor at net + deduction even when the totals disagree.
+    expect(
+      payoutWalletOutflow({ ...p, totalAmount: "95.00", feesCollectedAtPayment: "2.00" }),
+    ).toBe("98.00");
+    expect(payoutWalletOutflow({ ...p, feesCollectedAtPayment: "-3.00" })).toBe("100.00");
   });
 });

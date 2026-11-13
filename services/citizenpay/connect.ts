@@ -360,6 +360,15 @@ export async function consumeConnect(args: {
       where: { id: row.fundId },
       data: {
         citizenPayFundId: creds.treasury_id,
+        // A new treasury holds none of the payment settings La Caisse may
+        // show as live (fee account, payout fee, terminal cap): mark them
+        // unconfirmed. The settings page reads what the treasury applies and
+        // shows any difference; nothing is pushed from here.
+        ...(fundRow?.citizenPayFundId !== creds.treasury_id && {
+          feeAccountSynced: false,
+          platformPayoutFeeSynced: false,
+          earlyPaidMaxCentsSynced: false,
+        }),
         citizenPayApiKeyId: creds.api_key_id,
         citizenPayApiKeyEnc: encryptSecret(creds.api_key),
         citizenPayApiKeyUpdatedAt: now,

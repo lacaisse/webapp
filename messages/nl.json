@@ -1974,7 +1974,8 @@
           "confirm": "Tokens verbranden",
           "success": "Tokens verbrand. Transactiehash:",
           "feeSwept": "Platformkosten en inhouding overgemaakt naar de fondsrekening: {amount}",
-          "feeNotSwept": "Tokens verbrand, maar de platformkosten zijn nog niet overgemaakt."
+          "feeNotSwept": "Tokens verbrand, maar de platformkosten zijn nog niet overgemaakt.",
+          "nothingToSweep": "Niets over te maken voor deze uitbetaling."
         },
         "burnClaim": {
           "started": "Er is een verbranding gestart op {time} die niet is bevestigd.",
@@ -2009,7 +2010,12 @@
         "feeTransfer": {
           "pending": "De platformkosten en inhouding van deze uitbetaling zijn nog niet overgemaakt.",
           "button": "Platformkosten overmaken",
-          "done": "Platformkosten overgemaakt. Transactiehash:"
+          "done": "Platformkosten overgemaakt. Transactiehash:",
+          "settling": "Kosten worden nog verrekend, nieuwe poging…",
+          "settlingGaveUp": "De kosten worden nog verrekend. Probeer het over een paar minuten opnieuw.",
+          "nothingToTransfer": "Niets over te maken voor deze uitbetaling.",
+          "pendingHint": "Bij een fonds met een kostenrekening kunnen kosten na een betaling enkele seconden worden verrekend (hoogstens ongeveer twee dagen). De overdracht wordt dan vanzelf opnieuw geprobeerd zolang deze pagina open is.",
+          "listPending": "Kosten over te maken"
         },
         "orders": {
           "title": "Bestellingen",
@@ -2158,7 +2164,14 @@
           "releaseTooRecent": "Deze verbrandclaim kan nog niet worden vrijgegeven: een lopende verbranding kan enkele minuten nodig hebben om de chain te bereiken. Vrijgeven kan vanaf {releasableAt}.",
           "releaseClaimChanged": "De verbrandclaim is gewijzigd sinds de pagina werd geladen (een andere poging nam ze over, of ze werd afgehandeld). De pagina is opnieuw geladen — controleer opnieuw voor je iets doet.",
           "archiveAdjustmentLeg": "Dit is een terugbetalings-, correctie- of opwaardeerregel: ze wordt van de uitbetaling afgetrokken, archiveren zou de handelaar te veel betalen. Laat ze staan.",
-          "archiveUnknownOrder": "Kon deze bestelling niet controleren voor het archiveren. Probeer het zo opnieuw."
+          "archiveUnknownOrder": "Kon deze bestelling niet controleren voor het archiveren. Probeer het zo opnieuw.",
+          "feesSettling": "Kosten worden nog verrekend: sommige transactiekosten van deze uitbetaling zijn nog onderweg naar de kostenrekening.",
+          "feeMaySettle": "Dit fonds int transactiekosten bij de betaling: kosten van een bestelling in deze uitbetaling worden mogelijk nog verrekend. Probeer het over een minuut opnieuw."
+        },
+        "feeBreakdown": {
+          "collectedAtPayment": "Transactiekosten geïnd bij de betaling",
+          "sweptAtPayout": "Kosten en inhouding overgemaakt bij deze uitbetaling",
+          "hint": "De platformkosten hierboven omvatten de transactiekosten van het fonds en zijn uitbetalingskosten. De bij de betaling geïnde kosten staan al op de kostenrekening van het fonds."
         }
       },
       "export": {
@@ -2735,7 +2748,7 @@
       },
       "fees": {
         "title": "Kosten",
-        "description": "Commissie op betalingen aan handelaren. Hier ingesteld en vervolgens naar Citizen Pay gestuurd.",
+        "description": "Kosten die je fonds aan handelaren aanrekent. De klant betaalt ze nooit. Hier ingesteld en vervolgens naar Citizen Pay gestuurd.",
         "rate": "Kostentarief (%)",
         "rateHint": "Percentage dat op elke betaling wordt ingehouden (bijv. 2,5 voor 2,5%). Laat leeg om het standaardtarief van Citizen Pay te gebruiken.",
         "fixedFee": "Vaste kosten per bestelling (€)",
@@ -2769,6 +2782,27 @@
             "unavailable": "Citizen Pay ondersteunt nog geen vrijstellingen voor dit fonds.",
             "failed": "Citizen Pay heeft de wijziging niet aanvaard. Probeer het zo meteen opnieuw."
           }
+        },
+        "transactionTitle": "Transactiekosten",
+        "transactionDescription": "Bij elke betaling aan de handelaar aangerekend: het tarief en de vaste kosten per bestelling.",
+        "feeAccount": {
+          "title": "Kostenrekening",
+          "description": "Waar de transactiekosten van je fonds naartoe gaan. Met een gekozen rekening worden de kosten van elke betaling binnen een minuut na de betaling daarheen gestuurd, in plaats van bij de uitbetaling te worden ingehouden. Zonder rekening verandert er niets.",
+          "label": "Kostenrekening",
+          "none": "Geen (inhouden bij uitbetaling)",
+          "hint": "Alleen de eigen rekeningen van het fonds worden aangeboden: de hoofdrekening, zijn andere rekeningen en zijn Safes. Bronrekeningen van kaarten en rekeningen van handelaren kunnen geen kosten ontvangen.",
+          "kindMain": "uitbetalingsrekening",
+          "kindAccount": "rekening",
+          "kindSafe": "Safe",
+          "unlisted": "{address} (niet langer een rekening van het fonds)",
+          "sameAsSweep": "Dit is ook de rekening waarnaar de kosten bij de uitbetaling worden overgemaakt. Dat werkt, maar in een zeldzaam geval kan Citizen Pay kosten die bij de betaling zijn verstuurd niet onderscheiden van kosten die bij de uitbetaling zijn overgemaakt, en kan het de ene voor de andere tellen. Een aparte rekening houdt ze gescheiden."
+        },
+        "payoutFee": {
+          "title": "Uitbetalingskosten",
+          "description": "Platformkosten die alleen bij een uitbetaling aan de handelaar worden aangerekend, los van de transactiekosten hierboven. De klant betaalt ze nooit.",
+          "label": "Uitbetalingskosten (%)",
+          "hint": "Percentage van de verkopen in elke uitbetaling (bijv. 1,5 voor 1,5%). Laat leeg voor geen uitbetalingskosten. Een wijziging geldt voor uitbetalingen die daarna worden aangemaakt.",
+          "none": "geen uitbetalingskosten"
         }
       },
       "emails": {
@@ -2981,6 +3015,34 @@
           "show": "Voorbeeld",
           "hide": "Voorbeeld verbergen"
         }
+      },
+      "terminals": {
+        "title": "Terminals",
+        "description": "Hoe de betaalterminals van het fonds walletbetalingen bevestigen.",
+        "earlyPaid": {
+          "title": "Directe bevestiging",
+          "description": "Tot dit bedrag toont een terminal een walletbetaling als geslaagd zodra de betaling is geverifieerd, voordat ze definitief is op de blockchain. Daarboven wacht de terminal enkele seconden op de definitieve bevestiging.",
+          "risk": "Een hogere limiet betekent een groter mogelijk verlies als een betaling later mislukt.",
+          "label": "Limiet voor directe bevestiging",
+          "default": "Standaard ({amount})",
+          "custom": "Eigen bedrag",
+          "none": "Geen limiet",
+          "amount": "Limiet (€)",
+          "amountHint": "Tussen € 0,01 en € 1.000,00.",
+          "effective": "Huidige limiet: {amount}",
+          "effectiveNone": "Huidige limiet: geen"
+        }
+      },
+      "paymentSync": {
+        "notYetSupported": "Opgeslagen, nog niet toegepast: het wordt toegepast zodra de betaaldienst is bijgewerkt. Gebruik dan hier \"Nu toepassen\".",
+        "notConnected": "Opgeslagen. Het wordt toegepast zodra het fonds met Citizen Pay is verbonden.",
+        "failed": "Opgeslagen, maar de synchronisatie met Citizen Pay is mislukt. Sla opnieuw op om het opnieuw te proberen.",
+        "refused": "Opgeslagen, maar Citizen Pay heeft het geweigerd: {message}",
+        "drift": "Citizen Pay past momenteel {remote} toe; La Caisse heeft {local}.",
+        "applyLocal": "Waarde van La Caisse toepassen",
+        "useRemote": "Waarde van Citizen Pay overnemen",
+        "applyNow": "Nu toepassen",
+        "unreadable": "De waarde die Citizen Pay toepast kon niet worden gelezen. Laad de pagina opnieuw om het opnieuw te proberen."
       }
     }
   },
@@ -3040,7 +3102,13 @@
       "cutoffDayInvalid": "Afkapdag moet een geheel getal tussen 1 en 31 zijn.",
       "nameTooLong": "De naam is te lang.",
       "embedDomainInvalid": "Voer één domein per regel in (voorbeeld.org, *.voorbeeld.org, localhost:3000).",
-      "embedDomainsTooMany": "Te veel domeinen — verwijder er een paar."
+      "embedDomainsTooMany": "Te veel domeinen — verwijder er een paar.",
+      "feeAccountInvalid": "Kies een van de rekeningen van het fonds.",
+      "feeAccountNotOwn": "Deze rekening is geen rekening van het fonds.",
+      "platformFeeInvalid": "De uitbetalingskosten moeten een getal zijn met maximaal 2 decimalen.",
+      "platformFeeTooHigh": "De uitbetalingskosten mogen niet hoger zijn dan 100%.",
+      "earlyPaidInvalid": "Voer een bedrag in euro in met maximaal 2 decimalen (bijv. 25,00).",
+      "earlyPaidRange": "De limiet moet tussen € 0,01 en € 1.000,00 liggen."
     }
   },
   "team": {

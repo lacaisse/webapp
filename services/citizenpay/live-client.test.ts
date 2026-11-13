@@ -7,7 +7,12 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/services/db/prisma", () => ({ prisma: {} }));
 
 import { cards, CitizenPayApiError, feeWaivers, payouts, treasury } from "./api";
-import { burnClaimFromWire, feeWaiversFromWire, LiveCitizenPayClient } from "./live-client";
+import {
+  burnClaimFromWire,
+  feeWaiversFromWire,
+  LiveCitizenPayClient,
+  paymentSettingsFromWire,
+} from "./live-client";
 
 const creds = { baseUrl: "https://cp.test", apiKeyId: "0xkey", apiKey: "secret" };
 type Call = { url: URL; method: string; body: unknown };
@@ -388,5 +393,85 @@ describe("fee waivers wire (/v2/treasury/fee-waivers)", () => {
     const err = await feeWaivers.list(creds).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(CitizenPayApiError);
     expect((err as CitizenPayApiError).status).toBe(404);
+  });
+});
+
+describe("payment settings wire (GET / PATCH /v2/treasury, api#277 + #278)", () => {
+  const client = new LiveCitizenPayClient(creds);
+  const A = "0x52908400098527886E0F7030069857D2E4169EE7";
+
+  it("reads absent fields as undefined (= not supported) and keeps null / 0", async () => {
+    reply = { status: 200, body: { feePercentageBps: 100 } }; // today's api
+    await expect(client.getTreasuryPaymentSettings()).resolves.toEqual({});
+    reply = {
+      status: 200,
+      body: {
+        feeAccountAddress: null,
+        payoutFeePercentageBps: 0,
+        earlyPaidMaxCents: null,
+        earlyPaidMaxCentsEffective: 5000,
+      },
+    };
+    await expect(client.getTreasuryPaymentSettings()).resolves.toEqual({
+      feeAccountAddress: null,
+      payoutFeePercentageBps: 0,
+      earlyPaidMaxCents: null,
+      earlyPaidMaxCentsEffective: 5000,
+    });
+    expect(calls[1].method).toBe("GET");
+    expect(calls[1].url.pathname).toBe("/v2/treasury");
+  });
+
+  it("drops unusable values rather than confirming with them", () => {
+    expect(
+      paymentSettingsFromWire({
+        feeAccountAddress: "nope",
+        payoutFeePercentageBps: -1,
+        earlyPaidMaxCents: 1.5,
+      }),
+    ).toEqual({});
+  });
+
+  it.each([
+    [{ feeAccountAddress: A }, { feeAccountAddress: A }],
+    [{ feeAccountAddress: null }, { feeAccountAddress: null }],
+    [{ payoutFeePercentageBps: 150 }, { payoutFeePercentageBps: 150 }],
+    [{ earlyPaidMaxCents: null }, { earlyPaidMaxCents: null }],
+    [{ earlyPaidMaxCents: 0 }, { earlyPaidMaxCents: 0 }],
+    [{ earlyPaidMaxCents: 2500 }, { earlyPaidMaxCents: 2500 }],
+  ])("PATCHes exactly %j", async (update, body) => {
+    reply = { status: 200, body: { ...body } };
+    await client.setTreasuryPaymentSettings(update);
+    expect(calls[0].method).toBe("PATCH");
+    expect(calls[0].body).toEqual(body);
+  });
+
+  it("surfaces #278's 409 as CitizenPayApiError", async () => {
+    reply = { status: 409, body: { error: "earlyPaidMaxCents is not available yet" } };
+    const err = await client.setTreasuryPaymentSettings({ earlyPaidMaxCents: 0 }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(CitizenPayApiError);
+    expect((err as CitizenPayApiError).status).toBe(409);
+  });
+
+  it("reads feesCollectedAtPayment on a payout, 0.00 when omitted", async () => {
+    const row = {
+      payoutId: "p1",
+      businessId: "b",
+      placeId: "pl",
+      status: "pending",
+      total: 1000,
+      fees: 0,
+      payoutFees: 40,
+      manualDeduction: 0,
+      net: 960,
+      startDate: "2026-11-01T00:00:00Z",
+      endDate: "2026-11-02T00:00:00Z",
+      createdAt: "2026-11-02T00:00:00Z",
+      updatedAt: "2026-11-02T00:00:00Z",
+    };
+    reply = { status: 200, body: { ...row, feesCollectedAtPayment: 20 } };
+    await expect(client.getPayout("p1")).resolves.toMatchObject({ feesCollectedAtPayment: "0.20" });
+    reply = { status: 200, body: row };
+    await expect(client.getPayout("p1")).resolves.toMatchObject({ feesCollectedAtPayment: "0.00" });
   });
 });

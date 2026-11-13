@@ -58,6 +58,8 @@ import type {
   TopUpOrderState,
   TopUpSignUrlInput,
   TreasuryKind,
+  TreasuryPaymentSettings,
+  TreasuryPaymentSettingsUpdate,
   TreasuryStats,
 } from "./types";
 
@@ -696,6 +698,27 @@ export interface CitizenPayClient {
    * `fund`. Idempotent on the api.
    */
   setTreasuryKind(kind: TreasuryKind): Promise<void>;
+
+  /**
+   * The fund's payment settings as CP holds them (fee account, platform
+   * payout fee, instant terminal confirmation cap — citizenpay/api#277 and
+   * #278), from `GET /v2/treasury`. A field the answer does not carry is
+   * `undefined`: the api does not support it yet. Throws on a failed read.
+   */
+  getTreasuryPaymentSettings(): Promise<TreasuryPaymentSettings>;
+
+  /**
+   * `PATCH /v2/treasury` with exactly the keys present in `update` and
+   * nothing else; answers the stored values CP echoes back (same
+   * `undefined` = not reported rule). Throws `CitizenPayApiError` on a
+   * refusal: 400 (invalid or refused value, or an api that knows none of the
+   * fields), 409 (the cap's column is missing on the api). La Caisse is
+   * canonical; services/citizenpay/sync-payment-settings.ts decides what to
+   * send.
+   */
+  setTreasuryPaymentSettings(
+    update: TreasuryPaymentSettingsUpdate,
+  ): Promise<TreasuryPaymentSettings>;
 
   /**
    * CP's public bank directory (Ponto financial institutions) for one

@@ -24,7 +24,7 @@ import {
   FORCED_RELEASE_MIN_AGE_MS,
 } from "@/services/payout/burn-claim-config";
 import { burnRecordedFrom, burnedFromReads } from "@/services/payout/backing";
-import { payoutWalletOutflow } from "@/services/payout/money";
+import { payoutSweepAmount, payoutWalletOutflow, toCents } from "@/services/payout/money";
 import { cn } from "@/lib/utils";
 
 import { AddOrdersDialog } from "./add-orders-dialog";
@@ -231,6 +231,36 @@ export default async function PayoutDetailPage({
           </Suspense>
         </dl>
 
+        {/* Fees collected at payment (citizenpay/api#277): a fund with a fee
+            account receives its transaction fees right after each payment,
+            so only the rest is swept here. Shown only when the api reports
+            some; otherwise the payout reads exactly as before. */}
+        {toCents(payout.feesCollectedAtPayment) > 0 && (
+          <div className="space-y-1 rounded-lg border border-border px-3 py-2 text-sm">
+            <div className="flex flex-wrap gap-x-6 gap-y-1">
+              <span>
+                <span className="text-muted-foreground">
+                  {t("feeBreakdown.collectedAtPayment")}:{" "}
+                </span>
+                <span className="font-medium tabular-nums">
+                  {euro(format, payout.feesCollectedAtPayment ?? "0")}
+                </span>
+              </span>
+              <span>
+                <span className="text-muted-foreground">
+                  {t("feeBreakdown.sweptAtPayout")}:{" "}
+                </span>
+                <span className="font-medium tabular-nums">
+                  {euro(format, payoutSweepAmount(payout))}
+                </span>
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {t("feeBreakdown.hint")}
+            </p>
+          </div>
+        )}
+
         {/* Manual deduction — a ledger adjustment lowering the net paid out.
             Editable only while pending (CP's gate); shown read-only once
             settlement has started, and hidden when there's nothing to show. */}
@@ -401,7 +431,8 @@ function Stat({
 // The place's live on-chain balance vs what settling this payout takes out of
 // that account — green when it holds enough, amber when it's short.
 //
-// `required` is `total − fees` (payoutWalletOutflow): settlement removes the net
+// `required` is `total − fees − feesCollectedAtPayment` (payoutWalletOutflow;
+// the last term only for a fund with a fee account): settlement removes the net
 // (the burn) *and* the retained cut (the sweep of payoutFees + manualDeduction),
 // which together are exactly what the place's wallet was credited for these
 // orders. It is NOT the payout total — the processor's commission was withheld

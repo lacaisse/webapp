@@ -11,6 +11,17 @@ import { requireFundRole } from "@/services/auth/dal";
 import { scheduleFundCardHolderSync } from "@/services/card/holder-sync";
 import { getCitizenPayClient } from "@/services/citizenpay/client";
 import { scheduleTreasuryKindSync } from "@/services/citizenpay/sync-fund-kind";
+import {
+  SYNCED_COLUMN,
+  isDefaultValue,
+  remoteValue,
+  type PaymentSettingField,
+  type PaymentSettingValue,
+} from "@/services/citizenpay/payment-settings-rules";
+import {
+  applyPaymentSetting,
+  type ApplyPaymentSettingOutcome,
+} from "@/services/citizenpay/sync-payment-settings";
 import { scheduleTreasuryTopUpUrlSync } from "@/services/citizenpay/sync-top-up-url";
 import {
   ensureMinterRoles,
@@ -22,6 +33,21 @@ import { Erc20MetadataError, readErc20Metadata } from "@/services/token/erc20-me
 import { EXTRA_TOKENS_BY_CHAIN } from "@/services/token/extra-tokens";
 
 import { euroToCents, payoutFixedFeeField } from "./fee-schema";
+import {
+  adoptRemotePaymentSetting,
+  loadFeeAccountOptions,
+  localPaymentSetting,
+  recordPaymentSettingOutcome,
+} from "./payment-settings";
+import {
+  earlyPaidField,
+  earlyPaidToCents,
+  feeAccountField,
+  parseFeeAccount,
+  percentToBps,
+  platformFeeField,
+  sameAddress,
+} from "./payment-settings-schema";
 
 export type SettingsResult = { ok: true } | { error: string };
 
@@ -544,6 +570,187 @@ export async function updatePayoutFeeAction(
     return { ok: true, warning: t("fund.settings.fees.syncFailed") };
   }
 
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+// --- Payment settings (fee account, payout fee, terminal cap) -------------
+// Three money settings applied on Citizen Pay one by one (citizenpay/api#277,
+// #278; services/citizenpay/sync-payment-settings.ts). They go to Citizen Pay
+// ONLY from an explicit action on their own tab — the form's save
+// (updatePaymentSettingsAction), "Apply La Caisse's value" / "Apply now"
+// (applyPaymentSettingAction) or "Use Citizen Pay's value"
+// (adoptPaymentSettingAction) — never from another save or a connect, and
+// every change of what CP applies is recorded (FundPaymentSettingEvent: who,
+// when, what). A save always converges CP to the value shown, even when it
+// equals La Caisse's stored value (CP may hold another one, set elsewhere).
+// Nothing fails the save: an api that does not know a setting yet gives a
+// notice and the value waits for "Apply now"; a refusal puts the control
+// back on the value CP still applies and shows the api's message.
+
+export type PaymentSettingsResult =
+  | {
+      ok: true;
+      notice?: string;
+      warning?: string;
+      // After a refusal: the value Citizen Pay still applies, which the
+      // control goes back to (and which is now stored).
+      revertedTo?: { field: PaymentSettingField; value: PaymentSettingValue };
+    }
+  | { error: string };
+
+const PaymentSettingsSchema = z.object({
+  feeAccount: feeAccountField.optional(),
+  platformPayoutFee: platformFeeField.optional(),
+  earlyPaid: earlyPaidField.optional(),
+});
+
+const PAYMENT_FIELD = z.enum(["feeAccountAddress", "platformPayoutFeeBps", "earlyPaidMaxCents"]);
+
+type Translator = Awaited<ReturnType<typeof getTranslations>>;
+
+function isConnected(fund: { citizenPayApiKeyId: string | null; citizenPayApiKeyEnc: string | null }) {
+  return Boolean(fund.citizenPayApiKeyId && fund.citizenPayApiKeyEnc);
+}
+
+// Turn the per-setting outcomes into one answer for the form.
+function paymentSettingsAnswer(
+  t: Translator,
+  results: { field: PaymentSettingField; wanted: PaymentSettingValue; outcome: ApplyPaymentSettingOutcome }[],
+): PaymentSettingsResult {
+  const refused = results.find((r) => r.outcome.kind === "refused");
+  if (refused && refused.outcome.kind === "refused") {
+    return {
+      ok: true,
+      warning: t("fund.settings.paymentSync.refused", { message: refused.outcome.message }),
+      revertedTo: { field: refused.field, value: refused.outcome.confirmed },
+    };
+  }
+  if (results.some((r) => r.outcome.kind === "failed")) {
+    return { ok: true, warning: t("fund.settings.paymentSync.failed") };
+  }
+  if (results.some((r) => r.outcome.kind === "notSupported" && !isDefaultValue(r.field, r.wanted))) {
+    return { ok: true, notice: t("fund.settings.paymentSync.notYetSupported") };
+  }
+  return { ok: true };
+}
+
+// Apply each setting on CP (concurrently: the save is bounded by the slowest,
+// about 15 s — see sync-payment-settings.ts) and record each outcome.
+async function applyAndRecord(
+  fund: { id: string; citizenPayApiKeyId: string | null; citizenPayApiKeyEnc: string | null },
+  userId: string,
+  wanted: { field: PaymentSettingField; wanted: PaymentSettingValue }[],
+) {
+  const client = getCitizenPayClient(fund);
+  return Promise.all(
+    wanted.map(async (w) => {
+      const outcome = await applyPaymentSetting(client, w.field, w.wanted, { fundId: fund.id });
+      await recordPaymentSettingOutcome(fund.id, w.field, w.wanted, outcome, userId);
+      return { ...w, outcome };
+    }),
+  );
+}
+
+export async function updatePaymentSettingsAction(
+  input: z.input<typeof PaymentSettingsSchema>,
+): Promise<PaymentSettingsResult> {
+  const t = await getTranslations();
+  const { fund, user } = await requireFundRole("ADMIN");
+  const parsed = PaymentSettingsSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: t(parsed.error.issues[0].message as never) };
+  }
+  const { feeAccount, platformPayoutFee, earlyPaid } = parsed.data;
+
+  const wanted: { field: PaymentSettingField; wanted: PaymentSettingValue }[] = [];
+  if (feeAccount !== undefined) {
+    const address = parseFeeAccount(feeAccount);
+    // One of the fund's OWN accounts only, re-derived here from the fund's
+    // rows — never trust the option list the browser had. The stored value
+    // itself passes (an account archived since stays until changed).
+    if (address !== null && !sameAddress(address, fund.feeAccountAddress)) {
+      const options = await loadFeeAccountOptions(fund, "");
+      if (!options.some((o) => sameAddress(o.address, address))) {
+        return { error: t("settings.errors.feeAccountNotOwn") };
+      }
+    }
+    wanted.push({
+      field: "feeAccountAddress",
+      // Keep the stored spelling when it is the same account.
+      wanted: sameAddress(address, fund.feeAccountAddress) ? fund.feeAccountAddress : address,
+    });
+  }
+  if (platformPayoutFee !== undefined) {
+    wanted.push({ field: "platformPayoutFeeBps", wanted: percentToBps(platformPayoutFee) });
+  }
+  if (earlyPaid !== undefined) {
+    wanted.push({ field: "earlyPaidMaxCents", wanted: earlyPaidToCents(earlyPaid) });
+  }
+  if (wanted.length === 0) return { ok: true };
+
+  const connected = isConnected(fund);
+  // Stored first, pending until CP confirms it. Not connected: a default is
+  // simply in force; anything else waits for a connect and "Apply now".
+  const data: Record<string, unknown> = {};
+  for (const w of wanted) {
+    data[w.field] = w.wanted;
+    data[SYNCED_COLUMN[w.field]] = !connected && isDefaultValue(w.field, w.wanted);
+  }
+  await prisma.fund.update({ where: { id: fund.id }, data });
+
+  if (!connected) {
+    revalidatePath("/settings");
+    return wanted.some((w) => !isDefaultValue(w.field, w.wanted))
+      ? { ok: true, notice: t("fund.settings.paymentSync.notConnected") }
+      : { ok: true };
+  }
+
+  const results = await applyAndRecord(fund, user.id, wanted);
+  revalidatePath("/settings");
+  return paymentSettingsAnswer(t, results);
+}
+
+// "Apply La Caisse's value" / "Apply now": push the stored value of one
+// setting to CP, on an explicit click on its own tab.
+export async function applyPaymentSettingAction(input: {
+  field: PaymentSettingField;
+}): Promise<PaymentSettingsResult> {
+  const t = await getTranslations();
+  const { fund, user } = await requireFundRole("ADMIN");
+  const field = PAYMENT_FIELD.safeParse(input.field);
+  if (!field.success) return { error: t("fund.settings.paymentSync.failed") };
+  if (!isConnected(fund)) return { ok: true, notice: t("fund.settings.paymentSync.notConnected") };
+  const results = await applyAndRecord(fund, user.id, [
+    { field: field.data, wanted: localPaymentSetting(fund, field.data) },
+  ]);
+  revalidatePath("/settings");
+  return paymentSettingsAnswer(t, results);
+}
+
+// "Use Citizen Pay's value": take the value CP applies now as La Caisse's
+// own (read fresh, never from the browser), recorded as "adopted".
+export async function adoptPaymentSettingAction(input: {
+  field: PaymentSettingField;
+}): Promise<PaymentSettingsResult> {
+  const t = await getTranslations();
+  const { fund, user } = await requireFundRole("ADMIN");
+  const field = PAYMENT_FIELD.safeParse(input.field);
+  if (!field.success || !isConnected(fund)) {
+    return { error: t("fund.settings.paymentSync.failed") };
+  }
+  let value: PaymentSettingValue | undefined;
+  try {
+    value = remoteValue(
+      await getCitizenPayClient(fund).getTreasuryPaymentSettings(),
+      field.data,
+    );
+  } catch (e) {
+    console.warn("[settings] payment settings read failed", fund.id, e);
+    return { error: t("fund.settings.paymentSync.unreadable") };
+  }
+  if (value === undefined) return { error: t("fund.settings.paymentSync.notYetSupported") };
+  await adoptRemotePaymentSetting(fund.id, field.data, value, user.id);
   revalidatePath("/settings");
   return { ok: true };
 }

@@ -19,6 +19,13 @@ import { parseVisibleIf } from "@/services/onboarding/visibility";
 import { alchemyNetwork } from "@/services/alchemy/client";
 import { listCustomDisplayTokens } from "@/services/token/display-tokens";
 import { loadFeeWaiverState } from "@/services/fund/fee-waivers";
+import {
+  loadFeeAccountOptions,
+  loadRemotePaymentSettings,
+} from "@/services/fund/payment-settings";
+import { EARLY_PAID_DEFAULT_CENTS } from "@/services/fund/payment-settings-schema";
+import { viewPaymentSetting } from "@/services/citizenpay/payment-settings-rules";
+import type { Fund } from "@/services/db/generated/client";
 import { EXTRA_TOKENS_BY_CHAIN } from "@/services/token/extra-tokens";
 import {
   OnboardingFields,
@@ -41,6 +48,11 @@ import { TokenInfo } from "./token-info";
 import { BalanceDisplayForm } from "./balance-display-form";
 import { CustomTokensForm } from "./custom-tokens-form";
 import { FeeWaiversForm } from "./fee-waivers-form";
+import {
+  EarlyPaidForm,
+  FeeAccountForm,
+  PayoutFeeForm,
+} from "./payment-settings-forms";
 import {
   BrandingForm,
   CitizenPayForm,
@@ -163,6 +175,66 @@ function FeeWaiversSkeleton() {
       <Skeleton className="h-3 w-80 max-w-full" />
       <Skeleton className="h-10 w-full" />
     </div>
+  );
+}
+
+// Payment settings applied on Citizen Pay on their own (fee account, payout
+// fee, terminal confirmation limit; services/citizenpay/sync-payment-settings).
+// Whenever the fund is connected, the tab reads what Citizen Pay applies
+// right now (`GET /v2/treasury`) and each form says how that compares with
+// La Caisse's value (payment-settings-rules.ts::viewPaymentSetting). A failed
+// read does not block the page: the form says the live value is unknown.
+
+// Settings → Fees: the fee account (where transaction fees go at payment
+// time) and the payout fee (the platform fee, charged at payout only).
+async function FeePaymentSettingsSection({ fund }: { fund: Fund }) {
+  const t = await getTranslations("fund");
+  const [options, remote] = await Promise.all([
+    loadFeeAccountOptions(fund, t("accounts.defaultName")),
+    loadRemotePaymentSettings(fund),
+  ]);
+  return (
+    <div className="space-y-6">
+      <FeeAccountForm
+        // Remount on a stored-value change (adopt / revert), so the control
+        // shows it.
+        key={`fee-${fund.feeAccountAddress ?? "none"}`}
+        options={options}
+        current={fund.feeAccountAddress}
+        sweepDestination={fund.tokenMinterSmartAccountAddress}
+        view={viewPaymentSetting("feeAccountAddress", fund.feeAccountAddress, remote)}
+      />
+      <div className="border-t border-border pt-6">
+        <PayoutFeeForm
+          key={`payout-${fund.platformPayoutFeeBps}`}
+          bps={fund.platformPayoutFeeBps}
+          view={viewPaymentSetting("platformPayoutFeeBps", fund.platformPayoutFeeBps, remote)}
+        />
+      </div>
+    </div>
+  );
+}
+
+// Settings → Citizen Pay → Terminals: the instant confirmation limit, with
+// the limit Citizen Pay reports in force.
+async function TerminalSettingsSection({ fund }: { fund: Fund }) {
+  const remote = await loadRemotePaymentSettings(fund);
+  const live = remote && remote !== "error" ? remote : null;
+  return (
+    <EarlyPaidForm
+      key={`cap-${fund.earlyPaidMaxCents ?? "default"}`}
+      cents={fund.earlyPaidMaxCents}
+      effectiveCents={live?.earlyPaidMaxCentsEffective}
+      defaultCents={
+        // The api's default: what it reports in force while its own value is
+        // the default, else the documented one.
+        live?.earlyPaidMaxCents === null &&
+        typeof live.earlyPaidMaxCentsEffective === "number"
+          ? live.earlyPaidMaxCentsEffective
+          : EARLY_PAID_DEFAULT_CENTS
+      }
+      view={viewPaymentSetting("earlyPaidMaxCents", fund.earlyPaidMaxCents, remote)}
+    />
   );
 }
 
@@ -399,6 +471,22 @@ async function SettingsContent({
         </Card>
       )}
 
+      {/* The terminals' behaviour is a Citizen Pay setting of the fund (its
+          terminals are Citizen Pay's); La Caisse has no terminals page. */}
+      {active === "citizenpay" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("terminals.title")}</CardTitle>
+            <CardDescription>{t("terminals.description")}</CardDescription>
+          </CardHeader>
+          <CardContent className="pb-4">
+            <Suspense fallback={<Skeleton className="h-32 w-full" />}>
+              <TerminalSettingsSection fund={fund} />
+            </Suspense>
+          </CardContent>
+        </Card>
+      )}
+
       {active === "subscription" && (
         <Suspense fallback={<Skeleton className="h-64 w-full" />}>
           <SubscriptionTab
@@ -442,6 +530,13 @@ async function SettingsContent({
             <CardDescription>{t("fees.description")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6 pb-4">
+            {/* Transaction fees: charged to the merchant on each payment. */}
+            <div className="space-y-1">
+              <h3 className="text-sm font-medium">{t("fees.transactionTitle")}</h3>
+              <p className="text-xs text-muted-foreground">
+                {t("fees.transactionDescription")}
+              </p>
+            </div>
             <FeeForm fund={fundForForms} />
             <div className="border-t border-border pt-6">
               <Suspense fallback={<FeeWaiversSkeleton />}>
@@ -453,6 +548,11 @@ async function SettingsContent({
                     citizenPayApiKeyEnc: fund.citizenPayApiKeyEnc,
                   }}
                 />
+              </Suspense>
+            </div>
+            <div className="border-t border-border pt-6">
+              <Suspense fallback={<FeeWaiversSkeleton />}>
+                <FeePaymentSettingsSection fund={fund} />
               </Suspense>
             </div>
           </CardContent>
