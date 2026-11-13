@@ -104,11 +104,12 @@ export function PayoutProcess({
   // be running or it was interrupted. Replaces the Burn button with the
   // record / release panel so no second burn can start from here.
   burnClaim: BurnClaimView | null;
-  // A burn hash is recorded on the payout. While `payment-pending` without
-  // one (the payment was created first, e.g. by an agent), the burn is still
-  // open and must land before the transfer is signed: Citizen Pay refuses it
-  // once the bank has accepted the transfer.
-  burnRecorded: boolean;
+  // Is a burn recorded (services/payout/backing.ts::burnRecordedFrom): true,
+  // false = certainly not, null = cannot be told (a `complete` payout on an
+  // api predating citizenpay/api#275). While `payment-pending` or `complete`
+  // without one, the burn is still open: Citizen Pay takes it before or after
+  // the transfer is signed (an older api refuses it once complete).
+  burnRecorded: boolean | null;
 }) {
   const t = useTranslations("fund.payments.settlement.process");
   const tFee = useTranslations("fund.payments.settlement.feeTransfer");
@@ -171,6 +172,17 @@ export function PayoutProcess({
             signingUrl={signingUrl}
             signingQr={signingQr}
           />
+        )}
+        {status === "complete" && burnRecorded === false && (
+          <div className="mb-4 border-b border-border pb-4">
+            {burnClaim ? (
+              <BurnClaimPanel payoutId={payoutId} claim={burnClaim} />
+            ) : (
+              <ActionRow hint={t("burn.paidNotBurnt")}>
+                <BurnDialog payoutId={payoutId} />
+              </ActionRow>
+            )}
+          </div>
         )}
         {status === "complete" && (
           <p className="inline-flex items-center gap-2 text-sm text-muted-foreground">

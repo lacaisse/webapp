@@ -1913,7 +1913,8 @@
           },
           "burn": {
             "hint": "Brûle le net du commerce depuis son compte ; la commission plateforme et la déduction sont transférées à la caisse.",
-            "beforeSigning": "Brûlez avant de signer : une fois le virement accepté par la banque, Citizen Pay n’accepte plus le brûlage."
+            "beforeSigning": "Brûlez les jetons de ce virement. Cela fonctionne avant ou après la signature ; signer d’abord paie le commerçant avant que ses jetons soient détruits. Ne laissez jamais un virement payé sans brûlage.",
+            "paidNotBurnt": "Payé à la banque, jetons pas encore brûlés. Brûlez-les maintenant pour solder le virement."
           },
           "pay": {
             "hint": "Crée le paiement bancaire au commerce ; vous signerez le virement à votre banque.",

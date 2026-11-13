@@ -294,21 +294,26 @@ export function buildBackingReport(args: {
 }
 
 /**
- * Is a burn recorded on this payout? The live client never fills
- * `burnTxHashes` (neither the list, the detail nor the status wire carries
- * them), so an empty list proves nothing. Evidence of a burn: a hash, the live
- * status `burnt`, or a fee sweep (done or pending — it only exists on a burned
- * payout). `true` = evidence; `false` = certainly none (`pending` /
- * `payment-pending` without evidence: CP would say `burnt`); `null` = cannot
- * be told from here (`complete`, or an unknown status, without evidence — the
- * place wallet / token history on chain decides).
+ * Is a burn recorded on this payout? When the api sends `burned`
+ * (citizenpay/api#275, on the detail and the status) it is authoritative and
+ * decides alone: `status` says `complete` both for a burned payout and for one
+ * paid at the bank but never burned, and `burnTxHashes` can be empty for a
+ * burned legacy row. Without it (an older api, whose wires carry no hashes),
+ * fall back to evidence: a hash, the live status `burnt`, or a fee sweep (done
+ * or pending — it only exists on a burned payout) = `true`; `pending` /
+ * `payment-pending` without evidence = `false` (CP would say `burnt`);
+ * otherwise `null` = cannot be told from here (`complete`, or an unknown
+ * status, without evidence — the place wallet / token history on chain
+ * decides).
  */
 export function burnRecordedFrom(e: {
   status: string | null | undefined;
+  burned?: boolean | null;
   burnTxHashes?: readonly string[] | null;
   feeTransferTxHash?: string | null;
   feeTransferPending?: boolean | null;
 }): boolean | null {
+  if (typeof e.burned === "boolean") return e.burned;
   if (
     (e.burnTxHashes?.length ?? 0) > 0 ||
     e.status === "burnt" ||
@@ -319,6 +324,30 @@ export function burnRecordedFrom(e: {
   }
   if (e.status === "pending" || e.status === "payment-pending") return false;
   return null;
+}
+
+// The api's authoritative `burned` (citizenpay/api#275) from the detail and
+// the live status: true if either says so, false if either says not, else
+// undefined (an older api — burnRecordedFrom then goes by evidence).
+export function burnedFromReads(
+  ...reads: ({ burned?: boolean | null } | null | undefined)[]
+): boolean | undefined {
+  if (reads.some((r) => r?.burned === true)) return true;
+  if (reads.some((r) => r?.burned === false)) return false;
+  return undefined;
+}
+
+/**
+ * Is a burn still owed on this payout: a bank payment exists (`payment-pending`)
+ * or the payout is paid (`complete`), and the burn is CERTAINLY not recorded
+ * (`burnRecorded === false`; unknown is not outstanding). burn_payout takes it
+ * in both states on an api with citizenpay/api#275.
+ */
+export function burnOutstandingFrom(
+  status: string | null | undefined,
+  burnRecorded: boolean | null,
+): boolean {
+  return burnRecorded === false && (status === "payment-pending" || status === "complete");
 }
 
 /** One line per warning, for embedding in an error message. */

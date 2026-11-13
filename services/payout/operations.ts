@@ -40,6 +40,7 @@ import {
   backingSummary,
   buildBackingReport,
   burnRecordedFrom,
+  burnedFromReads,
   decodeTransferLogs,
   evaluateBalance,
   evaluateSharedSettlements,
@@ -50,7 +51,7 @@ import {
 } from "./backing";
 
 export type { PayoutBackingReport } from "./backing";
-export { burnRecordedFrom } from "./backing";
+export { burnOutstandingFrom, burnRecordedFrom, burnedFromReads } from "./backing";
 import {
   buildPayoutExportCsv,
   PayoutExportRangeSchema,
@@ -457,6 +458,9 @@ export type PayoutDetailResult =
       feeTransferTxHash: string | null;
       /** In-flight burn claim (a burn started, nothing recorded yet). */
       burnClaim: PayoutBurnClaim | null;
+      /** The api's authoritative "burn recorded" (citizenpay/api#275), from
+       *  the detail or the status; undefined on an older api. */
+      burned: boolean | undefined;
     };
 
 /**
@@ -495,6 +499,7 @@ export async function getPayoutDetail(
     feeTransferPending: live?.feeTransferPending ?? payout.feeTransferPending,
     feeTransferTxHash: live?.feeTransferTxHash ?? payout.feeTransferTxHash,
     burnClaim: live ? live.burnClaim : payout.burnClaim,
+    burned: burnedFromReads(payout, live),
   };
 }
 
@@ -1496,7 +1501,7 @@ export async function addOrders(
 }
 
 // =============================================================================
-// Settlement — create the bank payment, burn the tokens, then the operator signs
+// Settlement — create the bank payment, the operator signs, burn the tokens
 // =============================================================================
 
 export type CreatePayoutPaymentOutcome =
@@ -1725,9 +1730,10 @@ export type BurnPayoutResult =
 
 // CP's 409 messages on `burn-claim` (plan §4.2). Matched loosely — the
 // status code is what says "refused"; the text only picks the explanation.
-// "already complete" is told apart: the bank payment completed the payout
-// (CP's cron does so within seconds of the bank accepting the transfer) and
-// CP then refuses the burn whether or not one happened — see paidNotBurnt.
+// "already complete" is told apart: an api predating citizenpay/api#275
+// refuses the burn on any complete payout (CP's cron completes one within
+// seconds of the bank accepting the transfer), burned or not; a newer one only
+// on a complete payout CP itself claimed or burned — see paidNotBurnt.
 const CLAIM_COMPLETE = /already complete/i;
 const CLAIM_NOT_BURNABLE = /already (burnt|burned)|not pending/i;
 const CLAIM_IN_PROGRESS = /burn already in progress/i;
@@ -1759,15 +1765,21 @@ async function releaseOwnClaim(
   }
 }
 
-// Evidence of a burn on a complete payout: hashes on the payout (mock only),
-// or a fee sweep done / pending on the payout or the live status.
+// Is a burn recorded on a complete payout: the api's `burned` when sent,
+// else evidence — hashes on the payout, or a fee sweep done / pending on the
+// payout or the live status.
 function hasBurnEvidence(
   payout: Payout,
-  live?: { feeTransferTxHash?: string | null; feeTransferPending?: boolean },
+  live?: {
+    burned?: boolean | null;
+    feeTransferTxHash?: string | null;
+    feeTransferPending?: boolean;
+  },
 ): boolean {
   return (
     burnRecordedFrom({
       status: "complete",
+      burned: burnedFromReads(payout, live),
       burnTxHashes: payout.burnTxHashes,
       feeTransferTxHash: payout.feeTransferTxHash || live?.feeTransferTxHash,
       feeTransferPending: payout.feeTransferPending || live?.feeTransferPending,
@@ -1775,10 +1787,11 @@ function hasBurnEvidence(
   );
 }
 
-// The answer for a payout CP marked `complete` with no evidence of a burn
-// (see burnRecordedFrom — the live client carries no burn hashes, so "none
-// recorded" cannot be asserted): paid at the bank, CP refuses both the burn and
-// the fee sweep, and whether it was burned must be checked on chain. Gives the
+// The answer when CP refuses the claim on a `complete` payout with no burn
+// recorded as far as we can tell ("already complete": an api predating
+// citizenpay/api#275, or a payout CP itself claimed): paid at the bank, CP
+// refuses both the burn and the fee sweep, and whether it was burned must be
+// checked on chain before anyone burns by hand from /token. Gives the
 // figures and wallet to check against, best-effort (left out when a read
 // fails). A payout with evidence of a burn is just not burnable.
 async function paidNotBurnt(
@@ -1786,7 +1799,11 @@ async function paidNotBurnt(
   c: CitizenPayClient,
   payoutId: string,
   known?: Payout,
-  live?: { feeTransferTxHash?: string | null; feeTransferPending?: boolean },
+  live?: {
+    burned?: boolean | null;
+    feeTransferTxHash?: string | null;
+    feeTransferPending?: boolean;
+  },
 ): Promise<BurnPayoutResult> {
   let payout: Payout | null = known ?? null;
   if (!payout) {
@@ -1806,7 +1823,7 @@ async function paidNotBurnt(
     console.warn("[payout] paidNotBurnt: place read failed", logSafe(payoutId), e);
   }
   console.error(
-    "[payout] complete with no burn evidence: Citizen Pay refuses the burn",
+    "[payout] complete with no burn recorded: Citizen Pay refuses the burn",
     logSafe(payoutId),
   );
   if (!payout || !wallet) return { error: err(ctx, "paidNotBurntNoDetail") };
@@ -1826,14 +1843,16 @@ async function paidNotBurnt(
  * payout `net`) with the fund's minter wallet, then report the hash so CP marks
  * the payout `burnt`. IRREVERSIBLE.
  *
- * Burnable while `pending` or `payment-pending` (a bank payment exists but the
- * bank has not accepted it): CP accepts the claim and the burn report in both.
- * Once the bank accepts the transfer CP's cron marks the payout `complete`
- * within seconds and refuses burn and sweep from then on — so the burn must
- * be finished before the operator signs. A `complete` payout with a burn
- * recorded is not burnable; one with none still takes the claim (an api that
- * accepts it then works unchanged), and CP's "already complete" answer comes
- * back as `paidNotBurnt`.
+ * Burnable while `pending`, `payment-pending` (a bank payment exists but the
+ * bank has not accepted it) or `complete` with no burn recorded (paid at the
+ * bank; CP's cron completes a payout within seconds of the bank accepting the
+ * transfer): CP accepts the claim, the burn report and the sweep in all three
+ * (citizenpay/api#275; the payout stays `complete`). Recommended order: pay →
+ * operator signs → burn, so the merchant is paid before their tokens are
+ * destroyed. A `complete` payout with a burn recorded (`burned`, or evidence
+ * on an older api) is not burnable. An api predating #275 refuses the claim
+ * on any complete payout with "already complete", which comes back as
+ * `paidNotBurnt` (burn by hand from /token after checking on chain).
  *
  * Double-burn guard: before touching the chain we take CP's burn claim, which
  * exactly one concurrent attempt can win (two admins, a double click across
@@ -1858,8 +1877,9 @@ export async function burnPayout(
     if (status === "burnt") return { error: err(ctx, "notBurnable") };
     let completedPayout: Payout | undefined;
     if (status === "complete") {
-      // Paid at the bank. Evidence of a burn? Then there's nothing to do. If
-      // not, the claim below still runs: it is what tells us whether CP takes it.
+      // Paid at the bank. Burn recorded (`burned`, or evidence on an older
+      // api)? Then there's nothing to do. If not — certainly not, or unknown —
+      // the claim below runs: it is what tells us whether CP takes it.
       try {
         completedPayout = await c.getPayout(payoutId);
       } catch (e) {
@@ -2017,9 +2037,11 @@ export async function burnPayout(
   }
 }
 
-// The live statuses CP accepts a burn claim and a burn report in.
+// The live statuses a client burn claim can be held in, so its hash can be
+// recorded or the claim released. `complete` since citizenpay/api#275 (a paid
+// payout still to burn); a `burnt` payout never shows a claim.
 function isBurnableStatus(status: PayoutStatus): boolean {
-  return status === "pending" || status === "payment-pending";
+  return status === "pending" || status === "payment-pending" || status === "complete";
 }
 
 // Report a burn's hash to CP and run the post-burn handling. Shared by the
@@ -2127,8 +2149,8 @@ export async function recordPayoutBurn(
     // Only while a claim is in flight: that's the one state where a burn may
     // exist unrecorded. Re-read it so a stale page can't record a hash on a
     // payout that's already burned (CP would book it as a second burn). A
-    // claim can be taken while `payment-pending` too, so it must stay
-    // resolvable there.
+    // claim can be taken while `payment-pending` or `complete` (unburned) too,
+    // so it must stay resolvable there.
     const live = await c.getPayoutStatus(input.payoutId);
     if (!isBurnableStatus(live.status) || !live.burnClaim) {
       return { error: err(ctx, "noBurnClaim") };

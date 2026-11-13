@@ -23,6 +23,7 @@ import {
   attemptBurnedNothing,
   FORCED_RELEASE_MIN_AGE_MS,
 } from "@/services/payout/burn-claim-config";
+import { burnRecordedFrom, burnedFromReads } from "@/services/payout/backing";
 import { payoutWalletOutflow } from "@/services/payout/money";
 import { cn } from "@/lib/utils";
 
@@ -106,9 +107,12 @@ export default async function PayoutDetailPage({
   // are formatted here so server and client render the same strings.
   const burnClaim = live ? live.burnClaim : payout.burnClaim;
   let burnClaimView: BurnClaimView | null = null;
-  // A claim can be taken while payment-pending too (the burn is still open
-  // there until the bank accepts the transfer).
-  if (burnClaim && (liveStatus === "pending" || liveStatus === "payment-pending")) {
+  // A claim can be taken while payment-pending, and on a complete payout with
+  // no burn recorded (citizenpay/api#275: a paid payout still to burn).
+  if (
+    burnClaim &&
+    (liveStatus === "pending" || liveStatus === "payment-pending" || liveStatus === "complete")
+  ) {
     const claimedAtMs = Date.parse(burnClaim.claimedAt);
     const known = !Number.isNaN(claimedAtMs);
     const releasableAtMs = known ? claimedAtMs + FORCED_RELEASE_MIN_AGE_MS : 0;
@@ -268,7 +272,13 @@ export default async function PayoutDetailPage({
         signingQr={signingQr}
         feeTransferPending={live?.feeTransferPending ?? payout.feeTransferPending}
         burnClaim={burnClaimView}
-        burnRecorded={(payout.burnTxHashes ?? []).length > 0}
+        burnRecorded={burnRecordedFrom({
+          status: liveStatus,
+          burned: burnedFromReads(payout, live),
+          burnTxHashes: payout.burnTxHashes,
+          feeTransferTxHash: live?.feeTransferTxHash || payout.feeTransferTxHash,
+          feeTransferPending: live?.feeTransferPending || payout.feeTransferPending,
+        })}
       />
 
       <section className="space-y-3">

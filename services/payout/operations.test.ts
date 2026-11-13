@@ -796,6 +796,56 @@ describe("burnPayout — payment-pending and complete", () => {
     expect(cp.burnPayout).toHaveBeenCalledWith(PAYOUT, TX, MINTER, CLAIM.claimId);
   });
 
+  it("burns a complete payout the api reports `burned: false` (api#275), stays on the claim path", async () => {
+    cp.getPayoutStatus.mockResolvedValue({ status: "complete", burnClaim: null, burned: false });
+    cp.getPayout.mockResolvedValue({
+      id: PAYOUT,
+      net: "48.75",
+      totalAmount: "52.00",
+      totalFees: "2.00",
+      totalPayoutFees: "1.25",
+      manualDeduction: "0.00",
+      burnTxHashes: [],
+      burned: false,
+    } as unknown as Payout);
+    expect(await burnPayout(ctx, PAYOUT)).toMatchObject({ ok: true, txHash: TX });
+    expect(cp.claimPayoutBurn).toHaveBeenCalledWith(PAYOUT);
+    expect(burnDirect).toHaveBeenCalledTimes(1);
+    expect(cp.burnPayout).toHaveBeenCalledWith(PAYOUT, TX, MINTER, CLAIM.claimId);
+  });
+
+  it("refuses a complete payout the api reports `burned: true` with no hashes, taking no claim", async () => {
+    cp.getPayoutStatus.mockResolvedValue({ status: "complete", burnClaim: null, burned: true });
+    cp.getPayout.mockResolvedValue({
+      id: PAYOUT,
+      net: "48.75",
+      burnTxHashes: [],
+      burned: true,
+    } as unknown as Payout);
+    expect(await burnPayout(ctx, PAYOUT)).toEqual({ error: `${E}.notBurnable` });
+    expect(cp.claimPayoutBurn).not.toHaveBeenCalled();
+    expect(burnDirect).not.toHaveBeenCalled();
+  });
+
+  it("`burned: false` outweighs a stale sweep flag (authoritative)", async () => {
+    cp.getPayoutStatus.mockResolvedValue({
+      status: "complete",
+      burnClaim: null,
+      burned: false,
+      feeTransferPending: true,
+    });
+    cp.getPayout.mockResolvedValue({
+      id: PAYOUT,
+      net: "48.75",
+      totalAmount: "52.00",
+      totalFees: "2.00",
+      totalPayoutFees: "1.25",
+      manualDeduction: "0.00",
+      burnTxHashes: [],
+    } as unknown as Payout);
+    expect(await burnPayout(ctx, PAYOUT)).toMatchObject({ ok: true, txHash: TX });
+  });
+
   it("a concurrent second attempt (claim held) is still refused and burns nothing", async () => {
     cp.getPayoutStatus.mockResolvedValue({ status: "payment-pending", burnClaim: null });
     cp.claimPayoutBurn.mockRejectedValueOnce(
@@ -837,6 +887,27 @@ describe("recordPayoutBurn — payment-pending", () => {
       txHash: TX,
     });
     expect(cp.burnPayout).toHaveBeenCalledWith(PAYOUT, TX, MINTER, undefined);
+  });
+
+  it("accepts a claim held on a complete payout (api#275: paid, burn still owed)", async () => {
+    cp.getPayoutStatus.mockResolvedValue({
+      status: "complete",
+      burned: false,
+      burnClaim: { claimId: CLAIM.claimId, claimedAt: CLAIM.claimedAt, source: "external" },
+    });
+    verifyPayoutBurn.mockResolvedValue({ ok: true, txHash: TX });
+    expect(await recordPayoutBurn(ctx, { payoutId: PAYOUT, txHash: TX })).toMatchObject({
+      ok: true,
+      txHash: TX,
+    });
+  });
+
+  it("refuses on a complete payout with no claim", async () => {
+    cp.getPayoutStatus.mockResolvedValue({ status: "complete", burnClaim: null });
+    expect(await recordPayoutBurn(ctx, { payoutId: PAYOUT, txHash: TX })).toEqual({
+      error: `${E}.noBurnClaim`,
+    });
+    expect(cp.burnPayout).not.toHaveBeenCalled();
   });
 });
 

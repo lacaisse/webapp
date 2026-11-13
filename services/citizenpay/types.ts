@@ -303,11 +303,13 @@ export type FeeTransferResult = {
 //   - createPayoutPayment → CP creates the SEPA transfer to the merchant and
 //     returns a signing URL the admin opens at their bank;
 //   - burnPayout → the matching tokens are burned on-chain.
-// The burn must be recorded BEFORE the transfer is signed: CP marks a payout
-// `complete` within seconds of the bank accepting the transfer, burned or
-// not, and refuses burn and fee sweep on a complete payout. CP accepts the
-// burn while `pending` or `payment-pending` (payment created, not accepted).
-// Statuses: pending, payment-pending, burnt, complete.
+// CP accepts the burn while `pending`, `payment-pending` (payment created,
+// not accepted) or `complete` with no burn recorded (citizenpay/api#275; CP
+// marks a payout `complete` within seconds of the bank accepting the signed
+// transfer, burned or not — an older api refuses the burn and fee sweep then).
+// Recommended order: create → reconcile → pay → operator signs → burn, so the
+// merchant is paid before their tokens are destroyed; never leave a paid
+// payout unburned. Statuses: pending, payment-pending, burnt, complete.
 
 export type PayoutStatus = "pending" | "payment-pending" | "burnt" | "complete";
 
@@ -323,6 +325,10 @@ export type PayoutStatusDetail = {
   // In-flight burn claim (see PayoutBurnClaim) — drives the "burn started but
   // not confirmed" panel. Null when none, or on an api without the claim.
   burnClaim: PayoutBurnClaim | null;
+  // Is a burn recorded — authoritative when the api sends it
+  // (citizenpay/api#275); undefined/null on an older api. `status` alone
+  // cannot tell "complete and burned" from "complete, paid, never burned".
+  burned?: boolean | null;
 };
 
 // =============================================================================
@@ -367,8 +373,12 @@ export type Payout = {
   net: string; // Decimal string, EUR — what the merchant is paid
   status: PayoutStatus;
   // On-chain burn tx hashes once the burn step runs (CP returns one per
-  // token batch). Empty until burnt.
+  // token batch). Empty until burnt, on list rows, and on an api predating
+  // citizenpay/api#275; can be empty for a burned legacy row — use `burned`.
   burnTxHashes: string[];
+  // Is a burn recorded — authoritative when the api sends it (detail only,
+  // citizenpay/api#275); undefined/null when it did not.
+  burned?: boolean | null;
   // Outstanding-sweep flags (see PayoutStatusDetail). `feeTransferPending` is
   // true on a burned payout whose retained cut hasn't been swept yet.
   feeTransferPending: boolean;

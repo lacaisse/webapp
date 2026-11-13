@@ -4,7 +4,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildBackingReport,
+  burnOutstandingFrom,
   burnRecordedFrom,
+  burnedFromReads,
   decodeTransferLogs,
   evaluateBalance,
   evaluateSharedSettlements,
@@ -339,5 +341,54 @@ describe("burnRecordedFrom", () => {
       }),
     ).toBeNull();
     expect(burnRecordedFrom({ status: null })).toBeNull();
+  });
+});
+
+describe("burnRecordedFrom with the api's `burned` (citizenpay/api#275)", () => {
+  it("burned: true is authoritative, even with no hashes (legacy record)", () => {
+    expect(burnRecordedFrom({ status: "complete", burned: true, burnTxHashes: [] })).toBe(true);
+    expect(burnRecordedFrom({ status: "payment-pending", burned: true })).toBe(true);
+  });
+
+  it("burned: false is authoritative: a complete payout certainly not burned", () => {
+    expect(burnRecordedFrom({ status: "complete", burned: false })).toBe(false);
+    // …and it overrides the evidence rule.
+    expect(
+      burnRecordedFrom({ status: "burnt", burned: false, feeTransferPending: true }),
+    ).toBe(false);
+  });
+
+  it("absent / null falls back to the evidence rule", () => {
+    expect(burnRecordedFrom({ status: "complete", burned: undefined })).toBeNull();
+    expect(burnRecordedFrom({ status: "complete", burned: null, feeTransferTxHash: H2 })).toBe(true);
+    expect(burnRecordedFrom({ status: "pending", burned: null })).toBe(false);
+  });
+});
+
+describe("burnedFromReads", () => {
+  it("true if any read says so, false if any says not, else undefined", () => {
+    expect(burnedFromReads({ burned: false }, { burned: true })).toBe(true);
+    expect(burnedFromReads({}, { burned: false })).toBe(false);
+    expect(burnedFromReads({ burned: null }, null, undefined)).toBeUndefined();
+  });
+});
+
+describe("burnOutstandingFrom (get_payout's burnOutstanding)", () => {
+  it("a payment exists or the payout is paid, and certainly no burn", () => {
+    expect(burnOutstandingFrom("payment-pending", false)).toBe(true);
+    expect(burnOutstandingFrom("complete", false)).toBe(true);
+  });
+
+  it("not while pending, nor when the burn is recorded or unknown", () => {
+    expect(burnOutstandingFrom("pending", false)).toBe(false);
+    expect(burnOutstandingFrom("complete", true)).toBe(false);
+    expect(burnOutstandingFrom("complete", null)).toBe(false);
+    expect(burnOutstandingFrom("burnt", true)).toBe(false);
+  });
+
+  it("follows the api's burned through burnRecordedFrom", () => {
+    const st = { status: "complete", burned: false };
+    expect(burnOutstandingFrom(st.status, burnRecordedFrom(st))).toBe(true);
+    expect(burnOutstandingFrom("complete", burnRecordedFrom({ status: "complete" }))).toBe(false);
   });
 });

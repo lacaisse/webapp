@@ -982,6 +982,7 @@ class MockCitizenPayClient implements CitizenPayClient {
       ...base,
       burnTxHashes: mockBurnHashes.get(payoutId) ?? base.burnTxHashes,
       burnClaim: mockBurnClaim(payoutId),
+      burned: mockLegacyBurnRules ? undefined : mockIsBurned(payoutId),
     };
   }
 
@@ -1041,6 +1042,7 @@ class MockCitizenPayClient implements CitizenPayClient {
       feeTransferPending: false,
       feeTransferTxHash: null,
       burnClaim: mockBurnClaim(payoutId),
+      burned: mockLegacyBurnRules ? undefined : mockIsBurned(payoutId),
     };
     // A manual "mark complete" wins over the fixture's lifecycle stage, then
     // a burn reported this session.
@@ -1085,11 +1087,16 @@ class MockCitizenPayClient implements CitizenPayClient {
     claimId?: string,
   ): Promise<PayoutBurnReport> {
     this.log("burnPayout", { payoutId, txHash, destination, claimId });
-    // As live: a completed payout takes no burn report, burned or not.
+    // As live: a completed payout takes a report only while no burn is
+    // recorded (or the same hash again); an older api takes none at all.
     if (completedMockPayouts.has(payoutId)) {
-      throw new CitizenPayApiError("payout is already complete", 409, {
-        error: "payout is already complete",
-      });
+      const recorded = mockBurnHashes.get(payoutId) ?? [];
+      const same = recorded.some((h) => h.toLowerCase() === txHash.toLowerCase());
+      if (mockLegacyBurnRules || (recorded.length > 0 && !same)) {
+        throw new CitizenPayApiError("payout is already complete", 409, {
+          error: "payout is already complete",
+        });
+      }
     }
     // Recording the burn closes whatever claim was in flight and marks the
     // payout burnt, as CP does. Same hash again is idempotent; a different
@@ -1118,9 +1125,12 @@ class MockCitizenPayClient implements CitizenPayClient {
     const refuse = (error: string): never => {
       throw new CitizenPayApiError(error, 409, { error });
     };
-    if (mockBurnHashes.has(payoutId)) refuse("payout is already burnt");
     const { status } = await this.getPayoutStatus(payoutId);
-    if (status === "complete") refuse("payout is already complete");
+    // An older api answers "already complete" on any complete payout first.
+    if (mockLegacyBurnRules && status === "complete") {
+      refuse("payout is already complete");
+    }
+    if (mockIsBurned(payoutId)) refuse("payout is already burnt");
     const existing = mockBurnClaims.get(payoutId);
     if (existing) {
       throw new CitizenPayApiError("burn already in progress", 409, {
@@ -1130,8 +1140,9 @@ class MockCitizenPayClient implements CitizenPayClient {
       });
     }
     // Live accepts a claim while the stored status is pending, which covers
-    // the live `payment-pending` (a payment exists, not yet accepted).
-    if (status !== "pending" && status !== "payment-pending") {
+    // the live `payment-pending` (a payment exists, not yet accepted), or
+    // complete with no burn recorded.
+    if (status !== "pending" && status !== "payment-pending" && status !== "complete") {
       refuse("payout is not pending");
     }
     const claim = {
@@ -1449,6 +1460,22 @@ const completedMockPayouts = new Set<string>();
 // enforces.
 const mockBurnClaims = new Map<string, PayoutBurnClaimed>();
 const mockBurnHashes = new Map<string, string[]>();
+
+// The mock behaves as an api with citizenpay/api#275 (reports `burned`;
+// a complete payout with no burn takes the claim, the report and the sweep and
+// stays complete). `setMockLegacyBurnRules(true)` turns it back into an api
+// predating it: no `burned`, and "payout is already complete" on any claim or
+// report on a complete payout. Tests only; same lifetime as the maps above.
+let mockLegacyBurnRules = false;
+export function setMockLegacyBurnRules(on: boolean): void {
+  mockLegacyBurnRules = on;
+}
+
+// Is a burn recorded on a mock payout: one reported this session, or the
+// burned fixture.
+function mockIsBurned(payoutId: string): boolean {
+  return mockBurnHashes.has(payoutId) || payoutId === "mock-payout-0";
+}
 
 function mockBurnClaim(payoutId: string): PayoutBurnClaim | null {
   const claim = mockBurnClaims.get(payoutId);

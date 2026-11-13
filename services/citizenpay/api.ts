@@ -221,6 +221,12 @@ export type PayoutDetailWire = PayoutListWire & {
   // Set only while a burn claim is in flight (taken, nothing recorded yet) —
   // see `burnClaim` below. Absent on an api that predates the claim.
   burnClaim?: PayoutBurnClaimWire | null;
+  // Is a burn recorded (citizenpay/api#275) — authoritative: `status` says
+  // `complete` both for a burned payout and for one paid at the bank but never
+  // burned. Absent on an older api. `burnTxHashes` can be `[]` while `burned`
+  // is true (a legacy non-array record): decide on `burned`, never on the list.
+  burned?: boolean;
+  burnTxHashes?: string[];
 };
 
 // An in-flight burn claim, as `/payouts/{id}` and `/payouts/{id}/status`
@@ -1356,6 +1362,9 @@ export const payouts = {
     feeTransferPending?: boolean;
     feeTransferTxHash?: string | null;
     burnClaim?: PayoutBurnClaimWire | null;
+    // See PayoutDetailWire (citizenpay/api#275; absent on an older api).
+    burned?: boolean;
+    burnTxHashes?: string[];
   }> {
     return request(
       creds,

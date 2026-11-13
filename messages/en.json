@@ -1913,7 +1913,8 @@
           },
           "burn": {
             "hint": "Burns the merchant's net from the place's account; the platform fees and deduction are swept to the fund.",
-            "beforeSigning": "Burn before signing: once the bank accepts the transfer, Citizen Pay no longer accepts the burn."
+            "beforeSigning": "Burn the tokens for this payout. It works before or after you sign the transfer; signing first pays the merchant before their tokens are destroyed. Never leave a paid payout unburned.",
+            "paidNotBurnt": "Paid at the bank, tokens not burned yet. Burn them now so the payout is settled."
           },
           "pay": {
             "hint": "Create the bank payment to the merchant; you'll sign the transfer at your bank.",
