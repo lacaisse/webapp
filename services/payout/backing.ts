@@ -201,7 +201,15 @@ export function evaluateSharedSettlements(
  */
 export function evaluateBalance(args: {
   balanceUnits: bigint | null;
-  payout: { totalAmount: string; totalFees: string; burnTxHashes?: readonly string[] | null };
+  payout: {
+    totalAmount: string;
+    totalFees: string;
+    totalPayoutFees?: string | null;
+    feesCollectedAtPayment?: string | null;
+    net?: string | null;
+    manualDeduction?: string | null;
+    burnTxHashes?: readonly string[] | null;
+  };
   status?: string | null;
   decimals: number | null;
 }): BalanceCheck {
@@ -231,6 +239,9 @@ export function buildBackingReport(args: {
   ordersRead: OrdersRead;
   symbol?: string | null;
   placeAccount?: string | null;
+  // The fund collects transaction fees at payment time (citizenpay/api#277):
+  // a short wallet may be a fee leg still settling.
+  feeAccount?: boolean;
 }): PayoutBackingReport {
   const sym = args.symbol ? ` ${args.symbol}` : "";
   const warnings: string[] = [];
@@ -268,7 +279,10 @@ export function buildBackingReport(args: {
   const wallet = args.placeAccount ? ` ${args.placeAccount}` : "";
   if (b.verdict === "short") {
     warnings.push(
-      `The place wallet${wallet} holds ${b.balance}${sym}, but settling this payout removes ${b.required}${sym} (net + retained cut): short by ${b.shortfall}${sym}.`,
+      `The place wallet${wallet} holds ${b.balance}${sym}, but settling this payout removes ${b.required}${sym} (net + retained cut): short by ${b.shortfall}${sym}.` +
+        (args.feeAccount
+          ? " This fund collects transaction fees at payment time: a fee from one of the payout's orders may still be settling. Retry in a minute."
+          : ""),
     );
   } else if (b.verdict === "unverified") {
     warnings.push(

@@ -491,6 +491,38 @@ model Fund {
   // /v2/treasury/fee-waivers), not here.
   payoutFixedFeeCents Int @default(0)
 
+  // Payment settings pushed to CP on their own PATCH /v2/treasury, beside the
+  // fee config above (citizenpay/api#277 and #278). Canonical here like the
+  // rate; each has its own `*Synced` flag, true by default, that a save of a
+  // CHANGED value sets to false and only CP's echo of exactly that value sets
+  // back to true. A field that is synced is never sent, so a fund that never
+  // touches these sends nothing at all. An api that does not know a field yet
+  // (absent from GET /v2/treasury, or the cap's 409 for a missing column)
+  // leaves it pending; only an explicit action on its own settings tab (that
+  // form's save, or its "Apply" button) ever pushes it
+  // (services/citizenpay/sync-payment-settings.ts), recorded in
+  // FundPaymentSettingEvent. A CP connect to a new treasury resets the flags.
+  //
+  // Fee account (`feeAccountAddress`, api#277): one of the fund's own
+  // accounts (EIP-55), where CP sends each payment's transaction fees shortly
+  // after the payment instead of sweeping them at payout. null = none: swept
+  // at payout, exactly as before.
+  feeAccountAddress       String?
+  feeAccountSynced        Boolean @default(true)
+  // Payout fee (`payoutFeePercentageBps`, api#277): the PLATFORM fee, a
+  // percentage of a payout's sales charged to the merchant only at payout,
+  // in basis points (250 = 2.5 %). 0 = none. Separate from the transaction
+  // fees above (`payoutFeePercentage` is the transaction rate despite its
+  // name). CP stamps it on a payout when the payout is created.
+  platformPayoutFeeBps    Int     @default(0)
+  platformPayoutFeeSynced Boolean @default(true)
+  // Instant terminal confirmation cap (`earlyPaidMaxCents`, api#278): the
+  // largest wallet payment a terminal shows as paid as soon as it is
+  // verified, before it is final on chain, in euro cents. null = CP's
+  // default (EUR 50), 0 = no limit, 1–100000 = that cap.
+  earlyPaidMaxCents       Int?
+  earlyPaidMaxCentsSynced Boolean @default(true)
+
   // Defaults
   defaultLocale String @default("fr")
   timezone      String @default("Europe/Brussels")
@@ -675,6 +707,7 @@ model Fund {
   citizenPayConnectAttempts CitizenPayConnectAttempt[] // in-flight CP connect handoffs
   addressProfiles           AddressProfileCache[] // CP profile cache (token explorer / transfers)
   tokenAccounts             FundTokenAccount[] // named smart accounts (minter EOA + salt)
+  paymentSettingEvents      FundPaymentSettingEvent[] // who applied a payment setting on Citizen Pay, and when
   txAnnotations             TransactionAnnotation[] // per-tx labels for on-chain history
   pendingAnnotations        PendingAnnotation[] // userOp hashes awaiting tx-hash resolution
   cardTopUps                CardTopUp[] // open-banking card top-ups (PAY_AND_GO /pay/<serial>)
@@ -779,6 +812,26 @@ model PendingAnnotation {
 enum FundTokenAccountKind {
   STANDARD // ordinary minter-derived Safe — supports transfer/mint/burn
   SOURCE // referenceable as a card source (has a `serial`); not transferable
+}
+
+// Who applied a payment setting (fee account, payout fee, terminal cap) on
+// Citizen Pay, and when: one row each time La Caisse changed the value CP
+// applies ("applied", after CP confirmed it) or took CP's value over as its
+// own ("adopted"). Append-only; the settings themselves live on Fund.
+model FundPaymentSettingEvent {
+  id     String @id @default(cuid())
+  fundId String
+  fund   Fund   @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  field  String // feeAccountAddress | platformPayoutFeeBps | earlyPaidMaxCents
+  value  String? // the value as JSON text (null = cleared / default)
+  action String // applied | adopted
+  // The acting team member (no FK: kept if the account is deleted).
+  userId String? @db.Uuid
+
+  createdAt DateTime @default(now())
+
+  @@index([fundId, createdAt])
 }
 
 model FundTokenAccount {

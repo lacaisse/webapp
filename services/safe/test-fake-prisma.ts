@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 // In-memory stand-in for the slice of Prisma the Safe core uses
-// (proposals.ts / sync.ts / migration.ts), for their unit tests only.
+// (proposals.ts / sync.ts / migration.ts), for their unit tests only — and
+// the fee-account eligibility query (fundSafe + fundTokenAccount findMany).
 // Implements just the where-semantics those modules rely on: equality, null,
 // { in }, { not }, { lt }, OR, the `safe: { fundId }` relation filter on
 // transactions / owners, and `signer: { is }` / `passkey: { is }` on owners.
@@ -50,6 +51,7 @@ export function createFakePrisma() {
     fundConversion: [] as Row[],
     tokenOperation: [] as Row[],
     fundDisplayToken: [] as Row[],
+    fundTokenAccount: [] as Row[],
     fundMember: [] as Row[],
     user: [] as Row[],
   };
@@ -372,6 +374,12 @@ export function createFakePrisma() {
         });
         return row;
       },
+    },
+    // Read-only, for the fee-account eligibility query
+    // (services/fund/payment-settings.ts::loadFeeAccountOptions).
+    fundTokenAccount: {
+      findMany: async (a: { where?: Where }) =>
+        db.fundTokenAccount.filter((r) => matches(r, a.where)).map((r) => ({ ...r })),
     },
     fundDisplayToken: {
       findFirst: async (a: { where: Where }) => {

@@ -44,6 +44,7 @@ import {
   releasePayoutBurnClaimAction,
 } from "@/services/payout/admin-actions";
 import { TX_HASH } from "@/services/payout/schemas";
+import { feeSettlingRetryDelayMs } from "@/services/payout/fee-sweep";
 import { cn } from "@/lib/utils";
 
 // How often to poll for signing completion while the QR is on screen (only
@@ -198,7 +199,10 @@ export function PayoutProcess({
         <div className="space-y-2 border-t border-border pt-3">
           <Alert variant="warning">
             <AlertTriangle className="size-4" />
-            <AlertDescription>{tFee("pending")}</AlertDescription>
+            <AlertDescription>
+              <div>{tFee("pending")}</div>
+              <div className="mt-1 text-xs opacity-90">{tFee("pendingHint")}</div>
+            </AlertDescription>
           </Alert>
           <FeeTransferButton payoutId={payoutId} />
         </div>
@@ -221,22 +225,72 @@ export function PayoutProcess({
 // Retry the standalone fee sweep for a burned payout whose cut wasn't swept.
 // The action is idempotent on CP's side and calls refresh() on success, so a
 // successful sweep makes the surrounding affordance disappear on re-render.
-function FeeTransferButton({ payoutId }: { payoutId: string }) {
+//
+// citizenpay/api#277: "still settling" (a transaction fee of the payout is
+// still on its way to the fund's fee account) is not an error — the button
+// says so and retries on its own with backoff (fee-sweep.ts) while the page
+// is open, and can still be pressed by hand. "Nothing to transfer" (every fee
+// was collected at payment time) is the sweep done. `autoStart` runs the first
+// attempt at once (the burn dialog, after a burn whose sweep is settling).
+function FeeTransferButton({
+  payoutId,
+  autoStart = false,
+}: {
+  payoutId: string;
+  autoStart?: boolean;
+}) {
   const t = useTranslations("fund.payments.settlement.feeTransfer");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<string | null>(null);
+  const [done, setDone] = useState<{ txHash: string | null } | null>(null);
+  // Automatic retries so far while settling; null = not settling.
+  const [settlingAttempt, setSettlingAttempt] = useState<number | null>(null);
+  const [gaveUp, setGaveUp] = useState(false);
+  // The next automatic attempt, scheduled by the effect below (`autoStart`:
+  // the first one, at once).
+  const [retry, setRetry] = useState<{ attempt: number; delayMs: number } | null>(
+    () => (autoStart ? { attempt: 1, delayMs: 0 } : null),
+  );
 
-  const onClick = () => {
+  function run(attempt: number) {
     setError(null);
+    setRetry(null);
     startTransition(async () => {
       const res = await feeTransferAction({ payoutId });
       if ("error" in res) {
+        setSettlingAttempt(null);
         setError(res.error);
         return;
       }
-      setDone(res.feeTransferTxHash);
+      if ("settling" in res) {
+        const delayMs = feeSettlingRetryDelayMs(attempt);
+        if (delayMs == null) {
+          setSettlingAttempt(null);
+          setGaveUp(true);
+          return;
+        }
+        setGaveUp(false);
+        setSettlingAttempt(attempt);
+        setRetry({ attempt: attempt + 1, delayMs });
+        return;
+      }
+      setSettlingAttempt(null);
+      setGaveUp(false);
+      setDone({ txHash: res.feeTransferTxHash });
     });
+  }
+
+  useEffect(() => {
+    if (!retry) return;
+    const id = setTimeout(() => run(retry.attempt), retry.delayMs);
+    return () => clearTimeout(id);
+    // `run` only reads state setters and the payout id.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [retry]);
+
+  const onClick = () => {
+    setGaveUp(false);
+    run(1);
   };
 
   if (done) {
@@ -244,8 +298,14 @@ function FeeTransferButton({ payoutId }: { payoutId: string }) {
       <Alert>
         <Check className="size-4" />
         <AlertDescription>
-          <div>{t("done")}</div>
-          <div className="mt-1 font-mono text-xs break-all">{done}</div>
+          {done.txHash ? (
+            <>
+              <div>{t("done")}</div>
+              <div className="mt-1 font-mono text-xs break-all">{done.txHash}</div>
+            </>
+          ) : (
+            <div>{t("nothingToTransfer")}</div>
+          )}
         </AlertDescription>
       </Alert>
     );
@@ -267,6 +327,18 @@ function FeeTransferButton({ payoutId }: { payoutId: string }) {
         )}
         {t("button")}
       </Button>
+      {settlingAttempt != null && (
+        <Alert>
+          <Loader2 className="size-4 animate-spin" />
+          <AlertDescription>{t("settling")}</AlertDescription>
+        </Alert>
+      )}
+      {gaveUp && (
+        <Alert variant="warning">
+          <AlertTriangle className="size-4" />
+          <AlertDescription>{t("settlingGaveUp")}</AlertDescription>
+        </Alert>
+      )}
       {error && (
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>
@@ -614,6 +686,8 @@ function BurnDialog({ payoutId }: { payoutId: string }) {
     amount: string | null;
     pending: boolean;
     error: string | null;
+    settling: boolean;
+    nothingToSweep: boolean;
   } | null>(null);
 
   function onOpenChange(next: boolean) {
@@ -645,6 +719,8 @@ function BurnDialog({ payoutId }: { payoutId: string }) {
         amount: result.feeAmount ?? null,
         pending: result.feeTransferPending ?? false,
         error: result.feeTransferError ?? null,
+        settling: result.feeSettling ?? false,
+        nothingToSweep: result.nothingToSweep ?? false,
       });
     });
   };
@@ -696,7 +772,18 @@ function BurnDialog({ payoutId }: { payoutId: string }) {
                 <AlertDescription>{warning}</AlertDescription>
               </Alert>
             )}
-            {fee?.pending && (
+            {fee?.nothingToSweep && (
+              <Alert>
+                <Check className="size-4" />
+                <AlertDescription>{t("nothingToSweep")}</AlertDescription>
+              </Alert>
+            )}
+            {fee?.pending && fee.settling && (
+              // Not a failure: a transaction fee of this payout is still on
+              // its way to the fee account. Retried automatically.
+              <FeeTransferButton payoutId={payoutId} autoStart />
+            )}
+            {fee?.pending && !fee.settling && (
               <>
                 <Alert variant="warning">
                   <AlertTriangle className="size-4" />

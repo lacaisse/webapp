@@ -167,6 +167,14 @@ export async function PendingPayoutsView({
                   {euro(format, p.net)}
                 </TableCell>
                 <TableCell className="text-right">
+                  {/* Burned, platform fees not transferred yet — for a fund
+                      with a fee account this can be fees still settling; the
+                      payout page retries while open. */}
+                  {p.feeTransferPending && (
+                    <span className="mr-2 text-xs text-warning">
+                      {t("feeTransfer.listPending")}
+                    </span>
+                  )}
                   <DetailsLink payoutId={p.id} />
                 </TableCell>
               </TableRow>
@@ -240,6 +248,14 @@ export async function CompletedPayoutsView({
                   {euro(format, p.net)}
                 </TableCell>
                 <TableCell className="text-right">
+                  {/* Burned, platform fees not transferred yet — for a fund
+                      with a fee account this can be fees still settling; the
+                      payout page retries while open. */}
+                  {p.feeTransferPending && (
+                    <span className="mr-2 text-xs text-warning">
+                      {t("feeTransfer.listPending")}
+                    </span>
+                  )}
                   <DetailsLink payoutId={p.id} />
                 </TableCell>
               </TableRow>

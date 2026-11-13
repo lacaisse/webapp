@@ -371,6 +371,12 @@ export type Payout = {
   manualDeduction: string; // Decimal string, EUR — admin adjustment
   manualDeductionComment: string | null;
   net: string; // Decimal string, EUR — what the merchant is paid
+  // Transaction fees already sent to the fund's fee account when the orders
+  // were paid (citizenpay/api#277, `feesCollectedAtPayment`). Part of
+  // `totalPayoutFees` (net subtracts them once) but NOT swept again at
+  // payout, and no longer in the place's wallet. "0.00" (or absent) when the api omits
+  // it: a fund without a fee account, or an api predating #277.
+  feesCollectedAtPayment?: string;
   status: PayoutStatus;
   // On-chain burn tx hashes once the burn step runs (CP returns one per
   // token batch). Empty until burnt, on list rows, and on an api predating
@@ -680,6 +686,33 @@ export type PayoutFeeConfig = {
 // response does not carry the field (an api older than the fixed fee).
 export type PayoutFeeConfigEcho = {
   fixedFeeCents: number | null;
+};
+
+// The fund's payment settings beside the fee config (citizenpay/api#277 and
+// #278), as GET / PATCH /v2/treasury answer them. Each field is `undefined`
+// when the answer does not carry it: an api that predates the setting (or,
+// for the fee settings, one whose own read of them failed). That absence is
+// how La Caisse detects support, rather than by trial.
+//   • feeAccountAddress — where transaction fees go shortly after each
+//     payment; null = swept at payout (the default).
+//   • payoutFeePercentageBps — the platform fee charged only at payout, in
+//     basis points; 0 = none (the default).
+//   • earlyPaidMaxCents — the instant terminal confirmation cap in cents;
+//     null = Citizen Pay's default (EUR 50), 0 = no limit.
+//   • earlyPaidMaxCentsEffective — the cap in force (read only).
+export type TreasuryPaymentSettings = {
+  feeAccountAddress?: string | null;
+  payoutFeePercentageBps?: number;
+  earlyPaidMaxCents?: number | null;
+  earlyPaidMaxCentsEffective?: number | null;
+};
+
+// A PATCH of those settings: only the keys present are sent (absent =
+// unchanged on the api).
+export type TreasuryPaymentSettingsUpdate = {
+  feeAccountAddress?: string | null;
+  payoutFeePercentageBps?: number;
+  earlyPaidMaxCents?: number | null;
 };
 
 // A business exempt from the treasury's fixed fee per order (the percentage

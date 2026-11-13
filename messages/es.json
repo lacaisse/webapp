@@ -1969,7 +1969,8 @@
           "confirm": "Quemar tokens",
           "success": "Tokens quemados. Hash de la transacción:",
           "feeSwept": "Comisiones de la plataforma y deducción transferidas a la cuenta del fondo: {amount}",
-          "feeNotSwept": "Tokens quemados, pero las comisiones de la plataforma aún no se han transferido."
+          "feeNotSwept": "Tokens quemados, pero las comisiones de la plataforma aún no se han transferido.",
+          "nothingToSweep": "Nada que transferir para esta liquidación."
         },
         "burnClaim": {
           "started": "Se inició una quema el {time} y no se ha confirmado.",
@@ -2004,7 +2005,12 @@
         "feeTransfer": {
           "pending": "Las comisiones de la plataforma y la deducción de este pago aún no se han transferido.",
           "button": "Transferir comisiones de la plataforma",
-          "done": "Comisiones de la plataforma transferidas. Hash de la transacción:"
+          "done": "Comisiones de la plataforma transferidas. Hash de la transacción:",
+          "settling": "Comisiones aún en curso, reintentando…",
+          "settlingGaveUp": "Las comisiones siguen en curso. Vuelve a intentarlo en unos minutos.",
+          "nothingToTransfer": "Nada que transferir para esta liquidación.",
+          "pendingHint": "En un fondo con cuenta de comisiones, las comisiones pueden estar en curso unos segundos después de un pago (como mucho unos dos días). La transferencia se reintenta sola mientras esta página esté abierta.",
+          "listPending": "Comisiones por transferir"
         },
         "orders": {
           "title": "Pedidos",
@@ -2153,7 +2159,14 @@
           "releaseTooRecent": "Esta reserva de quema aún no se puede liberar: una quema en curso puede tardar unos minutos en llegar a la cadena. Se podrá liberar a partir del {releasableAt}.",
           "releaseClaimChanged": "La reserva de quema cambió desde que se cargó la página (otro intento la tomó o se resolvió). La página se ha recargado: compruébalo de nuevo antes de actuar.",
           "archiveAdjustmentLeg": "Es un apunte de reembolso, corrección o recarga: se descuenta del pago, archivarlo pagaría de más al comercio. Déjalo donde está.",
-          "archiveUnknownOrder": "No se pudo comprobar este pedido antes de archivarlo. Inténtalo de nuevo en un momento."
+          "archiveUnknownOrder": "No se pudo comprobar este pedido antes de archivarlo. Inténtalo de nuevo en un momento.",
+          "feesSettling": "Comisiones aún en curso: algunas comisiones de transacción de esta liquidación siguen de camino a la cuenta de comisiones.",
+          "feeMaySettle": "Este fondo cobra las comisiones de transacción en el momento del pago: puede que la comisión de un pedido de esta liquidación aún esté en curso. Vuelve a intentarlo en un minuto."
+        },
+        "feeBreakdown": {
+          "collectedAtPayment": "Comisiones de transacción cobradas en el pago",
+          "sweptAtPayout": "Comisiones y deducción transferidas en esta liquidación",
+          "hint": "La comisión de la plataforma de arriba incluye las comisiones de transacción del fondo y su comisión de liquidación. Las cobradas en el pago ya están en la cuenta de comisiones del fondo."
         }
       },
       "export": {
@@ -2726,7 +2739,7 @@
       },
       "fees": {
         "title": "Comisiones",
-        "description": "Comisión cobrada sobre los pagos a comercios. Se configura aquí y luego se envía a Citizen Pay.",
+        "description": "Comisiones que tu fondo cobra a los comercios. El cliente nunca las paga. Se configuran aquí y luego se envían a Citizen Pay.",
         "rate": "Tasa de comisión (%)",
         "rateHint": "Porcentaje cobrado en cada pago (p. ej. 2.5 para 2.5%). Déjalo vacío para usar la tasa predeterminada de Citizen Pay.",
         "fixedFee": "Comisión fija por pedido (€)",
@@ -2760,6 +2773,27 @@
             "unavailable": "Citizen Pay aún no admite exenciones para este fondo.",
             "failed": "Citizen Pay no aceptó el cambio. Inténtalo de nuevo en un momento."
           }
+        },
+        "transactionTitle": "Comisiones de transacción",
+        "transactionDescription": "Se cobran al comercio en cada pago: la tasa y la comisión fija por pedido.",
+        "feeAccount": {
+          "title": "Cuenta de comisiones",
+          "description": "Adónde van las comisiones de transacción de tu fondo. Con una cuenta elegida, la comisión de cada pago se envía a ella en el minuto siguiente al pago, en lugar de cobrarse en la liquidación. Sin cuenta, nada cambia.",
+          "label": "Cuenta de comisiones",
+          "none": "Ninguna (cobrar en la liquidación)",
+          "hint": "Solo se ofrecen cuentas del propio fondo: la cuenta principal, sus otras cuentas y sus Safes. Las cuentas de origen de las tarjetas y las cuentas de los comercios no pueden recibir comisiones.",
+          "kindMain": "cuenta de liquidaciones",
+          "kindAccount": "cuenta",
+          "kindSafe": "Safe",
+          "unlisted": "{address} (ya no es una de las cuentas del fondo)",
+          "sameAsSweep": "Esta es también la cuenta a la que se transfieren las comisiones en la liquidación. Funciona, pero en un caso poco frecuente Citizen Pay no puede distinguir una comisión enviada en el pago de una transferida en la liquidación, y puede contar una por otra. Una cuenta aparte las mantiene separadas."
+        },
+        "payoutFee": {
+          "title": "Comisión de liquidación",
+          "description": "Una comisión de plataforma que se cobra al comercio solo cuando se hace una liquidación, aparte de las comisiones de transacción de arriba. El cliente nunca la paga.",
+          "label": "Comisión de liquidación (%)",
+          "hint": "Porcentaje de las ventas de cada liquidación (p. ej. 1.5 para 1.5%). Déjalo vacío para no cobrar comisión de liquidación. Un cambio se aplica a las liquidaciones creadas después.",
+          "none": "sin comisión de liquidación"
         }
       },
       "emails": {
@@ -2972,6 +3006,34 @@
           "show": "Vista previa",
           "hide": "Ocultar la vista previa"
         }
+      },
+      "terminals": {
+        "title": "Terminales",
+        "description": "Cómo confirman los terminales de pago del fondo los pagos con monedero.",
+        "earlyPaid": {
+          "title": "Confirmación inmediata",
+          "description": "Hasta este importe, un terminal muestra un pago con monedero como correcto en cuanto se verifica, antes de que sea definitivo en la blockchain. Por encima, el terminal espera unos segundos la confirmación definitiva.",
+          "risk": "Un límite más alto significa una pérdida posible mayor si un pago falla después.",
+          "label": "Límite de confirmación inmediata",
+          "default": "Predeterminado ({amount})",
+          "custom": "Importe personalizado",
+          "none": "Sin límite",
+          "amount": "Límite (€)",
+          "amountHint": "Entre 0,01 € y 1.000,00 €.",
+          "effective": "Límite vigente: {amount}",
+          "effectiveNone": "Límite vigente: ninguno"
+        }
+      },
+      "paymentSync": {
+        "notYetSupported": "Guardado, aún no aplicado: se aplicará cuando se actualice el servicio de pagos. Entonces usa «Aplicar ahora» aquí.",
+        "notConnected": "Guardado. Se aplicará cuando el fondo esté conectado a Citizen Pay.",
+        "failed": "Guardado, pero la sincronización con Citizen Pay falló. Guarda de nuevo para reintentar.",
+        "refused": "Guardado, pero Citizen Pay lo rechazó: {message}",
+        "drift": "Citizen Pay aplica actualmente {remote}; La Caisse tiene {local}.",
+        "applyLocal": "Aplicar el valor de La Caisse",
+        "useRemote": "Usar el valor de Citizen Pay",
+        "applyNow": "Aplicar ahora",
+        "unreadable": "No se pudo leer el valor que aplica Citizen Pay. Recarga la página para volver a intentarlo."
       }
     }
   },
@@ -3031,7 +3093,13 @@
       "cutoffDayInvalid": "El día de corte debe ser un número entero entre 1 y 31.",
       "nameTooLong": "El nombre es demasiado largo.",
       "embedDomainInvalid": "Introduce un dominio por línea (ejemplo.org, *.ejemplo.org, localhost:3000).",
-      "embedDomainsTooMany": "Demasiados dominios: elimina algunos."
+      "embedDomainsTooMany": "Demasiados dominios: elimina algunos.",
+      "feeAccountInvalid": "Elige una de las cuentas del fondo.",
+      "feeAccountNotOwn": "Esta cuenta no es una de las cuentas del fondo.",
+      "platformFeeInvalid": "La comisión de liquidación debe ser un número con hasta 2 decimales.",
+      "platformFeeTooHigh": "La comisión de liquidación no puede superar el 100%.",
+      "earlyPaidInvalid": "Introduce un importe en euros con hasta 2 decimales (p. ej. 25.00).",
+      "earlyPaidRange": "El límite debe estar entre 0,01 € y 1.000,00 €."
     }
   },
   "team": {

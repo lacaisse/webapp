@@ -8,6 +8,8 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Fund } from "@/services/db/generated/client";
 import * as ops from "@/services/payout/operations";
 
+import { payoutSweepAmount } from "@/services/payout/money";
+
 import { McpToolError, requireFundForTool, type ToolContext } from "./authz";
 import { FUND_PARAM, fail, guarded, ok, TX_HASH } from "./tool-kit";
 
@@ -46,9 +48,19 @@ import { FUND_PARAM, fail, guarded, ok, TX_HASH } from "./tool-kit";
 //   • `fees` / `payoutFee` on an order, `fees` on a payout — the payment
 //     processor's commission, withheld at source. Never in the wallet, never
 //     swept.
-//   • `payoutFees` — the platform's cut, charged at payout. It IS in the
-//     place's wallet and the fee sweep moves it to the treasury.
+//   • `payoutFees` — the fund's own fees: its transaction fees (rate, fixed
+//     fee per order) plus its payout (platform) fee. Charged to the merchant,
+//     never to the customer. Sits in the place's wallet until the fee sweep
+//     moves it to the fund — except `feesCollectedAtPayment`, the transaction
+//     fees a fund with a fee account already received right after each
+//     payment (citizenpay/api#277): the sweep moves payoutFees +
+//     manualDeduction − feesCollectedAtPayment (`feesToSweep`).
 //   net = total − fees − payoutFees − manualDeduction
+//
+// Sweep answers that are NOT failures (services/payout/fee-sweep.ts):
+// "still settling" (a fee leg in flight; retry later, the tools say so with
+// `status: "settling"`) and "nothing to transfer" (every fee was collected at
+// payment time: done).
 
 const PAYOUT_ID = z.string().min(1).describe("Payout id from list_payouts");
 const DATE = z
@@ -250,6 +262,7 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
           total: p.totalAmount,
           fees: p.totalFees,
           payoutFees: p.totalPayoutFees,
+          feesCollectedAtPayment: p.feesCollectedAtPayment ?? "0.00",
           manualDeduction: p.manualDeduction,
           net: p.net,
           feeTransferPending: p.feeTransferPending,
@@ -299,7 +312,7 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
     "get_payout",
     {
       description:
-        "Everything about one payout: totals (gross / processor fees withheld at source / platform payout fees / manual deduction / net, where net = total − fees − payoutFees − manualDeduction), the live status, the bank signing link while a payment exists (`payment-pending`), `burnRecorded` (Citizen Pay's own `burned` flag when it reports one, which decides alone; otherwise evidence: true = status `burnt` or a fee sweep done or pending; false = `pending` / `payment-pending` with no such evidence; null = `complete` with no evidence — an older Citizen Pay does not report it, so whether it was burned cannot be determined by this tool), `burnOutstanding` (true when `payment-pending` or `complete` and certainly no burn is recorded: run burn_payout — a paid payout must never stay unburned), whether the retained fee sweep is still outstanding, any burn attempt still in flight (`burnClaim`: never burn, and never let the operator sign, while it is set), and, with `includeOrderCheck`, `backing` while the payout is pending / payment-pending with no burn (warnings, and `blocking` = pay_payout will refuse) and the confirmed / issues split of its orders. A `complete` payout with `burnRecorded: null`: check the place wallet balance / token history on chain before anyone burns it. Reading the status also nudges settlement forward on CitizenPay's side (an accepted payment completes the payout here). Requires ADMIN.",
+        "Everything about one payout: totals (gross / processor fees withheld at source / the fund's fees `payoutFees` (transaction fees + payout fee) / `feesCollectedAtPayment` (the part of payoutFees already sent to the fund's fee account right after each payment, \"0.00\" without a fee account) / `feesToSweep` (what the fee sweep moves: payoutFees + manualDeduction − feesCollectedAtPayment) / manual deduction / net, where net = total − fees − payoutFees − manualDeduction), the live status, the bank signing link while a payment exists (`payment-pending`), `burnRecorded` (Citizen Pay's own `burned` flag when it reports one, which decides alone; otherwise evidence: true = status `burnt` or a fee sweep done or pending; false = `pending` / `payment-pending` with no such evidence; null = `complete` with no evidence — an older Citizen Pay does not report it, so whether it was burned cannot be determined by this tool), `burnOutstanding` (true when `payment-pending` or `complete` and certainly no burn is recorded: run burn_payout — a paid payout must never stay unburned), whether the retained fee sweep is still outstanding, any burn attempt still in flight (`burnClaim`: never burn, and never let the operator sign, while it is set), and, with `includeOrderCheck`, `backing` while the payout is pending / payment-pending with no burn (warnings, and `blocking` = pay_payout will refuse) and the confirmed / issues split of its orders. A `complete` payout with `burnRecorded: null`: check the place wallet balance / token history on chain before anyone burns it. Reading the status also nudges settlement forward on CitizenPay's side (an accepted payment completes the payout here). Requires ADMIN.",
       inputSchema: {
         fund: FUND_PARAM,
         payoutId: PAYOUT_ID,
@@ -374,6 +387,8 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
         total: p.totalAmount,
         fees: p.totalFees,
         payoutFees: p.totalPayoutFees,
+        feesCollectedAtPayment: p.feesCollectedAtPayment ?? "0.00",
+        feesToSweep: payoutSweepAmount(p),
         manualDeduction: p.manualDeduction,
         manualDeductionComment: p.manualDeductionComment,
         net: p.net,
@@ -793,7 +808,7 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
     "burn_payout",
     {
       description:
-        "IRREVERSIBLE. Burn the tokens backing a payout: destroys the payout's net from the merchant place's wallet with the fund's minter, reports the burn to CitizenPay (which marks the payout burnt, or records it on a payout already `complete`, which stays complete), and sweeps the retained cut — the platform payout fees plus any manual deduction — to the fund's treasury account. Processor fees withheld at source are in neither figure; they never entered the wallet. Works while the payout is `pending`, `payment-pending`, or `complete` with no burn recorded. Recommended order: create → reconcile → pay_payout → the operator signs → burn_payout, so the merchant is paid before their tokens are destroyed; never leave a paid payout unburned. An api predating citizenpay/api#275 refuses the burn on a `complete` payout; this tool then says so, and the tokens must be burned by hand from the token page after checking the place wallet on chain. A payout with a burn recorded is refused. Refuses, burning nothing, when the place's wallet holds less than settlement removes (net + retained cut) — top up the place or adjust the deduction first. A second call is rejected — the burn first takes Citizen Pay's burn claim, so only one attempt can run. If it fails saying the burn may have been sent or another attempt is in progress, do NOT retry: an admin checks the chain and records or releases the attempt from the payout page. A timeout or dropped connection does NOT mean the burn failed — the burn can take over a minute and may still land. Never call this again after an unclear outcome; read get_payout instead (status `burnt`, or a non-null `burnClaim` = an attempt still in flight). Requires ADMIN.",
+        "IRREVERSIBLE. Burn the tokens backing a payout: destroys the payout's net from the merchant place's wallet with the fund's minter, reports the burn to CitizenPay (which marks the payout burnt, or records it on a payout already `complete`, which stays complete), and sweeps the retained cut — the fund's fees (payoutFees) plus any manual deduction, minus the transaction fees already collected at payment time (feesCollectedAtPayment) — to the fund's treasury account. Processor fees withheld at source are in neither figure; they never entered the wallet. Two sweep outcomes are not failures: `feeSettling: true` (transaction fees of this payout are still on their way to the fee account; the burn is done, retry the sweep with sweep_payout_fees in a minute) and `nothingToSweep: true` (nothing to transfer for this payout: settlement is done). Works while the payout is `pending`, `payment-pending`, or `complete` with no burn recorded. Recommended order: create → reconcile → pay_payout → the operator signs → burn_payout, so the merchant is paid before their tokens are destroyed; never leave a paid payout unburned. An api predating citizenpay/api#275 refuses the burn on a `complete` payout; this tool then says so, and the tokens must be burned by hand from the token page after checking the place wallet on chain. A payout with a burn recorded is refused. Refuses, burning nothing, when the place's wallet holds less than settlement removes (net + retained cut) — top up the place or adjust the deduction first. A second call is rejected — the burn first takes Citizen Pay's burn claim, so only one attempt can run. If it fails saying the burn may have been sent or another attempt is in progress, do NOT retry: an admin checks the chain and records or releases the attempt from the payout page. A timeout or dropped connection does NOT mean the burn failed — the burn can take over a minute and may still land. Never call this again after an unclear outcome; read get_payout instead (status `burnt`, or a non-null `burnClaim` = an attempt still in flight). Requires ADMIN.",
       inputSchema: {
         fund: FUND_PARAM,
         payoutId: PAYOUT_ID,
@@ -815,11 +830,17 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
         feeTransferTxHash: res.feeTransferTxHash ?? null,
         feeTransferPending: res.feeTransferPending ?? false,
         feeTransferError: res.feeTransferError ?? null,
+        feeSettling: res.feeSettling ?? false,
+        nothingToSweep: res.nothingToSweep ?? false,
         // The burn is recorded; something after it on our side failed.
         warning: res.warning ?? null,
-        hint: res.feeTransferPending
-          ? "The burn succeeded but the fee sweep did not run — retry it with sweep_payout_fees. Do NOT call burn_payout again."
-          : undefined,
+        hint: res.nothingToSweep
+          ? "Burned. Nothing to transfer for this payout (no fees or deduction left to sweep): the settlement is done."
+          : res.feeSettling
+            ? "Burned. The fee sweep waits for transaction fees of this payout that are still settling (normally seconds, at most about two days): call sweep_payout_fees again in a minute or so, with backoff. This is not an error. Do NOT call burn_payout again."
+            : res.feeTransferPending
+              ? "The burn succeeded but the fee sweep did not run — retry it with sweep_payout_fees. Do NOT call burn_payout again."
+              : undefined,
       });
     }),
   );
@@ -828,15 +849,32 @@ export function registerPayoutTools(server: McpServer, ctx: ToolContext) {
     "sweep_payout_fees",
     {
       description:
-        "Run (or retry) just the fee sweep on a payout whose burn is recorded — moves the retained cut (the platform payout fees plus any manual deduction) from the place's wallet to the fund's treasury account. Needs a recorded burn: refused on a payout without one — run burn_payout first (it also works on a `complete` payout with no burn recorded). Idempotent: if an earlier sweep already went through you get that transfer back instead of a second one. Use it when burn_payout reported `feeTransferPending`. Requires ADMIN.",
+        "Run (or retry) just the fee sweep on a payout whose burn is recorded — moves the retained cut (the fund's fees plus any manual deduction, minus the transaction fees already collected at payment time) from the place's wallet to the fund's treasury account. Answers `status`: \"swept\" (with the transfer), \"nothing_to_transfer\" (nothing to transfer for this payout — e.g. every fee was collected at payment time and there is no deduction: done, nothing to retry) or \"settling\" (transaction fees of this payout are still on their way to the fund's fee account — not an error: call again after `retryAfterSeconds`, with backoff; normally seconds, at most about two days). Needs a recorded burn: refused on a payout without one — run burn_payout first (it also works on a `complete` payout with no burn recorded). Idempotent: if an earlier sweep already went through you get that transfer back instead of a second one. Use it when burn_payout reported `feeTransferPending`. Requires ADMIN.",
       inputSchema: { fund: FUND_PARAM, payoutId: PAYOUT_ID },
     },
     guarded(async ({ fund: fundDomain, payoutId }) => {
       const c = await payoutCtx(ctx, fundDomain);
       const res = await ops.feeTransfer(c, payoutId);
       if ("error" in res) return fail(res.error);
+      if ("settling" in res) {
+        return ok({
+          payoutId,
+          status: "settling",
+          retryAfterSeconds: 30,
+          message: res.message,
+          hint: "Not an error: a transaction fee of this payout is still on its way to the fund's fee account — normally seconds; at most about two days. Call sweep_payout_fees again later (back off: 30 s, 1 min, 2 min, … up to a few hours). Nothing else to do.",
+        });
+      }
+      if (res.nothingToTransfer) {
+        return ok({
+          payoutId,
+          status: "nothing_to_transfer",
+          hint: "Nothing to transfer for this payout (Citizen Pay reports no fees or deduction left to sweep, confirmed by re-reading the payout). The sweep is done.",
+        });
+      }
       return ok({
         payoutId,
+        status: "swept",
         feeTransferTxHash: res.feeTransferTxHash,
         feeAmount: res.feeAmount,
         alreadyTransferred: res.alreadyTransferred,

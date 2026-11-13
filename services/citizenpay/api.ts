@@ -192,6 +192,10 @@ export type PayoutListWire = {
   payoutFees?: number | null; // cents — platform cut, swept from the wallet
   manualDeduction?: number | null; // cents
   net?: number | null; // cents — what the merchant is paid
+  // Part of `payoutFees` already sent to the fund's fee account at payment
+  // time (citizenpay/api#277). Present only when non-zero; fee-transfer
+  // sweeps payoutFees + manualDeduction − this.
+  feesCollectedAtPayment?: number | null;
   tokens?: string[];
   pontoPaymentStatus?: string | null;
   // Outstanding-sweep flags: `feeTransferPending` is true on a burned payout
@@ -581,7 +585,29 @@ export type TreasuryWire = {
   // canonical for our own funds: every connected fund is pushed as `fund`
   // (services/citizenpay/sync-fund-kind.ts); read back only to report.
   kind?: TreasuryKindWire;
+  // Payment settings (TreasuryPaymentSettingsWire below): absent on an api
+  // that predates citizenpay/api#277 (fee account, platform payout fee) or
+  // #278 (instant terminal confirmation cap).
+  feeAccountAddress?: string | null;
+  payoutFeePercentageBps?: number | null;
+  earlyPaidMaxCents?: number | null;
+  earlyPaidMaxCentsEffective?: number | null;
 };
+
+// The payment settings of citizenpay/api#277 (fee account, platform payout
+// fee) and #278 (instant terminal confirmation cap) on GET / PATCH
+// /v2/treasury, camelCase only. Absent on an api that predates them.
+export type TreasuryPaymentSettingsWire = Pick<
+  TreasuryWire,
+  | "feeAccountAddress"
+  | "payoutFeePercentageBps"
+  | "earlyPaidMaxCents"
+  | "earlyPaidMaxCentsEffective"
+>;
+
+// Budget for the payment-settings sync (its GET + PATCHes). A settings save
+// waits for it, so it stays short.
+export const PAYMENT_SETTINGS_TIMEOUT_MS = 5_000;
 
 // The fixed fee per order CP says it stored (PATCH echo or GET): a
 // non-negative integer, else null ("CP said nothing" — an api that predates
@@ -761,6 +787,22 @@ export const treasury = {
     return request(creds, "PATCH", "/v2/treasury", {
       body: { kind },
       timeoutMs: TREASURY_KIND_TIMEOUT_MS,
+    });
+  },
+  // The payment settings alone (TreasuryPaymentSettingsWire), body = only the
+  // keys the caller set. An api without any of them answers 400 ("… is
+  // required") — callers only send a field the GET reported. #278 answers
+  // 409 "earlyPaidMaxCents is not available yet" while its column is
+  // missing; #277 answers 400 for a refused fee account (the zero address, a
+  // place's account, the fund's own machinery). The response echoes the
+  // stored values.
+  updatePaymentSettings(
+    creds: CitizenPayApiCredentials,
+    body: Record<string, unknown>,
+  ): Promise<TreasuryWire> {
+    return request(creds, "PATCH", "/v2/treasury", {
+      body,
+      timeoutMs: PAYMENT_SETTINGS_TIMEOUT_MS,
     });
   },
   // Read `account`'s minter/burner roles on the treasury's token, on chain.

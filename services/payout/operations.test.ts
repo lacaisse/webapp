@@ -1072,3 +1072,178 @@ describe("createPayoutPayment — backing check", () => {
     expect(getBalances).not.toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Transaction fees collected at payment time (citizenpay/api#277)
+// ---------------------------------------------------------------------------
+
+describe("fees collected at payment (api#277)", () => {
+  const SETTLING = "transaction fees of this payout are still settling, retry shortly";
+  const NOTHING = "payout has no fees or manual deduction to transfer";
+
+  it("feeTransfer: a 409 'still settling' is not an error — settling, retry later", async () => {
+    cp.feeTransfer.mockRejectedValueOnce(new CitizenPayApiError(SETTLING, 409, null));
+    expect(await feeTransfer(ctx, PAYOUT)).toEqual({
+      settling: true,
+      message: `${E}.feesSettling`,
+    });
+    expect(resolveOrEnqueueAnnotation).not.toHaveBeenCalled();
+  });
+
+  it("feeTransfer: a 422 'no fees or manual deduction' is done once the re-read payout agrees", async () => {
+    cp.feeTransfer.mockRejectedValueOnce(new CitizenPayApiError(NOTHING, 422, null));
+    cp.getPayout.mockResolvedValueOnce({
+      id: PAYOUT,
+      totalPayoutFees: "1.25",
+      manualDeduction: "0.00",
+      feesCollectedAtPayment: "1.25",
+      feeTransferPending: true,
+    } as Payout);
+    expect(await feeTransfer(ctx, PAYOUT)).toEqual({
+      ok: true,
+      feeTransferTxHash: null,
+      feeAmount: null,
+      alreadyTransferred: false,
+      nothingToTransfer: true,
+    });
+  });
+
+  it("feeTransfer: the 422 is an error when the re-read payout still has a cut to sweep (W5)", async () => {
+    cp.feeTransfer.mockRejectedValueOnce(new CitizenPayApiError(NOTHING, 422, null));
+    cp.getPayout.mockResolvedValueOnce({
+      id: PAYOUT,
+      totalPayoutFees: "1.25",
+      manualDeduction: "0.00",
+      feeTransferPending: true,
+    } as Payout);
+    expect(await feeTransfer(ctx, PAYOUT)).toEqual({ error: NOTHING });
+    cp.feeTransfer.mockRejectedValueOnce(new CitizenPayApiError(NOTHING, 422, null));
+    cp.getPayout.mockRejectedValueOnce(new Error("down"));
+    expect(await feeTransfer(ctx, PAYOUT)).toEqual({ error: NOTHING });
+  });
+
+  it("feeTransfer: done when the re-read payout reports no pending sweep", async () => {
+    cp.feeTransfer.mockRejectedValueOnce(new CitizenPayApiError(NOTHING, 422, null));
+    cp.getPayout.mockResolvedValueOnce({
+      id: PAYOUT,
+      totalPayoutFees: "1.25",
+      manualDeduction: "0.00",
+      feeTransferPending: false,
+    } as Payout);
+    expect(await feeTransfer(ctx, PAYOUT)).toMatchObject({ ok: true, nothingToTransfer: true });
+  });
+
+  it("feeTransfer: any other 422 is still an error", async () => {
+    cp.feeTransfer.mockRejectedValueOnce(new CitizenPayApiError("destination not allowed", 422, null));
+    expect(await feeTransfer(ctx, PAYOUT)).toEqual({ error: "destination not allowed" });
+  });
+
+  it("burn: feeTransferPending false + 'no fees' error = nothing to sweep, not a failure", async () => {
+    cp.burnPayout.mockResolvedValueOnce(
+      report({ feeTransferTxHash: null, feeAmount: null, feeTransferPending: false, feeTransferError: NOTHING }),
+    );
+    expect(await burnPayout(ctx, PAYOUT)).toEqual({
+      ok: true,
+      txHash: TX,
+      feeAmount: null,
+      feeTransferTxHash: null,
+      feeTransferPending: false,
+      feeTransferError: null,
+      nothingToSweep: true,
+    });
+  });
+
+  it("burn: a sweep that is still settling stays pending, flagged settling", async () => {
+    cp.burnPayout.mockResolvedValueOnce(
+      report({ feeTransferTxHash: null, feeAmount: null, feeTransferPending: true, feeTransferError: SETTLING }),
+    );
+    expect(await burnPayout(ctx, PAYOUT)).toMatchObject({
+      ok: true,
+      feeTransferPending: true,
+      feeSettling: true,
+      feeTransferError: `${E}.feesSettling`,
+    });
+  });
+
+  it("burn: an ordinary sweep failure is not mistaken for either", async () => {
+    cp.burnPayout.mockResolvedValueOnce(
+      report({ feeTransferTxHash: null, feeTransferPending: true, feeTransferError: "bundler unavailable" }),
+    );
+    const res = await burnPayout(ctx, PAYOUT);
+    expect(res).toMatchObject({ ok: true, feeTransferPending: true, feeTransferError: "bundler unavailable" });
+    expect(res).not.toHaveProperty("feeSettling");
+    expect(res).not.toHaveProperty("nothingToSweep");
+  });
+
+  it("burn preflight: the wallet no longer holds fees collected at payment", async () => {
+    // total 52, processor 2, fund fees 1.25 of which 1.25 left at payment:
+    // the wallet holds 48.75 = the net, and that is enough.
+    cp.getPayout.mockResolvedValue({
+      id: PAYOUT,
+      net: "48.75",
+      totalAmount: "52.00",
+      totalFees: "2.00",
+      totalPayoutFees: "1.25",
+      manualDeduction: "0.00",
+      feesCollectedAtPayment: "1.25",
+    } as Payout);
+    getBalances.mockResolvedValueOnce([{ address: PLACE.toLowerCase(), rawBalance: units("48.75") }]);
+    expect(await burnPayout(ctx, PAYOUT)).toMatchObject({ ok: true, txHash: TX });
+  });
+
+  it("burn preflight: still refuses a wallet short after subtracting them, saying a fee may be settling (W4)", async () => {
+    cp.getPayout.mockResolvedValue({
+      id: PAYOUT,
+      net: "48.75",
+      totalAmount: "52.00",
+      totalFees: "2.00",
+      totalPayoutFees: "1.25",
+      manualDeduction: "0.00",
+      feesCollectedAtPayment: "0.25",
+    } as Payout);
+    // Needs 50.00 − 0.25 = 49.75; holds 49.00.
+    getBalances.mockResolvedValueOnce([{ address: PLACE.toLowerCase(), rawBalance: units("49.00") }]);
+    const res = await burnPayout(ctx, PAYOUT);
+    expect(res).toMatchObject({ error: expect.stringContaining(`${E}.burnInsufficientBalance`) });
+    expect((res as { error: string }).error).toContain(`${E}.feeMaySettle`);
+    expect((res as { error: string }).error).toContain('"required":"49.75 EUR"');
+    expect(burnDirect).not.toHaveBeenCalled();
+  });
+
+  it("burn preflight: an inflated feesCollectedAtPayment never lowers the requirement below net + deduction (W3)", async () => {
+    cp.getPayout.mockResolvedValue({
+      id: PAYOUT,
+      net: "48.75",
+      totalAmount: "52.00",
+      totalFees: "2.00",
+      totalPayoutFees: "1.25",
+      manualDeduction: "0.00",
+      feesCollectedAtPayment: "40.00",
+    } as Payout);
+    getBalances.mockResolvedValueOnce([{ address: PLACE.toLowerCase(), rawBalance: units("10.00") }]);
+    const res = await burnPayout(ctx, PAYOUT);
+    expect((res as { error: string }).error).toContain('"required":"48.75 EUR"');
+  });
+
+  it("checkPayoutBacking counts fees collected at payment, and says a fee may be settling when short", async () => {
+    const payout = {
+      id: PAYOUT,
+      net: "48.75",
+      totalAmount: "52.00",
+      totalFees: "2.00",
+      totalPayoutFees: "1.25",
+      manualDeduction: "0.00",
+      feesCollectedAtPayment: "1.25",
+      burnTxHashes: [],
+    } as unknown as Payout;
+    const orders = { orders: [], placeAccountAddress: PLACE, truncated: false };
+    getBalances.mockResolvedValueOnce([{ address: PLACE.toLowerCase(), rawBalance: units("48.75") }]);
+    const enough = await checkPayoutBacking(ctx, PAYOUT, { payout, orders, status: "pending" });
+    expect(enough.balance).toMatchObject({ verdict: "ok", required: "48.75" });
+
+    getBalances.mockResolvedValueOnce([{ address: PLACE.toLowerCase(), rawBalance: units("40.00") }]);
+    const short = await checkPayoutBacking(ctx, PAYOUT, { payout, orders, status: "pending" });
+    expect(short.blocking).toBe(true);
+    expect(short.warnings.join(" ")).toMatch(/may still be settling/);
+  });
+});

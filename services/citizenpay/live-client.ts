@@ -10,6 +10,7 @@ import {
   businesses as apiBusinesses,
   cards as apiCards,
   feeWaivers as apiFeeWaivers,
+  PAYMENT_SETTINGS_TIMEOUT_MS,
   fixedFeeCentsFromWire,
   invites as apiInvites,
   payments as apiPayments,
@@ -40,6 +41,7 @@ import {
   type CardChargeResultWire,
   type FeeCollectionFrequencyWire,
   type FeeWaiverListWire,
+  type TreasuryPaymentSettingsWire,
   type OpenOrderWire,
   type TopUpOrderWire,
   type OrderStatsBucketWire,
@@ -93,6 +95,8 @@ import type {
   PayoutDraftPreview,
   PayoutFeeConfig,
   PayoutFeeConfigEcho,
+  TreasuryPaymentSettings,
+  TreasuryPaymentSettingsUpdate,
   PayoutOrder,
   PayoutOrdersPage,
   PayoutPeriod,
@@ -187,6 +191,8 @@ function payoutFromListWire(w: PayoutListWire): Payout {
     manualDeduction: centsToDecimal(w.manualDeduction),
     manualDeductionComment: null,
     net: centsToDecimal(w.net),
+    // citizenpay/api#277; omitted when 0 and on an older api.
+    feesCollectedAtPayment: centsToDecimal(w.feesCollectedAtPayment),
     status: w.status,
     // Burn hashes / ponto id / emails aren't in the list shape — they live
     // on the order/status endpoints. Surface what the list gives us.
@@ -477,6 +483,38 @@ export function feeWaiversFromWire(wire: FeeWaiverListWire): FeeWaiver[] {
       businessName: (row.businessName ?? row.business_name ?? "").trim(),
       createdAt: row.createdAt ?? row.created_at ?? null,
     });
+  }
+  return out;
+}
+
+// GET / PATCH /v2/treasury → the payment settings (citizenpay/api#277, #278).
+// A key the answer does not carry stays undefined (= not supported by this
+// api); a key carried with an unusable value is treated the same way, so a
+// garbled answer can never confirm a sync.
+export function paymentSettingsFromWire(
+  wire: TreasuryPaymentSettingsWire | null | undefined,
+): TreasuryPaymentSettings {
+  const out: TreasuryPaymentSettings = {};
+  if (!wire || typeof wire !== "object") return out;
+  const isCount = (v: unknown): v is number =>
+    typeof v === "number" && Number.isInteger(v) && v >= 0;
+  if ("feeAccountAddress" in wire) {
+    const v = wire.feeAccountAddress;
+    if (v === null) out.feeAccountAddress = null;
+    else if (typeof v === "string" && /^0x[0-9a-fA-F]{40}$/.test(v)) {
+      out.feeAccountAddress = v;
+    }
+  }
+  if ("payoutFeePercentageBps" in wire && isCount(wire.payoutFeePercentageBps)) {
+    out.payoutFeePercentageBps = wire.payoutFeePercentageBps;
+  }
+  if ("earlyPaidMaxCents" in wire) {
+    const v = wire.earlyPaidMaxCents;
+    if (v === null || isCount(v)) out.earlyPaidMaxCents = v;
+  }
+  if ("earlyPaidMaxCentsEffective" in wire) {
+    const v = wire.earlyPaidMaxCentsEffective;
+    if (v === null || isCount(v)) out.earlyPaidMaxCentsEffective = v;
   }
   return out;
 }
@@ -1378,6 +1416,27 @@ export class LiveCitizenPayClient implements CitizenPayClient {
 
   async setTreasuryKind(kind: TreasuryKind): Promise<void> {
     await apiTreasury.setKind(this.creds, kind);
+  }
+
+  async getTreasuryPaymentSettings(): Promise<TreasuryPaymentSettings> {
+    return paymentSettingsFromWire(
+      await apiTreasury.get(this.creds, { timeoutMs: PAYMENT_SETTINGS_TIMEOUT_MS }),
+    );
+  }
+
+  async setTreasuryPaymentSettings(
+    update: TreasuryPaymentSettingsUpdate,
+  ): Promise<TreasuryPaymentSettings> {
+    const body: Record<string, unknown> = {};
+    if (update.feeAccountAddress !== undefined) body.feeAccountAddress = update.feeAccountAddress;
+    if (update.payoutFeePercentageBps !== undefined) {
+      body.payoutFeePercentageBps = update.payoutFeePercentageBps;
+    }
+    if (update.earlyPaidMaxCents !== undefined) body.earlyPaidMaxCents = update.earlyPaidMaxCents;
+    if (Object.keys(body).length === 0) {
+      throw new Error("setTreasuryPaymentSettings: nothing to send");
+    }
+    return paymentSettingsFromWire(await apiTreasury.updatePaymentSettings(this.creds, body));
   }
 
   async listBanks(query: { country: string }): Promise<CitizenPayBank[]> {

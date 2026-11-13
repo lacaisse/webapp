@@ -2035,7 +2035,8 @@
           "confirm": "Burn tokens",
           "success": "Tokens burned. Transaction hash:",
           "feeSwept": "Platform fees and deduction transferred to the fund account: {amount}",
-          "feeNotSwept": "Tokens burned, but the platform fees haven't been transferred yet."
+          "feeNotSwept": "Tokens burned, but the platform fees haven't been transferred yet.",
+          "nothingToSweep": "Nothing to transfer for this payout."
         },
         "burnClaim": {
           "started": "A burn was started at {time} and has not been confirmed.",
@@ -2070,7 +2071,12 @@
         "feeTransfer": {
           "pending": "This payout's platform fees and deduction haven't been transferred yet.",
           "button": "Transfer platform fees",
-          "done": "Platform fees transferred. Transaction hash:"
+          "done": "Platform fees transferred. Transaction hash:",
+          "settling": "Fees still settling, retrying…",
+          "settlingGaveUp": "Fees are still settling. Try again in a few minutes.",
+          "nothingToTransfer": "Nothing to transfer for this payout.",
+          "pendingHint": "For a fund with a fee account, fees can still be settling for a few seconds after a payment (at most about two days). The transfer then retries on its own while this page is open.",
+          "listPending": "Fees to transfer"
         },
         "orders": {
           "title": "Orders",
@@ -2225,7 +2231,14 @@
           "releaseTooRecent": "This burn claim can't be released yet: a burn in progress can take a few minutes to reach the chain. Release becomes available at {releasableAt}.",
           "releaseClaimChanged": "The burn claim changed since this page loaded (another attempt took it, or it was resolved). The page has been reloaded — check again before acting.",
           "archiveAdjustmentLeg": "This is a refund, correction or top-up leg: it subtracts from the payout, so archiving it would overpay the merchant. Leave it in place.",
-          "archiveUnknownOrder": "Couldn't check this order before archiving it. Try again shortly."
+          "archiveUnknownOrder": "Couldn't check this order before archiving it. Try again shortly.",
+          "feesSettling": "Fees still settling: some transaction fees of this payout are still on their way to the fee account.",
+          "feeMaySettle": "This fund collects transaction fees at payment time: a fee from one of the payout's orders may still be settling. Retry in a minute."
+        },
+        "feeBreakdown": {
+          "collectedAtPayment": "Transaction fees collected at payment",
+          "sweptAtPayout": "Fees and deduction swept at this payout",
+          "hint": "The platform fee above includes the fund's transaction fees and its payout fee. Fees collected at payment already went to the fund's fee account."
         }
       },
       "export": {
@@ -2802,7 +2815,7 @@
       },
       "fees": {
         "title": "Fees",
-        "description": "Commission taken on payments to merchants. Configured here, then pushed to Citizen Pay.",
+        "description": "Fees your fund charges merchants. The customer never pays them. Configured here, then pushed to Citizen Pay.",
         "rate": "Fee rate (%)",
         "rateHint": "Percentage taken on each payment (e.g. 2.5 for 2.5%). Leave empty to use Citizen Pay's default rate.",
         "fixedFee": "Fixed fee per order (€)",
@@ -2836,6 +2849,27 @@
             "unavailable": "Citizen Pay doesn't support exemptions for this fund yet.",
             "failed": "Citizen Pay didn't accept the change. Try again in a moment."
           }
+        },
+        "transactionTitle": "Transaction fees",
+        "transactionDescription": "Charged to the merchant on each payment: the rate and the fixed fee per order.",
+        "feeAccount": {
+          "title": "Fee account",
+          "description": "Where your fund's transaction fees go. With an account set, each payment's transaction fee is sent to it within a minute of the payment, instead of being collected at payout. With none, nothing changes.",
+          "label": "Fee account",
+          "none": "None (collect at payout)",
+          "hint": "Only the fund's own accounts are offered: the main account, its other accounts and its Safes. Card source accounts and merchants' accounts can't receive fees.",
+          "kindMain": "payout account",
+          "kindAccount": "account",
+          "kindSafe": "Safe",
+          "unlisted": "{address} (no longer one of the fund's accounts)",
+          "sameAsSweep": "This is also the account payout fees are swept to. That works, but in a rare case Citizen Pay can't tell a fee sent at payment from one swept at payout, and may count one for the other. A separate account keeps them apart."
+        },
+        "payoutFee": {
+          "title": "Payout fee",
+          "description": "A platform fee charged to the merchant only when a payout is made, separate from the transaction fees above. The customer never pays it.",
+          "label": "Payout fee (%)",
+          "hint": "Percentage of the sales in each payout (e.g. 1.5 for 1.5%). Leave empty for no payout fee. A change applies to payouts created afterwards.",
+          "none": "no payout fee"
         }
       },
       "emails": {
@@ -3048,6 +3082,34 @@
           "show": "Preview",
           "hide": "Hide preview"
         }
+      },
+      "terminals": {
+        "title": "Terminals",
+        "description": "How the fund's payment terminals confirm wallet payments.",
+        "earlyPaid": {
+          "title": "Instant confirmation",
+          "description": "Up to this amount, a terminal shows a wallet payment as successful as soon as the payment is verified, before it is final on the blockchain. Above it, the terminal waits a few seconds for the final confirmation.",
+          "risk": "A higher limit means a larger possible loss if a payment later fails.",
+          "label": "Instant confirmation limit",
+          "default": "Default ({amount})",
+          "custom": "Custom amount",
+          "none": "No limit",
+          "amount": "Limit (€)",
+          "amountHint": "Between €0.01 and €1,000.00.",
+          "effective": "Limit in force now: {amount}",
+          "effectiveNone": "Limit in force now: none"
+        }
+      },
+      "paymentSync": {
+        "notYetSupported": "Saved, not applied yet: it will apply once the payments service is updated. Then use \"Apply now\" here.",
+        "notConnected": "Saved. It will apply once the fund is connected to Citizen Pay.",
+        "failed": "Saved, but the sync to Citizen Pay failed. Save again to retry.",
+        "refused": "Saved, but Citizen Pay refused it: {message}",
+        "drift": "Citizen Pay currently applies {remote}; La Caisse has {local}.",
+        "applyLocal": "Apply La Caisse's value",
+        "useRemote": "Use Citizen Pay's value",
+        "applyNow": "Apply now",
+        "unreadable": "Couldn't read the value Citizen Pay applies right now. Reload the page to try again."
       }
     }
   },
@@ -3108,7 +3170,13 @@
       "cutoffDayInvalid": "Cutoff day must be a whole number between 1 and 31.",
       "nameTooLong": "The name is too long.",
       "embedDomainInvalid": "Enter one domain per line (example.org, *.example.org, localhost:3000).",
-      "embedDomainsTooMany": "Too many domains — remove a few and try again."
+      "embedDomainsTooMany": "Too many domains — remove a few and try again.",
+      "feeAccountInvalid": "Choose one of the fund's accounts.",
+      "feeAccountNotOwn": "This account isn't one of the fund's accounts.",
+      "platformFeeInvalid": "The payout fee must be a number with up to 2 decimal places.",
+      "platformFeeTooHigh": "The payout fee can't exceed 100%.",
+      "earlyPaidInvalid": "Enter an amount in euros with up to 2 decimals (e.g. 25.00).",
+      "earlyPaidRange": "The limit must be between €0.01 and €1,000.00."
     }
   },
   "team": {

@@ -60,6 +60,8 @@ import type {
   PayoutDraftPreview,
   PayoutFeeConfig,
   PayoutFeeConfigEcho,
+  TreasuryPaymentSettings,
+  TreasuryPaymentSettingsUpdate,
   PayoutOrder,
   PayoutOrdersPage,
   PayoutPeriod,
@@ -1256,6 +1258,33 @@ class MockCitizenPayClient implements CitizenPayClient {
     mockTreasuryKinds.set(this.fundId, kind);
   }
 
+  // The mock is an up-to-date api (#277 + #278): it stores the payment
+  // settings per fund and echoes them, the cap's default being EUR 50.
+  async getTreasuryPaymentSettings(): Promise<TreasuryPaymentSettings> {
+    this.log("getTreasuryPaymentSettings", { fundId: this.fundId });
+    return mockPaymentSettingsView(this.fundId);
+  }
+
+  async setTreasuryPaymentSettings(
+    update: TreasuryPaymentSettingsUpdate,
+  ): Promise<TreasuryPaymentSettings> {
+    this.log("setTreasuryPaymentSettings", { fundId: this.fundId, ...update });
+    const current = mockPaymentSettings.get(this.fundId) ?? {};
+    mockPaymentSettings.set(this.fundId, {
+      ...current,
+      ...(update.feeAccountAddress !== undefined && {
+        feeAccountAddress: update.feeAccountAddress,
+      }),
+      ...(update.payoutFeePercentageBps !== undefined && {
+        payoutFeePercentageBps: update.payoutFeePercentageBps,
+      }),
+      ...(update.earlyPaidMaxCents !== undefined && {
+        earlyPaidMaxCents: update.earlyPaidMaxCents,
+      }),
+    });
+    return mockPaymentSettingsView(this.fundId);
+  }
+
   async listBanks(query: { country: string }): Promise<CitizenPayBank[]> {
     this.log("listBanks", query);
     return MOCK_BANKS.filter((b) => b.country === query.country);
@@ -1432,6 +1461,21 @@ export function getMockTreasuryTopUpUrl(
 // Treasury kinds pushed per fund this session (services/citizenpay/
 // sync-fund-kind.ts). Read back with getMockTreasuryKind in tests.
 const mockTreasuryKinds = new Map<string, TreasuryKind>();
+
+// Payment settings per fund (fundId → stored values), same process lifetime.
+const mockPaymentSettings = new Map<string, TreasuryPaymentSettingsUpdate>();
+const MOCK_EARLY_PAID_DEFAULT_CENTS = 5000;
+
+function mockPaymentSettingsView(fundId: string): TreasuryPaymentSettings {
+  const s = mockPaymentSettings.get(fundId) ?? {};
+  const cap = s.earlyPaidMaxCents ?? null;
+  return {
+    feeAccountAddress: s.feeAccountAddress ?? null,
+    payoutFeePercentageBps: s.payoutFeePercentageBps ?? 0,
+    earlyPaidMaxCents: cap,
+    earlyPaidMaxCentsEffective: cap ?? MOCK_EARLY_PAID_DEFAULT_CENTS,
+  };
+}
 
 /**
  * The last kind the mock client recorded for a fund: `undefined` when nothing

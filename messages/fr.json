@@ -2035,7 +2035,8 @@
           "confirm": "Brûler les jetons",
           "success": "Jetons brûlés. Hash de transaction :",
           "feeSwept": "Commission plateforme et déduction transférées vers le compte de la caisse : {amount}",
-          "feeNotSwept": "Jetons brûlés, mais la commission plateforme n’a pas encore été transférée."
+          "feeNotSwept": "Jetons brûlés, mais la commission plateforme n’a pas encore été transférée.",
+          "nothingToSweep": "Rien à transférer pour ce virement."
         },
         "burnClaim": {
           "started": "Un brûlage a été lancé le {time} et n’a pas été confirmé.",
@@ -2070,7 +2071,12 @@
         "feeTransfer": {
           "pending": "La commission plateforme et la déduction de ce virement n’ont pas encore été transférées.",
           "button": "Transférer la commission",
-          "done": "Commission plateforme transférée. Hash de transaction :"
+          "done": "Commission plateforme transférée. Hash de transaction :",
+          "settling": "Frais en cours de règlement, nouvel essai…",
+          "settlingGaveUp": "Les frais sont toujours en cours de règlement. Réessayez dans quelques minutes.",
+          "nothingToTransfer": "Rien à transférer pour ce virement.",
+          "pendingHint": "Pour une caisse avec un compte de frais, des frais peuvent être en cours de règlement quelques secondes après un paiement (au plus environ deux jours). Le transfert est alors réessayé automatiquement tant que cette page est ouverte.",
+          "listPending": "Frais à transférer"
         },
         "orders": {
           "title": "Commandes",
@@ -2225,7 +2231,14 @@
           "releaseTooRecent": "Cette réservation de brûlage ne peut pas encore être libérée : un brûlage en cours peut mettre quelques minutes à atteindre la chaîne. La libération sera possible à partir du {releasableAt}.",
           "releaseClaimChanged": "La réservation de brûlage a changé depuis le chargement de la page (une autre tentative l’a prise, ou elle a été résolue). La page a été rechargée — vérifiez à nouveau avant d’agir.",
           "archiveAdjustmentLeg": "C’est une ligne de remboursement, de correction ou de rechargement : elle se déduit du versement, l’archiver ferait trop payer le commerçant. Laissez-la en place.",
-          "archiveUnknownOrder": "Impossible de vérifier cette commande avant de l’archiver. Réessayez dans un instant."
+          "archiveUnknownOrder": "Impossible de vérifier cette commande avant de l’archiver. Réessayez dans un instant.",
+          "feesSettling": "Frais en cours de règlement : des frais de transaction de ce virement sont encore en route vers le compte de frais.",
+          "feeMaySettle": "Cette caisse prélève les frais de transaction au paiement : des frais d’une commande de ce virement sont peut-être encore en cours de règlement. Réessayez dans une minute."
+        },
+        "feeBreakdown": {
+          "collectedAtPayment": "Frais de transaction prélevés au paiement",
+          "sweptAtPayout": "Frais et déduction transférés à ce virement",
+          "hint": "La commission plateforme ci-dessus comprend les frais de transaction de la caisse et ses frais de virement. Les frais prélevés au paiement sont déjà sur le compte de frais de la caisse."
         }
       },
       "export": {
@@ -2802,7 +2815,7 @@
       },
       "fees": {
         "title": "Frais",
-        "description": "Commission prélevée sur les paiements aux commerces. Configurée ici, puis transmise à Citizen Pay.",
+        "description": "Frais que votre caisse facture aux commerces. Le client ne les paie jamais. Configurés ici, puis transmis à Citizen Pay.",
         "rate": "Taux de commission (%)",
         "rateHint": "Pourcentage prélevé sur chaque paiement (ex. 2,5 pour 2,5 %). Laissez vide pour utiliser le taux par défaut de Citizen Pay.",
         "fixedFee": "Frais fixes par commande (€)",
@@ -2836,6 +2849,27 @@
             "unavailable": "Citizen Pay ne gère pas encore les exemptions pour cette caisse.",
             "failed": "Citizen Pay n'a pas accepté la modification. Réessayez dans un instant."
           }
+        },
+        "transactionTitle": "Frais de transaction",
+        "transactionDescription": "Facturés au commerce sur chaque paiement : le taux et les frais fixes par commande.",
+        "feeAccount": {
+          "title": "Compte de frais",
+          "description": "Le compte où arrivent les frais de transaction de votre caisse. Avec un compte choisi, les frais de chaque paiement y sont envoyés dans la minute qui suit le paiement, au lieu d’être prélevés au virement. Sans compte, rien ne change.",
+          "label": "Compte de frais",
+          "none": "Aucun (prélever au virement)",
+          "hint": "Seuls les comptes de la caisse sont proposés : le compte principal, ses autres comptes et ses Safes. Les comptes source des cartes et les comptes des commerces ne peuvent pas recevoir de frais.",
+          "kindMain": "compte des virements",
+          "kindAccount": "compte",
+          "kindSafe": "Safe",
+          "unlisted": "{address} (ne fait plus partie des comptes de la caisse)",
+          "sameAsSweep": "C’est aussi le compte vers lequel les frais sont transférés au virement. Cela fonctionne, mais dans un cas rare Citizen Pay ne peut pas distinguer des frais envoyés au paiement de frais transférés au virement, et peut compter les uns pour les autres. Un compte distinct les garde séparés."
+        },
+        "payoutFee": {
+          "title": "Frais de virement",
+          "description": "Des frais de plateforme facturés au commerce uniquement lors d’un virement, distincts des frais de transaction ci-dessus. Le client ne les paie jamais.",
+          "label": "Frais de virement (%)",
+          "hint": "Pourcentage des ventes de chaque virement (ex. 1,5 pour 1,5 %). Laissez vide pour aucun frais de virement. Un changement s’applique aux virements créés ensuite.",
+          "none": "aucun frais de virement"
         }
       },
       "emails": {
@@ -3048,6 +3082,34 @@
           "show": "Aperçu",
           "hide": "Masquer l'aperçu"
         }
+      },
+      "terminals": {
+        "title": "Terminaux",
+        "description": "Comment les terminaux de paiement de la caisse confirment les paiements par portefeuille.",
+        "earlyPaid": {
+          "title": "Confirmation immédiate",
+          "description": "Jusqu’à ce montant, un terminal affiche un paiement par portefeuille comme réussi dès qu’il est vérifié, avant qu’il soit définitif sur la blockchain. Au-delà, le terminal attend quelques secondes la confirmation définitive.",
+          "risk": "Une limite plus élevée signifie une perte possible plus importante si un paiement échoue par la suite.",
+          "label": "Limite de confirmation immédiate",
+          "default": "Par défaut ({amount})",
+          "custom": "Montant personnalisé",
+          "none": "Aucune limite",
+          "amount": "Limite (€)",
+          "amountHint": "Entre 0,01 € et 1 000,00 €.",
+          "effective": "Limite en vigueur : {amount}",
+          "effectiveNone": "Limite en vigueur : aucune"
+        }
+      },
+      "paymentSync": {
+        "notYetSupported": "Enregistré, pas encore appliqué : le réglage s’appliquera dès que le service de paiement sera mis à jour. Utilisez alors « Appliquer maintenant » ici.",
+        "notConnected": "Enregistré. Le réglage s’appliquera dès que la caisse sera connectée à Citizen Pay.",
+        "failed": "Enregistré, mais la synchronisation avec Citizen Pay a échoué. Enregistrez à nouveau pour réessayer.",
+        "refused": "Enregistré, mais Citizen Pay l’a refusé : {message}",
+        "drift": "Citizen Pay applique actuellement {remote} ; La Caisse a {local}.",
+        "applyLocal": "Appliquer la valeur de La Caisse",
+        "useRemote": "Reprendre la valeur de Citizen Pay",
+        "applyNow": "Appliquer maintenant",
+        "unreadable": "Impossible de lire la valeur appliquée par Citizen Pay. Rechargez la page pour réessayer."
       }
     }
   },
@@ -3108,7 +3170,13 @@
       "cutoffDayInvalid": "Le jour de clôture doit être un entier entre 1 et 31.",
       "nameTooLong": "Le nom est trop long.",
       "embedDomainInvalid": "Saisissez un domaine par ligne (exemple.org, *.exemple.org, localhost:3000).",
-      "embedDomainsTooMany": "Trop de domaines — retirez-en quelques-uns."
+      "embedDomainsTooMany": "Trop de domaines — retirez-en quelques-uns.",
+      "feeAccountInvalid": "Choisissez un des comptes de la caisse.",
+      "feeAccountNotOwn": "Ce compte ne fait pas partie des comptes de la caisse.",
+      "platformFeeInvalid": "Les frais de virement doivent être un nombre avec au plus 2 décimales.",
+      "platformFeeTooHigh": "Les frais de virement ne peuvent pas dépasser 100 %.",
+      "earlyPaidInvalid": "Saisissez un montant en euros avec au plus 2 décimales (ex. 25,00).",
+      "earlyPaidRange": "La limite doit être comprise entre 0,01 € et 1 000,00 €."
     }
   },
   "team": {

@@ -76,6 +76,8 @@ describe("updateGeneralSettingsAction → top-up URL + treasury kind", () => {
       ["/v2/treasury", "PATCH"],
       ["/v2/treasury", "PATCH"],
     ]);
+    // Exactly these two: a General save never pushes a payment setting
+    // (fee account, payout fee, terminal cap), pending or not.
     expect(calls.map(([, init]) => JSON.parse(String(init.body)))).toEqual([
       { topUpUrl: "https://laclass.lacaisse.eu/pay/{serial}" },
       { kind: "fund" },

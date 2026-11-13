@@ -63,7 +63,14 @@ import {
   type PayoutOrderExportEntry,
   type PayoutOrderExportFile,
 } from "./order-export";
-import { fromCents, maxManualDeductionCents, payoutWalletOutflow, toCents } from "./money";
+import { isFeesSettlingMessage, isNothingToSweepMessage } from "./fee-sweep";
+import {
+  fromCents,
+  maxManualDeductionCents,
+  payoutSweepAmount,
+  payoutWalletOutflow,
+  toCents,
+} from "./money";
 import {
   assignPlaceBurns,
   assignPlaceMints,
@@ -1700,7 +1707,18 @@ export async function checkPayoutBacking(
     ordersRead,
     symbol: fund.tokenSymbol ?? null,
     placeAccount,
+    feeAccount: payout ? hasFeeAccount(fund, payout) : Boolean(fund.feeAccountAddress),
   });
+}
+
+// Does this payout belong to a fund that collects transaction fees at
+// payment time (citizenpay/api#277)? La Caisse's own setting, or the api
+// reporting fees collected on the payout (a value set on the api directly).
+function hasFeeAccount(
+  fund: { feeAccountAddress: string | null },
+  payout: { feesCollectedAtPayment?: string | null },
+): boolean {
+  return Boolean(fund.feeAccountAddress) || toCents(payout.feesCollectedAtPayment ?? "0") > 0;
 }
 
 export type BurnPayoutResult =
@@ -1722,6 +1740,14 @@ export type BurnPayoutResult =
       feeTransferTxHash?: string | null;
       feeTransferPending?: boolean;
       feeTransferError?: string | null;
+      // citizenpay/api#277. `feeSettling`: the sweep waits for transaction
+      // fees of this payout still in flight to the fund's fee account (the
+      // api's "still settling, retry shortly"): not an error, retry the sweep
+      // later (`feeTransfer`); `feeTransferPending` stays true.
+      // `nothingToSweep`: every fee was already collected at payment time and
+      // there is no deduction, so the sweep had nothing to move: done.
+      feeSettling?: boolean;
+      nothingToSweep?: boolean;
       // The burn went through and is recorded with CP, but something on our
       // side after it failed (e.g. the token-history bookkeeping). Show it,
       // but it is not a burn failure.
@@ -1965,7 +1991,15 @@ export async function burnPayout(
     const shortfall = await walletShortfall(ctx, placeAccount, payout);
     if (shortfall) {
       await releaseOwnClaim(c, payoutId, claimId);
-      return { error: err(ctx, "burnInsufficientBalance", shortfall) };
+      // A fund with a fee account: a fee leg of one of the payout's orders
+      // may still be on its way (the place's balance then moves within a
+      // minute). The refusal stands; the message says to retry shortly.
+      const message = err(ctx, "burnInsufficientBalance", shortfall);
+      return {
+        error: hasFeeAccount(ctx.fund, payout)
+          ? `${message} ${err(ctx, "feeMaySettle")}`
+          : message,
+      };
     }
 
     // Burn only the `net` on-chain with our minter (records a TokenOperation).
@@ -2110,13 +2144,31 @@ async function reportPayoutBurn(
 
   revalidatePath("/payments");
   revalidatePath(`/payments/payouts/${payoutId}`);
+  // citizenpay/api#277: the two sweep answers that are not failures.
+  // Nothing left to sweep (every fee collected at payment time, no
+  // deduction) is the sweep DONE; "still settling" waits for a fee leg in
+  // flight and is retried, the payout staying where it is.
+  if (!report.feeTransferPending && isNothingToSweepMessage(report.feeTransferError)) {
+    return {
+      ok: true,
+      txHash,
+      feeAmount: report.feeAmount,
+      feeTransferTxHash: null,
+      feeTransferPending: false,
+      feeTransferError: null,
+      nothingToSweep: true,
+    };
+  }
+  const feeSettling =
+    report.feeTransferPending && isFeesSettlingMessage(report.feeTransferError);
   return {
     ok: true,
     txHash,
     feeAmount: report.feeAmount,
     feeTransferTxHash: report.feeTransferTxHash,
     feeTransferPending: report.feeTransferPending,
-    feeTransferError: report.feeTransferError,
+    feeTransferError: feeSettling ? err(ctx, "feesSettling") : report.feeTransferError,
+    ...(feeSettling ? { feeSettling: true } : {}),
   };
 }
 
@@ -2355,18 +2407,30 @@ async function attemptProvablyBurnedNothing(
 
 export type FeeTransferOutcome =
   | { error: string }
+  // citizenpay/api#277, 409 "still settling": a transaction fee of one of the
+  // payout's orders is still on its way to the fund's fee account. NOT a
+  // failure: the payout stays in its step; retry shortly (the payout page
+  // retries on its own with backoff, services/payout/fee-sweep.ts).
+  | { settling: true; message: string }
   | {
       ok: true;
-      feeTransferTxHash: string;
+      // null with `nothingToTransfer`: there was nothing left to sweep.
+      feeTransferTxHash: string | null;
       feeAmount: string | null;
       alreadyTransferred: boolean;
+      // citizenpay/api#277, 422 "no fees or manual deduction to transfer":
+      // every fee was collected at payment time and there is no deduction.
+      // The sweep is DONE, not failed.
+      nothingToTransfer?: true;
     };
 
 /**
  * Run (or retry) just the fee sweep for an already-burned payout — the
  * standalone, idempotent counterpart to the burn's inline sweep. Sweeps to the
  * fund's minter account. Idempotent on CP's side, so a retry after a lost
- * response won't double-transfer.
+ * response won't double-transfer. Two answers are not errors (see
+ * FeeTransferOutcome): "still settling" (retry later) and "nothing to
+ * transfer" (done).
  */
 export async function feeTransfer(
   ctx: PayoutContext,
@@ -2396,6 +2460,26 @@ export async function feeTransfer(
       alreadyTransferred: res.alreadyTransferred,
     };
   } catch (e) {
+    if (e instanceof CitizenPayApiError && e.status === 409 && isFeesSettlingMessage(e.message)) {
+      console.info("[payout] feeTransfer: fees still settling", logSafe(payoutId));
+      return { settling: true, message: err(ctx, "feesSettling") };
+    }
+    if (
+      e instanceof CitizenPayApiError &&
+      e.status === 422 &&
+      isNothingToSweepMessage(e.message) &&
+      (await nothingLeftToSweep(ctx, payoutId))
+    ) {
+      revalidatePath("/payments");
+      revalidatePath(`/payments/payouts/${payoutId}`);
+      return {
+        ok: true,
+        feeTransferTxHash: null,
+        feeAmount: null,
+        alreadyTransferred: false,
+        nothingToTransfer: true,
+      };
+    }
     // CP surfaces sweep failures as HTTP status with a descriptive message
     // (402 insufficient, 409 not-burnt/in-progress, 422 config, 503 bundler).
     // toMessage forwards that message so the operator sees the real reason —
@@ -2406,6 +2490,21 @@ export async function feeTransfer(
       return { error: err(ctx, "feeTransferNotBurned") };
     }
     return { error: toMessage(e, err(ctx, "feeTransferFailed")) };
+  }
+}
+
+// After a 422 "no fees or manual deduction to transfer": done only if the
+// payout, read fresh, agrees there is nothing to sweep — the api no longer
+// reports a pending sweep, or its sweep amount is 0. A failed read, or a
+// payout that still shows a cut, is not "done" (the 422 is then surfaced as
+// an error, as before).
+async function nothingLeftToSweep(ctx: PayoutContext, payoutId: string): Promise<boolean> {
+  try {
+    const fresh = await client(ctx).getPayout(payoutId);
+    return fresh.feeTransferPending === false || toCents(payoutSweepAmount(fresh)) === 0;
+  } catch (e) {
+    console.warn("[payout] feeTransfer: re-read after 422 failed", logSafe(payoutId), e);
+    return false;
   }
 }
 
