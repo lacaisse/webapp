@@ -1912,10 +1912,15 @@
             "complete": "Complete"
           },
           "burn": {
-            "hint": "Burns the merchant's net from the place's account; the platform fees and deduction are swept to the fund."
+            "hint": "Burns the merchant's net from the place's account; the platform fees and deduction are swept to the fund.",
+            "beforeSigning": "Burn the tokens for this payout. It works before or after you sign the transfer; signing first pays the merchant before their tokens are destroyed. Never leave a paid payout unburned.",
+            "paidNotBurnt": "Paid at the bank, tokens not burned yet. Burn them now so the payout is settled."
           },
           "pay": {
             "hint": "Create the bank payment to the merchant; you'll sign the transfer at your bank.",
+            "unbackedTitle": "Payout not fully backed",
+            "unbackedWarning": "Paying anyway sends the merchant more than the place's tokens cover. Continue only if you have checked the orders.",
+            "payAnyway": "Pay anyway",
             "notEnabled": "Payment initiation isn't enabled on your bank connection, so the transfer can't be created yet.",
             "openBank": "Set it up in Bank"
           },
@@ -2212,6 +2217,11 @@
           "burnHashNotSuccessful": "That transaction failed on chain, so it burned nothing. Nothing was recorded.",
           "burnHashNotBurn": "That transaction isn't a burn of this place's tokens. Nothing was recorded.",
           "burnHashWrongAmount": "That transaction burned {found}, but this payout's net is {expected}. Nothing was recorded.",
+          "paidNotBurnt": "This payout was paid and Citizen Pay marked it complete. Citizen Pay does not accept a burn or a fee sweep on a completed payout, so nothing was burned now. Whether it was burned earlier cannot be confirmed here. Before any manual burn from the Token page, check the place wallet {wallet} on chain (its balance and token history) against {net} net + {cut} retained cut.",
+          "paidNotBurntNoDetail": "This payout was paid and Citizen Pay marked it complete. Citizen Pay does not accept a burn or a fee sweep on a completed payout, so nothing was burned now. Whether it was burned earlier cannot be confirmed here. Before any manual burn from the Token page, check the place's wallet on chain (its balance and token history) against the net plus the retained cut.",
+          "burnReportRefusedComplete": "The burn DID happen on chain (tx {txHash}), but Citizen Pay refused to record it: the bank payment completed the payout while the burn was running. Do not burn again. The fee sweep cannot run on this payout.",
+          "feeTransferNotBurned": "The fee sweep needs a recorded burn, and this payout has none. If the payout is already complete, Citizen Pay no longer accepts a burn for it, so the sweep cannot run.",
+          "payUnbacked": "No bank payment was created: this payout is not fully backed by the place's tokens. {summary}",
           "releaseTooRecent": "This burn claim can't be released yet: a burn in progress can take a few minutes to reach the chain. Release becomes available at {releasableAt}.",
           "releaseClaimChanged": "The burn claim changed since this page loaded (another attempt took it, or it was resolved). The page has been reloaded — check again before acting.",
           "archiveAdjustmentLeg": "This is a refund, correction or top-up leg: it subtracts from the payout, so archiving it would overpay the merchant. Leave it in place.",

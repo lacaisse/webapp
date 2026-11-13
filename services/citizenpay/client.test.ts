@@ -7,7 +7,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/services/db/prisma", () => ({ prisma: {} }));
 
 import { CitizenPayApiError } from "./api";
-import { getCitizenPayClient } from "./client";
+import { getCitizenPayClient, setMockLegacyBurnRules } from "./client";
 
 const fund = { id: "f1", citizenPayApiKeyId: null, citizenPayApiKeyEnc: null };
 const TX = `0x${"ab".repeat(32)}`;
@@ -35,6 +35,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  setMockLegacyBurnRules(false);
   vi.useRealTimers();
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
@@ -68,10 +69,44 @@ describe("mock client burn claim", () => {
     expect(await refusal(c.claimPayoutBurn(id))).toBe("burn already in progress");
   });
 
-  it("refuses to claim complete and not-pending payouts", async () => {
+  it("refuses to claim a burned complete payout, but takes one while payment-pending (as live)", async () => {
     const c = getCitizenPayClient(fund);
+    expect((await c.getPayout("mock-payout-0")).burned).toBe(true);
+    expect((await c.getPayoutStatus("mock-payout-0")).burned).toBe(true);
+    expect(await refusal(c.claimPayoutBurn("mock-payout-0"))).toBe("payout is already burnt");
+    const claim = await c.claimPayoutBurn("mock-payout-2");
+    expect(claim.claimId).toBeTruthy();
+    await c.releasePayoutBurn("mock-payout-2", { claimId: claim.claimId });
+  });
+
+  it("burns a complete payout with no burn recorded, which stays complete (api#275)", async () => {
+    const c = getCitizenPayClient(fund);
+    const id = freshPayout();
+    expect(await refusal(c.feeTransfer(id, TX))).toBe("payout has not been burned");
+    await c.completePayout(id);
+    expect((await c.getPayoutStatus(id)).burned).toBe(false);
+    const claim = await c.claimPayoutBurn(id);
+    await c.burnPayout(id, TX, undefined, claim.claimId);
+    const live = await c.getPayoutStatus(id);
+    expect(live).toMatchObject({ status: "complete", burned: true, burnClaim: null });
+    expect((await c.getPayout(id)).burned).toBe(true);
+    expect((await c.feeTransfer(id, TX)).feeTransferTxHash).toBeTruthy();
+    // Same hash again is idempotent; another hash is refused as complete.
+    expect((await c.burnPayout(id, TX)).duplicateBurn).toBe(false);
+    expect(await refusal(c.burnPayout(id, `0x${"cd".repeat(32)}`))).toBe("payout is already complete");
+    expect(await refusal(c.claimPayoutBurn(id))).toBe("payout is already burnt");
+  });
+
+  it("legacy rules: no `burned`, and claim + report refused on any complete payout", async () => {
+    setMockLegacyBurnRules(true);
+    const c = getCitizenPayClient(fund);
+    const id = freshPayout();
+    await c.completePayout(id);
+    expect((await c.getPayoutStatus(id)).burned).toBeUndefined();
+    expect((await c.getPayout(id)).burned).toBeUndefined();
+    expect(await refusal(c.claimPayoutBurn(id))).toBe("payout is already complete");
+    expect(await refusal(c.burnPayout(id, TX))).toBe("payout is already complete");
     expect(await refusal(c.claimPayoutBurn("mock-payout-0"))).toBe("payout is already complete");
-    expect(await refusal(c.claimPayoutBurn("mock-payout-2"))).toBe("payout is not pending");
   });
 
   it("releases by claim id at once, but a forced release only after 10 minutes and pinned", async () => {

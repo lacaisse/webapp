@@ -211,7 +211,20 @@ function payoutFromDetailWire(w: PayoutDetailWire): Payout {
     ...payoutFromListWire(w),
     manualDeductionComment: w.manualDeductionComment ?? null,
     burnClaim: burnClaimFromWire(w.burnClaim),
+    // citizenpay/api#275; absent on an older api (then [] / undefined).
+    burnTxHashes: burnTxHashesFromWire(w.burnTxHashes),
+    burned: burnedFromWire(w.burned),
   };
+}
+
+// `burned` is only meaningful as a real boolean; anything else = not sent.
+export function burnedFromWire(w: unknown): boolean | undefined {
+  return typeof w === "boolean" ? w : undefined;
+}
+
+export function burnTxHashesFromWire(w: unknown): string[] {
+  if (!Array.isArray(w)) return [];
+  return w.filter((h): h is string => typeof h === "string" && h !== "");
 }
 
 // In-flight burn claim. Absent (older api) and null both mean "none"; a claim
@@ -1248,6 +1261,7 @@ export class LiveCitizenPayClient implements CitizenPayClient {
       feeTransferPending: res.feeTransferPending ?? false,
       feeTransferTxHash: res.feeTransferTxHash ?? null,
       burnClaim: burnClaimFromWire(res.burnClaim),
+      burned: burnedFromWire(res.burned),
     };
   }
 

@@ -100,6 +100,44 @@ describe("LiveCitizenPayClient burn claim", () => {
     expect((await client.getPayoutStatus("p1")).burnClaim).toBeNull();
   });
 
+  it("maps burned on /status when sent, and leaves it undefined when absent", async () => {
+    reply = { status: 200, body: { status: "complete", burned: false, burnTxHashes: [] } };
+    expect((await client.getPayoutStatus("p1")).burned).toBe(false);
+    reply = { status: 200, body: { status: "complete", burned: true, burnTxHashes: [] } };
+    expect((await client.getPayoutStatus("p1")).burned).toBe(true);
+    reply = { status: 200, body: { status: "complete" } };
+    expect((await client.getPayoutStatus("p1")).burned).toBeUndefined();
+  });
+
+  const detail = {
+    payoutId: "p1",
+    businessId: "b1",
+    placeId: "pl1",
+    status: "complete",
+    startDate: "2026-11-01",
+    endDate: "2026-11-07",
+    createdAt: "2026-11-08T00:00:00Z",
+    updatedAt: "2026-11-08T00:00:00Z",
+  };
+
+  it("maps burned + burnTxHashes on the payout detail when sent", async () => {
+    reply = { status: 200, body: { ...detail, burned: true, burnTxHashes: ["0xa", "0xb"] } };
+    const p = await client.getPayout("p1");
+    expect(calls[0].url.pathname).toBe("/v2/treasury/payouts/p1");
+    expect(p.burned).toBe(true);
+    expect(p.burnTxHashes).toEqual(["0xa", "0xb"]);
+    // A burned legacy row: no hashes, `burned` still says so.
+    reply = { status: 200, body: { ...detail, burned: true, burnTxHashes: [] } };
+    expect(await client.getPayout("p1")).toMatchObject({ burned: true, burnTxHashes: [] });
+  });
+
+  it("leaves burned undefined and burnTxHashes empty on an older api", async () => {
+    reply = { status: 200, body: detail };
+    const p = await client.getPayout("p1");
+    expect(p.burned).toBeUndefined();
+    expect(p.burnTxHashes).toEqual([]);
+  });
+
   it("reports duplicateBurn", async () => {
     reply = { status: 200, body: { success: true, duplicateBurn: true } };
     expect((await client.burnPayout("p1", "0xtx", undefined, "c-1")).duplicateBurn).toBe(true);

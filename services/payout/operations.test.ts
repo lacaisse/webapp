@@ -21,6 +21,8 @@ const cp = vi.hoisted(() => ({
   getPayoutOrders: vi.fn(),
   burnPayout: vi.fn(),
   archiveOrder: vi.fn(),
+  createPayoutPayment: vi.fn(),
+  feeTransfer: vi.fn(),
 }));
 vi.mock("@/services/citizenpay/client", () => ({
   getCitizenPayClient: () => cp,
@@ -48,7 +50,8 @@ vi.mock("@/services/alchemy/transfers", () => ({}));
 const getBalances = vi.hoisted(() => vi.fn());
 vi.mock("@/services/alchemy/balances", () => ({ getBalances }));
 const verifyPayoutBurn = vi.hoisted(() => vi.fn());
-vi.mock("./burn-verify", () => ({ verifyPayoutBurn }));
+const resolveReceiptWithLogs = vi.hoisted(() => vi.fn());
+vi.mock("./burn-verify", () => ({ verifyPayoutBurn, resolveReceiptWithLogs }));
 const findBurnAttempt = vi.hoisted(() => vi.fn());
 vi.mock("./burn-attempt", () => ({ findBurnAttempt }));
 vi.mock("./receipts", () => ({ resolveOrderReceipts: vi.fn() }));
@@ -57,7 +60,10 @@ import {
   archiveOrder,
   archiveOrders,
   burnPayout,
+  checkPayoutBacking,
   classifyPayoutOrders,
+  createPayoutPayment,
+  feeTransfer,
   recordPayoutBurn,
   releasePayoutBurnClaim,
   type PayoutContext,
@@ -155,7 +161,7 @@ describe("burnPayout — claim before burning", () => {
     expect(burnDirect).not.toHaveBeenCalled();
   });
 
-  it.each(["payout is already burnt", "payout is already complete", "payout is not pending"])(
+  it.each(["payout is already burnt", "payout is not pending"])(
     "maps claim 409 %j to not-burnable and burns nothing",
     async (message) => {
       cp.claimPayoutBurn.mockRejectedValueOnce(
@@ -686,5 +692,383 @@ describe("archiveOrders — never an adjustment leg", () => {
     const res = await archiveOrders(ctx, { payoutId: PAYOUT, orderIds: [5] });
     expect(res).toEqual([{ orderId: 5, ok: false, error: `${E}.ordersFailed` }]);
     expect(cp.archiveOrder).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Burn while payment-pending; a completed payout with no burn (2026-11-13)
+// ---------------------------------------------------------------------------
+// Citizen Pay accepts the claim + burn report while a payment exists but the
+// bank hasn't accepted it (`payment-pending`), and marks the payout complete
+// within seconds once it has — refusing burn and sweep from then on.
+
+describe("burnPayout — payment-pending and complete", () => {
+  it("takes the claim and burns while payment-pending", async () => {
+    cp.getPayoutStatus.mockResolvedValue({ status: "payment-pending", burnClaim: null });
+    const res = await burnPayout(ctx, PAYOUT);
+    expect(res).toMatchObject({ ok: true, txHash: TX });
+    expect(cp.claimPayoutBurn).toHaveBeenCalledWith(PAYOUT);
+    expect(burnDirect).toHaveBeenCalled();
+    expect(cp.burnPayout).toHaveBeenCalledWith(PAYOUT, TX, MINTER, CLAIM.claimId);
+  });
+
+  it("refuses a complete payout with a burn recorded, taking no claim", async () => {
+    cp.getPayoutStatus.mockResolvedValue({ status: "complete", burnClaim: null });
+    cp.getPayout.mockResolvedValue({ id: PAYOUT, net: "48.75", burnTxHashes: [TX] } as Payout);
+    expect(await burnPayout(ctx, PAYOUT)).toEqual({ error: `${E}.notBurnable` });
+    expect(cp.claimPayoutBurn).not.toHaveBeenCalled();
+    expect(burnDirect).not.toHaveBeenCalled();
+  });
+
+  it("refuses a complete payout whose fee sweep ran (evidence of a burn; the live client has no hashes)", async () => {
+    cp.getPayoutStatus.mockResolvedValue({
+      status: "complete",
+      burnClaim: null,
+      feeTransferTxHash: "0xsweep",
+      feeTransferPending: false,
+    });
+    cp.getPayout.mockResolvedValue({
+      id: PAYOUT,
+      net: "48.75",
+      burnTxHashes: [],
+      feeTransferTxHash: null,
+      feeTransferPending: false,
+    } as unknown as Payout);
+    expect(await burnPayout(ctx, PAYOUT)).toEqual({ error: `${E}.notBurnable` });
+    expect(cp.claimPayoutBurn).not.toHaveBeenCalled();
+  });
+
+  it("refuses a complete payout with a sweep still pending on the payout row", async () => {
+    cp.getPayoutStatus.mockResolvedValue({ status: "complete", burnClaim: null });
+    cp.getPayout.mockResolvedValue({
+      id: PAYOUT,
+      net: "48.75",
+      burnTxHashes: [],
+      feeTransferPending: true,
+    } as unknown as Payout);
+    expect(await burnPayout(ctx, PAYOUT)).toEqual({ error: `${E}.notBurnable` });
+    expect(cp.claimPayoutBurn).not.toHaveBeenCalled();
+  });
+
+  it("still tries the claim on a complete payout with no burn; CP's 'already complete' → paidNotBurnt", async () => {
+    cp.getPayoutStatus.mockResolvedValue({ status: "complete", burnClaim: null });
+    cp.getPayout.mockResolvedValue({
+      id: PAYOUT,
+      net: "48.75",
+      totalAmount: "52.00",
+      totalFees: "2.00",
+      totalPayoutFees: "1.25",
+      manualDeduction: "0.00",
+      burnTxHashes: [],
+    } as unknown as Payout);
+    cp.claimPayoutBurn.mockRejectedValueOnce(
+      new CitizenPayApiError("payout is already complete", 409, { error: "payout is already complete" }),
+    );
+    expect(await burnPayout(ctx, PAYOUT)).toEqual({
+      error: `${E}.paidNotBurnt ${JSON.stringify({ net: "48.75 EUR", cut: "1.25 EUR", wallet: PLACE })}`,
+    });
+    expect(cp.claimPayoutBurn).toHaveBeenCalledWith(PAYOUT);
+    expect(burnDirect).not.toHaveBeenCalled();
+    expect(cp.burnPayout).not.toHaveBeenCalled();
+  });
+
+  it("paidNotBurnt without the figures when the place can't be read", async () => {
+    cp.claimPayoutBurn.mockRejectedValueOnce(
+      new CitizenPayApiError("payout is already complete", 409, null),
+    );
+    cp.getPayoutOrders.mockRejectedValueOnce(new Error("down"));
+    expect(await burnPayout(ctx, PAYOUT)).toEqual({ error: `${E}.paidNotBurntNoDetail` });
+    expect(burnDirect).not.toHaveBeenCalled();
+  });
+
+  it("burns on a complete payout with no burn if CP takes the claim (forward-compatible)", async () => {
+    cp.getPayoutStatus.mockResolvedValue({ status: "complete", burnClaim: null });
+    cp.getPayout.mockResolvedValue({
+      id: PAYOUT,
+      net: "48.75",
+      totalAmount: "52.00",
+      totalFees: "2.00",
+      totalPayoutFees: "1.25",
+      manualDeduction: "0.00",
+      burnTxHashes: [],
+    } as unknown as Payout);
+    expect(await burnPayout(ctx, PAYOUT)).toMatchObject({ ok: true, txHash: TX });
+    expect(cp.burnPayout).toHaveBeenCalledWith(PAYOUT, TX, MINTER, CLAIM.claimId);
+  });
+
+  it("burns a complete payout the api reports `burned: false` (api#275), stays on the claim path", async () => {
+    cp.getPayoutStatus.mockResolvedValue({ status: "complete", burnClaim: null, burned: false });
+    cp.getPayout.mockResolvedValue({
+      id: PAYOUT,
+      net: "48.75",
+      totalAmount: "52.00",
+      totalFees: "2.00",
+      totalPayoutFees: "1.25",
+      manualDeduction: "0.00",
+      burnTxHashes: [],
+      burned: false,
+    } as unknown as Payout);
+    expect(await burnPayout(ctx, PAYOUT)).toMatchObject({ ok: true, txHash: TX });
+    expect(cp.claimPayoutBurn).toHaveBeenCalledWith(PAYOUT);
+    expect(burnDirect).toHaveBeenCalledTimes(1);
+    expect(cp.burnPayout).toHaveBeenCalledWith(PAYOUT, TX, MINTER, CLAIM.claimId);
+  });
+
+  it("refuses a complete payout the api reports `burned: true` with no hashes, taking no claim", async () => {
+    cp.getPayoutStatus.mockResolvedValue({ status: "complete", burnClaim: null, burned: true });
+    cp.getPayout.mockResolvedValue({
+      id: PAYOUT,
+      net: "48.75",
+      burnTxHashes: [],
+      burned: true,
+    } as unknown as Payout);
+    expect(await burnPayout(ctx, PAYOUT)).toEqual({ error: `${E}.notBurnable` });
+    expect(cp.claimPayoutBurn).not.toHaveBeenCalled();
+    expect(burnDirect).not.toHaveBeenCalled();
+  });
+
+  it("`burned: false` outweighs a stale sweep flag (authoritative)", async () => {
+    cp.getPayoutStatus.mockResolvedValue({
+      status: "complete",
+      burnClaim: null,
+      burned: false,
+      feeTransferPending: true,
+    });
+    cp.getPayout.mockResolvedValue({
+      id: PAYOUT,
+      net: "48.75",
+      totalAmount: "52.00",
+      totalFees: "2.00",
+      totalPayoutFees: "1.25",
+      manualDeduction: "0.00",
+      burnTxHashes: [],
+    } as unknown as Payout);
+    expect(await burnPayout(ctx, PAYOUT)).toMatchObject({ ok: true, txHash: TX });
+  });
+
+  it("a concurrent second attempt (claim held) is still refused and burns nothing", async () => {
+    cp.getPayoutStatus.mockResolvedValue({ status: "payment-pending", burnClaim: null });
+    cp.claimPayoutBurn.mockRejectedValueOnce(
+      new CitizenPayApiError("burn already in progress", 409, {
+        error: "burn already in progress",
+        claimedAt: "2026-10-05T09:30:12Z",
+        source: "external",
+      }),
+    );
+    expect(await burnPayout(ctx, PAYOUT)).toMatchObject({
+      error: expect.stringContaining(`${E}.burnInProgress`),
+    });
+    expect(burnDirect).not.toHaveBeenCalled();
+    expect(cp.releasePayoutBurn).not.toHaveBeenCalled();
+  });
+
+  it("names the hash when CP refuses the report because the bank completed the payout meanwhile", async () => {
+    cp.burnPayout.mockRejectedValueOnce(
+      new CitizenPayApiError("payout is already complete", 409, { error: "payout is already complete" }),
+    );
+    expect(await burnPayout(ctx, PAYOUT)).toEqual({
+      error: `${E}.burnReportRefusedComplete ${JSON.stringify({ txHash: TX })}`,
+      txHash: TX,
+    });
+    expect(burnDirect).toHaveBeenCalledTimes(1);
+    expect(cp.releasePayoutBurn).not.toHaveBeenCalled();
+  });
+});
+
+describe("recordPayoutBurn — payment-pending", () => {
+  it("accepts a claim taken while payment-pending", async () => {
+    cp.getPayoutStatus.mockResolvedValue({
+      status: "payment-pending",
+      burnClaim: { claimId: CLAIM.claimId, claimedAt: CLAIM.claimedAt, source: "external" },
+    });
+    verifyPayoutBurn.mockResolvedValue({ ok: true, txHash: TX });
+    expect(await recordPayoutBurn(ctx, { payoutId: PAYOUT, txHash: TX })).toMatchObject({
+      ok: true,
+      txHash: TX,
+    });
+    expect(cp.burnPayout).toHaveBeenCalledWith(PAYOUT, TX, MINTER, undefined);
+  });
+
+  it("accepts a claim held on a complete payout (api#275: paid, burn still owed)", async () => {
+    cp.getPayoutStatus.mockResolvedValue({
+      status: "complete",
+      burned: false,
+      burnClaim: { claimId: CLAIM.claimId, claimedAt: CLAIM.claimedAt, source: "external" },
+    });
+    verifyPayoutBurn.mockResolvedValue({ ok: true, txHash: TX });
+    expect(await recordPayoutBurn(ctx, { payoutId: PAYOUT, txHash: TX })).toMatchObject({
+      ok: true,
+      txHash: TX,
+    });
+  });
+
+  it("refuses on a complete payout with no claim", async () => {
+    cp.getPayoutStatus.mockResolvedValue({ status: "complete", burnClaim: null });
+    expect(await recordPayoutBurn(ctx, { payoutId: PAYOUT, txHash: TX })).toEqual({
+      error: `${E}.noBurnClaim`,
+    });
+    expect(cp.burnPayout).not.toHaveBeenCalled();
+  });
+});
+
+describe("feeTransfer", () => {
+  it("explains a 409 'has not been burned' instead of forwarding it", async () => {
+    cp.feeTransfer.mockRejectedValueOnce(
+      new CitizenPayApiError("payout has not been burned", 409, null),
+    );
+    expect(await feeTransfer(ctx, PAYOUT)).toEqual({ error: `${E}.feeTransferNotBurned` });
+  });
+
+  it("still forwards other Citizen Pay errors", async () => {
+    cp.feeTransfer.mockRejectedValueOnce(new CitizenPayApiError("insufficient balance", 402, null));
+    expect(await feeTransfer(ctx, PAYOUT)).toEqual({ error: "insufficient balance" });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Backing check before the bank payment
+// ---------------------------------------------------------------------------
+
+describe("createPayoutPayment — backing check", () => {
+  const DUP = `0x${"d4".repeat(32)}`;
+  const word = (n: bigint) => `0x${n.toString(16).padStart(64, "0")}`;
+  const topic = (a: string) => `0x${"0".repeat(24)}${a.slice(2).toLowerCase()}`;
+  const TRANSFER = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+  const mintLog = (to: string, amount: string) => ({
+    address: TOKEN,
+    topics: [TRANSFER, topic(`0x${"0".repeat(40)}`), topic(to)],
+    data: word(parseUnits(amount, 6)),
+  });
+
+  beforeEach(() => {
+    cp.getPayout.mockResolvedValue({
+      id: PAYOUT,
+      net: "18.75",
+      totalAmount: "20.00",
+      totalFees: "0.00",
+      totalPayoutFees: "1.25",
+      manualDeduction: "0.00",
+      burnTxHashes: [],
+    } as unknown as Payout);
+    // Two orders, one hash; the tx minted only one of them to the place.
+    pageOf([
+      order({ id: 1, status: "paid", txHash: DUP }),
+      order({ id: 2, status: "paid", txHash: DUP }),
+    ]);
+    resolveReceiptWithLogs.mockResolvedValue({
+      kind: "receipt",
+      receipt: { transactionHash: DUP, status: "success", logs: [mintLog(PLACE, "10.00")] },
+    });
+    getBalances.mockResolvedValue([{ address: PLACE.toLowerCase(), rawBalance: units("20.00") }]);
+    cp.createPayoutPayment.mockResolvedValue({
+      alreadyCreated: false,
+      paymentId: "pay-1",
+      signingUrl: "https://bank/sign",
+    });
+  });
+
+  it("refuses a blocking report on a payout that already has a payment", async () => {
+    cp.getPayoutStatus.mockResolvedValue({ status: "payment-pending", burnClaim: null });
+    const res = await createPayoutPayment(ctx, PAYOUT, { redirectUrl: "https://x/payout-signed" });
+    expect(res).toMatchObject({ backing: { blocking: true } });
+    expect(cp.createPayoutPayment).not.toHaveBeenCalled();
+    // No /status read before the guard (it can mint a fresh bank payment).
+    expect(cp.getPayoutStatus).not.toHaveBeenCalled();
+  });
+
+  it("refuses a blocking report and creates no bank payment", async () => {
+    const res = await createPayoutPayment(ctx, PAYOUT, { redirectUrl: "https://x/payout-signed" });
+    expect(res).toMatchObject({
+      error: expect.stringContaining(`${E}.payUnbacked`),
+      backing: { blocking: true },
+    });
+    expect(res).toMatchObject({ error: expect.stringContaining("Orders 1, 2 share settlement tx") });
+    expect(cp.createPayoutPayment).not.toHaveBeenCalled();
+  });
+
+  it("creates it anyway with allowUnbacked, returning the warnings", async () => {
+    const res = await createPayoutPayment(ctx, PAYOUT, {
+      redirectUrl: "https://x/payout-signed",
+      allowUnbacked: true,
+    });
+    expect(res).toMatchObject({ ok: true, paymentId: "pay-1", backing: { blocking: true } });
+    // The engine's own flag never reaches Citizen Pay.
+    expect(cp.createPayoutPayment).toHaveBeenCalledWith(PAYOUT, {
+      redirectUrl: "https://x/payout-signed",
+    });
+  });
+
+  it("creates it when the report is clean", async () => {
+    resolveReceiptWithLogs.mockResolvedValue({
+      kind: "receipt",
+      receipt: {
+        transactionHash: DUP,
+        status: "success",
+        logs: [mintLog(PLACE, "10.00"), mintLog(PLACE, "10.00")],
+      },
+    });
+    const res = await createPayoutPayment(ctx, PAYOUT, { redirectUrl: "https://x/payout-signed" });
+    expect(res).toMatchObject({ ok: true, backing: { blocking: false, warnings: [] } });
+    expect(cp.createPayoutPayment).toHaveBeenCalledTimes(1);
+    // Status is read only once, after the payment exists, with the redirect URL.
+    expect(cp.getPayoutStatus).toHaveBeenCalledTimes(1);
+    expect(cp.getPayoutStatus).toHaveBeenCalledWith(PAYOUT, { redirectUrl: "https://x/payout-signed" });
+    expect(cp.createPayoutPayment.mock.invocationCallOrder[0]).toBeLessThan(
+      cp.getPayoutStatus.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("counts a shared tx as covered at total − fees − payoutFee (historical mints)", async () => {
+    // 55.50 (payoutFee 0.94) + 40.00 (payoutFee 0.88) minted 54.56 + 39.12.
+    pageOf([
+      order({ id: 1, status: "paid", txHash: DUP, total: "55.50", payoutFee: "0.94" }),
+      order({ id: 2, status: "paid", txHash: DUP, total: "40.00", payoutFee: "0.88" }),
+    ]);
+    resolveReceiptWithLogs.mockResolvedValue({
+      kind: "receipt",
+      receipt: {
+        transactionHash: DUP,
+        status: "success",
+        logs: [mintLog(PLACE, "54.56"), mintLog(PLACE, "39.12")],
+      },
+    });
+    const report = await checkPayoutBacking(ctx, PAYOUT, { status: "burnt" });
+    expect(report.settlements[0]).toMatchObject({
+      verdict: "covered",
+      required: "95.50",
+      minimum: "93.68",
+      found: "93.68",
+    });
+    expect(report.blocking).toBe(false);
+  });
+
+  it("treats an unreadable balance as blocking", async () => {
+    pageOf([order({ id: 1, status: "paid", txHash: DUP })]);
+    getBalances.mockRejectedValue(new Error("ALCHEMY_API_KEY is not set"));
+    const res = await createPayoutPayment(ctx, PAYOUT);
+    expect(res).toMatchObject({
+      backing: { blocking: true, balance: { verdict: "unverified" } },
+    });
+    expect(cp.createPayoutPayment).not.toHaveBeenCalled();
+  });
+
+  it("treats an unreadable settlement tx as blocking (unverified, never a throw)", async () => {
+    resolveReceiptWithLogs.mockRejectedValue(new Error("bundler down"));
+    const report = await checkPayoutBacking(ctx, PAYOUT);
+    expect(report.blocking).toBe(true);
+    expect(report.duplicates[0]).toMatchObject({ orderIds: [1, 2], verdict: "unverified" });
+  });
+
+  it("skips the balance once a burn is recorded", async () => {
+    pageOf([order({ id: 1, status: "paid", txHash: DUP })]);
+    cp.getPayout.mockResolvedValue({
+      id: PAYOUT,
+      totalAmount: "20.00",
+      totalFees: "0.00",
+      burnTxHashes: [TX],
+    } as unknown as Payout);
+    const report = await checkPayoutBacking(ctx, PAYOUT, { status: "burnt" });
+    expect(report).toMatchObject({ blocking: false, balance: { verdict: "notApplicable" } });
+    expect(getBalances).not.toHaveBeenCalled();
   });
 });

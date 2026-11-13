@@ -76,6 +76,6 @@ export function buildInstructions(fund: IdentityFund | null): string {
   return [
     "Operate a La Caisse fund (a 'caisse'): its members, cards, on-chain token, and merchant payouts.",
     scope,
-    "Merchant settlement runs in order: list_payout_drafts (what a place is owed) → create_payout → list_payout_orders / fix_payout_orders (clear anything unconfirmed) → pay_payout (returns a bank signing link a person must open) → burn_payout. Burning is irreversible and destroys the merchant's balance, so only burn once the fiat leg is actually paid.",
+    "Merchant settlement runs in order: list_payout_drafts (what a place is owed) → create_payout → list_payout_orders / fix_payout_orders (clear anything unconfirmed) → pay_payout (creates the bank transfer and returns its signing link; nothing leaves the account yet) → the operator signs at their bank → burn_payout, so the merchant is paid before their tokens are destroyed. burn_payout works while the payout is `pending`, `payment-pending`, or `complete` with no burn recorded; never leave a paid payout unburned (get_payout's `burnOutstanding`). An api predating citizenpay/api#275 refuses the burn on a completed payout; burn_payout then says so, and the tokens must be burned by hand from the token page after checking the place wallet on chain. Burning is irreversible.",
   ].join("\n\n");
 }

@@ -62,7 +62,11 @@ export type {
 export type ArchiveOrderResult = ops.ArchiveOrderResult;
 export type BurnPayoutResult = ops.BurnPayoutResult;
 export type CompletePayoutResult = ops.CompletePayoutResult;
-export type CreatePayoutPaymentResult = { error: string } | { ok: true };
+// `unbacked`: refused by the backing check — the dialog may offer "Pay anyway"
+// (the same action with `allowUnbacked`).
+export type CreatePayoutPaymentResult =
+  | { error: string; unbacked?: true }
+  | { ok: true };
 export type FeeTransferActionResult = ops.FeeTransferOutcome;
 export type ReleaseBurnClaimResult = ops.ReleaseBurnClaimResult;
 
@@ -573,11 +577,20 @@ export async function getPayoutStatusAction(input: {
 // Just kicks off the bank payment. The signing URL is not returned here — the
 // dashboard reads it from `GET /payouts/{id}/status` (canonical, survives
 // reloads), so we only need success/failure + the revalidate ops did.
+// Refused when the payout isn't backed by the place's tokens (ops'
+// checkPayoutBacking) unless `allowUnbacked`: the operator saw the warning in
+// the confirmation dialog and chose "Pay anyway".
 export async function createPayoutPaymentAction(input: {
   payoutId: string;
+  allowUnbacked?: boolean;
 }): Promise<CreatePayoutPaymentResult> {
-  const res = await ops.createPayoutPayment(await ctx(), input.payoutId);
-  return "error" in res ? { error: res.error } : { ok: true };
+  const res = await ops.createPayoutPayment(await ctx(), input.payoutId, {
+    allowUnbacked: input.allowUnbacked === true,
+  });
+  if ("error" in res) {
+    return res.backing?.blocking ? { error: res.error, unbacked: true } : { error: res.error };
+  }
+  return { ok: true };
 }
 
 // Burn the place's tokens for this payout and report the hash to CP.
