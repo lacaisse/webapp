@@ -1,12 +1,13 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Download } from "lucide-react";
 import { getFormatter, getTranslations } from "next-intl/server";
 
 import { Sensitive } from "@/components/privacy/sensitive";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, resolveActiveTab } from "@/components/ui/tabs";
 import {
@@ -88,6 +89,7 @@ async function AllocationPeriodDetail({
 }) {
   await requireFundRole("ADMIN");
   const t = await getTranslations("fund.allocations.periodDetail");
+  const tExport = await getTranslations("fund.allocations.export");
   const format = await getFormatter();
   const fund = await requireCurrentFund();
   const { id } = await params;
@@ -289,6 +291,20 @@ async function AllocationPeriodDetail({
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="font-heading text-2xl font-medium">{period.label}</h1>
           <PeriodStatusBadge status={period.status} />
+          {/* This period's deposits, mints and tier amount per member
+              (issue #320). */}
+          <a
+            href={`/api/allocations/export?period=${encodeURIComponent(period.id)}`}
+            download
+            className={buttonVariants({
+              variant: "outline",
+              size: "sm",
+              className: "ml-auto",
+            })}
+          >
+            <Download className="size-4" />
+            {tExport("button")}
+          </a>
         </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
           <span>

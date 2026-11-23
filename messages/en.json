@@ -1370,6 +1370,20 @@
         "tiers": "Tiers",
         "schedule": "Schedule"
       },
+      "export": {
+        "button": "Export CSV",
+        "buttonAll": "Export all periods (CSV)",
+        "total": "Total",
+        "columns": {
+          "period": "Period",
+          "lastName": "Last name",
+          "firstName": "First name",
+          "deposits": "Contribution paid (deposits)",
+          "minted": "Allocation paid (mints)",
+          "tier": "Tier",
+          "tierAmount": "Tier amount"
+        }
+      },
       "reconcile": {
         "errors": {
           "opNotFound": "Allocation not found.",

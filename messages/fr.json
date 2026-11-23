@@ -1370,6 +1370,20 @@
         "tiers": "Paliers",
         "schedule": "Planification"
       },
+      "export": {
+        "button": "Exporter en CSV",
+        "buttonAll": "Exporter toutes les périodes (CSV)",
+        "total": "Total",
+        "columns": {
+          "period": "Période",
+          "lastName": "Nom",
+          "firstName": "Prénom",
+          "deposits": "Cotisation versée (dépôts)",
+          "minted": "Allocation versée (émissions)",
+          "tier": "Palier",
+          "tierAmount": "Montant du palier"
+        }
+      },
       "reconcile": {
         "errors": {
           "opNotFound": "Allocation introuvable.",

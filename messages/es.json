@@ -1309,6 +1309,20 @@
         "tiers": "Niveles",
         "schedule": "Calendario"
       },
+      "export": {
+        "button": "Exportar en CSV",
+        "buttonAll": "Exportar todos los periodos (CSV)",
+        "total": "Total",
+        "columns": {
+          "period": "Periodo",
+          "lastName": "Apellido",
+          "firstName": "Nombre",
+          "deposits": "Cotización pagada (depósitos)",
+          "minted": "Asignación pagada (emisiones)",
+          "tier": "Nivel",
+          "tierAmount": "Importe del nivel"
+        }
+      },
       "reconcile": {
         "errors": {
           "opNotFound": "Asignación no encontrada.",
