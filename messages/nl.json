@@ -1314,6 +1314,20 @@
         "tiers": "Niveaus",
         "schedule": "Planning"
       },
+      "export": {
+        "button": "Exporteren als CSV",
+        "buttonAll": "Alle periodes exporteren (CSV)",
+        "total": "Totaal",
+        "columns": {
+          "period": "Periode",
+          "lastName": "Achternaam",
+          "firstName": "Voornaam",
+          "deposits": "Betaalde bijdrage (stortingen)",
+          "minted": "Uitgekeerde toelage (uitgiftes)",
+          "tier": "Niveau",
+          "tierAmount": "Bedrag van het niveau"
+        }
+      },
       "reconcile": {
         "errors": {
           "opNotFound": "Allocatie niet gevonden.",

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 import { Suspense } from "react";
 import Link from "next/link";
+import { Download } from "lucide-react";
 import { getFormatter, getTranslations } from "next-intl/server";
 
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { prisma } from "@/services/db/prisma";
 import { requireFundRole } from "@/services/auth/dal";
 import { requireCurrentFund } from "@/services/fund/server";
@@ -211,6 +212,7 @@ async function ScheduleTab({
   allocationMode: "FIXED_PERIOD" | "PAY_AND_GO" | "DISABLED";
 }) {
   const t = await getTranslations("fund.allocations.schedule");
+  const tExport = await getTranslations("fund.allocations.export");
   const format = await getFormatter();
 
   // Only FIXED_PERIOD funds have periods. Pay-and-go and disabled funds show
@@ -238,7 +240,17 @@ async function ScheduleTab({
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        {/* Every period: deposits, mints and tier amount per member, then
+            per-member totals (issue #320). */}
+        <a
+          href="/api/allocations/export"
+          download
+          className={buttonVariants({ variant: "outline", size: "sm" })}
+        >
+          <Download className="size-4" />
+          {tExport("buttonAll")}
+        </a>
         <PeriodDialog
           mode={{ kind: "create" }}
           trigger={<Button size="sm">{t("newPeriod")}</Button>}
