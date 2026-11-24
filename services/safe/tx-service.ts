@@ -15,7 +15,14 @@ import {
   str,
   strOrNull,
 } from "@/services/http/shape";
-import { txServiceBaseUrl } from "@/services/safe/config";
+import { queueServiceBaseUrl, txServiceBaseUrl } from "@/services/safe/config";
+import {
+  queueConfirmTransaction,
+  queueGetMultisigTransaction,
+  queueListPendingTransactions,
+  queueProposeTransaction,
+} from "@/services/safe/queue-service";
+import { getSafeApiJson, safeApiHttpError, sendSafeApi } from "@/services/safe/safe-api-http";
 import { SafeError, type Address, type Hex, type SafeTx } from "@/services/safe/types";
 
 // Safe Transaction Service HTTP client (no SDK). Proposals and confirmations
@@ -34,10 +41,17 @@ import { SafeError, type Address, type Hex, type SafeTx } from "@/services/safe/
 // owner or delegate) — exactly the ones worth syncing; spam proposals by
 // non-owners stay out.
 //
-// `SAFE_API_KEY` (optional) is sent as a Bearer token; without it the hosted
-// service allows a low unauthenticated rate. 10 s timeout per request.
+//
+// Safe is replacing the queue endpoints above (proposals, confirmations,
+// pending list) with the Safe Queue Service (queue-service.ts). This module
+// stays the one import surface: when `SAFE_TX_SERVICE_URL` names a Queue
+// Service base (config.ts queueServiceBaseUrl) the four queue functions go
+// there and return the same normalised shapes; otherwise they use the
+// Transaction Service as before. `getSafeInfo` is on-chain data and always
+// stays on the Transaction Service.
+//
+// Auth, timeout and error mapping: safe-api-http.ts.
 
-const TIMEOUT_MS = 10_000;
 const PAGE_SIZE = 100;
 const MAX_PAGES = 5;
 
@@ -48,6 +62,10 @@ export type TxServiceConfirmation = {
   submissionDate: string;
 };
 
+// One shape for both services. From the Queue Service: `isExecuted` is
+// "txHash is set", `isSuccessful` the inverse of `failed`, `submissionDate`
+// is `created`; `executionDate` and `confirmationsRequired` are always null
+// (the service has neither) and addresses are checksummed here.
 export type TxServiceMultisigTx = {
   safe: Address;
   safeTxHash: Hex;
@@ -79,72 +97,19 @@ export function isTxServiceEnabled(chainId: number): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// HTTP
+// HTTP (shared plumbing: safe-api-http.ts)
 // ---------------------------------------------------------------------------
 
-type HttpResult = { status: number; text: string };
-
-async function send(
-  chainId: number,
-  method: "GET" | "POST",
-  path: string,
-  body?: unknown,
-): Promise<HttpResult> {
+function baseFor(chainId: number): string {
   const base = txServiceBaseUrl(chainId);
   if (!base) {
     throw new SafeError("unsupported_chain", `No Safe Transaction Service for chain ${chainId}`);
   }
-  const headers: Record<string, string> = { accept: "application/json" };
-  if (body !== undefined) headers["content-type"] = "application/json";
-  const apiKey = process.env.SAFE_API_KEY?.trim();
-  if (apiKey) {
-    headers.authorization = `Bearer ${apiKey}`;
-    // Safe API keys can be restricted to domains (the dashboard's allowed
-    // hosts, e.g. `lacaisse.eu` / `*.lacaisse.eu`); the service enforces that
-    // on the Referer host and answers 403 "Your referer host is not allowed"
-    // to a server-side call, which carries none. Identify as the apex so a
-    // domain-restricted key still works from the server.
-    const apex = process.env.APP_DOMAIN?.trim();
-    if (apex && apex !== "localhost") headers.referer = `https://${apex}/`;
-  }
-
-  let res: Response;
-  try {
-    res = await fetch(`${base}${path}`, {
-      method,
-      headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
-      cache: "no-store",
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
-  } catch (e) {
-    const reason = e instanceof Error ? e.message : String(e);
-    throw new SafeError("tx_service", `${method} ${path} failed: ${reason}`, { cause: e });
-  }
-  return { status: res.status, text: await res.text().catch(() => "") };
+  return base;
 }
 
-function httpError(method: string, path: string, r: HttpResult): SafeError {
-  return new SafeError(
-    "tx_service",
-    `${method} ${path} HTTP ${r.status}: ${r.text.slice(0, 300)}`,
-  );
-}
-
-function parseJson(method: string, path: string, r: HttpResult): unknown {
-  try {
-    return JSON.parse(r.text);
-  } catch {
-    throw new SafeError("tx_service", `${method} ${path}: response is not JSON`);
-  }
-}
-
-/** GET returning parsed JSON, or null on 404. */
 async function getJson(chainId: number, path: string): Promise<unknown | null> {
-  const r = await send(chainId, "GET", path);
-  if (r.status === 404) return null;
-  if (r.status < 200 || r.status >= 300) throw httpError("GET", path, r);
-  return parseJson("GET", path, r);
+  return getSafeApiJson(baseFor(chainId), path);
 }
 
 // A re-submission the service already has: the proposal or confirmation is in
@@ -153,12 +118,12 @@ async function getJson(chainId: number, path: string): Promise<unknown | null> {
 const ALREADY_THERE = /already (exists|confirmed|been confirmed)|duplicate/i;
 
 async function postJson(chainId: number, path: string, body: unknown): Promise<void> {
-  const r = await send(chainId, "POST", path, body);
+  const r = await sendSafeApi(baseFor(chainId), "POST", path, body);
   if (r.status >= 200 && r.status < 300) return;
   if ((r.status === 400 || r.status === 422) && ALREADY_THERE.test(r.text) && !/executed/i.test(r.text)) {
     return;
   }
-  throw httpError("POST", path, r);
+  throw safeApiHttpError("POST", path, r);
 }
 
 // ---------------------------------------------------------------------------
@@ -241,6 +206,8 @@ export async function getMultisigTransaction(a: {
   chainId: number;
   safeTxHash: Hex;
 }): Promise<TxServiceMultisigTx | null> {
+  const queue = queueServiceBaseUrl();
+  if (queue) return queueGetMultisigTransaction(queue, a);
   const path = `/v2/multisig-transactions/${a.safeTxHash}/`;
   const json = await getJson(a.chainId, path);
   return json === null ? null : shaped("GET", path, () => parseMultisigTx(json));
@@ -251,6 +218,8 @@ export async function listPendingTransactions(a: {
   chainId: number;
   safeAddress: Address;
 }): Promise<TxServiceMultisigTx[]> {
+  const queue = queueServiceBaseUrl();
+  if (queue) return queueListPendingTransactions(queue, a);
   const safe = getAddress(a.safeAddress);
   const out: TxServiceMultisigTx[] = [];
   for (let page = 0; page < MAX_PAGES; page++) {
@@ -278,7 +247,8 @@ export async function listPendingTransactions(a: {
 /**
  * Propose a tx with the proposer's own signature. `sender` must be a Safe
  * owner and `signature` its signature over `safeTxHash` (the service
- * recomputes the hash and rejects a mismatch).
+ * recomputes the hash and rejects a mismatch). On either service a proposal
+ * that is already there is a success, and the signature ends up stored.
  */
 export async function proposeTransaction(a: {
   chainId: number;
@@ -289,6 +259,8 @@ export async function proposeTransaction(a: {
   signature: Hex;
   origin?: string;
 }): Promise<void> {
+  const queue = queueServiceBaseUrl();
+  if (queue) return queueProposeTransaction(queue, a);
   const safe = getAddress(a.safeAddress);
   await postJson(a.chainId, `/v2/safes/${safe}/multisig-transactions/`, {
     safe,
@@ -314,6 +286,8 @@ export async function confirmTransaction(a: {
   safeTxHash: Hex;
   signature: Hex;
 }): Promise<void> {
+  const queue = queueServiceBaseUrl();
+  if (queue) return queueConfirmTransaction(queue, a);
   await postJson(a.chainId, `/v1/multisig-transactions/${a.safeTxHash}/confirmations/`, {
     signature: a.signature,
   });

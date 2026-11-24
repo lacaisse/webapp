@@ -331,3 +331,30 @@ describe("confirmTransaction", () => {
     ).rejects.toMatchObject({ code: "tx_service" });
   });
 });
+
+describe("Safe Queue Service switch", () => {
+  const QUEUE = "https://api.safe.global/queue";
+
+  it("routes the queue calls to the Queue Service when SAFE_TX_SERVICE_URL names one", async () => {
+    vi.stubEnv("SAFE_TX_SERVICE_URL", `${QUEUE}/`);
+    stubFetch(() => new Response("", { status: 404 }));
+    await getMultisigTransaction({ chainId: 100, safeTxHash: HASH });
+    expect(calls[0].url).toBe(`${QUEUE}/api/v1/multisig-transactions/${HASH}`);
+  });
+
+  it("keeps Safe info on the hosted Transaction Service", async () => {
+    vi.stubEnv("SAFE_TX_SERVICE_URL", QUEUE);
+    stubFetch(() => new Response("", { status: 404 }));
+    await getSafeInfo({ chainId: 100, safeAddress: SAFE });
+    expect(calls[0].url).toBe(`${BASE}/v1/safes/${SAFE_CS}/`);
+    expect(isTxServiceEnabled(100)).toBe(true);
+    expect(isTxServiceEnabled(31337)).toBe(false);
+  });
+
+  it("stays on the Transaction Service for any other override", async () => {
+    vi.stubEnv("SAFE_TX_SERVICE_URL", "http://localhost:8000/queue/api");
+    stubFetch(() => new Response("", { status: 404 }));
+    await getMultisigTransaction({ chainId: 100, safeTxHash: HASH });
+    expect(calls[0].url).toBe(`http://localhost:8000/queue/api/v2/multisig-transactions/${HASH}/`);
+  });
+});

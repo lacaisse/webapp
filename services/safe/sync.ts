@@ -33,7 +33,8 @@ import {
 } from "./tx-service";
 import { isSafeError, type Address, type Hex, type SafeTxSummary } from "./types";
 
-// Mirror a fund Safe's chain + Safe Transaction Service state into the DB:
+// Mirror a fund Safe's chain + Safe Transaction Service (or Safe Queue
+// Service, see tx-service.ts) state into the DB:
 // owners / threshold, confirmations made in Safe{Wallet}, transactions
 // executed outside La Caisse, nonces consumed by another transaction. Then
 // execute whatever now meets its threshold. Scoped like proposals.ts: the
@@ -260,7 +261,12 @@ export async function syncSafe(a: {
     if (serviceOn) {
       const remote = remoteByHash.get(lc(tx.safeTxHash));
       const safeTx = safeTxFromRow(tx);
-      const local = tx.signatures.filter((s) => s.source === "LACAISSE");
+      // Signatures made in La Caisse — a legacy server key (LACAISSE) or a
+      // member's passkey (PASSKEY) — by someone who still owns the Safe: the
+      // service refuses a removed owner's, and drops the ones it held.
+      const local = tx.signatures.filter(
+        (s) => s.source !== "SAFE_WALLET" && ownerSet.has(lc(s.ownerAddress)),
+      );
       if (!remote) {
         // (2c) Never reached the service (proposed before the Safe was
         // indexed, or an outage): mirror it now with the signatures we hold,
@@ -289,6 +295,25 @@ export async function syncSafe(a: {
           }
         }
       } else {
+        // (2d) The service has the proposal but not every signature we hold
+        // (a confirmation whose mirror failed): send those.
+        const there = new Set((remote.confirmations ?? []).map((c) => lc(c.owner)));
+        const missing = local.filter((s) => !there.has(lc(s.ownerAddress)));
+        if (missing.length > 0) {
+          try {
+            for (const s of missing) {
+              await confirmTransaction({
+                chainId: safe.chainId,
+                safeTxHash: tx.safeTxHash as Hex,
+                signature: s.signature as Hex,
+              });
+            }
+            await clearMirrorFailure(a.fundId, tx.id);
+          } catch (e) {
+            await noteMirrorFailure(a.fundId, tx.id, e);
+          }
+        }
+
         // (2a) import Safe{Wallet} confirmations we don't have yet.
         const have = new Set(tx.signatures.map((s) => lc(s.ownerAddress)));
         for (const c of (remote.confirmations ?? []).slice(0, MAX_CONFIRMATIONS_PER_TX)) {
