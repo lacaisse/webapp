@@ -128,7 +128,7 @@ Set by the image (do not put them in a bundle): `NODE_ENV=production`, `HOSTNAME
 | `ALCHEMY_API_KEY` | no | yes | Gnosis RPC and token reads |
 | `SAFE_RELAYER_PRIVATE_KEY` | no | yes | Safe relayer; unset = Safe actions report "relayer not configured" |
 | `SAFE_API_KEY` | no | yes | Safe Transaction Service |
-| `SAFE_TX_SERVICE_URL` | no | no | override of the Transaction Service base |
+| `SAFE_TX_SERVICE_URL` | no | no | override of the Transaction Service base; `https://api.safe.global/queue` switches proposals and confirmations to the Safe Queue Service |
 | `COW_API_URL` | no | no | override of the CoW orderbook base |
 | `GIT_COMMIT_SHA` | no | no | commit shown by the source link (Vercel uses `VERCEL_GIT_COMMIT_SHA`) |
 | `SEED_SYNTHETIC_OK` | seed only | no | must be `1` for `--seed` |

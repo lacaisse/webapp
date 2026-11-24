@@ -33,7 +33,10 @@
 //   owner-rules.ts   — pure: recovery rules for Safes with team owners.
 //   relayer.ts       — chain I/O through the relayer EOA: read Safe state,
 //                      deploy a Safe, simulate + broadcast execTransaction.
-//   tx-service.ts    — Safe Transaction Service HTTP client (no SDK).
+//   tx-service.ts    — Safe Transaction Service HTTP client (no SDK), and the
+//                      one import surface for the queue calls.
+//   queue-service.ts — Safe Queue Service HTTP client, used by tx-service.ts
+//                      when SAFE_TX_SERVICE_URL names a Queue Service.
 //   proposals.ts     — propose / confirm / execute flows over DB + chain + TS.
 //   sync.ts          — reconcile DB with chain + tx-service (cron + on view).
 //   admin-actions.ts — "use server" actions behind app/(fund)/accounts/safes.
@@ -178,15 +181,32 @@ export function safeWalletTxUrl(
   return `${SAFE_APP_BASE}/transactions/tx?safe=${safe}&id=multisig_${address}_${safeTxHash}`;
 }
 
+function serviceUrlOverride(): string | null {
+  return process.env.SAFE_TX_SERVICE_URL?.trim().replace(/\/+$/, "") || null;
+}
+
+/**
+ * Base URL of the Safe Queue Service (`https://api.safe.global/queue`, one
+ * for all chains; paths are appended as `/api/v1/...`), or null when the
+ * queue calls still go to the Safe Transaction Service — the default. The
+ * switch is `SAFE_TX_SERVICE_URL`: a value whose path ends in `/queue` names
+ * a Queue Service; anything else is a Transaction Service base, as before.
+ */
+export function queueServiceBaseUrl(): string | null {
+  const override = serviceUrlOverride();
+  return override && /\/queue$/i.test(override) ? override : null;
+}
+
 /**
  * Base URL of the Safe Transaction Service API for `chainId`, ending in
  * `/api` (paths are appended as `/v1/...`, `/v2/...`). `SAFE_TX_SERVICE_URL`
- * overrides it (self-hosted service, tests); otherwise the hosted service at
- * api.safe.global. Null when the chain has no Safe short name.
+ * overrides it (self-hosted service, tests) unless it names a Queue Service
+ * (above); otherwise the hosted service at api.safe.global. Null when the
+ * chain has no Safe short name.
  */
 export function txServiceBaseUrl(chainId: number): string | null {
-  const override = process.env.SAFE_TX_SERVICE_URL?.trim();
-  if (override) return override.replace(/\/+$/, "");
+  const override = serviceUrlOverride();
+  if (override && !queueServiceBaseUrl()) return override;
   const short = SAFE_CHAIN_SHORT_NAMES[chainId];
   if (!short) return null;
   return `https://api.safe.global/tx-service/${short}/api`;

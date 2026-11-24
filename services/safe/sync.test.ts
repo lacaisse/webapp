@@ -314,6 +314,74 @@ describe("syncSafe", () => {
     );
   });
 
+  it("re-proposes a passkey-signed PENDING tx the service does not know (issue #322)", async () => {
+    db.fundPasskeySigner.push(passkeyOf("u-p", P));
+    db.fundSafeOwner.push({ id: "o-p", safeId: SAFE_ID, address: P, kind: "PASSKEY", signerId: null, passkeyId: "pk-u-p", label: null, removedAt: null });
+    chain([A, X, P], 3, 0);
+    const tx = addTx({ errorMessage: "tx_service: POST /x HTTP 503: down" });
+    const passkeySig = contractSignature(P, "0xabcdef");
+    db.fundSafeSignature.push(
+      { id: "s-p", transactionId: tx.id, ownerAddress: P, signature: passkeySig, source: "PASSKEY" },
+      { id: "s-a", transactionId: tx.id, ownerAddress: A, signature: sig("1a"), source: "LACAISSE" },
+    );
+
+    await syncSafe({ fundId: FUND_ID, safeId: SAFE_ID, force: true });
+
+    expect(txService.proposeTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({ safeTxHash: tx.safeTxHash, sender: P, signature: passkeySig }),
+    );
+    expect(txService.confirmTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({ safeTxHash: tx.safeTxHash, signature: sig("1a") }),
+    );
+    expect(tx.errorMessage).toBeNull();
+  });
+
+  it("never re-sends a signature imported from Safe{Wallet}, nor a removed owner's", async () => {
+    const tx = addTx();
+    db.fundSafeSignature.push(
+      { id: "s-x", transactionId: tx.id, ownerAddress: X, signature: sig("2b"), source: "SAFE_WALLET" },
+      { id: "s-y", transactionId: tx.id, ownerAddress: Y, signature: sig("3c"), source: "LACAISSE" },
+    );
+
+    await syncSafe({ fundId: FUND_ID, safeId: SAFE_ID, force: true });
+
+    expect(txService.proposeTransaction).not.toHaveBeenCalled();
+    expect(txService.confirmTransaction).not.toHaveBeenCalled();
+  });
+
+  it("sends a signature the service lacks on a proposal it already has", async () => {
+    const tx = addTx({ errorMessage: "tx_service: POST /x HTTP 503: down" });
+    db.fundSafeSignature.push({ id: "s-a", transactionId: tx.id, ownerAddress: A, signature: sig("1a"), source: "LACAISSE" });
+    txService.listPendingTransactions.mockResolvedValue([
+      { safeTxHash: tx.safeTxHash, confirmations: [] },
+    ]);
+
+    await syncSafe({ fundId: FUND_ID, safeId: SAFE_ID, force: true });
+
+    expect(txService.proposeTransaction).not.toHaveBeenCalled();
+    expect(txService.confirmTransaction).toHaveBeenCalledTimes(1);
+    expect(txService.confirmTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({ safeTxHash: tx.safeTxHash, signature: sig("1a") }),
+    );
+    expect(tx.errorMessage).toBeNull();
+  });
+
+  it("sends nothing when the service already holds our signatures", async () => {
+    const tx = addTx();
+    db.fundSafeSignature.push({ id: "s-a", transactionId: tx.id, ownerAddress: A, signature: sig("1a"), source: "LACAISSE" });
+    txService.listPendingTransactions.mockResolvedValue([
+      {
+        safeTxHash: tx.safeTxHash,
+        // Lowercase, the way the Queue Service writes addresses.
+        confirmations: [{ owner: A.toLowerCase(), signature: sig("1a"), signatureType: "EOA", submissionDate: "" }],
+      },
+    ]);
+
+    await syncSafe({ fundId: FUND_ID, safeId: SAFE_ID, force: true });
+
+    expect(txService.confirmTransaction).not.toHaveBeenCalled();
+  });
+
   it("never touches the Transaction Service for a Safe with team-only owners", async () => {
     db.fundSafeOwner.splice(1, 1); // drop the external owner
     chain([A], 1, 0);
